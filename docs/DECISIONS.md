@@ -286,3 +286,23 @@ what the frozen cache exists to avoid.
 **Consequences.** A goalkeeper clean sheet is `gk_minutes > 0 and conceded_while_gk = 0`, a
 match-level count, while `gk_clean_minutes` is the finer-grained figure for a shared keeper.
 The reducer already computed both; this only stores them.
+
+---
+
+## 019 — Jersey numbers are assigned by the coach, not chosen by the player
+**2026-09-23** · accepted
+
+A player edits their own preferred positions and declares their own injuries, but not their
+number. `can()` keeps the number under `member:update`, a coach permission.
+
+**Why.** A number must be unique among the active squad, so it is an allocation, not a
+preference: two players tapping « 10 » on a Tuesday evening would race for it, and the loser
+would get a refusal for a reason they cannot see. The coach is also the one holding the shirts.
+This is the difference between the self-scoped permissions and this one — there is no
+`profile:editNumber`.
+
+**Consequences.** The profile page shows the number read-only to its owner, with « Les numéros
+sont attribués par le coach » so the absence of a field is not read as a bug. `updateJerseyNumber`
+wraps `updateMember` rather than writing the column itself, so the uniqueness check lives in one
+place. If the owner later wants players to pick their own, this needs a new self action plus a
+clash message, not a relaxed check.
