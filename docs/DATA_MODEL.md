@@ -129,7 +129,7 @@ Types and their payloads:
 | `KICKOFF` | `{}` — starts a period |
 | `PERIOD_END` | `{}` |
 | `PAUSE` / `RESUME` | `{ reason? }` — the clock only advances between RESUME and PAUSE |
-| `GOAL_FOR` | `{ scorerId, assistId? }` |
+| `GOAL_FOR` | `{ scorerId?, assistId? }` — the scorer is optional: an opponent own goal counts for us with nobody to credit, and a retro entry often has the score without the scorer (decision 017) |
 | `GOAL_AGAINST` | `{}` — no opponent detail (decision 010) |
 | `OWN_GOAL` | `{ scorerId }` — counts against us, not as a goal for the player |
 | `PENALTY_SCORED` | `{ scorerId }` |
@@ -157,7 +157,13 @@ Also unique `(lineup_id, team_member_id)` — a player cannot occupy two slots.
 ### `match_player_stats` — a cache, not a source of truth
 `(match_id, team_member_id)` unique, `minutes`, `goals`, `assists`, `own_goals`,
 `penalties_scored`, `penalties_missed`, `fouls`, `gk_minutes`, `clean_minutes`,
-`conceded_while_on`, `squad_role`, `computed_at`.
+`conceded_while_on`, `gk_clean_minutes`, `conceded_while_gk`, `squad_role`, `computed_at`.
+
+`clean_minutes` / `conceded_while_on` cover every player; `gk_clean_minutes` /
+`conceded_while_gk` are the same two figures restricted to time spent in goal, which is what a
+goalkeeper's clean sheet means. A keeper kept one in this match when `gk_minutes > 0 and
+conceded_while_gk = 0`; keeping the minutes too lets a substituted keeper keep credit for the
+half they kept clean (decision 018).
 
 Written by reducing `match_events` at the final whistle, and recomputed from scratch whenever the
 match is amended. **Never** written incrementally — that would let it drift from the log.

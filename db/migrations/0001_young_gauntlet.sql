@@ -1,0 +1,2 @@
+ALTER TABLE "match_player_stats" ADD COLUMN "gk_clean_minutes" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "match_player_stats" ADD COLUMN "conceded_while_gk" integer DEFAULT 0 NOT NULL;

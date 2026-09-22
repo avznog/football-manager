@@ -38,11 +38,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Custom formation creation (dragging the slots)
 - [ ] Match sheet selection: titulaire / remplaçant / supporter
 - [ ] Planned compositions from minute X, with the deduced-changes diff
-- [ ] `lib/match/lineup.ts` + unit tests (including chained position changes)
+- [x] `lib/match/lineup.ts` + unit tests (including chained position changes)
 
 ## M4 — Game mode
-- [ ] `lib/match/clock.ts` — continuous minutes with pauses
-- [ ] `lib/match/reducer.ts` — pure reducer + extensive unit tests
+- [x] `lib/match/clock.ts` — continuous minutes with pauses
+- [x] `lib/match/reducer.ts` — pure reducer + extensive unit tests
 - [ ] Event ingestion API, idempotent on `client_event_id`
 - [ ] `lib/match/outbox.ts` — IndexedDB queue with retry and pending badge
 - [ ] Game mode screen: clock, pitch, bench, ACTION sheet, TERRAIN fast-change
