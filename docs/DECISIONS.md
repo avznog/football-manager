@@ -306,3 +306,21 @@ sont attribués par le coach » so the absence of a field is not read as a bug. 
 wraps `updateMember` rather than writing the column itself, so the uniqueness check lives in one
 place. If the owner later wants players to pick their own, this needs a new self action plus a
 clash message, not a relaxed check.
+
+---
+
+## 020 — Training attendance has three states, and « non jugé » stores nothing
+**2026-09-23** · accepted
+
+The coach's attendance list offers `présent` / `absent` / `—`. The third writes no row, and
+choosing it for somebody who already has one deletes it. Availability (declared in advance by
+the player) and attendance (recorded on the day by the coach) stay separate columns.
+
+**Why.** "Nobody marked this player" is not the same fact as "this player was absent", and the
+attendance rate in M5 is `present / marked`, not `present / squad`. Storing an unmarked player as
+absent would punish them for the coach's phone dying, and a nullable boolean would give the same
+row two meanings.
+
+**Consequences.** `training_attendance` has a row only for a judged player, so the whole squad
+travels in one submit and an unset value is a delete. A rate is only meaningful over marked
+sessions, which the stats screens must say out loud.

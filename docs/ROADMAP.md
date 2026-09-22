@@ -27,12 +27,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Invite management and coach appointment UI
 
 ## M2 — Calendar
-- [ ] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)
-- [ ] Trainings CRUD
-- [ ] Unified chronological calendar, next event pinned
-- [ ] Availability declaration for matches and trainings
-- [ ] Coach view of non-responders, copyable list
-- [ ] Training attendance marking
+- [x] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)
+- [x] Trainings CRUD
+- [x] Unified chronological calendar, next event pinned
+- [x] Availability declaration for matches and trainings
+- [x] Coach view of non-responders, copyable list
+- [x] Training attendance marking
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)
