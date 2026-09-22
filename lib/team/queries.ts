@@ -8,8 +8,11 @@ import "server-only";
 import { and, asc, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { injuries, invites, teamMembers, users } from "@/db/schema";
+import { isPositionCode } from "@/db/reference";
+import { injuries, invites, playerPositions, teamMembers, users } from "@/db/schema";
 import type { TeamRole } from "@/db/schema";
+import type { PositionPreference } from "@/lib/pitch/preferences";
+import { type PreferredPosition, sortPreferredPositions } from "@/lib/player/positions";
 
 export type SquadMember = {
   membershipId: string;
@@ -21,6 +24,8 @@ export type SquadMember = {
   jerseyNumber: number | null;
   /** True while an injury row exists with no `resolvedOn` (decision 011 — flagged, not blocked). */
   isInjured: boolean;
+  /** Preferred positions, primary first — shown on the squad row and set on the profile. */
+  positions: PreferredPosition[];
 };
 
 /**
@@ -62,6 +67,28 @@ export async function getSquad(teamId: string): Promise<SquadMember[]> {
       asc(users.displayName),
     );
 
+  // A second round trip rather than a third join: `player_positions` has several rows per member
+  // and would multiply the injuries aggregate above. Merged by membership id below.
+  const positionRows = await db
+    .select({
+      membershipId: playerPositions.teamMemberId,
+      code: playerPositions.positionCode,
+      preference: playerPositions.preference,
+    })
+    .from(playerPositions)
+    .innerJoin(teamMembers, eq(teamMembers.id, playerPositions.teamMemberId))
+    .where(and(eq(teamMembers.teamId, teamId), isNull(teamMembers.leftAt)));
+
+  const positionsByMember = new Map<string, PreferredPosition[]>();
+  for (const row of positionRows) {
+    // Unknown codes cannot happen behind the foreign key, but the narrowing is what gives us the
+    // `PositionCode` type without a cast.
+    if (!isPositionCode(row.code)) continue;
+    const list = positionsByMember.get(row.membershipId) ?? [];
+    list.push({ code: row.code, preference: row.preference as PositionPreference });
+    positionsByMember.set(row.membershipId, list);
+  }
+
   return rows.map((row) => ({
     membershipId: row.membershipId,
     userId: row.userId,
@@ -71,6 +98,7 @@ export async function getSquad(teamId: string): Promise<SquadMember[]> {
     isPlayer: row.isPlayer,
     jerseyNumber: row.jerseyNumber,
     isInjured: Number(row.openInjuries) > 0,
+    positions: sortPreferredPositions(positionsByMember.get(row.membershipId) ?? []),
   }));
 }
 

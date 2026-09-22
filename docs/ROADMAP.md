@@ -18,9 +18,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Playwright end-to-end happy path — deferred to its own slice
 
 ## M1 — Squad & profiles
-- [~] Squad list with jersey numbers and injury badges — done; preferred positions still to add
-- [ ] Player profile: position picker on a pitch diagram (primary / secondary)
-- [ ] Injuries: declared by the player or the coach, with expected return
+- [x] Squad list with jersey numbers, injury badges and preferred positions, each row linking
+      to the profile
+- [x] Player profile (`/joueur/[id]`): position picker on a pitch diagram (primary / secondary),
+      jersey number, personal details, injury history — `lib/player/`
+- [x] Injuries: declared by the player for themselves or by a coach for anyone, with an expected
+      return date, and resolvable
 - [x] Invite management and coach appointment UI
 
 ## M2 — Calendar
