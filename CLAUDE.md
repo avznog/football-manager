@@ -66,15 +66,19 @@ comments, commit messages, docs and PR descriptions are English. Never mix the t
 
 ```bash
 npm run dev            # dev server
-npm run db:up          # start the local Postgres container
+npm run db:start       # start the local Postgres (Homebrew — see decision 016)
 npm run db:generate    # generate a migration from schema.ts changes
 npm run db:migrate     # apply migrations
-npm run db:seed        # reset + seed a fake team with players, matches and events
-npm run test           # Vitest
-npm run test:e2e       # Playwright
+npm run db:seed        # reference data + the demo season (idempotent)
+npm run db:reset       # drop everything, remigrate, reseed — local only
+npm test               # Vitest
 npm run lint           # eslint
-npm run typecheck      # tsc --noEmit
+npm run typecheck      # next typegen && tsc --noEmit
+npm run build          # production build
 ```
+
+`next typegen` has to run before `tsc`, so always go through `npm run typecheck` rather than
+calling `tsc` directly: `PageProps<"/route">` does not exist until the route types are generated.
 
 ## Definition of done for any change
 
@@ -84,8 +88,28 @@ npm run typecheck      # tsc --noEmit
 - `docs/ROADMAP.md` updated, `docs/SESSIONS.md` appended to, and `docs/DECISIONS.md`
   extended if a decision was made
 - migrations committed alongside the schema change that produced them
+- **the work is committed and pushed to `origin`** — see below
 
 ## Git workflow
 
 One branch per slice, named `feat/<slice>`. Open a PR describing what the slice does and how to
 verify it. **Squash-merge** into `main`. Never commit directly to `main`.
+
+**Nothing is done until it is on `origin`.** The whole reason this project keeps its spec, its
+decisions and its migrations in git is that sessions share no memory: work that exists only in a
+local working tree is work the next session cannot find. So, without being asked:
+
+- commit as you go, in logical commits — one concern per commit, message in English explaining
+  *why*, not just *what*;
+- `git push` the branch as soon as the first commit exists, and again after every commit, so a
+  crashed machine costs nothing;
+- open the PR, squash-merge it, then `git push` / pull `main` so the remote and the local `main`
+  agree;
+- **never end a working session with a dirty working tree or an unpushed commit.** If something
+  is half-finished, commit it on its branch with a message saying so and push it anyway.
+
+Run `git status -sb` before you stop. `## main...origin/main` with nothing after it, and no
+listed files, is the only acceptable final state.
+
+Subagents do not run git. They report what they changed and the session that launched them
+commits, pushes and merges — that keeps one hand on the history instead of several racing.
