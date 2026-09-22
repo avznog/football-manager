@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Football Manager — design tokens (decision 014)
+   --------------------------------------------------------------------------
+   Neutral application palette. Club colours (team.primaryColor /
+   secondaryColor) are NEVER used as the app accent: they are applied inline,
+   at the point of use only, on kit discs, the team header and match cards.
+
+   Theme strategy
+   --------------
+   Light values live in `@theme` (so they are the default, even with JS off).
+   Dark values are applied twice:
+     1. `@media (prefers-color-scheme: dark) { :root:not(.light) }` — follows
+        the system preference with no JavaScript at all.
+     2. `:root.dark` — the manual override written by the inline script in
+        `app/layout.tsx` from `localStorage['fm-theme']`.
+   The script adds `.light` or `.dark` for an explicit choice and adds nothing
+   for `system`, so the media query keeps working and an OS change is picked
+   up live without a reload.
+
+   Because `@theme` is used WITHOUT `inline`, every utility compiles to
+   `var(--color-*)`, which is what makes the `.dark` override work.
+
+   Contrast (WCAG 2.1 relative luminance, computed — see ratios per token).
+   Target: >= 4.5:1 for every text-on-background pair we ship, >= 3:1 for
+   borders and pitch markings (non-text contrast, WCAG 1.4.11).
+   ========================================================================== */
+
+@theme {
+  /* System font stack only — no webfont download. The app is used on flaky
+     mobile networks at the side of a pitch and must render instantly. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* ---------------- LIGHT THEME ----------------
+     Ratios below are against the surfaces they are allowed to sit on:
+     canvas #F4F6F8 / surface #FFFFFF / surface-2 #E9ECF0
+
+     ink        #101418 → 17.07 / 18.50 / 15.61   AAA
+     ink-muted  #4B5560 →  7.00 /  7.59 /  6.40   AAA
+     ink-subtle #5F6974 →  5.16 /  5.59 /  4.71   AA
+     accent     #0B5FA4 →  6.08 /  6.59 /  5.56   AA(+)
+     success    #0E6B3C →  6.08 /  6.59 /  5.56   AA(+)
+     danger     #B02218 →  6.28 /  6.80 /  5.74   AA(+)
+     warning    #8A5100 →  5.95 /  6.45 /  5.44   AA(+)
+     border     #8A939E →  2.87 /  3.11 /  2.63   >=3:1 on surface, where
+                inputs and controls live (WCAG 1.4.11). Use `border-border/60`
+                for purely decorative dividers.
+     accent-ink #FFFFFF on accent #0B5FA4 → 6.59  AA(+)
+                (also 6.80 on danger, 6.59 on success, 6.45 on warning, so it
+                 is the single "ink on a saturated fill" token)
+     line       #FFFFFF on turf #2F7A46 → 5.26, on turf-stripe #286C3D → 6.36
+  */
+  --color-canvas: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-surface-2: #e9ecf0;
+  --color-border: #8a939e;
+  --color-ink: #101418;
+  --color-ink-muted: #4b5560;
+  --color-ink-subtle: #5f6974;
+  --color-accent: #0b5fa4;
+  --color-accent-ink: #ffffff;
+  --color-success: #0e6b3c;
+  --color-danger: #b02218;
+  --color-warning: #8a5100;
+  --color-turf: #2f7a46;
+  --color-turf-stripe: #286c3d;
+  --color-line: #ffffff;
+
+  /* Label colour for a surface painted with an untrusted CLUB colour (kit
+     discs, team header, match cards). Deliberately identical in both themes:
+     the club colour does not change with the theme, so neither may its label.
+     Pick between this and --color-line with `inkOnColor()` in
+     components/ui/contrast.ts, which computes the real WCAG ratio. */
+  --color-kit-ink: #0b1014;
+}
+
+/* ---------------- DARK THEME ----------------
+   Ratios against canvas #0D1013 / surface #161A1F / surface-2 #20262C
+
+   ink        #E8ECF1 → 16.08 / 14.73 / 12.87   AAA
+   ink-muted  #A6B0BB →  8.68 /  7.95 /  6.94   AAA
+   ink-subtle #8B95A0 →  6.27 /  5.75 /  5.02   AA(+)
+   accent     #6BB0F5 →  8.32 /  7.62 /  6.66   AAA
+   success    #48C67F →  8.78 /  8.04 /  7.03   AAA
+   danger     #FF7A70 →  7.51 /  6.88 /  6.01   AAA
+   warning    #E0A93A →  9.00 /  8.24 /  7.20   AAA
+   border     #6A737D →  3.96 /  3.63 /  3.17   >=3:1 everywhere
+   accent-ink #08203A on accent #6BB0F5 → 7.16  (danger 6.47, success 7.56,
+              warning 7.75 — all AA+ for filled buttons and badges)
+   line       #EAF1EB on turf #255E39 → 6.67, on turf-stripe #1E5231 → 7.93
+   The turf stays green in both themes; only its value drops, so white-ish
+   markings and kit-disc labels stay legible.
+   ------------------------------------------------------------------------ */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --color-canvas: #0d1013;
+    --color-surface: #161a1f;
+    --color-surface-2: #20262c;
+    --color-border: #6a737d;
+    --color-ink: #e8ecf1;
+    --color-ink-muted: #a6b0bb;
+    --color-ink-subtle: #8b95a0;
+    --color-accent: #6bb0f5;
+    --color-accent-ink: #08203a;
+    --color-success: #48c67f;
+    --color-danger: #ff7a70;
+    --color-warning: #e0a93a;
+    --color-turf: #255e39;
+    --color-turf-stripe: #1e5231;
+    --color-line: #eaf1eb;
+  }
+}
+
+:root.dark {
+  --color-canvas: #0d1013;
+  --color-surface: #161a1f;
+  --color-surface-2: #20262c;
+  --color-border: #6a737d;
+  --color-ink: #e8ecf1;
+  --color-ink-muted: #a6b0bb;
+  --color-ink-subtle: #8b95a0;
+  --color-accent: #6bb0f5;
+  --color-accent-ink: #08203a;
+  --color-success: #48c67f;
+  --color-danger: #ff7a70;
+  --color-warning: #e0a93a;
+  --color-turf: #255e39;
+  --color-turf-stripe: #1e5231;
+  --color-line: #eaf1eb;
+}
+
+/* `dark:` utilities must work for BOTH the system preference (no class) and
+   the manual override (`.dark`). Prefer the tokens above; this variant is for
+   the few cases a token cannot express (shadow strength, overlay opacity). */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not(.light), :root:not(.light) *) {
+      @slot;
+    }
+  }
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+}
+
+/* iPhone safe areas. `viewportFit: "cover"` is set in app/layout.tsx. */
+@utility safe-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility safe-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility safe-px {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+/* Height of the fixed bottom tab bar, safe area included. Used to pad the
+   bottom of scrollable content so nothing hides behind the bar. */
+@utility tabbar-pb {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    /* Never let iOS zoom-scroll the app shell horizontally. */
+    overflow-x: hidden;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Visible, consistent focus for keyboard users on every interactive thing
+     that does not define its own ring. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Sober by decision 014: no decorative motion, and none at all for users
+     who asked for less. */
+  @media (prefers-reduced-motion: reduce) {
+    /* `.fm-spinner` is excluded on purpose: a frozen spinner would read as a
+       hung screen. It is the only motion that survives. */
+    *:not(.fm-spinner),
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Form controls inherit the font; 16px minimum on mobile inputs so iOS
+     Safari does not zoom in when the coach taps a field. */
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  ::placeholder {
+    color: var(--color-ink-subtle);
+    opacity: 1;
+  }
+
+  /* `::backdrop` lives in the top layer and its inheritance of custom
+     properties is not reliable on older Safari, so the scrim is a literal.
+     It is the same dim in both themes — it sits over the whole app. */
+  .fm-sheet::backdrop {
+    background-color: rgb(4 7 10 / 0.6);
+  }
+}

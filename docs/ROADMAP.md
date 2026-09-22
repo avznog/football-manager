@@ -3,22 +3,25 @@
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## M0 — Foundations
-- [ ] Next.js + TypeScript + Tailwind scaffold, mobile-first shell, light/dark theming
-- [ ] PWA manifest (installable, no push)
-- [ ] `docs/` + `CLAUDE.md`
-- [ ] Local Postgres via Docker (`npm run db:up`), Drizzle config, `DATABASE_URL` only
-- [ ] Full schema in `db/schema.ts` + first migration committed
-- [ ] Auth: argon2id password hashing, sessions table, httpOnly cookie, login/logout
-- [ ] Teams, `team_members`, invite codes, join-by-code, coach appointment
-- [ ] `lib/auth/can.ts` with unit tests
-- [ ] "No team" layout guard
-- [ ] `db/seed.ts` — a fake team with 13 players, formations, matches, events
+- [x] Next.js + TypeScript + Tailwind scaffold, mobile-first shell, light/dark theming
+- [x] PWA manifest (installable, no push)
+- [x] `docs/` + `CLAUDE.md`
+- [x] Local Postgres via Homebrew (`npm run db:start`), Drizzle config, `DATABASE_URL` only
+      — Docker was abandoned, see decision 016
+- [x] Full schema in `db/schema.ts` + first migration committed
+- [x] Auth: argon2id password hashing, sessions table, httpOnly cookie, login/logout
+- [x] Teams, `team_members`, invite codes, join-by-code, coach appointment
+- [x] `lib/auth/can.ts` with unit tests
+- [x] "No team" layout guard (`app/(app)/layout.tsx` + optimistic `proxy.ts`)
+- [x] `db/seed.ts` — reference data (prod-safe) + a demo season of 13 players, 4 matches,
+      3 trainings, an event log with a voided goal, ratings
+- [ ] Playwright end-to-end happy path — deferred to its own slice
 
 ## M1 — Squad & profiles
-- [ ] Squad list with jersey numbers, preferred positions, injury badges
+- [~] Squad list with jersey numbers and injury badges — done; preferred positions still to add
 - [ ] Player profile: position picker on a pitch diagram (primary / secondary)
 - [ ] Injuries: declared by the player or the coach, with expected return
-- [ ] Invite management and coach appointment UI
+- [x] Invite management and coach appointment UI
 
 ## M2 — Calendar
 - [ ] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)
@@ -29,8 +32,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Training attendance marking
 
 ## M3 — Compositions
-- [ ] `positions` reference data + built-in 7-a-side formation templates
-- [ ] Turf pitch component (light/dark, mobile + desktop)
+- [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)
+- [x] Turf pitch component (light/dark, mobile + desktop) — `components/pitch/`
 - [ ] Drag-and-drop composition editor, swap on drop
 - [ ] Custom formation creation (dragging the slots)
 - [ ] Match sheet selection: titulaire / remplaçant / supporter
