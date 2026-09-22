@@ -403,6 +403,14 @@ export const matchPlayerStats = pgTable(
     /** Minutes on the pitch during which the team conceded nothing (decision 011). */
     cleanMinutes: integer().notNull().default(0),
     concededWhileOn: integer().notNull().default(0),
+    /**
+     * The same two figures restricted to time spent in goal, which is what a goalkeeper's clean
+     * sheet actually means (decision 011 asks for clean sheets both ways). A keeper kept a clean
+     * sheet in this match when `gkMinutes > 0 && concededWhileGk === 0`; storing the minutes as
+     * well as the count lets a keeper who was substituted keep credit for the half he kept clean.
+     */
+    gkCleanMinutes: integer().notNull().default(0),
+    concededWhileGk: integer().notNull().default(0),
     squadRole: squadRole(),
     computedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

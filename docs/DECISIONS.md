@@ -239,14 +239,50 @@ The coach's match page has a copyable list of non-responders.
 
 ---
 
-## 016 — Local Docker Postgres for development, Neon for production
+## 016 — Local Postgres from Homebrew for development, Neon for production
 **2026-09-23** · accepted
 
-Development runs against a Postgres container started by `npm run db:up`. Production will use a
-Neon project; switching is a single `DATABASE_URL`.
+Development runs against the Homebrew `postgresql@17` service, started by `npm run db:start`.
+Production will use a Neon project; switching is a single `DATABASE_URL`.
 
 **Why.** Provisioning Neon needs an interactive browser flow that the build session could not
-perform. Nothing in the application depends on Neon-specific behaviour.
+perform. Docker was the first choice but the Desktop daemon is not installed on the owner's
+machine, and a Homebrew service needs no daemon and survives a reboot. Nothing in the
+application depends on Neon-specific behaviour.
 
 **Consequences.** `drizzle.config.ts` and the db client read `DATABASE_URL` only. Deployment to
 Vercel is blocked until a Neon connection string exists — tracked in `docs/ROADMAP.md`.
+
+---
+
+## 017 — `GOAL_FOR.scorerId` is optional
+**2026-09-23** · accepted
+
+A goal for us can be recorded with no scorer.
+
+**Why.** Two real cases have a goal but no player of ours to credit: an opponent puts it in their
+own net, and a retro entry where the owner remembers the score but not who scored (decision 013
+exists precisely so the season can be backfilled). Forcing a scorer would mean either losing the
+goal or inventing an attribution, and the score is the more important of the two facts.
+
+**Consequences.** The reducer counts the goal in the score and credits nobody. Statistics must
+never assume the scorers of a match sum to its score. The game-mode ACTION sheet still asks for
+the scorer first — this is a deliberate escape hatch, not the happy path.
+
+---
+
+## 018 — Goalkeeper clean sheets are stored separately from clean minutes
+**2026-09-23** · accepted
+
+`match_player_stats` carries both `clean_minutes` / `conceded_while_on` for every player and
+`gk_clean_minutes` / `conceded_while_gk` restricted to time in goal.
+
+**Why.** Decision 011 asks for clean sheets "both ways", and the two are not derivable from one
+another. A keeper who is substituted at half time in a 0-1 match has a clean first half; a field
+player's clean minutes say nothing about who was in goal for them. Deriving the keeper's figure
+at read time would mean re-reducing the event log for every season aggregate, which is exactly
+what the frozen cache exists to avoid.
+
+**Consequences.** A goalkeeper clean sheet is `gk_minutes > 0 and conceded_while_gk = 0`, a
+match-level count, while `gk_clean_minutes` is the finer-grained figure for a shared keeper.
+The reducer already computed both; this only stores them.
