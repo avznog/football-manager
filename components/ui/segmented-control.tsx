@@ -41,7 +41,10 @@ export type SegmentedControlProps<T extends string> = {
 /**
  * Built on native radio inputs: arrow-key navigation, screen-reader semantics
  * and `FormData` submission all come for free, and it stays usable from a
- * Server Component as long as no `onChange` is passed.
+ * Server Component as long as no `onChange` is passed — hence the handler is
+ * only attached when there is one to call. Attaching an inert closure
+ * unconditionally would make every render a function prop, which a Server
+ * Component cannot serialise.
  */
 export function SegmentedControl<T extends string>({
   name,
@@ -64,6 +67,7 @@ export function SegmentedControl<T extends string>({
       <div className="flex w-full gap-1 rounded-xl border border-border bg-surface-2 p-1">
         {options.map((option) => {
           const id = `${name}-${option.value}`;
+          const handleChange = onChange ? () => onChange(option.value) : undefined;
           return (
             <div key={option.value} className="min-w-0 flex-1">
               <input
@@ -76,11 +80,14 @@ export function SegmentedControl<T extends string>({
                 {...(controlled
                   ? {
                       checked: value === option.value,
-                      onChange: () => onChange?.(option.value),
+                      onChange: handleChange,
+                      // A controlled radio with no handler is a display of state, not a
+                      // broken input; saying so keeps React from warning about it.
+                      readOnly: handleChange === undefined,
                     }
                   : {
                       defaultChecked: defaultValue === option.value,
-                      onChange: () => onChange?.(option.value),
+                      onChange: handleChange,
                     })}
               />
               <label

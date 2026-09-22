@@ -1,0 +1,156 @@
+/**
+ * One training session: when, where, what is on the programme, who said they would come, and — for
+ * the coach — who actually did.
+ *
+ * `params` is a Promise in Next 16 and `PageProps<"/entrainements/[id]">` comes from `next typegen`
+ * (`docs/NEXTJS16.md`). A training id from another team is a 404: `getTraining` scopes its query by
+ * team.
+ */
+
+import { notFound } from "next/navigation";
+import Link from "next/link";
+
+import { ButtonLink } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { can } from "@/lib/auth/can";
+import { requireTeamContext } from "@/lib/auth/dal";
+import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
+import {
+  buildReminderMessage,
+  tallyAvailability,
+  trainingWindowMinutes,
+  type Responder,
+} from "@/lib/calendar/timeline";
+import { getSquad } from "@/lib/team/queries";
+import { getTraining, getTrainingAnswers, getTrainingAttendance } from "@/lib/training/queries";
+import { AvailabilityControl } from "../../calendrier/_components/availability-control";
+import { AvailabilityGrid } from "../../calendrier/_components/availability-grid";
+import { ReminderCard } from "../../calendrier/_components/reminder-card";
+import { AttendanceList, type AttendancePlayer } from "../_components/attendance-list";
+
+export async function generateMetadata({ params }: PageProps<"/entrainements/[id]">) {
+  const [{ team }, { id }] = await Promise.all([requireTeamContext(), params]);
+  const training = await getTraining(team.id, id);
+  if (!training) return { title: "Entraînement introuvable" };
+  return { title: `Entraînement · ${formatDay(new Date(training.startsAt))}` };
+}
+
+export default async function TrainingPage({ params }: PageProps<"/entrainements/[id]">) {
+  const [{ actor, team }, { id }] = await Promise.all([requireTeamContext(), params]);
+
+  const training = await getTraining(team.id, id);
+  if (!training) notFound();
+
+  const [answers, attendance, squad] = await Promise.all([
+    getTrainingAnswers(training.id),
+    getTrainingAttendance(training.id),
+    getSquad(team.id),
+  ]);
+
+  const startsAt = new Date(training.startsAt);
+  const now = new Date();
+  const over = startsAt.getTime() + trainingWindowMinutes() * 60_000 <= now.getTime();
+
+  const activePlayers = squad.filter((member) => member.isPlayer);
+  const responders: Responder[] = activePlayers.map((member) => ({
+    membershipId: member.membershipId,
+    displayName: member.displayName,
+  }));
+  const tally = tallyAvailability(responders, answers);
+
+  const isCoach = can(actor, "training:markAttendance", { teamId: team.id });
+  const myAnswer =
+    answers.find((answer) => answer.teamMemberId === team.membershipId)?.status ?? null;
+
+  const declared = new Map(answers.map((answer) => [answer.teamMemberId, answer.status]));
+  const marks = new Map(attendance.map((row) => [row.teamMemberId, row.present]));
+  const players: AttendancePlayer[] = activePlayers.map((member) => ({
+    membershipId: member.membershipId,
+    displayName: member.displayName,
+    jerseyNumber: member.jerseyNumber,
+    declared: declared.get(member.membershipId) ?? null,
+  }));
+
+  const reminder = buildReminderMessage({
+    title: "Entraînement",
+    when: formatWhen(startsAt, now),
+    pending: tally.pending,
+  });
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-2">
+        <Link
+          href="/entrainements"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          ← Entraînements
+        </Link>
+
+        <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink">
+          {capitalizeFirst(formatDay(startsAt, now))}
+        </h1>
+
+        <p className="text-sm text-ink-muted">
+          {formatTime(startsAt)}
+          {training.venue ? ` · ${training.venue}` : ""}
+        </p>
+
+        {training.note ? <p className="text-sm text-ink">{training.note}</p> : null}
+
+        {isCoach ? (
+          <div className="pt-1">
+            <ButtonLink
+              href={`/entrainements/${training.id}/modifier`}
+              variant="secondary"
+              size="sm"
+            >
+              Modifier
+            </ButtonLink>
+          </div>
+        ) : null}
+      </header>
+
+      {team.isPlayer && !over ? (
+        <Card title="Ta réponse" description="Un seul appui. Tu peux changer d’avis.">
+          <AvailabilityControl
+            kind="training"
+            teamId={team.id}
+            eventId={training.id}
+            value={myAnswer}
+            legend="Ta disponibilité pour cet entraînement"
+          />
+        </Card>
+      ) : null}
+
+      <AvailabilityGrid tally={tally} selfMembershipId={team.membershipId} />
+
+      {isCoach && !over ? <ReminderCard message={reminder} pending={tally.pending.length} /> : null}
+
+      {isCoach ? (
+        <AttendanceList
+          teamId={team.id}
+          trainingId={training.id}
+          players={players}
+          marks={marks}
+        />
+      ) : (
+        <PresenceSummary marks={marks} total={players.length} />
+      )}
+    </div>
+  );
+}
+
+/** What a player sees instead of the marking list: the count, once the coach has pointed. */
+function PresenceSummary({ marks, total }: { marks: Map<string, boolean>; total: number }) {
+  if (marks.size === 0) return null;
+  const present = [...marks.values()].filter(Boolean).length;
+
+  return (
+    <Card title="Présences">
+      <p className="text-sm text-ink-muted">
+        {present} présent{present > 1 ? "s" : ""} sur {total} joueur{total > 1 ? "s" : ""}.
+      </p>
+    </Card>
+  );
+}
