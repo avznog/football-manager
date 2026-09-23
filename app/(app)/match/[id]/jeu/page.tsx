@@ -54,6 +54,17 @@ export default async function GameModePage({ params }: PageProps<"/match/[id]/je
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
+        {/*
+         * The only `h1` in the app that is not drawn. Every pixel above the pitch is the clock and
+         * the score, on purpose — a title bar here would push the ACTION button down the screen, and
+         * a coach holding the phone at 0-0 in the 58th minute knows which match he is at. But the
+         * page still needs a name: an audit of every screen found this one and the composition
+         * editor were the only two with no level-one heading, so a screen reader landing here had
+         * nothing to announce. `sr-only` is the same answer the recap table and the squad rows give.
+         */}
+        <h1 className="sr-only">
+          Mode match · {live.match.isHome ? "contre" : "chez"} {live.match.opponentName}
+        </h1>
         <Link
           href={`/match/${live.match.id}`}
           className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"

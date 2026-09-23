@@ -7,6 +7,8 @@
  * route checks `can()` before rendering this, and the actions check again.
  */
 
+import type { ReactNode } from "react";
+
 import Link from "next/link";
 
 import { CompositionEditor, type EditorMember } from "@/components/composition";
@@ -42,51 +44,6 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
   const backHref = `/match/${match.id}/composition`;
   const target = lineupId ? lineups.find((lineup) => lineup.id === lineupId) : undefined;
 
-  if (lineupId && !target) {
-    return (
-      <Guidance
-        title="Composition introuvable"
-        description="Elle a peut-être été supprimée depuis."
-        backHref={backHref}
-      />
-    );
-  }
-
-  if (target?.isApplied) {
-    return (
-      <Guidance
-        title="Cette composition a été appliquée"
-        description="Elle a été confirmée pendant le match : elle décrit ce qui s’est passé et ne se modifie plus."
-        backHref={backHref}
-      />
-    );
-  }
-
-  const selectable = members.filter(
-    (member) => member.squadRole === "starter" || member.squadRole === "substitute",
-  );
-  if (selectable.length === 0) {
-    return (
-      <Card title="Feuille de match vide">
-        <EmptyState
-          title="Personne n’est encore retenu"
-          description="Seuls les titulaires et les remplaçants de la feuille de match peuvent être placés sur le terrain."
-          action={<ButtonLink href={`/match/${match.id}/feuille`}>Remplir la feuille</ButtonLink>}
-        />
-      </Card>
-    );
-  }
-
-  if (formations.length === 0) {
-    return (
-      <Guidance
-        title="Aucune formation disponible"
-        description="Les formations types n’ont pas été chargées dans la base."
-        backHref={backHref}
-      />
-    );
-  }
-
   const plans = sortPlans(lineups.map(toPlannedLineup));
   const otherPlans = plans.filter((plan) => plan.id !== lineupId);
 
@@ -97,6 +54,71 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
       : plans.length === 0
         ? 0
         : suggestNextMinute(plans, match.periodsCount * match.periodMinutes));
+
+  /*
+   * Computed before the dead ends below, not after, because they render the same header: an audit of
+   * every screen at 390 px found this route reaching four different states with no `h1` at all — a
+   * bare centred panel saying « Cette composition a été appliquée » about no match in particular.
+   * The title is the one thing all five states can state truthfully, so it is outside all of them.
+   */
+  const title = target
+    ? planTitleFr(target)
+    : lineupId
+      ? "Composition introuvable"
+      : fromMinute === 0
+        ? "Composition de départ"
+        : "Nouvelle composition";
+
+  const shell = (body: ReactNode) => (
+    <Shell backHref={backHref} title={title} match={match}>
+      {body}
+    </Shell>
+  );
+
+  if (lineupId && !target) {
+    return shell(
+      <Guidance
+        title="Rien à modifier ici"
+        description="Cette composition n’existe pas, ou plus : elle a peut-être été supprimée depuis."
+        backHref={backHref}
+      />,
+    );
+  }
+
+  if (target?.isApplied) {
+    return shell(
+      <Guidance
+        title="Elle ne se modifie plus"
+        description="Elle a été confirmée pendant le match : elle décrit ce qui s’est passé, pas ce qui était prévu."
+        backHref={backHref}
+      />,
+    );
+  }
+
+  const selectable = members.filter(
+    (member) => member.squadRole === "starter" || member.squadRole === "substitute",
+  );
+  if (selectable.length === 0) {
+    return shell(
+      <Card title="Feuille de match vide">
+        <EmptyState
+          title="Personne n’est encore retenu"
+          description="Seuls les titulaires et les remplaçants de la feuille de match peuvent être placés sur le terrain."
+          action={<ButtonLink href={`/match/${match.id}/feuille`}>Remplir la feuille</ButtonLink>}
+        />
+      </Card>,
+    );
+  }
+
+  if (formations.length === 0) {
+    return shell(
+      <Guidance
+        title="Aucune formation disponible"
+        description="Les formations types n’ont pas été chargées dans la base."
+        backHref={backHref}
+      />,
+    );
+  }
 
   const formationId =
     target?.formationId ??
@@ -112,28 +134,8 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
     primaryPositionCode: member.primaryPositionCode,
   }));
 
-  return (
-    <div className="space-y-4">
-      <header className="space-y-1">
-        <Link
-          href={backHref}
-          className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          ← Compositions
-        </Link>
-        <h1 className="text-xl font-bold tracking-tight text-ink">
-          {target
-            ? planTitleFr(target)
-            : fromMinute === 0
-              ? "Composition de départ"
-              : "Nouvelle composition"}
-        </h1>
-        <p className="text-sm text-ink-muted">
-          {match.opponentName} · {match.periodsCount}×{match.periodMinutes} minutes
-        </p>
-      </header>
-
-      <CompositionEditor
+  return shell(
+    <CompositionEditor
         teamId={team.id}
         matchId={match.id}
         lineupId={target?.id ?? null}
@@ -144,13 +146,47 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
         assignments={target?.assignments ?? []}
         fromMinute={fromMinute}
         otherPlans={otherPlans}
-        totalMinutes={match.periodsCount * match.periodMinutes}
-        cancelHref={backHref}
-      />
+      totalMinutes={match.periodsCount * match.periodMinutes}
+      cancelHref={backHref}
+    />,
+  );
+}
+
+/** The back link, the title and the match, above whatever state the editor is in. */
+function Shell({
+  backHref,
+  title,
+  match,
+  children,
+}: {
+  backHref: string;
+  title: string;
+  match: MatchRow;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      <header className="space-y-1">
+        <Link
+          href={backHref}
+          className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          ← Compositions
+        </Link>
+        <h1 className="text-xl font-bold tracking-tight text-ink">{title}</h1>
+        <p className="text-sm text-ink-muted">
+          {match.opponentName} · {match.periodsCount}×{match.periodMinutes} minutes
+        </p>
+      </header>
+      {children}
     </div>
   );
 }
 
+/**
+ * A dead end in the editor. The page's `h1` says *which* composition — `Shell` puts it there in every
+ * state — so this says only what is wrong with it and where to go instead.
+ */
 function Guidance({
   title,
   description,

@@ -761,3 +761,41 @@ thing it protects.
 **Debt after this:** none outside deployment.
 
 **Next:** deployment. It still needs a Neon `DATABASE_URL` from the owner.
+
+## The walk that used to be done by hand
+
+`CLAUDE.md` has said from the start that `npm run db:reset` and then walking the season at 390 px is
+the cheapest review tool in the repo. It is right, and it was being done by hand, which is why it was
+being done rarely. This session turned the mechanical half of it into `npm run audit:screens`:
+23 screens, both themes, as a coach and as a non-coach player, 92 visits, a PNG each in `audit/`
+(gitignored), and a non-zero exit on a console error, a box outside the viewport, an English framework
+string, a screen open to the wrong audience, or a page with no level-one heading. The human half — is
+this screen *telling the truth* — is untouched, and the script says so in its own output.
+
+Two things it taught me while being written. Its first version hardcoded the demo match ids, so after
+`db:reset` it walked thirteen 404s and reported a clean sweep: a review tool that can pass by looking
+at nothing is worse than none, and everything is now read out of Postgres. And its overflow check
+flagged `/stats`' competition filter, which is a deliberate sideways scroller — the probe was wrong,
+not the app, and it now ignores anything a scroll container owns. Both are in decision 059.
+
+Then it found three real defects, all the family this project keeps finding by looking rather than by
+testing — a screen stating something that is not so.
+
+A member who may not operate the match was being offered « Appliquer » on the planned-composition
+card. The card is shown to everyone deliberately, but only « Ajuster » was gated; the other button
+produced an event the route handler answered 403 to, so the invitation was the bug. And the card said
+« Cette composition ne change rien sur le terrain » over a *starting seven* — the « 7 changements » lie
+of decision 031 fixed in one direction and grown back in the other, because a starting composition and
+a genuinely empty plan both have an empty change list and the component could not tell them apart.
+`pendingLineupChangesFr` now can, in `lib/` where a test can reach it, because Vitest runs in `node`
+and cannot render the component.
+
+The third was structural: game mode and the composition editor were the only two screens in the app
+with no `h1`. The editor's was the worse one — hitting an already-applied composition dropped you on a
+bare panel saying « Cette composition a été appliquée » about no match in particular. It now renders
+its header in every one of its five states, so the page always says which composition of which match,
+and the panel says only what is wrong with it. Game mode gets an `sr-only` heading, the only invisible
+one in the app, for the reason written next to it: the clock and the score own every pixel above the
+pitch on purpose. The audit checks for a missing `h1` now, so this cannot come back quietly.
+
+846 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.
