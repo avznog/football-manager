@@ -22,6 +22,8 @@ import { hashPassword } from "@/lib/auth/password";
 import { passwordSchema, type FormState, toFormState } from "@/lib/auth/validation";
 import { setActiveTeam } from "@/lib/auth/actions";
 import { CREST_KEEP } from "./crest";
+import { wouldLeaveNoCoach } from "./coaches";
+import { getActiveCoachIds } from "./queries";
 import { INVITE_TTL_DAYS, generateInviteCode } from "./invite-code";
 import {
   createInviteSchema,
@@ -271,18 +273,8 @@ export async function setMemberRole(formData: FormData): Promise<void> {
   });
 
   if (parsed.data.role === "player") {
-    const coaches = await db
-      .select({ id: teamMembers.id })
-      .from(teamMembers)
-      .where(
-        and(
-          eq(teamMembers.teamId, parsed.data.teamId),
-          eq(teamMembers.role, "coach"),
-          isNull(teamMembers.leftAt),
-        ),
-      );
-    const wouldBeLast = coaches.length <= 1 && coaches[0]?.id === parsed.data.memberId;
-    if (wouldBeLast) return;
+    const coaches = await getActiveCoachIds(parsed.data.teamId);
+    if (wouldLeaveNoCoach(coaches, parsed.data.memberId)) return;
   }
 
   await db
@@ -292,7 +284,10 @@ export async function setMemberRole(formData: FormData): Promise<void> {
       and(eq(teamMembers.id, parsed.data.memberId), eq(teamMembers.teamId, parsed.data.teamId)),
     );
 
+  // Both screens show the role: the squad list as a badge, and the profile page, which is where the
+  // form lives. Revalidating only `/equipe` left the page the coach was looking at saying « Joueur ».
   revalidatePath("/equipe");
+  revalidatePath(`/joueur/${parsed.data.memberId}`);
 }
 
 /**
@@ -315,17 +310,8 @@ export async function removeMember(formData: FormData): Promise<void> {
     targetMemberId: parsed.data.memberId,
   });
 
-  const remaining = await db
-    .select({ id: teamMembers.id })
-    .from(teamMembers)
-    .where(
-      and(
-        eq(teamMembers.teamId, parsed.data.teamId),
-        eq(teamMembers.role, "coach"),
-        isNull(teamMembers.leftAt),
-      ),
-    );
-  if (remaining.length <= 1 && remaining[0]?.id === parsed.data.memberId) return;
+  const coaches = await getActiveCoachIds(parsed.data.teamId);
+  if (wouldLeaveNoCoach(coaches, parsed.data.memberId)) return;
 
   await db
     .update(teamMembers)
@@ -335,6 +321,9 @@ export async function removeMember(formData: FormData): Promise<void> {
     );
 
   revalidatePath("/equipe");
+  // The form is on the removed member's own profile, and `getPlayerProfile` will not find them
+  // again — re-rendering that page is a 404. Send the coach back to the squad he just changed.
+  redirect("/equipe");
 }
 
 /**
