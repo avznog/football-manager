@@ -315,7 +315,9 @@ async function seedDemo(): Promise<void> {
         teamId: team.id,
         startsAt: at(-11, 19),
         venue: "Stade municipal",
-        note: "Terrain impraticable, séance écourtée.",
+        // T2's note has to agree with T2's thirteen absences: « écourtée » says the squad turned up
+        // and trained for twenty minutes, which is not what the rows underneath say.
+        note: "Terrain impraticable, séance annulée sur place.",
         createdBy: admin.id,
       },
       { teamId: team.id, startsAt: at(-4, 19), venue: "Gymnase des Peupliers", createdBy: admin.id },
