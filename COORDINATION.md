@@ -71,6 +71,17 @@ extract it, and do not print it if you are handed it.
 
 ---
 
+## Watching for each other
+
+`npm run peer` prints what the other sessions have done since the last time it ran — branches, open
+pull requests, `main`, and how many lines this file's log has. `npm run peer -- --full` prints the
+whole picture whether or not it moved. It is read-only against `origin` (no fetch into the working
+tree, no checkout) and keeps its snapshot in `.git/`, so it can never be committed by accident. Exit
+code 0 means nothing changed and 10 means something did, so it can drive a watcher.
+
+The log below is the part worth checking. Everything else is inference from what a session *did*; a
+line here is a session saying what it *meant*.
+
 ## Log
 
 Newest last. One line: date, which machine or branch, what you are doing or have stopped doing.
@@ -78,3 +89,6 @@ Newest last. One line: date, which machine or branch, what you are doing or have
 - **2026-09-23 11:00 · owner's machine · `feat/deploy-only-main`** — Wrote this file. Landed:
   `vercel.json` so only `main` deploys, the `tag` job, decisions 080 and 081. Watching the `tag` job's
   first real run. Next: nothing on `main` until the owner runs `db:bootstrap`.
+- **2026-09-23 11:00 · owner's machine · `feat/peer-activity`** — Added `npm run peer`. Saw #56
+  (`feat/attendance-not-filtered`) open and rebased onto the `vercel.json` merge, so the other session
+  is reading the new `main`. Not touching its files. Still waiting on the owner for `db:bootstrap`.

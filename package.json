@@ -27,7 +27,8 @@
     "docker:up": "docker compose up -d --build app",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v",
-    "docker:logs": "docker compose logs -f app"
+    "docker:logs": "docker compose logs -f app",
+    "peer": "bash scripts/peer-activity.sh"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.1",
