@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { updateJerseyNumber } from "@/lib/player/actions";
+import { jerseyHintFr } from "@/lib/player/labels";
 
 export type JerseyFormProps = {
   teamId: string;
@@ -36,7 +37,7 @@ export function JerseyForm({ teamId, memberId, jerseyNumber, isPlayer }: JerseyF
         htmlFor="jerseyNumber"
         label="Numéro de maillot"
         optional
-        hint="Laisse vide si le joueur n’a pas de numéro fixe."
+        hint={jerseyHintFr(isPlayer)}
         error={state?.fieldErrors?.jerseyNumber}
         className="min-w-40"
       >
