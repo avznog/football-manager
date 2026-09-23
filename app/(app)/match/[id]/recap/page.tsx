@@ -23,7 +23,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { COMPETITION_LABELS, venueSideLabel } from "@/lib/calendar/labels";
+import { COMPETITION_LABELS, entryModeBadgeFr, venueSideLabel } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import type { MatchRow } from "@/lib/match/queries";
 import { MOTM_MIN_RATINGS } from "@/lib/rating/aggregate";
@@ -55,7 +55,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
   if (match.status === "scheduled") {
     return (
       <div className="space-y-6">
-        <RecapHeader match={match} kickoff={kickoff} now={now} />
+        <RecapHeader match={match} kickoff={kickoff} now={now} recorded={false} />
         <EmptyState
           title="Ce match n’a pas encore été joué"
           description="Le résumé apparaîtra ici quand le match aura été suivi et terminé."
@@ -87,7 +87,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
 
   return (
     <div className="space-y-6">
-      <RecapHeader match={match} kickoff={kickoff} now={now} />
+      <RecapHeader match={match} kickoff={kickoff} now={now} recorded={recap.recorded} />
 
       <Scoreboard
         recap={recap}
@@ -143,14 +143,29 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
       {/* With an empty log every man on the sheet would be listed « non entré » at 0’, which is not
           « il n'est pas entré » but « on ne sait pas » — the scoreboard has already said so, and the
           timeline below says it again. Nine false lines would be the third telling, and a wrong one. */}
-      {recap.recorded ? <MinutesTable players={recap.players} /> : null}
+      {recap.recorded ? (
+        <MinutesTable players={recap.players} entryMode={match.entryMode} />
+      ) : null}
 
       <TimelineList entries={recap.timeline} />
     </div>
   );
 }
 
-function RecapHeader({ match, kickoff, now }: { match: MatchRow; kickoff: Date; now: Date }) {
+function RecapHeader({
+  match,
+  kickoff,
+  now,
+  recorded,
+}: {
+  match: MatchRow;
+  kickoff: Date;
+  now: Date;
+  /** Whether there is a log at all: an empty one is not a log that was « saisi après le match ». */
+  recorded: boolean;
+}) {
+  const entryBadge = entryModeBadgeFr(match.entryMode, { recorded });
+
   return (
     <header className="space-y-2">
       <Link
@@ -165,6 +180,9 @@ function RecapHeader({ match, kickoff, now }: { match: MatchRow; kickoff: Date; 
         <Badge variant={match.isHome ? "neutral" : "warning"}>
           {capitalizeFirst(venueSideLabel(match.isHome))}
         </Badge>
+        {/* The reading page of a match nobody followed live. Everything below is derived from a log
+            that was reconstructed afterwards, and the minutes table says what that costs. */}
+        {entryBadge !== null ? <Badge variant="neutral">{entryBadge}</Badge> : null}
       </div>
 
       <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink">

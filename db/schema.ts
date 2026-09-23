@@ -685,5 +685,6 @@ export type SquadRole = (typeof squadRole.enumValues)[number];
 export type AvailabilityStatus = (typeof availabilityStatus.enumValues)[number];
 export type Competition = (typeof competition.enumValues)[number];
 export type MatchStatus = (typeof matchStatus.enumValues)[number];
+export type EntryMode = (typeof entryMode.enumValues)[number];
 export type MatchEventType = (typeof matchEventType.enumValues)[number];
 export type PositionLine = (typeof positionLine.enumValues)[number];

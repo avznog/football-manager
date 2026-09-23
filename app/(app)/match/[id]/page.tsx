@@ -29,6 +29,7 @@ import { requireTeamContext } from "@/lib/auth/dal";
 import {
   COMPETITION_LABELS,
   MATCH_STATUS_LABELS,
+  entryModeBadgeFr,
   periodsLabel,
   resultLabel,
   venueSideLabel,
@@ -79,6 +80,9 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
 
   const kickoff = new Date(match.kickoffAt);
   const now = new Date();
+  // `score === null` is this page's own test for "not one event was ever recorded", used again by
+  // the « Saisir le match » card below: with no log there is no entry to label.
+  const entryBadge = entryModeBadgeFr(match.entryMode, { recorded: score !== null });
 
   const players: Responder[] = squad
     .filter((member) => member.isPlayer)
@@ -131,6 +135,9 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
               {MATCH_STATUS_LABELS.live}
             </Badge>
           ) : null}
+          {/* The log of this match was reconstructed from memory rather than watched: decision 013
+              put the column in the database for this sentence, and nothing had ever printed it. */}
+          {entryBadge !== null ? <Badge variant="neutral">{entryBadge}</Badge> : null}
         </div>
 
         <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink">
