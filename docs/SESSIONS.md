@@ -183,3 +183,53 @@ self-heals, injury flags merge the roster outside the reducer, a goal may have n
 **Next:** wave 4 is four agents — M7 (retro-entry and amendments), TERRAIN fast-change inside game
 mode composing M3's editor, the seed fixtures above, and the Playwright happy path. Deployment is
 still blocked on a Neon `DATABASE_URL` from the owner; the Vercel CLI is already authenticated.
+
+---
+
+## 2026-09-23 — wave 4, part 1: the demo season, and the four lies it found
+
+Wave 4 is four parallel agents: M7 (retro-entry and amendments), TERRAIN fast-change inside game
+mode, the seed fixtures, and the Playwright happy path. The seed landed first, and reading the season
+it builds is what the rest of this entry is about. **Three agents are still in flight** as this is
+written; their work is not in `main` yet.
+
+### Shipped
+
+- **#15 — a demo season that contains the cases that break things.** Seven played matches, each
+  carrying one edge case on purpose (decision 037): a defeat, a draw, a keeper change, a voided goal,
+  a goal with no scorer, a supporter on the sheet, a player who has since left the team, and one
+  match that is *finished with an empty log* (decision 038). Four trainings cover marked, all-absent
+  and never-marked. Every played match is written as an append-only log and then frozen through
+  `finalizeMatchById`, so the fixtures exercise the real freeze path rather than inserting cache rows.
+- **#16 — say what was recorded instead of inventing a 0-0.** The empty-log match rendered « 0 – 0 »
+  under a red « en cours » badge while `/stats` correctly reported it as « 1 match terminé sans aucun
+  évènement saisi ». `MatchRecap.recorded` and a `status` prop on `Scoreboard` give the recap three
+  honest states (decision 041), and three gaps now state themselves rather than rendering blanks
+  (decision 042): « buteur non renseigné », « Tu étais supporter sur ce match », and a « supporter »
+  badge in the minutes table instead of « non entré ».
+- **#17 — keep a departed player on the sheet he actually played on.** `getLiveMatch` built its
+  roster from `getSquad`, which hides members with `left_at` set, and `reduceLive` takes the reducer's
+  squad from that roster — so re-freezing a match a since-departed player had *started* wrote his
+  cached row with `squad_role = null`. Verified by re-freezing the seeded match: null → `starter`,
+  every other row identical.
+
+### Worth knowing before the next session
+
+1. **Fixtures are only worth what you read from them.** All four defects above came from opening the
+   seeded season in a browser, not from a failing test — and each one was a screen stating something
+   untrue rather than crashing. `npm run db:reset` then walking `/calendrier` end to end is now the
+   cheapest review tool in the repo.
+2. **The « empty log » fixture is consumable.** The M7 agent backfilled *FC des Deux-Ponts* while
+   testing its retro-entry screen, which is exactly what that fixture is for — but it means the
+   unrecorded-recap state is only reproducible after a `db:reset`. Its three states were verified as
+   rendered HTML; the light/dark screenshots at 390 px were taken on the other recaps.
+3. **`match_player_stats` must equal a recomputation of the log, always.** That is the whole contract
+   of the cache, and #17 was a drift of exactly one column that nothing currently reads. M7's
+   amendments re-freeze finished matches by design, so anything that feeds the reducer from a
+   *current-squad* query rather than from the match's own sheet is the same bug waiting to happen.
+4. **No prettier config in this repo.** `npx prettier --write` reformats a file to 80 columns and
+   produces a diff three times the size of the change; the house style is 100. Edit by hand.
+
+**Next:** land the three agents still running (M7, TERRAIN, Playwright), each with its own PR after an
+isolated worktree verification, then `db:reset` and re-walk the season. Deployment is still blocked on
+a Neon `DATABASE_URL` from the owner; the Vercel CLI is authenticated as `avznog`.
