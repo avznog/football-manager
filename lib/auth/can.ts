@@ -35,6 +35,8 @@ export type Action =
   | "team:update"
   | "team:appointCoach"
   | "team:invite"
+  // The team's own vocabulary: the competitions it plays in (decision 107).
+  | "competition:manage"
   | "member:update"
   | "member:remove"
   | "member:resetPassword"
@@ -83,6 +85,7 @@ const COACH_ACTIONS = new Set<Action>([
   "team:update",
   "team:appointCoach",
   "team:invite",
+  "competition:manage",
   "member:update",
   "member:remove",
   "member:resetPassword",

@@ -23,7 +23,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { COMPETITION_LABELS, entryModeBadgeFr, venueSideLabel } from "@/lib/calendar/labels";
+import { entryModeBadgeFr, venueSideLabel } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import type { MatchRow } from "@/lib/match/queries";
 import { MOTM_MIN_RATINGS } from "@/lib/rating/aggregate";
@@ -180,7 +180,7 @@ function RecapHeader({
       </Link>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="accent">{COMPETITION_LABELS[match.competition]}</Badge>
+        <Badge variant="accent">{match.competitionLabel}</Badge>
         <Badge variant={match.isHome ? "neutral" : "warning"}>
           {capitalizeFirst(venueSideLabel(match.isHome))}
         </Badge>

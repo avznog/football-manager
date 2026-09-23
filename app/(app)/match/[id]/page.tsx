@@ -27,7 +27,6 @@ import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import {
-  COMPETITION_LABELS,
   entryModeBadgeFr,
   MATCH_STATUS_LABELS,
   matchNameFr,
@@ -120,10 +119,11 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
 
   const reminder = buildReminderMessage({
     // The group chat is being asked « dispo ? », and the next question is always *where*: the side
-    // and the pitch travel with the opponent's name (`matchReminderTitleFr`).
+    // and the pitch travel with the opponent's name (`matchReminderTitleFr`). The competition is
+    // the team's own label now (decision 107); the function lowercases it.
     title: matchReminderTitleFr({
       opponentName: match.opponentName,
-      competitionFr: COMPETITION_LABELS[match.competition],
+      competitionFr: match.competitionLabel,
       isHome: match.isHome,
       venue: match.venue,
     }),
@@ -142,7 +142,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         </Link>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="accent">{COMPETITION_LABELS[match.competition]}</Badge>
+          <Badge variant="accent">{match.competitionLabel}</Badge>
           <Badge variant={match.isHome ? "neutral" : "warning"}>
             {capitalizeFirst(venueSideLabel(match.isHome))}
           </Badge>

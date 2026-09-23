@@ -14,7 +14,8 @@ import { eq, sql } from "drizzle-orm";
 
 import { db } from "./client";
 import { BUILTIN_FORMATIONS, POSITIONS } from "./reference";
-import { formationSlots, formations, lineupSlots, positions } from "./schema";
+import { competitions, formationSlots, formations, lineupSlots, positions, teams } from "./schema";
+import { defaultCompetitionRows } from "../lib/competition/defaults";
 
 export async function seedReference(): Promise<void> {
   await db
@@ -85,4 +86,44 @@ export async function seedReference(): Promise<void> {
   console.log(
     `  positions: ${POSITIONS.length} · formations intégrées: ${BUILTIN_FORMATIONS.length}`,
   );
+}
+
+/**
+ * Gives a team the four competitions it starts life with — « Championnat », « Coupe », « Amical »,
+ * « Tournoi » — and nothing else (decision 107). Idempotent on the `(team_id, label_fr)` unique
+ * index, so calling it twice writes nothing the second time.
+ *
+ * Called by `createTeam` inside the transaction that creates the team: a team with no competition
+ * cannot have a match, so this is not decoration, it is what makes the match form work at all.
+ */
+export async function seedTeamCompetitions(teamId: string): Promise<void> {
+  await db
+    .insert(competitions)
+    .values(defaultCompetitionRows(teamId))
+    .onConflictDoNothing({ target: [competitions.teamId, competitions.labelFr] });
+}
+
+/**
+ * The safety net for **teams that have none at all**, which `db/bootstrap.ts` runs on every start.
+ *
+ * Deliberately not "re-add any of the four that is missing": a coach who deleted « Tournoi » because
+ * his team plays no tournaments must not find it back next deploy. Only a team with an empty list is
+ * touched, because that team cannot program a single match until something is in it — and the
+ * migration that created the table has already filled every team that existed when it ran.
+ */
+export async function seedMissingTeamCompetitions(): Promise<void> {
+  const rows = await db.select({ id: teams.id }).from(teams);
+  let filled = 0;
+
+  for (const team of rows) {
+    const existing = await db.query.competitions.findFirst({
+      where: eq(competitions.teamId, team.id),
+      columns: { id: true },
+    });
+    if (existing) continue;
+    await seedTeamCompetitions(team.id);
+    filled += 1;
+  }
+
+  console.log(`  compétitions: ${filled} équipe(s) sans aucune compétition réamorcée(s)`);
 }

@@ -38,7 +38,7 @@ function match(id: string, extra: Partial<StatsMatch> = {}): StatsMatch {
     kickoffAt: "2026-09-06T08:30:00.000Z",
     opponentName: "AS Cormeilles",
     isHome: true,
-    competition: "league",
+    competitionLabel: "Championnat",
     score: { goalsFor: 1, goalsAgainst: 0 },
     ...extra,
   };
@@ -491,7 +491,7 @@ describe("a competition filter that excludes somebody's only match", () => {
   // mention others, and the aggregate must ignore them rather than trust its caller.
   const stats = season({
     members,
-    matches: [match("m1", { competition: "league" })],
+    matches: [match("m1", { competitionLabel: "Championnat" })],
     lines: allLines,
     squad: allSquad,
     ratings: allRatings,
@@ -520,7 +520,10 @@ describe("a competition filter that excludes somebody's only match", () => {
   it("gives him everything back when the filter is lifted", () => {
     const unfiltered = season({
       members,
-      matches: [match("m1", { competition: "league" }), match("m2", { competition: "cup" })],
+      matches: [
+        match("m1", { competitionLabel: "Championnat" }),
+        match("m2", { competitionLabel: "Coupe" }),
+      ],
       lines: allLines,
       squad: allSquad,
       ratings: allRatings,

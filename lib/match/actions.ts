@@ -16,7 +16,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
-import { matchAvailability, matchEvents, matches } from "@/db/schema";
+import { competitions, matchAvailability, matchEvents, matches } from "@/db/schema";
 import { assertCan, membershipIn } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
@@ -26,6 +26,24 @@ import {
   matchTargetSchema,
   updateMatchSchema,
 } from "./validation";
+
+/**
+ * What a competition id from a form is allowed to be: a row of **this** team's list (decision 107).
+ *
+ * The foreign key alone would accept another team's competition, and a match filed under a
+ * competition belonging to somebody else's team is a leak of their vocabulary into our calendar. A
+ * stale tab is the honest case: the competition was deleted between render and submit.
+ */
+async function competitionBelongsToTeam(teamId: string, competitionId: string): Promise<boolean> {
+  const row = await db.query.competitions.findFirst({
+    where: and(eq(competitions.id, competitionId), eq(competitions.teamId, teamId)),
+    columns: { id: true },
+  });
+  return row !== undefined;
+}
+
+const UNKNOWN_COMPETITION_FR =
+  "Cette compétition n’existe plus. Choisis-en une autre, ou recrée-la sur la page Équipe.";
 
 /** Everything a calendar change can be seen from. */
 function revalidateCalendar(matchId?: string): void {
@@ -42,13 +60,17 @@ export async function createMatch(_prev: FormState, formData: FormData): Promise
     kickoffAt: formData.get("kickoffAt"),
     isHome: formData.get("isHome") ?? undefined,
     venue: formData.get("venue") ?? undefined,
-    competition: formData.get("competition") ?? undefined,
+    competitionId: formData.get("competitionId") ?? undefined,
     periodsCount: formData.get("periodsCount") ?? undefined,
     periodMinutes: formData.get("periodMinutes") ?? undefined,
   });
   if (!parsed.success) return toFormState(parsed.error);
 
   assertCan(actor, "match:create", { teamId: parsed.data.teamId });
+
+  if (!(await competitionBelongsToTeam(parsed.data.teamId, parsed.data.competitionId))) {
+    return { fieldErrors: { competitionId: [UNKNOWN_COMPETITION_FR] } };
+  }
 
   const [created] = await db
     .insert(matches)
@@ -58,7 +80,7 @@ export async function createMatch(_prev: FormState, formData: FormData): Promise
       opponentName: parsed.data.opponentName,
       isHome: parsed.data.isHome,
       venue: parsed.data.venue,
-      competition: parsed.data.competition,
+      competitionId: parsed.data.competitionId,
       periodsCount: parsed.data.periodsCount,
       periodMinutes: parsed.data.periodMinutes,
       createdBy: actor.userId,
@@ -80,13 +102,17 @@ export async function updateMatch(_prev: FormState, formData: FormData): Promise
     kickoffAt: formData.get("kickoffAt"),
     isHome: formData.get("isHome") ?? undefined,
     venue: formData.get("venue") ?? undefined,
-    competition: formData.get("competition") ?? undefined,
+    competitionId: formData.get("competitionId") ?? undefined,
     periodsCount: formData.get("periodsCount") ?? undefined,
     periodMinutes: formData.get("periodMinutes") ?? undefined,
   });
   if (!parsed.success) return toFormState(parsed.error);
 
   assertCan(actor, "match:update", { teamId: parsed.data.teamId });
+
+  if (!(await competitionBelongsToTeam(parsed.data.teamId, parsed.data.competitionId))) {
+    return { fieldErrors: { competitionId: [UNKNOWN_COMPETITION_FR] } };
+  }
 
   const updated = await db
     .update(matches)
@@ -95,7 +121,7 @@ export async function updateMatch(_prev: FormState, formData: FormData): Promise
       opponentName: parsed.data.opponentName,
       isHome: parsed.data.isHome,
       venue: parsed.data.venue,
-      competition: parsed.data.competition,
+      competitionId: parsed.data.competitionId,
       periodsCount: parsed.data.periodsCount,
       periodMinutes: parsed.data.periodMinutes,
     })

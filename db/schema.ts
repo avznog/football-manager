@@ -32,7 +32,6 @@ import { relations, sql } from "drizzle-orm";
 export const teamRole = pgEnum("team_role", ["coach", "player"]);
 export const availabilityStatus = pgEnum("availability_status", ["yes", "no", "maybe"]);
 export const squadRole = pgEnum("squad_role", ["starter", "substitute", "supporter"]);
-export const competition = pgEnum("competition", ["league", "cup", "friendly", "tournament"]);
 export const matchStatus = pgEnum("match_status", ["scheduled", "live", "finished"]);
 export const entryMode = pgEnum("entry_mode", ["live", "retro"]);
 export const positionLine = pgEnum("position_line", ["GB", "DEF", "MIL", "ATT"]);
@@ -245,6 +244,47 @@ export const playerPositions = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/* Competitions                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The competitions a team plays in — **the coach's data, not ours** (decision 107).
+ *
+ * This was a four-value Postgres enum until a coach asked who decides what « Coupe » means: a
+ * league nobody can call « Championnat D3 » and a cup nobody can call « Coupe du Crédit Mutuel »
+ * is a vocabulary imposed on a team by its tool. So it is a team-owned table, seeded with the four
+ * old values as defaults for every team (`lib/competition/defaults.ts`), edited on `/equipe`.
+ *
+ * Team-owned reference data, the way `formations` is — except that there is no `null` team here: a
+ * shared « Championnat » would be a row every coach could rename for everybody else.
+ *
+ * `archivedAt` is what makes a rename-or-delete decision survivable. A competition matches point at
+ * is never deleted (`matches.competition_id` is `on delete restrict`), because the season would lose
+ * which competition those matches were in; archiving takes it out of the match form and leaves the
+ * history intact.
+ */
+export const competitions = pgTable(
+  "competitions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    teamId: uuid()
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    /** French, typed by the coach: « Championnat D3 », « Coupe du Crédit Mutuel ». */
+    labelFr: text().notNull(),
+    /** The order of the match form's `<select>`: the league first, because it is the common case. */
+    sort: integer().notNull().default(0),
+    /** Set when the coach retires it: gone from the match form, still on its matches. */
+    archivedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("competitions_team_label_unique").on(t.teamId, t.labelFr),
+    index("competitions_team_idx").on(t.teamId),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
 /* Matches                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -260,7 +300,14 @@ export const matches = pgTable(
     opponentName: text().notNull(),
     isHome: boolean().notNull().default(true),
     venue: text(),
-    competition: competition().notNull().default("league"),
+    /**
+     * Which competition, as a row of the team's own list (decision 107). `restrict`: a coach
+     * deleting « Coupe » must not silently take the cup matches' competition with it — the UI
+     * counts them and offers archiving instead.
+     */
+    competitionId: uuid()
+      .notNull()
+      .references(() => competitions.id, { onDelete: "restrict" }),
     periodsCount: smallint().notNull().default(2),
     periodMinutes: smallint().notNull().default(30),
     status: matchStatus().notNull().default("scheduled"),
@@ -272,6 +319,9 @@ export const matches = pgTable(
   },
   (t) => [
     index("matches_team_kickoff_idx").on(t.teamId, t.kickoffAt),
+    // The stats filter reads by competition, and `restrict` has to count the matches of one before
+    // a delete is allowed: both are this index.
+    index("matches_competition_idx").on(t.competitionId),
     check("matches_periods_positive", sql`${t.periodsCount} > 0 and ${t.periodMinutes} > 0`),
   ],
 );
@@ -558,7 +608,13 @@ export const teamsRelations = relations(teams, ({ many }) => ({
   matches: many(matches),
   trainings: many(trainings),
   formations: many(formations),
+  competitions: many(competitions),
   invites: many(invites),
+}));
+
+export const competitionsRelations = relations(competitions, ({ one, many }) => ({
+  team: one(teams, { fields: [competitions.teamId], references: [teams.id] }),
+  matches: many(matches),
 }));
 
 export const teamMembersRelations = relations(teamMembers, ({ one, many }) => ({
@@ -597,6 +653,10 @@ export const formationSlotsRelations = relations(formationSlots, ({ one }) => ({
 
 export const matchesRelations = relations(matches, ({ one, many }) => ({
   team: one(teams, { fields: [matches.teamId], references: [teams.id] }),
+  competition: one(competitions, {
+    fields: [matches.competitionId],
+    references: [competitions.id],
+  }),
   availability: many(matchAvailability),
   squad: many(matchSquad),
   lineups: many(lineups),
@@ -686,6 +746,11 @@ export type TeamMember = typeof teamMembers.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
 export type Position = typeof positions.$inferSelect;
 export type Formation = typeof formations.$inferSelect;
+/**
+ * A **row**, since decision 107 — it used to be one of four enum values. Anything that wants the
+ * word a coach reads wants `labelFr`, and anything that wants to point at one wants `id`.
+ */
+export type Competition = typeof competitions.$inferSelect;
 export type FormationSlot = typeof formationSlots.$inferSelect;
 export type Match = typeof matches.$inferSelect;
 export type MatchEvent = typeof matchEvents.$inferSelect;
@@ -699,7 +764,6 @@ export type MatchPlayerStats = typeof matchPlayerStats.$inferSelect;
 export type TeamRole = (typeof teamRole.enumValues)[number];
 export type SquadRole = (typeof squadRole.enumValues)[number];
 export type AvailabilityStatus = (typeof availabilityStatus.enumValues)[number];
-export type Competition = (typeof competition.enumValues)[number];
 export type MatchStatus = (typeof matchStatus.enumValues)[number];
 export type EntryMode = (typeof entryMode.enumValues)[number];
 export type MatchEventType = (typeof matchEventType.enumValues)[number];

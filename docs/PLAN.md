@@ -30,7 +30,7 @@ The repository is currently empty apart from `instructions.md` — this is a gre
 | Branding | Neutral app palette; club colours and crest only where they carry meaning (kit discs, team header, match cards). |
 | Personality | Sober tool, one celebratory moment: the post-match recap. |
 | Reminders | In-app only. No push, no email. The coach gets a "who hasn't answered" list. |
-| Match data | Date, kick-off, opponent, home/away, venue, score, **competition type** (league / cup / friendly / tournament) with stats filterable by competition. No convocation fields, no manual league table. |
+| Match data | Date, kick-off, opponent, home/away, venue, score, **competition** — each team defines its own list, starting from the four the app used to hardcode (championnat / coupe / amical / tournoi), with stats filterable by competition (decision 107). No convocation fields, no manual league table. |
 | Clean sheets | Both: GK clean sheets as the headline stat, clean minutes for every player on their detail page. |
 | Language | **French only.** UI strings in French, code and identifiers in English. |
 | Starting point | Retro-entry screen so matches already played this season can be backfilled without game mode. |
@@ -121,8 +121,9 @@ player_positions team_member_id, position_code, preference ('primary'|'secondary
 formations       id, team_id null (null = built-in template), name, label ('1-3-2-1')
 formation_slots  id, formation_id, position_code, x, y, order
 
+competitions     id, team_id, label_fr, sort, archived_at   -- the coach's own list (decision 107)
 matches          id, team_id, kickoff_at, opponent_name, is_home, venue,
-                 competition ('league'|'cup'|'friendly'|'tournament'),
+                 competition_id -> competitions (on delete restrict),
                  periods_count, period_minutes (default 30),
                  status ('scheduled'|'live'|'finished'), operator_user_id,
                  entry_mode ('live'|'retro')

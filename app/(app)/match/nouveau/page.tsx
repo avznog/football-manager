@@ -12,6 +12,8 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { getTeamCompetitions } from "@/lib/competition/queries";
+import { competitionOptions, defaultCompetitionId } from "@/lib/competition/options";
 import { MatchForm } from "../_components/match-form";
 
 export const metadata = { title: "Nouveau match" };
@@ -19,6 +21,9 @@ export const metadata = { title: "Nouveau match" };
 export default async function NewMatchPage() {
   const { actor, team } = await requireTeamContext();
   if (!can(actor, "match:create", { teamId: team.id })) notFound();
+
+  // Nothing is preselected by hand: the first option is the lowest `sort`, which is the league.
+  const competitions = competitionOptions(await getTeamCompetitions(team.id));
 
   return (
     <div className="space-y-4">
@@ -35,12 +40,13 @@ export default async function NewMatchPage() {
       <Card>
         <MatchForm
           teamId={team.id}
+          competitions={competitions}
           defaults={{
             opponentName: "",
             kickoffAt: "",
             isHome: true,
             venue: "",
-            competition: "league",
+            competitionId: defaultCompetitionId(competitions),
             // 2×30, the format of the team (decision 009).
             periodsCount: 2,
             periodMinutes: 30,

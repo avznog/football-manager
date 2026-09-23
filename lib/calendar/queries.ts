@@ -119,7 +119,7 @@ export async function getCalendar(
         opponentName: match.opponentName,
         isHome: match.isHome,
         venue: match.venue,
-        competition: match.competition,
+        competitionLabel: match.competitionLabel,
         status: match.status,
         periodsCount: match.periodsCount,
         periodMinutes: match.periodMinutes,

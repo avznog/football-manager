@@ -141,6 +141,7 @@ jobs:
           fetch-depth: 0
 
       - name: tag this commit with the version in package.json
+        id: tag
         run: |
           version="v$(node -p 'require("./package.json").version')"
 
@@ -154,3 +155,27 @@ jobs:
           git tag -a "$version" -m "$version — $(git log -1 --format=%s)"
           git push origin "refs/tags/$version"
           echo "::notice::Tagged $version at $(git rev-parse --short HEAD)."
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # A tag is a pointer; a release is the thing a human can read. The notes are the squashed
+      # commit subjects since the previous tag — one line per pull request, which is exactly the
+      # granularity this repository merges at. Only ever runs on the push that cut the tag, so a
+      # re-run of an already-tagged commit publishes nothing twice.
+      - name: publish the release for that tag
+        if: steps.tag.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          previous=$(git describe --tags --abbrev=0 "$VERSION^" 2>/dev/null || true)
+          if [ -n "$previous" ]; then
+            range="$previous..$VERSION"
+            echo "Changes since $previous:" > /tmp/notes.md
+          else
+            range="$VERSION"
+            echo "Everything up to $VERSION:" > /tmp/notes.md
+          fi
+          echo >> /tmp/notes.md
+          git log --format='- %s' "$range" >> /tmp/notes.md
+          gh release create "$VERSION" --title "$VERSION" --notes-file /tmp/notes.md
+          echo "::notice::Published the release $VERSION."

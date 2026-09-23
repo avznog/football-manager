@@ -36,6 +36,7 @@ import {
   type FormationTemplate,
 } from "../../db/reference";
 import {
+  competitions,
   formationSlots,
   formations,
   positions,
@@ -44,6 +45,7 @@ import {
   users,
 } from "../../db/schema";
 import { hashPassword } from "../../lib/auth/password";
+import { defaultCompetitionRows } from "../../lib/competition/defaults";
 import type { Fixture, FixturePlayer, FixturePlayerKey } from "./types";
 
 /** Everything this script creates is named after it, and pruned by it. */
@@ -155,6 +157,11 @@ async function createTeam(runId: string): Promise<Fixture> {
     .insert(teams)
     .values({ name: `E2E ${runId}`, slug: `${PREFIX}${runId}` })
     .returning({ id: teams.id, name: teams.name, slug: teams.slug });
+
+  // What `createTeam` gives a real team (decision 107). The happy path never opens the
+  // « Compétition » select — it takes the default — so without these rows « Créer le match » has
+  // nothing to file the match under and the whole season loop stops on the first form.
+  await db.insert(competitions).values(defaultCompetitionRows(team.id));
 
   // One hash for everybody: argon2id is deliberately slow, and nine of them is a visible pause.
   const passwordHash = await hashPassword(PASSWORD);

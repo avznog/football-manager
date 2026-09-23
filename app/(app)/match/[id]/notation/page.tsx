@@ -24,7 +24,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { COMPETITION_LABELS, matchNameFr, pluralize } from "@/lib/calendar/labels";
+import { matchNameFr, pluralize } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import { getMatch } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
@@ -66,7 +66,7 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
         </Link>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="accent">{COMPETITION_LABELS[match.competition]}</Badge>
+          <Badge variant="accent">{match.competitionLabel}</Badge>
           {window.state === "closed" ? <Badge variant="neutral">notation fermée</Badge> : null}
         </div>
 

@@ -2729,3 +2729,71 @@ decision 097's defect once more, in the sentence a coach glances at to decide wh
 valides. » It goes away the moment he moves somebody, because from then on « Changements déduits »
 says what he has done — one line, « Léo → Yanis », where an empty pitch used to print seven departures
 for a coach who had touched nobody.
+
+## 107 — The competitions a team plays in are the coach's data, not ours
+
+*2026-09-23*
+
+`matches.competition` was a Postgres enum: `league`, `cup`, `friendly`, `tournament`, printed through
+a `COMPETITION_LABELS` map in `lib/calendar/labels.ts`. So the vocabulary of every team on the
+installation was decided in this repository, by us, once. A 7-a-side team playing a « Coupe du
+district » alongside its league, or a winter futsal session that is neither a friendly nor a
+tournament, had no way to say so — and the owner's remark is exactly the right question: *qui définit
+les compétitions ?* The coach does. He owns the season; the words for it are his.
+
+**Decision.** A `competitions` table, owned by the team: `team_id`, `label_fr`, `sort`, `archived_at`,
+unique on `(team_id, label_fr)`. `matches.competition_id` points at a row, `on delete restrict`.
+`/equipe` gets the CRUD, behind `competition:manage` in `COACH_ACTIONS` — the same page that already
+holds the squad and the invites, because that is where the coach configures the team.
+
+Four consequences worth stating:
+
+**The four old values survive as a starting point, not as a schema.** `DEFAULT_COMPETITIONS` in
+`lib/competition/defaults.ts` is what `createTeam` writes into the new team's own table, and the
+migration backfills the same four for every team that predates it. A new team therefore behaves
+exactly as before until the coach changes something — the feature costs nobody a setup step.
+
+**The migration is a data migration, and its order is the safety.** Table, backfill of the defaults,
+nullable column, `UPDATE … CASE` mapping every existing match by label, `SET NOT NULL`, then drop the
+enum. The `SET NOT NULL` is a deliberate fail-loud: a match the `CASE` did not map aborts the whole
+migration rather than quietly losing which competition it was played in.
+
+**`restrict`, not `cascade`, and archiving rather than deleting.** Deleting a competition still filed
+on a match would take the match with it, or silently blank the one field the stats filter on. So the
+database refuses, the screen says which matches hold it, and a competition the team no longer plays is
+*archived*: it keeps filing its old matches and stops being offered on the form. Stats filter on the
+id, never on the label, so renaming « Championnat » to « D3 » renames it everywhere at once and breaks
+no saved link.
+
+**No label map left.** `COMPETITION_LABELS` and `COMPETITION_ORDER` are gone; the label travels on the
+row, through the join, in `MatchRow.competitionLabel`. A screen can no longer print a competition name
+the team never chose, because there is no map to print it from.
+
+`docs/PLAN.md` described the enum as approved scope; its table and its data-model sketch now describe
+the table instead, pointing here.
+
+## 108 — Every tag gets a GitHub release, cut by the same job
+
+*2026-09-23*
+
+Decision 081 made CI tag `main` from the `version` field in `package.json`, and said in as many words
+that it would not write release notes: *"the tag message is the commit subject, and the history is the
+changelog."* The owner asked for releases as well as tags, every time the version moves. This entry
+supersedes that one sentence of 081; everything else in it stands.
+
+**Decision.** The `tag` job publishes a GitHub release for the tag it just created, with the squashed
+commit subjects since the previous tag as its notes. It is one step in the same job, gated on that
+job's own output, so a re-run of an already-tagged commit publishes nothing twice and a version whose
+migration failed still gets neither tag nor release.
+
+**Why the notes are the commit subjects.** This repository squash-merges one pull request per slice,
+and the subject line of each squash is written to say *why* the slice exists. So « one line per
+merged pull request » is already the changelog 081 pointed at — the release page just puts it
+somewhere a human can read without a terminal. Nothing new has to be maintained, and there is no
+second place for the story of a version to drift out of agreement with the first.
+
+**Why in CI and not by hand.** Same argument as 081's: `gh release create` typed after a merge is a
+convention that survives two sessions. And a release created by hand is a claim about a version
+nothing verified — exactly what `CLAUDE.md` forbids about tags, for exactly the same reason.
+
+The first release this cuts is `v0.2.0`, the wave of eight remarks the owner made on 2026-09-23.

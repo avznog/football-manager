@@ -103,6 +103,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## M2 — Calendar
 - [x] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)
+- [x] The competitions a team plays in are the coach's list, edited on `/equipe`, not four enum values
+      compiled into the app. Every existing team is backfilled with the four labels the enum printed,
+      every match repointed at its own team's row before the column goes `NOT NULL`; `restrict` on the
+      foreign key and archiving for the ones the team stops playing, and the stats filter keys on the
+      id so a rename orphans nothing (decision 107)
 - [x] Trainings CRUD
 - [x] Unified chronological calendar, next event pinned
 - [x] Availability declaration for matches and trainings

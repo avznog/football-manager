@@ -10,7 +10,7 @@
  * rendered through `lib/calendar/time.ts`, which pins Europe/Paris.
  */
 
-import type { AvailabilityStatus, Competition, MatchStatus } from "@/db/schema";
+import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
 
 /* -------------------------------------------------------------------------- */
 /* Durations                                                                  */
@@ -91,7 +91,8 @@ export type CalendarMatch = {
   opponentName: string;
   isHome: boolean;
   venue: string | null;
-  competition: Competition;
+  /** The team's own word for the competition (decision 107), not a code to look up. */
+  competitionLabel: string;
   status: MatchStatus;
   periodsCount: number;
   periodMinutes: number;

@@ -15,8 +15,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
-import { invites, sessions, teamMembers, teams, users } from "@/db/schema";
+import { competitions, invites, sessions, teamMembers, teams, users } from "@/db/schema";
 import { assertCan } from "@/lib/auth/can";
+import { defaultCompetitionRows } from "@/lib/competition/defaults";
 import { requireActor } from "@/lib/auth/dal";
 import { hashPassword } from "@/lib/auth/password";
 import { passwordSchema, type FormState, toFormState } from "@/lib/auth/validation";
@@ -67,6 +68,12 @@ export async function createTeam(_prev: FormState, formData: FormData): Promise<
       role: "coach",
       isPlayer: false,
     });
+
+    // The four competitions every team starts with (decision 107). In the same transaction as the
+    // team, because a team with an empty list cannot program a single match: the coach would reach
+    // « Nouveau match » and find a sentence telling him to go back where he came from. He renames,
+    // adds and archives them from the team page afterwards.
+    await tx.insert(competitions).values(defaultCompetitionRows(team.id));
 
     return team.id;
   });

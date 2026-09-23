@@ -7,17 +7,16 @@
  */
 
 import type { SegmentOption } from "@/components/ui";
-import type { AvailabilityStatus, Competition, EntryMode, MatchStatus } from "@/db/schema";
+import type { AvailabilityStatus, EntryMode, MatchStatus } from "@/db/schema";
 
-export const COMPETITION_LABELS: Record<Competition, string> = {
-  league: "Championnat",
-  cup: "Coupe",
-  friendly: "Amical",
-  tournament: "Tournoi",
-};
-
-/** In the order a coach picks them: the league is the common case. */
-export const COMPETITION_ORDER: readonly Competition[] = ["league", "cup", "friendly", "tournament"];
+/**
+ * There is no competition label map here any more, and that is decision 107.
+ *
+ * « Championnat », « Coupe », « Amical » and « Tournoi » used to be four enum values translated on
+ * this line. They are now rows of the team's own `competitions` table, so the label a screen prints
+ * is the one the coach typed — carried on the row (`competitionLabel`), never looked up. The four
+ * words survive as the defaults a new team starts with, in `lib/competition/defaults.ts`.
+ */
 
 /**
  * A match that is over with an empty log, in the words the recap already used.

@@ -47,6 +47,7 @@ describe("can — players", () => {
 
   it("cannot administer the team", () => {
     expect(can(player, "team:invite", { teamId: TEAM })).toBe(false);
+    expect(can(player, "competition:manage", { teamId: TEAM })).toBe(false);
     expect(can(player, "team:appointCoach", { teamId: TEAM })).toBe(false);
     expect(can(player, "member:resetPassword", { teamId: TEAM })).toBe(false);
     expect(can(player, "match:create", { teamId: TEAM })).toBe(false);
@@ -96,6 +97,8 @@ describe("can — coaches", () => {
     expect(can(coach, "match:operate", { teamId: TEAM })).toBe(true);
     expect(can(coach, "match:amend", { teamId: TEAM })).toBe(true);
     expect(can(coach, "team:invite", { teamId: TEAM })).toBe(true);
+    // The competitions the team plays in are the coach's to define (decision 107).
+    expect(can(coach, "competition:manage", { teamId: TEAM })).toBe(true);
     expect(can(coach, "team:appointCoach", { teamId: TEAM })).toBe(true);
     expect(can(coach, "training:markAttendance", { teamId: TEAM })).toBe(true);
   });

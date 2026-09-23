@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { getTeamCompetitions } from "@/lib/competition/queries";
 import { invitesReadOnlyFr, staffCardFr } from "@/lib/team/labels";
 import { getActiveInvites, getSquad } from "@/lib/team/queries";
+import { CompetitionManager } from "./competition-manager";
 import { InviteManager } from "./invite-manager";
 import { MemberRow } from "./member-row";
 import { TeamSettings } from "./team-settings";
@@ -11,9 +13,10 @@ export const metadata = { title: "Équipe" };
 
 export default async function TeamPage() {
   const { team } = await requireTeamContext();
-  const [squad, activeInvites] = await Promise.all([
+  const [squad, activeInvites, competitions] = await Promise.all([
     getSquad(team.id),
     team.isCoach ? getActiveInvites(team.id) : Promise.resolve([]),
+    team.isCoach ? getTeamCompetitions(team.id) : Promise.resolve([]),
   ]);
 
   const players = squad.filter((member) => member.isPlayer);
@@ -73,6 +76,7 @@ export default async function TeamPage() {
       {team.isCoach ? (
         <>
           <InviteManager teamId={team.id} invites={activeInvites} />
+          <CompetitionManager teamId={team.id} competitions={competitions} />
           <TeamSettings
             teamId={team.id}
             name={team.name}
