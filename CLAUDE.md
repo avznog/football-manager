@@ -71,11 +71,22 @@ npm run db:generate    # generate a migration from schema.ts changes
 npm run db:migrate     # apply migrations
 npm run db:seed        # reference data + the demo season (idempotent)
 npm run db:reset       # drop everything, remigrate, reseed — local only
-npm test               # Vitest
+npm test               # Vitest — unit only, and it stays that way
+npm run test:e2e       # Playwright, the whole season loop in a browser (~25s)
+npm run test:e2e:install   # Chromium, once per machine
 npm run lint           # eslint
 npm run typecheck      # next typegen && tsc --noEmit
 npm run build          # production build
 ```
+
+`npm run test:e2e` reuses a dev server if one is already up, so it is cheap. It drives
+**`localhost`, never `127.0.0.1`** — see decision 043: Next treats the latter as a foreign origin,
+the page never hydrates, and the suite silently tests the no-JavaScript fallbacks instead. It owns
+its own fixture team and never touches the demo season (decision 044).
+
+`.github/workflows/ci.yml` runs the same checks on every push and pull request: one job for
+typecheck · lint · vitest, and one for the browser run on a `postgres:17` service with the committed
+migrations and a production build.
 
 `next typegen` has to run before `tsc`, so always go through `npm run typecheck` rather than
 calling `tsc` directly: `PageProps<"/route">` does not exist until the route types are generated.
@@ -83,8 +94,14 @@ calling `tsc` directly: `PageProps<"/route">` does not exist until the route typ
 ## Definition of done for any change
 
 - `npm run typecheck`, `npm run lint` and `npm run test` all pass
+- `npm run test:e2e` passes if the change touches the match flow, a Server Action or a screen the
+  happy path walks through — and CI must be green on the PR before it is merged
 - new behaviour has a test if it touches the reducer, the lineup diff, or permissions
-- both light and dark mode verified on a mobile viewport
+- both light and dark mode verified on a mobile viewport — **actually looked at, at 390 px**. Every
+  defect found in waves 3 and 4 was a screen stating something untrue, and not one of them failed a
+  test: « 0 – 0 » for a match nobody recorded, « 7 changements » for the starting seven, a confirm
+  button 8 px off the right edge. `npm run db:reset` then walking the season is the cheapest review
+  tool in the repo
 - `docs/ROADMAP.md` updated, `docs/SESSIONS.md` appended to, and `docs/DECISIONS.md`
   extended if a decision was made
 - migrations committed alongside the schema change that produced them
