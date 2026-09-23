@@ -1908,7 +1908,7 @@ Three smaller untruths on the same page came from the same root, and each is now
 `live` stays editable on purpose, in all of it: planning the 40th minute during the 20th is the whole
 point of the screen, and invariant 3 means what is written is still only a proposal.
 
-## NNN — A diff needs two teams, and a draft is not one
+## 086 — A diff needs two teams, and a draft is not one
 **2026-09-23** · accepted
 
 « Nouvelle composition » opens on an empty pitch — that is what it is for. At the bottom of it, under
