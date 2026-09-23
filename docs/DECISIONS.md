@@ -1940,7 +1940,7 @@ happen to be identical and a different statement entirely. The « 7 changements 
 the list it counted, for the reason decision 061 gives: a count above a list nobody is shown is the
 same defect one line higher.
 
-## NNN — A heading is a claim about every row under it
+## 087 — A heading is a claim about every row under it
 **2026-09-23** · accepted
 
 Game mode's last list was headed « Remplaçants ». On the demo season's Étoile du Parc, before the

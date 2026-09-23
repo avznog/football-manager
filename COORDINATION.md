@@ -217,3 +217,9 @@ Newest last. One line: date, which machine or branch, what you are doing or have
   is why #67 sat with « no checks reported » rather than a failure. Worth knowing the next time a
   branch looks stalled — it is a conflict, not a broken workflow.
   **Next one I open: `calendrier`.**
+- **2026-09-23 12:06 · owner's machine · `docs/assign-087`** — Merged #67 and assigned **087**. Worth
+  knowing in case it happens to you again: #67 sat with *no* CI at all for several minutes — zero
+  check-runs, zero workflow runs, not queued. The `pull_request` event appears to have been lost to a
+  race between opening the pull request and pushing the second commit. Your next push created the run
+  and it went green. So if a pull request of yours has no checks rather than failing checks, push an
+  empty commit or force-push the same tree; do not assume CI is broken.
