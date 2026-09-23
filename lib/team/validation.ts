@@ -4,6 +4,8 @@
 
 import { z } from "zod";
 
+import { CREST_DATA_URL_PATTERN, CREST_MAX_CHARS, CREST_KEEP, CREST_REMOVE } from "./crest";
+
 export const teamNameSchema = z
   .string()
   .trim()
@@ -31,11 +33,39 @@ export const createTeamSchema = z.object({
   secondaryColor: hexColorSchema.default("#ffffff"),
 });
 
+/**
+ * A crest the browser has already re-encoded (`lib/team/crest.ts`, decision 054).
+ *
+ * The pattern is not politeness about file formats: the value goes straight into the `src` of an
+ * `<img>`, so anything but the two raster types the canvas produces is refused here. An SVG `data:`
+ * URL is the one shape of this string that can carry markup, and it never has to be considered
+ * downstream because it cannot get past this line.
+ */
+export const crestDataUrlSchema = z
+  .string()
+  .trim()
+  .max(CREST_MAX_CHARS, "Ce blason est trop lourd : choisis une image plus simple.")
+  .regex(CREST_DATA_URL_PATTERN, "Ce fichier n’est pas une image utilisable comme blason.");
+
+/**
+ * The crest field of the settings form, as three states rather than two.
+ *
+ * `undefined` after parsing means **leave the column alone**: the card also renames the team and sets
+ * the kit colours, and a coach fixing a typo in the name must not lose the crest because the file
+ * input was empty. `null` is the explicit « Retirer le blason ».
+ */
+export const crestFieldSchema = z
+  .union([z.literal(CREST_KEEP), z.literal(CREST_REMOVE), crestDataUrlSchema])
+  .transform((value) =>
+    value === CREST_KEEP ? undefined : value === CREST_REMOVE ? null : value,
+  );
+
 export const updateTeamSchema = z.object({
   teamId: z.uuid(),
   name: teamNameSchema,
   primaryColor: hexColorSchema,
   secondaryColor: hexColorSchema,
+  crest: crestFieldSchema,
 });
 
 export const createInviteSchema = z.object({

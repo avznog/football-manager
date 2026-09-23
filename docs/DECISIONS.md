@@ -943,3 +943,41 @@ to every player listed as a substitute, so the unused substitute — the commone
 
 The retro path is therefore correct as it stands: a listed substitute who actually started keeps
 `squad_role = 'substitute'`, and every screen that cares whether he started asks the log.
+
+## 054 — The club crest is re-encoded in the browser and stored in the row as a `data:` URL
+**2026-09-23** · accepted
+
+`teams.crest_url` has existed since M0 and nothing could write it, because uploading a file needs
+somewhere to put it and this app has no object store. Rather than add one, the crest is shrunk to at most
+**96 px on its long side** in the coach's own browser (`lib/team/crest.ts`, `app/(app)/equipe/crest-field.tsx`)
+and posted as a `data:image/png` or `data:image/jpeg` URL that goes straight into the column.
+
+**Why not a bucket.** Vercel Blob or S3 would mean a second service to provision, a second set of
+credentials in `docs/DEPLOY.md`, a lifecycle to think about (what happens to the old crest when the coach
+changes it), and a signed-upload round trip — all for **one image per team**, a value that changes perhaps
+once a year. The whole project is one Postgres and one Next app on purpose; a 20 KB string is a smaller
+price than a third moving part.
+
+**Why 96 px, and why a ceiling at all.** `lib/auth/dal.ts` reads the team row on **every authenticated
+request** to build the shell, so the crest is not a column that is read when someone visits a gallery: it
+is on the hot path of every page in the app. 96 px is twice the 40 px the header draws it at, which covers
+a 3× phone screen, and it lands under ~24 KB of base64 for anything that looks like a crest.
+`CREST_MAX_CHARS = 32_000` is the hard stop the Server Action enforces, and the client tries PNG first,
+then JPEG on white, then refuses with a message rather than silently storing something huge.
+
+**Consequences.**
+
+- The resizing is the client's job, so a 4 MB phone photograph never crosses the wire, and the preview
+  the coach sees before saving is the **re-encoded** image — a crest that came out badly is visible
+  before « Enregistrer », not afterwards in the header.
+- The server trusts nothing but a string it can validate with a regular expression
+  (`crestDataUrlSchema`). Only `image/png` and `image/jpeg` are accepted: the value is rendered as the
+  `src` of an `<img>`, and `data:image/svg+xml` is the one shape of it that can carry markup, so it is
+  refused at the boundary instead of reasoned about downstream.
+- The field is three-state — `""` keep, `"none"` remove, a data URL replace — mapping to Drizzle's
+  `undefined` / `null` / value. A two-state field would mean renaming the team cost it its crest.
+- `next/image` has nothing to do with a `data:` URL: no host to allow, nothing to optimise. The two
+  `<img>` elements keep their eslint exception, now for that reason rather than the stale « arbitrary
+  URL per club » one.
+- If a team ever needs a large crest, or if the app grows a photo of anything, that is when an object
+  store is worth adding — and this decision is what it supersedes.

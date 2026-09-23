@@ -30,8 +30,8 @@ function TeamMark({
 }) {
   if (crestUrl) {
     return (
-      // A crest is an arbitrary URL uploaded per club, so `next/image` would
-      // need a `remotePatterns` entry we cannot predict. Plain <img> it is.
+      // The crest is a `data:` URL re-encoded in the browser (decision 054): there is no
+      // remote host for `next/image` to fetch and nothing for it to optimise. Plain <img> it is.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={crestUrl}

@@ -21,6 +21,7 @@ import { requireActor } from "@/lib/auth/dal";
 import { hashPassword } from "@/lib/auth/password";
 import { passwordSchema, type FormState, toFormState } from "@/lib/auth/validation";
 import { setActiveTeam } from "@/lib/auth/actions";
+import { CREST_KEEP } from "./crest";
 import { INVITE_TTL_DAYS, generateInviteCode } from "./invite-code";
 import {
   createInviteSchema,
@@ -100,6 +101,8 @@ export async function updateTeam(_prev: FormState, formData: FormData): Promise<
     name: formData.get("name"),
     primaryColor: formData.get("primaryColor"),
     secondaryColor: formData.get("secondaryColor"),
+    // A form posted by an older tab has no crest field at all, and that must mean "leave it".
+    crest: formData.get("crest") ?? CREST_KEEP,
   });
   if (!parsed.success) return toFormState(parsed.error);
 
@@ -111,10 +114,15 @@ export async function updateTeam(_prev: FormState, formData: FormData): Promise<
       name: parsed.data.name,
       primaryColor: parsed.data.primaryColor,
       secondaryColor: parsed.data.secondaryColor,
+      // `undefined` is Drizzle's "do not touch this column", which is exactly what the untouched
+      // file input means; `null` is the coach asking for the crest to go.
+      crestUrl: parsed.data.crest,
     })
     .where(eq(teams.id, parsed.data.teamId));
 
-  revalidatePath("/equipe");
+  // The crest and the name live in the header, which is part of every screen's layout, so this
+  // revalidates the shell rather than the one page that changed it.
+  revalidatePath("/", "layout");
   return undefined;
 }
 

@@ -106,8 +106,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       invariant 5 sends a user with no team to `/rejoindre` and nowhere else, so the form lives
       there for a super admin. Walked in a browser at 390 px, light and dark: bootstrap → login →
       create → all five tabs reachable, no console errors
-- [x] The club colours can be changed after creation — « Réglages de l'équipe » on `/equipe`
+- [x] The club colours can be changed after creation — « Réglages de l’équipe » on `/equipe`
       (`updateTeam` had no UI either)
+- [x] The club crest can be set — `teams.crest_url` had existed since M0 with nothing able to write
+      it, for want of an object store. The image is resized to 96 px in the browser and stored in the
+      row as a `data:` URL (decision 054), which is why there is still no object store to provision
 - [x] Every tab checked in the state a brand-new instance is actually in — zero matches, zero
       players, zero trainings. The demo seed always had a season in it, so this state had never
       been looked at; `/equipe` was an empty bordered box and now says what to do next
