@@ -200,6 +200,13 @@ export async function saveLineup(_prev: FormState, formData: FormData): Promise<
 
   const match = await findMatch(teamId, matchId);
   if (!match) return { error: "Ce match n’existe pas dans cette équipe." };
+  // The same rule as the match sheet, in the same words (decision NNN). Without it the compositions
+  // screen's « Planifier un changement » button really did add a plan « à partir de la 30ᵉ minute »
+  // to a match played last week; a finished match is changed by appending, through
+  // `lib/retro/amend.ts`, and not by planning a minute that has already been played.
+  if (match.status === "finished") {
+    return { error: "Le match est terminé : les compositions ne changent plus." };
+  }
 
   const existing = await getMatchLineups(matchId);
   const target = lineupId ? existing.find((lineup) => lineup.id === lineupId) : undefined;
@@ -374,6 +381,10 @@ export async function deleteLineup(formData: FormData): Promise<void> {
 
   const match = await findMatch(parsed.data.teamId, parsed.data.matchId);
   if (!match) return;
+  // A plan on a finished match is part of the record of it, even one game mode never confirmed: it
+  // is what the coach had intended (decision NNN). `void` here, like every other refusal in this
+  // action — the screen no longer offers the button.
+  if (match.status === "finished") return;
 
   const deleted = await db
     .delete(lineups)

@@ -17,7 +17,12 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BUILTIN_FORMATIONS } from "@/db/reference";
 import type { ActiveTeam } from "@/lib/auth/dal";
-import { planTitleFr, sortPlans, suggestNextMinute } from "@/lib/composition/plan";
+import {
+  LINEUPS_FROZEN_FR,
+  planTitleFr,
+  sortPlans,
+  suggestNextMinute,
+} from "@/lib/composition/plan";
 import { getCompositionMembers, getMatchLineups, toPlannedLineup } from "@/lib/composition/queries";
 import { getFormations } from "@/lib/formation/queries";
 import type { MatchRow } from "@/lib/match/queries";
@@ -59,7 +64,7 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
    * Computed before the dead ends below, not after, because they render the same header: an audit of
    * every screen at 390 px found this route reaching four different states with no `h1` at all — a
    * bare centred panel saying « Cette composition a été appliquée » about no match in particular.
-   * The title is the one thing all five states can state truthfully, so it is outside all of them.
+   * The title is the one thing all six states can state truthfully, so it is outside all of them.
    */
   const title = target
     ? planTitleFr(target)
@@ -92,6 +97,15 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
         description="Elle a été confirmée pendant le match : elle décrit ce qui s’est passé, pas ce qui était prévu."
         backHref={backHref}
       />,
+    );
+  }
+
+  // A sixth dead end, and the one this route had no opinion about: `saveLineup` now refuses a finished
+  // match (decision NNN), so the editor says so here instead of taking a composition and losing it on
+  // submit. Same sentence as the list's notice, `LINEUPS_FROZEN_FR`.
+  if (match.status === "finished") {
+    return shell(
+      <Guidance title="Le match est joué" description={LINEUPS_FROZEN_FR} backHref={backHref} />,
     );
   }
 
