@@ -246,7 +246,7 @@ export function sheetNextStepFr(
     return {
       description:
         `${counts.starters} titulaires cochés pour ${FORMATION_SLOT_COUNT} places : il y en a ` +
-        `${extra} de trop. Repasse ${extra > 1 ? "les" : "le"} en remplaçant${extra > 1 ? "s" : ""} ` +
+        `${extra} de trop. Repasse${extra > 1 ? "-les en remplaçants" : "-le en remplaçant"} ` +
         "avant de composer.",
       cta: "composition",
     };

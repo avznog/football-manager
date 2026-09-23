@@ -1839,3 +1839,36 @@ one screen is exactly what decisions 061 and 064 exist to have removed, so the s
 Both live in `lib/retro/labels.ts` with tests, for the reason that keeps recurring: Vitest collects
 nothing under `app/`, so copy whose truth depends on state has to leave the component before it can
 be pinned.
+
+## NNN — A « what next » card reads the state it is standing on
+**2026-09-23** · accepted
+
+The match sheet ended with a card that said, on every match, in every state:
+
+> Et maintenant ?
+> Le groupe est fait : place les sept sur le terrain.
+> [ Compositions ]
+
+It was written while looking at a finished selection, and it is a statement about one. Three of the
+states it is actually shown in contradict it:
+
+- a match created a minute ago has thirteen rows marked « Hors » and no group at all. The card told
+  the coach to place seven players and offered a link to an editor that would open with an empty
+  bench;
+- a match played a fortnight ago has a frozen sheet. `SquadSheet` says so, two centimetres above, and
+  the card underneath was still giving instructions for a match that is over;
+- nothing caps the starters — the badge turns amber past seven but the action accepts nine — so
+  « les sept » routinely named a seven that did not exist.
+
+Decision 083 said an empty state describes the form rather than the match. This is the same rule for
+the other end of a screen: **a next-step card is derived from the state it is standing on, like any
+other rendered fact.** It is the most quoted line on the page, the one a coach acts on, and it was the
+only thing on the screen that could not be wrong in a way `audit:screens` would notice.
+
+`sheetNextStepFr` returns the sentence *and* the call to action, because on an untouched sheet the
+honest answer is that there is no next screen yet: the button disappears rather than leading somewhere
+useless, and on a finished match it becomes the recap. It lives next to `countSquadRoles`, whose result
+it reads, in `lib/composition/plan.ts` — under `lib/` so Vitest collects it.
+
+`live` is deliberately not a case of its own: preparing a composition during a match is the normal way
+to plan a change, and invariant 3 means the plan is a proposal whenever it is written.

@@ -413,6 +413,7 @@ describe("sheetNextStepFr", () => {
 
     expect(step.description).toContain("9 titulaires cochés pour 7 places");
     expect(step.description).toContain("2 de trop");
+    expect(step.description).toContain("Repasse-les en remplaçants");
     expect(step.description).not.toContain("place les sept");
   });
 

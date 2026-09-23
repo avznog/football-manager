@@ -1513,3 +1513,30 @@ form in a browser at 390 px rather than by trusting the unit tests: 0 → « la 
 vide », 1 → « le titulaire choisi », 2 → « les 2 titulaires choisis », 3 → « les 3 titulaires
 choisis », and the three-line wrap fits the card in both themes. `npm run audit:screens` found no
 mechanical defect and `npm run test:e2e` passes, the retro sheet being a Server Action screen.
+
+### « Le groupe est fait » on a sheet nobody had touched
+
+Next capture: `light-coach-feuille.png`, the match sheet against Étoile du Parc. It ends with a card —
+« Et maintenant ? · Le groupe est fait : place les sept sur le terrain. · [Compositions] » — and on
+that screen it is true: 7/7 titulaires. Reading the source rather than the capture is what showed the
+sentence is a constant, so I went looking for the states it is shown in and wrong.
+
+There are three. A match created a minute ago: thirteen rows marked « Hors », no group, and the link
+would open an editor with an empty bench. A match played a fortnight ago: the sheet is frozen, says so
+two centimetres higher, and the card was still telling the coach to place seven players. And a sheet
+with nine titulaires, which nothing caps — the badge turns amber past seven but the action accepts them
+— where « les sept » names a seven that does not exist.
+
+Decision NNN is decision 083 for the other end of a screen: **a next-step card is derived from the
+state it is standing on.** `sheetNextStepFr` returns the sentence *and* the call to action, because on
+an untouched sheet the honest answer is that there is no next screen yet — the button disappears rather
+than leading somewhere useless, and on a finished match it becomes « Résumé du match ». 906 unit tests,
+45 files.
+
+Verified by looking at all five states at 390 px in both themes, which meant manufacturing two of them:
+AS Coteaux's sheet is genuinely empty in the demo season, so four and nine starters were inserted with
+`psql`, captured, and deleted again — the demo data is back to zero rows, checked. The five readings:
+« Personne n'est encore titulaire… » · « 4 titulaires sur 7 : il en manque 3… » · « Le groupe est
+fait… » · « 9 titulaires cochés pour 7 places : il y en a 2 de trop. Repasse-les en remplaçants… » ·
+« Le match est joué : la feuille reste ici pour mémoire. » The first capture of the over-seven case is
+also what caught « Repasse les » without its hyphen; an imperative with a pronoun takes one.
