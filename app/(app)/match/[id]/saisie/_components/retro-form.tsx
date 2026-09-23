@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/components/ui/cn";
 import { EVENT_LABELS_FR } from "@/lib/match/events";
+import { scoreLineFr } from "@/lib/calendar/labels";
 import { regulationMinutes } from "@/lib/match/clock";
 import { reduceMatch } from "@/lib/match/reducer";
 import { submitRetroMatch } from "@/lib/retro/actions";
@@ -178,7 +179,7 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
       >
         <div className="space-y-3">
           <p className="text-center font-mono text-4xl font-bold text-ink tabular-nums">
-            {preview.state.goalsFor} – {preview.state.goalsAgainst}
+            {scoreLineFr(preview.state.goalsFor, preview.state.goalsAgainst)}
           </p>
           <div className="grid grid-cols-2 gap-2">
             <Button type="button" variant="secondary" onClick={() => addGoal("GOAL_FOR")}>

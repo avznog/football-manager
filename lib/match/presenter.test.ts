@@ -10,6 +10,7 @@ import {
   nextEventStamp,
   onPitchOptions,
   pendingCountLabelFr,
+  emptyPitchFr,
   pendingLineupChangesFr,
   pendingLineupView,
   periodsOf,
@@ -622,6 +623,31 @@ describe("the planned-composition prompt", () => {
    * screen stating the opposite of the truth, which is the defect class this repo keeps finding by
    * looking rather than by testing. Now there is a test.
    */
+  /*
+   * The pitch is empty before kick-off in every properly prepared match, so « aucune composition
+   * enregistrée » — which the screen printed on that basis alone — was usually false, and was printed
+   * directly beneath the card showing the composition it denied.
+   */
+  it("does not deny a composition that is on screen waiting to be applied", () => {
+    expect(emptyPitchFr({ hasLineups: false, isProposed: false, canOperate: true })).toMatchObject({
+      title: "Aucune composition enregistrée.",
+    });
+
+    const proposed = emptyPitchFr({ hasLineups: true, isProposed: true, canOperate: true });
+    expect(proposed.title).toBe("Personne n’est encore sur le terrain.");
+    expect(proposed.description).toContain("votre confirmation");
+
+    // A viewer who cannot operate is told whose confirmation it is waiting for, not asked for theirs.
+    const watching = emptyPitchFr({ hasLineups: true, isProposed: true, canOperate: false });
+    expect(watching.description).toContain("l’opérateur");
+    expect(watching.description).not.toContain("votre");
+
+    // Saved, not proposed — a plan for the 30th minute, say. Still not « aucune composition ».
+    expect(emptyPitchFr({ hasLineups: true, isProposed: false, canOperate: true })).toMatchObject({
+      title: "Personne n’est encore sur le terrain.",
+    });
+  });
+
   it("tells « rien ne changerait » apart from « c'est la feuille de match »", () => {
     const nothingWouldChange: PendingLineupView = {
       lineupId: "l-45",

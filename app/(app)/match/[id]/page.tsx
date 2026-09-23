@@ -28,10 +28,11 @@ import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import {
   COMPETITION_LABELS,
-  MATCH_STATUS_LABELS,
   entryModeBadgeFr,
+  MATCH_STATUS_LABELS,
   periodsLabel,
   resultLabel,
+  scoreLineFr,
   venueSideLabel,
 } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
@@ -153,7 +154,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         {score ? (
           <p className="flex items-baseline gap-3">
             <span className="font-mono text-3xl font-bold text-ink tabular-nums">
-              {score.goalsFor} – {score.goalsAgainst}
+              {scoreLineFr(score.goalsFor, score.goalsAgainst)}
             </span>
             <span className="text-sm font-medium text-ink-muted">
               {resultLabel(score.goalsFor, score.goalsAgainst)}

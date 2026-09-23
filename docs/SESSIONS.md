@@ -799,3 +799,33 @@ one in the app, for the reason written next to it: the clock and the score own e
 pitch on purpose. The audit checks for a missing `h1` now, so this cannot come back quietly.
 
 846 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.
+
+## Looking at the screenshots, which was the point of the script
+
+The audit from earlier in this session came back clean, so I did the half it exists to make cheap and
+read the PNGs. Two more defects, both of the same family, neither mechanical.
+
+The recap of an away win — a real one in the demo season, CS Morvan away — showed « CS Morvan — Nous »
+and « 0 – 2 » in the largest numerals in the product, under a green « Victoire » badge, over a timeline
+writing the same two goals « 1 – 0 » and « 2 – 0 ». Digging found no bug: two conventions, both
+deliberate, written by different hands on different days. The calendar pill has carried a docstring
+since M2 saying « never « 1-3 » read the wrong way round », and both scoreboards put the home side
+first the way a broadcast does. So the fix was to decide, once, and the decision went to ours-first
+(061): this app has exactly one side, and in game mode the score is 36 px while the caption naming the
+sides is 12 px and truncates — making a coach work out which figure is his at 58’ is the wrong thing to
+ask. Game mode's scoreboard now spends its `isHome` on a « Dom. » / « Ext. » badge, which is strictly
+more information than the ordering carried. The timeline needed no change, which is how you know the
+convention was the problem.
+
+The other was in game mode: « Aucune composition enregistrée. » printed directly beneath the card
+showing the composition, saved and proposed and waiting. The copy was keyed on an empty pitch, and an
+empty pitch before kick-off is exactly what invariant 3 produces. `emptyPitchFr` now distinguishes the
+three cases and names whose confirmation is awaited. The e2e happy path had pinned the old string — at
+the very moment a composition was saved — so a test was holding the lie in place rather than catching
+it; it now asserts the true copy *and* the absence of the false one.
+
+Both fixes went into `lib/` rather than into JSX, for the reason that is becoming a pattern here:
+Vitest runs in `node`, cannot render a client component, and copy this easy to get backwards has to
+live where a test can read it.
+
+848 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.

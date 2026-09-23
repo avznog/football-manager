@@ -14,6 +14,7 @@ import {
   pluralize,
   resultLabel,
   resultLetter,
+  scoreLineFr,
   venueSideLabel,
 } from "@/lib/calendar/labels";
 import type { AvailabilityCounts, CalendarMatch, CalendarTraining } from "@/lib/calendar/timeline";
@@ -84,7 +85,8 @@ export function AnswersLine({
 
 /**
  * The derived score, from the team's point of view: our goals first, whether the match was at
- * home or away. Never « 1-3 » read the wrong way round.
+ * home or away. Never « 1-3 » read the wrong way round — `scoreLineFr` is now that rule, and the app
+ * follows it on every screen rather than only on this one.
  */
 export function ScorePill({ match }: { match: CalendarMatch }) {
   if (match.score === null) return null;
@@ -97,7 +99,7 @@ export function ScorePill({ match }: { match: CalendarMatch }) {
     <span className="flex shrink-0 items-center gap-2">
       <span className="font-mono text-base font-bold text-ink tabular-nums">
         <span className="sr-only">{resultLabel(goalsFor, goalsAgainst)}, </span>
-        {goalsFor} – {goalsAgainst}
+        {scoreLineFr(goalsFor, goalsAgainst)}
       </span>
       <Badge variant={variant} solid aria-hidden>
         {letter}
