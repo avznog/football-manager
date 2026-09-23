@@ -597,3 +597,68 @@ decisions 013 and 017 into the live flow.
 
 **Consequences.** `GOAL_FOR.scorerId` is optional and the goal still counts in the score; it simply
 adds to nobody's tally. The timeline reads « But 58' » with no name.
+
+## 037 — The demo season contains one instance of every edge case, with its expected figures
+**2026-09-23** · accepted
+
+`db/seed.ts` deliberately seeds a defeat, a draw, a keeper swapped at half time, an unattributed
+goal, a finished match with an empty log, a supporter on a sheet, a departed player who scored,
+voided events, and rating sets that are complete, partial and insufficient. Above each fixture, a
+comment states the figures it should produce.
+
+**Why.** The previous seed was two identical logs, so every screen looked correct against it and a
+regression in an edge case would only surface on a real Sunday, in front of the team. A fixture whose
+expected numbers are written down turns « does this screen look plausible? » into « does this screen
+match? », which is a question a human can answer in five seconds and an agent can answer at all.
+
+**Consequences.** Every match is written the way the app writes one — squad, composition,
+append-only log — and frozen through `finalizeMatchById`; not one `match_player_stats` row is
+hand-written, and `seedPlayedMatch` throws if the freeze does not happen. The fixtures therefore
+cannot drift from the reducer. The season is 4 V / 1 N / 1 D, 13–10, minutes 2520 = 6 × 420, and
+those totals are as much a test as the unit suite is.
+
+## 038 — A finished match with an empty log is seeded by writing the status directly
+**2026-09-23** · accepted
+
+`finalizeMatch` refuses to freeze, and refuses to touch `matches.status`, without a `FINAL_WHISTLE`.
+The empty-log fixture therefore writes `status: 'finished'` itself. It is the only place in the
+codebase where a match is closed outside the freeze path, and the seed asserts that no
+`match_player_stats` row was created.
+
+**Why.** « Finished with nothing recorded » is a real state — the phone died, or nobody ran game mode
+— and it is *not* 0-0 (aggregate rule 7, decision 013). It has to be reachable in the fixtures, and
+the freeze path is right to refuse it: freezing a log with no final whistle would invent a result.
+
+**Consequences.** This is the fixture that exposed a defect in the recap's scoreboard, which renders
+such a match as « 0 – 0 » with an « en cours » badge. Being able to *see* the state was the point.
+
+## 039 — A supporter is on the sheet, rates nobody, and may read the results
+**2026-09-23** · accepted
+
+A supporter appears in `match_squad` with `role = 'supporter'`. They are never rated and never rate,
+and because they had no set to submit, the rating gate classifies them `not-a-rater` and shows them
+the notes.
+
+**Why.** Being on the sheet is the record of having been there, which is what the attendance and
+appearance counts are about (decision 022). But decision 007's gate exists to stop copying and
+anchoring among the people whose notes are being compared, and someone who owes no note can neither
+copy nor anchor — withholding the results from them would punish them for not having played.
+
+**Consequences.** A supporter counts as an appearance with zero minutes, never as a *gardien*, and
+never appears in a rating average. The notation screen currently tells them « Tu n'étais pas sur la
+feuille de match », which is false — the reason is right, the sentence is not, and it is fixed
+separately.
+
+## 040 — A departed member keeps the sessions they were marked at
+**2026-09-23** · accepted
+
+Training attendance rows are never deleted when a member leaves: sessions before their `left_at` keep
+mentioning them, sessions after it never do.
+
+**Why.** Attendance is a record of a session, not a property of a current squad member, and the rate
+is `présent / marqué` over the sessions a player was actually judged at (decision 020). Removing the
+rows would silently rewrite the history of sessions that happened, and would make last season's
+attendance rate change as people leave.
+
+**Consequences.** Same reasoning as the season scorer table keeping a departed scorer: `lib/stats/`
+deliberately reads every membership, including those with `left_at` set.
