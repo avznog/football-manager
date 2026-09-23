@@ -4,6 +4,11 @@ This file is the entry point for any Claude session. Read it first, then `docs/`
 It exists because the owner works across many sessions that share no memory: **everything
 needed to resume is in git.**
 
+> **Read [`COORDINATION.md`](COORDINATION.md) before anything else, on every wake-up.** More than one
+> session works this repository at once, sometimes on different machines where they cannot see each
+> other at all, and that file is the only channel they share. It says who is active, what changed
+> under you, and how to avoid the collisions that have already cost hours. It is short.
+
 ## What this project is
 
 A mobile-first web app to manage an amateur **7-a-side** football team over a season:
@@ -21,6 +26,8 @@ travaillez ».
 
 ## Read these, in order
 
+0. `COORDINATION.md` — who else is working right now, and what moved under you. Re-read it every
+   wake-up; unlike the rest of this list, it is written to go stale.
 1. `docs/PLAN.md` — the approved plan. The source of truth for scope and architecture.
 2. `docs/DECISIONS.md` — every product and technical decision, with its rationale.
    **Do not silently contradict a decision here.** If you think one is wrong, say so and add
@@ -122,6 +129,14 @@ calling `tsc` directly: `PageProps<"/route">` does not exist until the route typ
 
 One branch per slice, named `feat/<slice>`. Open a PR describing what the slice does and how to
 verify it. **Squash-merge** into `main`. Never commit directly to `main`.
+
+Only `main` deploys — a push to any other branch builds nothing on Vercel (decision 080), so the
+preview URL to check a change on is the one CI's browser job builds, or a local `npm run build`.
+
+**Versions are the `version` field in `package.json`, and CI turns them into tags.** Bump it in the PR
+that earns the bump and the `tag` job cuts `v<version>` on `main` once the tests and the migration have
+passed (decision 081). Never create a release tag by hand: a tag that does not follow that path is a
+claim about a version nothing verified.
 
 **Nothing is done until it is on `origin`.** The whole reason this project keeps its spec, its
 decisions and its migrations in git is that sessions share no memory: work that exists only in a

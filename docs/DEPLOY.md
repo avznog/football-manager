@@ -81,9 +81,10 @@ rewrite every team on the instance.
 ## 4. Vercel
 
 The project is `avznog-team/football-manager`, connected to `avznog/football-manager`. **Deploys come
-from git**: a push to `main` is a production deploy, a pull request is a preview. `vercel --prod` from
-a laptop still works and is the way to ship a commit that is not on `main`, but it should stay the
-exception — the point of decision 078 is that the schema and the code move on the same push.
+from git, and only from `main`**: a push to `main` is a production deploy, and a push to any other
+branch deploys nothing at all (decision 080). `vercel --prod` from a laptop still works and is the way
+to ship a commit that is not on `main`, but it should stay the exception — the point of decision 078 is
+that the schema and the code move on the same push.
 
 If it ever has to be re-linked:
 
@@ -92,8 +93,28 @@ vercel link --yes --project football-manager
 vercel git connect --yes
 ```
 
-Next.js is detected without configuration; there is no `vercel.json` and none is needed. The build
-command is the default `npm run build`, and it deliberately does not migrate — decision 078 says why.
+Next.js is detected without configuration. `vercel.json` exists for one reason — the branch rule above
+— and holds nothing else. The build command is the default `npm run build`, and it deliberately does
+not migrate: decision 078 says why.
+
+### Only `main` deploys
+
+```json
+{ "git": { "deploymentEnabled": { "**": false, "*": false, "main": true } } }
+```
+
+Read it as "nothing, except `main`". Three keys for two rules because of one trap: the patterns are
+[minimatch](https://github.com/isaacs/minimatch), where **`*` does not match a `/`** — and every
+branch in this repository is `feat/<slice>`, so a lone `*` would have matched `main` and missed every
+branch it was written to stop. `**` crosses the slash; `*` is kept because it costs nothing and the
+next reader should not have to know which one does the work.
+
+`main` matches both `**` (false) and `main` (true), and Vercel's rule is that a branch matching several
+patterns deploys if **any** of them is `true`. So the `true` wins, on purpose.
+
+This is a `git.deploymentEnabled` rule rather than an `ignoreCommand`, which is the other way to do it:
+`ignoreCommand` starts a build container and then exits early, so it shows a cancelled deployment per
+push and bills for the start-up. `deploymentEnabled` means the deployment is never created.
 
 ### The one variable, and the trap in it
 
@@ -124,15 +145,21 @@ happened here on the first attempt: both were set on the Vercel project, along w
 for the one account that can read and rewrite every team on the instance, once it has been somewhere
 it did not need to be, is reset rather than reasoned about: run `db:bootstrap` again with a new one.
 
-### Preview deployments share the production database
+### Preview deployments, and the gun the branch rule unloaded
 
-`DATABASE_URL` is set for Preview too, pointing at the same Neon database as production. Every pull
-request therefore previews against the real season, and a Server Action tapped in a preview writes to
-it. What keeps this from being worse than it sounds is Vercel Authentication: an unauthenticated
-request to a preview URL answers `302` to `vercel.com/sso-api`, so the reachable set is the team
-scope, not the internet. It is still a loaded gun — the same hand that opens a preview to check a
-lineup editor is writing to the real season — so give Preview its own Neon branch before a second
-person is added to the scope.
+`DATABASE_URL` is set for Preview as well as Production, and it is **the same Neon database**. While
+every branch deployed, that meant every pull request previewed against the real season and a Server
+Action tapped in a preview wrote to it — the same hand that opens a preview to check a lineup editor,
+writing to the season the team's statistics come from. Vercel Authentication kept the reachable set to
+the team scope rather than the internet, which made it survivable, not fine.
+
+Decision 080 removes it rather than mitigating it: no branch but `main` deploys, so there is no preview
+to point at the wrong database. The Preview value is now inert — it is left in place because
+`vercel --prod`-style manual deploys and any future preview should find a working variable rather than
+a missing one, but nothing reads it automatically.
+
+If previews are ever turned back on, give Preview its own Neon branch **first**. That is the fix the
+branch rule let us skip, not one it made unnecessary.
 
 ### Turn Deployment Protection off
 
@@ -186,7 +213,7 @@ to be copied from the **Neon** dashboard, not pulled from Vercel.
 
 ## 6. On a real phone
 
-The one check that cannot be automated, and the one that has caught the most: open the preview on an
+The one check that cannot be automated, and the one that has caught the most: open the site on an
 iPhone and on an Android, **outside, in daylight**, and walk a match. Is the turf legible in the sun?
 Is the ACTION button reachable with a thumb? Does dragging a player onto a slot work without a mouse?
 
@@ -198,13 +225,27 @@ test, which is why this step is in the definition of done rather than in a wish 
 ## Upgrading later
 
 Squash-merge the pull request. That is the whole procedure: CI typechecks, lints, runs Vitest and the
-browser suite, then applies any new migration to Neon, while Vercel builds and promotes the same
-commit. Nothing to run by hand.
+browser suite, then applies any new migration to Neon and tags the version, while Vercel builds and
+promotes the same commit. Nothing to run by hand.
 
-The two are not ordered against each other, so for a few seconds the new code may be serving against
+Vercel is not ordered against the migration, so for a few seconds the new code may be serving against
 the old schema. Migrations are written to be safe in that direction. One that cannot be — a dropped
 column, a narrowed type — is the case to take out of this flow and do by hand, with the reasoning
 written down.
+
+### Versions are tags, and CI cuts them
+
+The version of the app is the `version` field in `package.json` and lives nowhere else. **Bump it in
+the pull request that earns the bump**; the `tag` job in `.github/workflows/ci.yml` creates the
+annotated `v<version>` tag on `main` after the tests and the migration have passed, and pushing a
+`main` commit whose version is already tagged does nothing (decision 081).
+
+So: to cut a release, edit one number. To find what a tag contains, `git show v0.1.0`. To see which
+version is live, read `package.json` on `main` — Vercel deploys `main` and nothing else, so they cannot
+disagree.
+
+The tag comes after the migration deliberately. A tag is a claim that a version reached production
+whole, and a version whose schema change failed to apply did not.
 
 ## Running the whole stack locally with Docker — optional
 

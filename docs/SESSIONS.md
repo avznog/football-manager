@@ -1384,3 +1384,77 @@ data point: the branch was opened against `97a1256`, two pull requests merged wh
 written, and « 077 » had been taken by the Docker Compose decision before this one reached GitHub —
 which GitHub reported not as a stale number but as a conflicting pull request with no CI run at all.
 Renumbered to 079 against `origin/main`, rebased, checks re-run.
+
+---
+
+## Nine copies of the app, all pointed at the real season
+
+**2026-09-23** · `vercel.json` (new), `.github/workflows/ci.yml`, `CLAUDE.md`, docs
+
+The owner asked two things: check that Vercel only deploys `main`, and tag versions.
+
+**It did not.** `vercel list` showed **nine preview deployments in twenty-three minutes** — one per
+branch push from the previous hour's work. Each was a full running copy of the app with
+`DATABASE_URL` set to the production Neon string, because the variable is set for Preview and
+Production with the same value. The previous session had written that hazard down in `DEPLOY.md` and
+left it standing, mitigated by Vercel Authentication, with « give Preview its own Neon branch » on the
+roadmap. Asking the question again turned out to be the fix: previews were buying nothing. Not one
+check in the definition of done needs a deployed URL — `typecheck`, `lint`, Vitest, Playwright and a
+look at 390 px all run locally or in CI. So `vercel.json` now deploys `main` and nothing else
+(decision 080), and the Neon branch stays on the roadmap as the thing to do *before* previews ever come
+back, because turning something off is not solving it.
+
+Two things about that one-line file were worth the reading:
+
+1. **`*` does not match a `/`** — the patterns are minimatch. A lone `"*": false` would have matched
+   `main` and missed every `feat/<slice>` branch in the repository, which is all of them. The rule
+   would have read as "block everything" and blocked nothing. `"**"` is what does the work.
+2. `git.deploymentEnabled` rather than `ignoreCommand`. The latter is the answer that comes up first
+   and it starts a build container in order to exit it — a cancelled deployment per push, and the
+   start-up billed.
+
+**Tags: there were none.** Eight milestones, fifty-four merged pull requests and a live app, with no
+way to name what was running except a commit hash. The version is `package.json`'s `version` field and
+the new `tag` job cuts `v<version>` on `main` after `checks`, `e2e` **and** `migrate` (decision 081).
+After `migrate` on purpose: a tag claims a version reached production whole, and a version whose
+migration failed did not.
+
+It is a CI job rather than a note in `CLAUDE.md` for the reason `CLAUDE.md` exists at all. Sessions
+share no memory, and "remember to tag after merging" fails invisibly — nothing goes red, there is
+simply no tag, and nobody notices for a milestone. `CLAUDE.md` now says the rule *and* says never to
+tag by hand, because a tag off that path is a claim about a version nothing checked.
+
+**The rule was proved, not assumed**, and by the branch that introduced it. Two things were genuinely
+unknown: whether Vercel reads `vercel.json` from the pushed commit or only from the production branch —
+if the latter, the rule would do nothing until it merged — and whether `**` really matches a branch name
+containing a `/`. Pushing `feat/deploy-only-main` answered both: **zero** deployments for it, while a
+third session's `feat/rating-deadline` collected five previews in the same twenty minutes. So the file
+takes effect on the commit that adds it, and the slash is crossed.
+
+That third session is the other half of what this found. `feat/rating-deadline` (#53) was being pushed
+throughout, by a session this one never saw in any agent listing, and it accounts for five of the nine
+preview deployments. It is a **looping** session on another machine, which the owner confirmed and
+cannot stop before tonight — see `COORDINATION.md`, which exists because of it. Its own pull request
+merged before this one, so it keeps the previews it already had; what changes is everything after.
+
+It also took decision 079 five minutes after this branch had renumbered itself against `origin/main` —
+the process note from the previous entry failing on its own advice. « Renumber immediately before
+pushing » is not enough when another session merges in the window between the check and the push. The
+number is only safe at **merge** time. So these became 080 and 081.
+
+Three claims in `DEPLOY.md` were false once previews were gone and are fixed: §4's « a pull request is
+a preview », the note that « there is no `vercel.json` and none is needed », and §6's instruction to
+open *the preview* on a phone.
+
+**Next:** still §3, `db:bootstrap` — the app has a schema and no account. Watch the `tag` job on the
+push that merges this: like the `migrate` job before it, it has never run.
+
+The last thing this session did was open a channel to it. `COORDINATION.md`, pointed at from the top of
+`CLAUDE.md` and inserted as item 0 of the reading order, because **a file nothing links to is a file
+nobody reads** — and the one reader it is written for cannot be messaged any other way. It says who is
+active, what moved under the reader (only `main` deploys, CI migrates, CI tags), what must not be
+worked around (the super-admin credentials, the unreadable connection string), and five habits that
+would have saved the last two hours, of which the first is: **take a decision number at merge time,
+never before.** It deliberately does not tell the other session to stop working — it is doing good
+work, the owner cannot stop it before tonight, and a loop would restart it anyway. It asks for the five
+cheap things instead, and ends with a log both sides can append a line to.

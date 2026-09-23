@@ -1713,3 +1713,62 @@ It returns `null` twice, and both silences are the point:
 
 The sentence only appears to a viewer whose notes are unfinished. Somebody who has rated everybody
 can read the notes already, so for him the closing time is a fact about nothing.
+
+## 080 — Only `main` deploys to Vercel
+**2026-09-23** · accepted · closes the Preview hazard recorded in `docs/DEPLOY.md` §4
+
+Vercel deployed every branch, because that is what a freshly connected project does. In twenty-three
+minutes of one session it built **nine preview deployments** for pull-request branches, and each of
+them was a full running copy of the app pointed at the production Neon database, because
+`DATABASE_URL` is set for Preview with the same value as Production.
+
+`vercel.json` now says, and holds nothing else:
+
+```json
+{ "git": { "deploymentEnabled": { "**": false, "*": false, "main": true } } }
+```
+
+**Why not fix the database instead.** The obvious repair is a Neon branch for Preview, and it is on
+the roadmap for the day previews come back. It is the wrong *first* move: it is work, it needs a second
+connection string kept in step with the first, and it buys a facility nobody was using. Nothing in the
+definition of done asks for a preview URL — the checks are `typecheck`, `lint`, Vitest, Playwright and
+a look at 390 px, and every one of them runs locally or in CI. A preview was a loaded gun aimed at the
+season's statistics in exchange for a convenience that was not being spent.
+
+**Two details that cost time to get right, both written up in `docs/DEPLOY.md` §4.** The patterns are
+minimatch, where `*` does not cross a `/`, so a lone `*` would have matched `main` and missed every
+`feat/<slice>` branch it was written to stop — the rule would have read as "block everything" and done
+nothing. And this is `git.deploymentEnabled` rather than an `ignoreCommand`, because the latter starts
+a build container in order to exit it: a cancelled deployment per push, and the start-up billed.
+
+**What is given up.** No preview URL to hand somebody, and no Vercel status check on a pull request.
+The status check was never load-bearing — GitHub Actions is the gate — and `vercel --prod` still
+deploys any commit from a laptop when a real one is needed. Turning previews back on is one key in one
+file, and the roadmap says what to do first when it happens.
+
+## 081 — A version is a number in `package.json`, and CI turns it into a tag
+**2026-09-23** · accepted
+
+There were no tags. Eight milestones, a production deployment and fifty-four pull requests, and no way
+to name what was live except a commit hash.
+
+The version is the `version` field in `package.json` and nowhere else. The `tag` job in
+`.github/workflows/ci.yml` creates the annotated `v<version>` tag on `main` after `checks`, `e2e` and
+`migrate` have passed; a push whose version is already tagged does nothing and passes.
+
+**Why CI and not a session.** This repository exists in the form it does because sessions share no
+memory — the whole of `CLAUDE.md` is an answer to that. "Remember to tag after merging" is exactly the
+kind of convention that survives two sessions and then quietly stops happening, and the failure is
+invisible: nothing is red, there is simply no tag. Making it a job means the rule is executable rather
+than remembered, and `package.json` is the only place a human has to be right.
+
+**Why after `migrate`.** A tag is a claim that a version reached production whole. A version whose
+migration failed did not reach production at all — the code is live against the old schema — so
+tagging it would put a name on a state nobody wants to return to.
+
+**What this does not do.** It does not decide *when* to bump, which is a judgement about what changed
+and stays with whoever opens the pull request. It does not write release notes: the tag message is the
+commit subject, and the history is the changelog. The first tag it cuts is `v0.1.0`, which is the
+version the field has held since M0 — the number is honest about an app that has never been used by
+the team it was written for, and bumping it to `1.0.0` is a one-line change on the day the squad
+actually walks a match with it.
