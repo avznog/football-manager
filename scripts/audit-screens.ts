@@ -249,7 +249,17 @@ async function walk(
   targets: readonly Target[],
   findings: Finding[],
 ): Promise<void> {
-  const browser = await chromium.launch();
+  // `--lang` as well as `context.locale`, because they reach different things. The context locale is
+  // what `Intl` and the `Accept-Language` header see; the **native form controls** follow Chromium's
+  // own UI language, which only this flag sets. Without it every date field was screenshotted as
+  // `09/23/2026`, month first — not what a French phone shows, and a screenshot that lies about the
+  // app is worse than no screenshot.
+  //
+  // What the flag does not fix: the empty placeholder still reads `dd/mm/yyyy` rather than
+  // `jj/mm/aaaa`. The field *order* comes from ICU and is now right; those three words come from
+  // Chromium's own localised strings, and Playwright's build ships the English ones only. A real
+  // French phone writes `jj/mm/aaaa`, so that one difference is the harness, not the app.
+  const browser = await chromium.launch({ args: ["--lang=fr-FR"] });
   const context = await browser.newContext({
     viewport: VIEWPORT,
     colorScheme: theme,

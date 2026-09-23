@@ -114,6 +114,20 @@ export function resultLetter(goalsFor: number, goalsAgainst: number): "V" | "N" 
   return "N";
 }
 
+/**
+ * « 11 présents sur 14 pointés » — the attendance of one session, denominator included.
+ *
+ * The denominator is the number of players the coach **marked**, never the size of the squad, and
+ * the word « pointés » is what says so (decision 020). Without it the demo season's 29 August
+ * session reads « 11 présents sur 14 » to a coach who has thirteen players — the fourteenth had left
+ * by September, so the figure is right about that night and only the missing word makes it look
+ * wrong. Both places that print this line, the calendar row and the coach's marking card, come
+ * through here, and `labels.test.ts` pins the two plurals.
+ */
+export function attendanceCountFr(present: number, marked: number): string {
+  return `${pluralize(present, "présent")} sur ${pluralize(marked, "pointé")}`;
+}
+
 /** A plural `s` only when it is needed: `pluralize(1, "joueur")` → « 1 joueur ». */
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count > 1 ? plural : singular}`;

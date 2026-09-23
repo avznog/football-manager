@@ -880,3 +880,29 @@ reader as « +3 » and nothing else. It now carries an invisible « de différen
 
 847 unit tests (one fewer: `formatScore`'s went with it), 3 e2e specs, `audit:screens` clean on 92
 visits.
+
+## The screens that were only nearly right
+
+With the scorelines agreeing, the remaining screenshots had nothing false on them, and reading them
+turned up three things worth a commit anyway (decision 065).
+
+The first was in the audit tool rather than the app: every date input was rendered `09/23/2026`, month
+first, in a French app. `context.locale` was already `fr-FR` — but native form controls follow
+Chromium's *UI* language, which only `--lang=fr-FR` at launch sets. So the screenshots had been
+misrepresenting every date field since the script was written, which for a tool whose entire job is to
+make looking at the app cheap is a defect in the tool. Fixed, with the one residual difference written
+next to it: the placeholder still says `dd/mm/yyyy` because Playwright's Chromium ships English form
+strings, and a real French phone writes `jj/mm/aaaa`.
+
+The second: the calendar's « 11 présents sur 14 » for the 29 August session. The figure is right — the
+denominator is who the coach *pointé*, and fourteen were members that night — but the squad has
+thirteen players today, so a coach counting names concludes the app is wrong. The missing word is
+« pointés », which `AttendanceList` and the player page have both carried all along. `attendanceCountFr`
+is now the single place it is built, in `lib/` with a test, which also caught « 1 présent sur 1
+pointés ».
+
+The third: « Je me suis blessé » on `/moi` is a `<summary>` with `list-none` and nothing in place of
+the triangle it suppressed — a grey panel of text with an invisible `cursor-pointer` as its only
+affordance. It now has a chevron that turns when it opens, and reads as the action it is.
+
+849 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.

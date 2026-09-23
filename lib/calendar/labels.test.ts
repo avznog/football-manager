@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  attendanceCountFr,
   entryModeBadgeFr,
   periodsLabel,
   resultLabel,
@@ -58,5 +59,22 @@ describe("the labels the match header shares with the calendar", () => {
     // An en dash, not a hyphen: it is a score, not a range of two numbers.
     expect(scoreLineFr(1, 1)).toContain("–");
     expect(scoreLineFr(1, 1)).not.toContain("-");
+  });
+});
+
+describe("attendanceCountFr", () => {
+  /**
+   * The line the demo season's 29 August session prints. Fourteen players were marked that night and
+   * thirteen are in the squad today, because one had left by September — so « sur 14 » is right and
+   * only looks wrong. « pointés » is the word that says the denominator is the list the coach ticked
+   * and not the size of the team (decision 020).
+   */
+  it("names what the denominator counts", () => {
+    expect(attendanceCountFr(11, 14)).toBe("11 présents sur 14 pointés");
+  });
+
+  it("keeps both halves singular when both are one", () => {
+    expect(attendanceCountFr(1, 1)).toBe("1 présent sur 1 pointé");
+    expect(attendanceCountFr(0, 13)).toBe("0 présent sur 13 pointés");
   });
 });

@@ -98,8 +98,14 @@ export default async function MePage() {
                 Ta guérison se déclare depuis ta fiche.
               </p>
             ) : (
-              <details className="rounded-xl border border-border bg-surface-2/50 px-4 py-3">
-                <summary className="min-h-11 cursor-pointer list-none py-2 text-sm font-medium text-ink">
+              <details className="group rounded-xl border border-border bg-surface-2/50 px-4 py-3">
+                {/* `list-none` hides the native triangle, so something has to replace it: without a
+                    marker this read as a grey panel of text, and `cursor-pointer` is invisible on a
+                    phone. The chevron turns when the panel opens, which is the whole affordance. */}
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 py-2 text-sm font-medium text-accent">
+                  <span aria-hidden="true" className="transition-transform group-open:rotate-90">
+                    ›
+                  </span>
                   Je me suis blessé
                 </summary>
                 <div className="pt-2">

@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
-import { AVAILABILITY_LABELS, pluralize } from "@/lib/calendar/labels";
+import { attendanceCountFr, AVAILABILITY_LABELS } from "@/lib/calendar/labels";
 import type { AvailabilityStatus } from "@/db/schema";
 import { markEveryonePresent, markTrainingAttendance } from "@/lib/training/actions";
 
@@ -76,7 +76,7 @@ export function AttendanceList({ teamId, trainingId, players, marks }: Attendanc
       description={
         judged === 0
           ? "Personne n’est encore pointé."
-          : `${pluralize(present, "présent")} sur ${judged} pointés.`
+          : `${attendanceCountFr(present, judged)}.`
       }
       flush
     >

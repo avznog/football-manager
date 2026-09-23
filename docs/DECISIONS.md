@@ -1284,3 +1284,32 @@ the character, `getByText("1 – 1")` matches both and Playwright's strict mode 
 fix working. The recap's scoreboard gained `aria-label="Score du match"`, making it a `region` the way
 game mode's « Chrono et score » already is — the largest number in the product had no accessible name,
 and now the spec has a stable handle on it for the same reason a screen reader user does.
+
+## 065 — The audit browser speaks French, and « sur 14 » says what the 14 is
+**2026-09-23** · accepted
+
+Three small things the screenshots showed, once the scorelines agreed and there was nothing louder to
+look at.
+
+**`audit:screens` launches Chromium with `--lang=fr-FR`.** `context.locale` was already `fr-FR`, and it
+is not enough: it reaches `Intl` and `Accept-Language`, while **native form controls follow Chromium's
+own UI language**. Every date field in the audit was therefore screenshotted as `09/23/2026`, month
+first — a thing no French phone shows. The tool exists to make looking at the app cheap, so a
+screenshot that misrepresents it is a defect in the tool. One caveat is written next to the flag: the
+empty placeholder still reads `dd/mm/yyyy` because the field order comes from ICU (now correct) while
+those three words come from Chromium's localised resources, and Playwright's build ships English only.
+
+**« 11 présents sur 14 pointés », never « 11 présents sur 14 ».** The denominator has always been the
+number of players the coach *marked* — decision 020's rule, and the data was right — but the word was
+missing on the calendar row, and the demo season shows exactly why it matters: fourteen were marked on
+29 August and the squad has thirteen players today, because one had left by September. A coach reads
+« sur 14 », counts thirteen names, and concludes the app is wrong about a figure that is right about
+that night. `attendanceCountFr` in `lib/calendar/labels.ts` is now the one place this line is built,
+used by both the calendar row and the coach's marking card, and `labels.test.ts` pins both plurals —
+« 1 présent sur 1 pointé » was the other thing a bare template got wrong.
+
+**The injury disclosure on `/moi` has a marker.** « Je me suis blessé » is a `<summary>` with
+`list-none`, so the native triangle was suppressed and nothing replaced it: on a phone it was a grey
+panel of text, and `cursor-pointer` says nothing to a thumb. It is now accent-coloured with a chevron
+that turns on `group-open`. The panel stays closed by default for the reason it always was — declaring
+an injury is the exception, not the routine.
