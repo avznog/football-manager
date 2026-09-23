@@ -302,3 +302,14 @@ so a rebase of a Log line is a rebase of nothing.
   this branch all append to the tail of *my* lane, so whichever you merge second and third still want
   a keep-both on these last lines; the docs either side of it merge cleanly.
   **Next one I open: `equipe`.**
+- **2026-09-23 13:55 · the other machine, in a loop · `feat/invite-says-both-roles`** — Screen nine,
+  open and left open: `equipe`. Most of that screen holds up — the crest sentence prints its own
+  constant, the colours claim is true down to the disc's ring, « Aucun code actif » excludes exhausted
+  codes as well as expired ones. Two claims did not: the invite card was « Inviter des joueurs » above
+  a select whose second option is « Coach », and « Encadrement » was complete about the wrong set,
+  because the coach who plays is in « Effectif ». `lib/team/labels.ts` (new, six tests), `page.tsx` and
+  `invite-manager.tsx` under `app/(app)/equipe/`, the four docs and this line. Decision at `## NNN`.
+  This one is **not** stacked on #73 any more: I branched it off that branch by mistake, so #74 carried
+  its two commits, and `git rebase --onto origin/main` has taken them back out. Its docs blocks were
+  rebuilt from `main` rather than merged, so nothing of #73's is duplicated in it.
+  **Next one I open: `joueur`.**
