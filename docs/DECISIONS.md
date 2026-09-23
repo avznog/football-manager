@@ -473,3 +473,127 @@ would otherwise have to guess at.
 **Consequences.** Dropping a player from the sheet clears him from **planned** lineups only; a
 player already fielded in a confirmed composition cannot be removed from the sheet, since that would
 rewrite a fact. The sheet itself is frozen once the match is `finished`.
+
+## 029 — Game mode posts to a route handler, never a Server Action
+**2026-09-23** · accepted
+
+Every game-mode action is POSTed to `app/api/match-events/route.ts` from the outbox. Server Actions
+are used everywhere else in the app; here they are not used at all.
+
+**Why.** A queue needs something it can retry, and an HTTP status is a contract a queue can act on:
+**200** drop the entry, **4xx** never retry and show the coach, **5xx** keep it and back off. A
+Server Action invoked from a phone with no signal gives back a framework-shaped failure that the
+queue cannot classify — and reaching one from a background flush, outside a React render, is not
+something the framework promises at all.
+
+**Consequences.** The route handler stays thin: session, parse, delegate to `lib/match/append.ts`.
+The screen never writes to the database directly, which is also why the optimistic state is the
+local queue merged into the server log by `reduceLive` rather than a second source of truth.
+
+## 030 — The outbox is strictly FIFO per match, and a refused action is isolated
+**2026-09-23** · accepted
+
+The queue flushes in device order and a younger action never overtakes an older one's backoff. On a
+4xx the batch is split until the poisoned action is identified; it lands in « Actions refusées » with
+« Réessayer » / « Ignorer » and the rest of the queue keeps flowing.
+
+**Why.** `seq` is what breaks the reducer's ties (`docs/DATA_MODEL.md`), and it is assigned on
+arrival. A 55ᵉ-minute position change that arrives after the substitution completing it would reduce
+to a different match. FIFO is therefore not a nicety, it is what makes the log mean what the coach
+did. But one rejected action must not take the afternoon with it: a match is 60 minutes long and the
+coach cannot debug a queue on the touchline, so the poison is isolated and named rather than left to
+block everything behind it.
+
+**Consequences.** Throughput is capped at one in-flight batch per match, which is irrelevant at the
+scale of one operator. The split-on-4xx is why `prepareEventBatch` is pure and tested on its own.
+
+## 031 — An action is stamped at the tap that opened it
+**2026-09-23** · accepted
+
+`occurred_at` and `clock_ms` are captured on the device when the flow opens, not when the last
+question is answered.
+
+**Why.** « But » belongs to the minute the ball crossed the line, not the minute the coach finished
+scrolling for a scorer's name. Stamping at the end would make the recorded minute a measure of how
+fast the coach types, and the timeline is the one thing everybody rereads on Sunday evening.
+
+**Consequences.** The device clock is authoritative for the match minute, which is what lets an
+event queued offline land at the right minute hours later. `recorded_at` is the server's own view and
+is kept for audit, never for display.
+
+## 032 — No drag-and-drop in game mode
+**2026-09-23** · accepted
+
+Substitutions, position changes and the ad-hoc composition are explicit lists — native `<select>` per
+slot in the composer. `PitchLayout` is read-only inside game mode, and the planned-composition prompt
+is a card rather than a modal, whose « Plus tard » writes nothing.
+
+**Why.** Dragging a disc on a phone held one-handed at 78 minutes is how you lose a player. The same
+gesture that is right on Thursday's planning screen — deliberate, two hands, a table — is wrong at
+the touchline, and M3's editor already owns the planning case (decision 026). A dialog that appears
+over the pitch at 45' is a dialog dismissed by accident, and the thing dismissed would be the
+composition the coach spent Thursday on.
+
+**Consequences.** TERRAIN, the fast multi-player change, stays open as a roadmap line and should
+compose M3's editor rather than reimplement it. The final whistle and every annulment use a
+**non-dismissible** sheet — no Escape, no scrim tap, no close cross, two buttons — because those two
+are irreversible in a way a substitution is not.
+
+## 033 — Game mode is open to everybody, read-only for anyone but the operator
+**2026-09-23** · accepted
+
+Any member may open `/match/[id]/jeu`. A non-operator sees the same screen with « Vous suivez le
+match en direct. Seul l'opérateur du match peut enregistrer les actions. », no ACTION bar, no
+« Annuler », no « Composition ». ACTION is disabled before kick-off and after the final whistle, and
+the starting XI is reachable through a separate « Composition » button so the big button never means
+two things.
+
+**Why.** Following the score from the touchline, or from home, is a legitimate use of the app and the
+data is the team's own. `can()` decides what may be *written*; hiding the read would only push people
+back to asking on WhatsApp. This is invariant 4 exactly: one permission helper, no ad-hoc check.
+
+**Consequences.** The match page links to game mode for every member and for a finished match, where
+it reads « Voir le déroulé ».
+
+## 034 — A stale `matches.status` self-heals when game mode opens
+**2026-09-23** · accepted
+
+Opening game mode on a match whose log contains a final whistle but whose row still says `live` calls
+`finalizeMatchById`, then renders the finished screen.
+
+**Why.** It is what a device that died between the POST and its response leaves behind, and the coach
+should not have to know that. The freeze is idempotent by construction (decision below), so healing
+costs nothing.
+
+**Consequences.** `match_player_stats` is frozen by a wholesale delete and insert, never an
+increment: re-running the whistle, healing a stale row, or amending a match in M7 all produce the
+identical table, and a player whose only appearance was voided disappears from the cache instead of
+lingering at zero.
+
+## 035 — The prompt's injury flags merge the roster, not just the log
+**2026-09-23** · accepted
+
+`lib/match/presenter.ts` merges `team_members` injuries into the planned-composition prompt's flags.
+When the reducer and the roster disagree about *why* a player is flagged, the reducer's reason wins.
+
+**Why.** `reduceMatch` is pure and sees only this match's log, so it can only know about an injury
+that happened during the match. An injury declared on Tuesday is invisible to it — and that is the
+common case for a plan made on Thursday. Rather than let the reducer read the roster, which would
+cost it its purity and with it invariant 2, the presenter does the merge. The reducer's reason wins
+because an injury that happened ten minutes ago is more informative than one declared last week.
+
+**Consequences.** Invariant 2 is untouched: the reducer still takes only events. The merge is tested
+in `presenter.test.ts` from fixtures.
+
+## 036 — A goal may be recorded without a scorer
+**2026-09-23** · accepted
+
+The ACTION flow allows « Buteur inconnu » and « Aucune passe décisive ».
+
+**Why.** The score is never held hostage to a name. In 7-a-side the ball goes in off three players in
+a scramble and nobody agrees who touched it last; a tool that refuses the goal until somebody is
+blamed for it records the wrong score, which is the one number that must be right. This extends
+decisions 013 and 017 into the live flow.
+
+**Consequences.** `GOAL_FOR.scorerId` is optional and the goal still counts in the score; it simply
+adds to nobody's tally. The timeline reads « But 58' » with no name.

@@ -46,12 +46,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses
 - [x] `lib/match/reducer.ts` — pure reducer + extensive unit tests
-- [ ] Event ingestion API, idempotent on `client_event_id`
-- [ ] `lib/match/outbox.ts` — IndexedDB queue with retry and pending badge
-- [ ] Game mode screen: clock, pitch, bench, ACTION sheet, TERRAIN fast-change
-- [ ] Planned composition prompts, pre-filled and confirmed
-- [ ] Event timeline with per-event "annuler" (VOID)
-- [ ] Final whistle → freeze `match_player_stats`
+- [x] Event ingestion API, idempotent on `client_event_id`
+- [x] `lib/match/outbox.ts` — IndexedDB queue with retry and pending badge
+- [x] Game mode screen: clock, pitch, bench, ACTION sheet
+- [ ] TERRAIN fast-change inside game mode, composing M3's drag editor
+- [x] Planned composition prompts, pre-filled and confirmed
+- [x] Event timeline with per-event "annuler" (VOID)
+- [x] Final whistle → freeze `match_player_stats`
 
 ## M5 — Stats
 - [x] Player stats: matches, minutes, goals, assists, own goals, fouls

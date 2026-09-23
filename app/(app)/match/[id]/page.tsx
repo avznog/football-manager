@@ -10,7 +10,8 @@
  * team, so nothing leaks.
  *
  * The composition card (M3) is coach-only and loads its own data, so a player's match page pays
- * nothing for it. Game mode (M4) is not built yet; its placeholder card names the milestone.
+ * nothing for it. Game mode is open to everybody — it is read-only for anyone who is not the
+ * operator, and following the score from the touchline is a legitimate use of it.
  */
 
 import { notFound } from "next/navigation";
@@ -19,7 +20,6 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import {
@@ -152,11 +152,23 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
           player sees the availability grid above and nothing else. */}
       {isCoach ? <CompositionCard team={team} match={match} /> : null}
 
+      {/* Open to every member, not just the operator: following the score from the touchline is
+          legitimate, and game mode itself decides who may record an action (`can()`). */}
       <Card title="Mode match" as="h2">
-        <EmptyState
-          title="Le mode match en direct arrive"
-          description="Chronomètre, buts, cartons, remplacements et minutes jouées (jalon M4)."
-        />
+        <div className="space-y-3">
+          <p className="text-sm text-ink-muted">
+            {match.status === "finished"
+              ? "Le match est terminé : le déroulé reste consultable."
+              : "Chronomètre, buts, remplacements et minutes jouées, en direct."}
+          </p>
+          <ButtonLink href={`/match/${match.id}/jeu`} fullWidth>
+            {match.status === "live"
+              ? "Reprendre le mode match"
+              : match.status === "finished"
+                ? "Voir le déroulé"
+                : "Ouvrir le mode match"}
+          </ButtonLink>
+        </div>
       </Card>
     </div>
   );
