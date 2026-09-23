@@ -1600,3 +1600,24 @@ tap, a player watching is told what the list is. 921 tests. Checked at 390 px in
 the kick-off and after it, then `npm run db:reset` because tapping « Coup d'envoi » to see the second
 state starts the demo match for real.
 
+### « Déjà joué », over three trainings and a match nobody had recorded
+
+Sixth screen from the captures, `/calendrier`. The card at the bottom of the screen — the whole
+history of the season — was titled with a string literal, and the list under it is a merged agenda by
+design: `audit/light-joueur-calendrier.png` has « Entraînement · sam. 19 sept. » two rows below the
+heading.
+
+The second row of the same list is the more interesting one. FC des Deux-Ponts is finished, `retro`,
+and has zero events, and `ScorePill` returns `null` when there is no score — so the one row in the
+history that is asking to be acted on was the only row with nothing on its right-hand end. Silence
+read as « nothing to report » on the row that had the most to report.
+
+The words for it already existed. The recap of that same match says « ? – ? · rien saisi » and offers
+« Saisir le match » — decisions 041 and 061 — so this is not a new label, it is the recap's sentence
+said one screen earlier, and `NOT_RECORDED_FR` is now imported by both. I wrote « Non saisi » first and
+deleted it: two screens inventing their own wording for one state is the defect 085 is about.
+
+921 tests, four of them new on `pastSectionTitleFr`. Checked at 390 px in both themes, as `karim` and
+as `hugo`, and the recap of the unrecorded match re-read to make sure the two screens now agree. The
+e2e suite passes — `/calendrier` is on the happy path, and its fixture history is all played matches,
+so it still reads « Déjà joué ».

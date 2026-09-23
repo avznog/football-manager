@@ -12,13 +12,14 @@ import {
   attendanceLineFr,
   AVAILABILITY_LABELS,
   COMPETITION_LABELS,
+  NOT_RECORDED_FR,
   pluralize,
   resultLabel,
   resultLetter,
-  SCORE_NOT_RECORDED_FR,
   scoreLineFr,
   venueSideLabel,
 } from "@/lib/calendar/labels";
+import { capitalizeFirst } from "@/lib/calendar/time";
 import type { AvailabilityCounts, CalendarMatch, CalendarTraining } from "@/lib/calendar/timeline";
 import { pendingCount } from "@/lib/calendar/timeline";
 
@@ -121,7 +122,7 @@ export function PastMatchResult({ match }: { match: CalendarMatch }) {
   if (match.score === null) {
     return (
       <Badge variant="neutral" className="shrink-0">
-        {SCORE_NOT_RECORDED_FR}
+        {capitalizeFirst(NOT_RECORDED_FR)}
       </Badge>
     );
   }

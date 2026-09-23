@@ -169,7 +169,7 @@ export function splitTimeline<T extends TimelineItem>(items: readonly T[], now: 
  * The heading of the history section, which used to be « Déjà joué » on every list.
  *
  * Two kinds of row have never been joué. A **training** is not played, and the demo season's history
- * has five of them interleaved with the matches — the single merged agenda is the point of the screen
+ * has three of them interleaved with the matches — the single merged agenda is the point of the screen
  * (`docs/PROJECT.md`), so the heading has to be true of both kinds. And a **match nobody recorded**:
  * the window closes, the row drops into the history with no score, and saying it was played is the
  * calendar's version of the invention decision 013 refused — the demo season keeps exactly that row,

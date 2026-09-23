@@ -1967,3 +1967,32 @@ a different question, because they cannot bring anyone on: they are told what it
 « En dehors du terrain », and given no instruction they cannot follow. The empty state stopped being
 « Personne sur le banc. » for the same reason the heading did — there is no bench in it.
 
+## NNN — « Déjà joué » over three trainings and a match nobody recorded
+**2026-09-23** · accepted
+
+The history section of `/calendrier` was headed « Déjà joué », hard-coded, over a list that is not a
+list of matches. The demo season's own history, read top to bottom:
+
+- three entraînements, which were attended, not played;
+- FC des Deux-Ponts — finished, nine men named on the sheet, **not one event** — rendering with no
+  score, no badge, nothing at all on the right-hand end of the row;
+- six matches with a real scoreline.
+
+Two different untruths under one heading, and they are the same untruth as the previous entry's: the
+word was chosen while looking at the rows that happen to sort first. `pastSectionTitleFr` now derives
+it — « Déjà joué » only when every row really is a played match, « Déjà passé » otherwise, which is
+true of a training, of a match still to be saisi, and of a scheduled match whose window simply
+elapsed. The narrow word survives because it is the better word when it is available: a season with no
+trainings recorded gets it, and this is not a rename.
+
+The silent row is the other half. `ScorePill` returns nothing when `score` is null, which is right
+where it is pinned at the top of the screen — a match kicking off in an hour owes nobody a score — and
+in the history it left the one row asking to be acted on as the quietest in the list. It now says
+**« rien saisi »**, capitalised as calendar badges are, and the words are not new: the recap's
+scoreboard has printed them under « ? – ? » since decision 041. That is the rule of decision 085 read
+the other way round — a state described on two screens is described in the same words — so
+`NOT_RECORDED_FR` lives in `lib/calendar/labels.ts` and both screens import it. « Non saisi » was
+written first and thrown away for exactly that reason.
+
+Not « 0 – 0 », for the reason decision 013 gives and decision 061 repeats: a match that ended nil-nil
+and a match nobody wrote down are two different facts, and only one of them is known.

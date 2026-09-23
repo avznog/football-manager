@@ -20,14 +20,18 @@ export const COMPETITION_LABELS: Record<Competition, string> = {
 export const COMPETITION_ORDER: readonly Competition[] = ["league", "cup", "friendly", "tournament"];
 
 /**
- * What stands where the score would be, on a past match with an empty log.
+ * A match that is over with an empty log, in the words the recap already used.
  *
- * Not an empty space: the row the coach most needs to act on was the quietest one in the list. Not
- * « 0 – 0 » either, which is the invention decisions 013 and 061 exist to have removed — nobody has
- * said what the score was, and a match ending 0 – 0 is a different statement from a match nobody
- * wrote down.
+ * Not an empty space, which is what the calendar row was: the one match asking to be filled in was
+ * the only silent row of the history. Not « 0 – 0 » either — the invention decisions 013 and 061
+ * exist to have removed — because nobody has said what the score was, and a match ending 0 – 0 is a
+ * different statement from a match nobody wrote down.
+ *
+ * Exported rather than written twice: the recap's scoreboard has said « rien saisi » under « ? – ? »
+ * since decision 041, and two screens describing one state describe it in the same words
+ * (decision 085). The calendar capitalises it, as it does every badge on a row.
  */
-export const SCORE_NOT_RECORDED_FR = "Non saisi";
+export const NOT_RECORDED_FR = "rien saisi";
 
 export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   scheduled: "À venir",
