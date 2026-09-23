@@ -1527,7 +1527,7 @@ two centimetres higher, and the card was still telling the coach to place seven 
 with nine titulaires, which nothing caps — the badge turns amber past seven but the action accepts them
 — where « les sept » names a seven that does not exist.
 
-Decision NNN is decision 083 for the other end of a screen: **a next-step card is derived from the
+Decision 084 is decision 083 for the other end of a screen: **a next-step card is derived from the
 state it is standing on.** `sheetNextStepFr` returns the sentence *and* the call to action, because on
 an untouched sheet the honest answer is that there is no next screen yet — the button disappears rather
 than leading somewhere useless, and on a finished match it becomes « Résumé du match ». 906 unit tests,

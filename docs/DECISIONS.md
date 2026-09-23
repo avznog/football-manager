@@ -1840,7 +1840,7 @@ Both live in `lib/retro/labels.ts` with tests, for the reason that keeps recurri
 nothing under `app/`, so copy whose truth depends on state has to leave the component before it can
 be pinned.
 
-## NNN — A « what next » card reads the state it is standing on
+## 084 — A « what next » card reads the state it is standing on
 **2026-09-23** · accepted
 
 The match sheet ended with a card that said, on every match, in every state:

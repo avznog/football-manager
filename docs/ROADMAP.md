@@ -113,7 +113,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       « Le groupe est fait : place les sept sur le terrain. » on an untouched sheet, on a match played
       a fortnight ago, and on a sheet with nine titulaires ticked. `sheetNextStepFr` returns the
       sentence and the call to action together, so the button can disappear when there is nowhere
-      useful to go (decision NNN)
+      useful to go (decision 084)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses

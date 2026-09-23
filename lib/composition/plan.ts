@@ -195,8 +195,8 @@ export function squadSummaryFr(counts: SquadCounts): string {
  * It used to say « Le groupe est fait : place les sept sur le terrain. » on every sheet, in every
  * state. On a match created a minute ago that is a completed selection nobody has made; on a match
  * played a fortnight ago it is an instruction for a match that is over; and with nine names ticked it
- * names a seven that does not exist. Decision 083's rule, applied to a next-step card: **it describes
- * the form in front of the coach, not a match.**
+ * names a seven that does not exist. Decision 084, which is decision 083's rule applied to a
+ * next-step card: **it describes the form in front of the coach, not a match.**
  *
  * The four cases are the four different pieces of advice, in the order a coach meets them:
  *

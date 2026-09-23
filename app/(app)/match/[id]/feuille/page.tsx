@@ -75,7 +75,7 @@ export default async function MatchSheetPage({
   const now = new Date();
 
   // « Et maintenant ? » used to say « Le groupe est fait » on a sheet nobody had touched, and told
-  // the coach to place seven players on a match played a fortnight ago (decision 083).
+  // the coach to place seven players on a match played a fortnight ago (decision 084).
   const nextStep = sheetNextStepFr(countSquadRoles(sheetMembers), match.status);
 
   return (
