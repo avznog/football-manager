@@ -91,7 +91,7 @@ export default async function CompositionsPage({
             href={`/match/${match.id}/feuille`}
             className="font-medium text-accent hover:underline"
           >
-            modifier la feuille
+            {screen.sheetLinkFr}
           </Link>
         </p>
       </header>

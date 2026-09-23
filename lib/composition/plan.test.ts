@@ -448,6 +448,7 @@ describe("compositionsScreenFr", () => {
     expect(screen.noPlansFr.title).toBe("Le terrain est vide");
     expect(screen.noPlansFr.withCta).toBe(true);
     expect(screen.emptySheetFr.withCta).toBe(true);
+    expect(screen.sheetLinkFr).toBe("modifier la feuille");
   });
 
   /** Planning the 40th minute during the 20th is the point of the screen; invariant 3 keeps it a plan. */
@@ -465,7 +466,14 @@ describe("compositionsScreenFr", () => {
       expect(screen.noPlansFr.description).not.toContain("Place tes sept joueurs");
       expect(screen.noPlansFr.description).not.toContain("planifier");
       expect(screen.emptySheetFr.description).not.toContain("Choisis d’abord");
+      // The sheet itself is `frozen` on a finished match, so « modifier » is a promise it breaks.
+      expect(screen.sheetLinkFr).toBe("voir la feuille");
     }
+  });
+
+  it("does not repeat the heading of the card it sits in", () => {
+    expect(compositionsScreenFr(played).noPlansFr.title).not.toBe("Aucune composition");
+    expect(compositionsScreenFr(typedUp).noPlansFr.title).not.toBe("Aucune composition");
   });
 
   it("says where a typed-up match's minutes come from, since no composition made them", () => {

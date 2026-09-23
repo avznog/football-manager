@@ -286,6 +286,11 @@ export function compositionsScreenFr(match: { status: MatchStatus; entryMode: En
   editable: boolean;
   /** Said once, above the compositions, when they have stopped being plans. */
   frozenNoticeFr: string | null;
+  /**
+   * The link in the header to the match sheet. « modifier la feuille » is a promise the sheet does
+   * not keep once the match is over: `SquadSheet` gets `frozen` and refuses every checkbox.
+   */
+  sheetLinkFr: string;
   /** Nobody on the match sheet, so there is nobody to place. */
   emptySheetFr: { title: string; description: string; withCta: boolean };
   /** Somebody on the sheet, but no composition saved. */
@@ -295,6 +300,7 @@ export function compositionsScreenFr(match: { status: MatchStatus; entryMode: En
     return {
       editable: true,
       frozenNoticeFr: null,
+      sheetLinkFr: "modifier la feuille",
       emptySheetFr: {
         title: "Personne n’est encore retenu",
         description:
@@ -314,6 +320,7 @@ export function compositionsScreenFr(match: { status: MatchStatus; entryMode: En
   return {
     editable: false,
     frozenNoticeFr: LINEUPS_FROZEN_FR,
+    sheetLinkFr: "voir la feuille",
     emptySheetFr: {
       title: "Aucune feuille de match",
       description:
@@ -321,7 +328,9 @@ export function compositionsScreenFr(match: { status: MatchStatus; entryMode: En
       withCta: false,
     },
     noPlansFr: {
-      title: "Aucune composition",
+      // Not « Aucune composition » again: the card around it is already titled that, and at 390 px the
+      // two headings landed one under the other, the same three words twice.
+      title: match.entryMode === "retro" ? "Saisi sans composition" : "Le terrain est resté vide",
       description:
         match.entryMode === "retro"
           ? "Ce match a été saisi après coup, sans composition : les temps de jeu viennent de la " +
