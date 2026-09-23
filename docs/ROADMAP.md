@@ -134,7 +134,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       days away — and `getAttendanceMarks` has no date filter, so `/stats` then read « 3 séances
       pointées » in a season of two, with Brice credited 1/3 where the truth is 0/2. `attendanceIsOpen`
       opens the pointage 30 minutes before kick-off and never closes it; both Server Actions refuse
-      outside the window, and the card says what to use meanwhile (decision NNN)
+      outside the window, and the card says what to use meanwhile (decision 099)
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)

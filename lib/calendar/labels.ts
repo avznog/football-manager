@@ -181,7 +181,7 @@ export const unmarkedSessionNoteFr =
  * The list used to be there, in the present indicative: « Présences », « Tout le monde est là »,
  * « Enregistrer les présences », on a session four days away. One tap put thirteen observations in
  * `training_attendance` about an evening nobody had lived, and `/stats` then said « 3 séances
- * pointées » in a season of two, with Brice at 1/3 instead of 0/2 (decision NNN).
+ * pointées » in a season of two, with Brice at 1/3 instead of 0/2 (decision 099).
  *
  * Hiding the card would leave a coach looking for it, so the card stays and says when it opens and
  * what to use instead. The second sentence is the one doing the work: it does not just refuse, it

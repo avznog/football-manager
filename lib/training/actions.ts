@@ -201,7 +201,7 @@ export async function markTrainingAttendance(formData: FormData): Promise<void> 
   });
   if (!training) return;
   // A présence is an observation, so it cannot be recorded about an evening nobody has lived
-  // (decision 090, enforced by decision NNN). The page hides the list, and this is the rule: the
+  // (decision 090, enforced by decision 099). The page hides the list, and this is the rule: the
   // page is a courtesy, the action is the guard.
   if (!attendanceIsOpen(training.startsAt, new Date())) return;
 
@@ -287,7 +287,7 @@ export async function markEveryonePresent(formData: FormData): Promise<void> {
   });
   if (!training) return;
   // « Tout le monde est là » is the sentence this whole rule exists for: it was one tap, on a séance
-  // four days away, and it wrote thirteen rows (decision NNN).
+  // four days away, and it wrote thirteen rows (decision 099).
   if (!attendanceIsOpen(training.startsAt, new Date())) return;
 
   const players = [...(await activePlayerIds(parsed.data.teamId))];

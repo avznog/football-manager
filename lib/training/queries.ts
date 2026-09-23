@@ -150,9 +150,10 @@ export async function getTeamAttendanceCounts(
 /**
  * What would go with this séance, for the sentence on the « supprimer » card.
  *
- * Attendance is counted even though the button only appears before the session: `AttendanceList`
- * renders for a coach whether or not the session is over, so marks on a future séance exist, and a
- * warning that only mentioned the answers would be describing the easier half of the loss.
+ * Attendance is counted even though the button only appears before the session is over: the pointage
+ * opens 30 minutes before kick-off (decision 099) and the delete button closes when the séance does,
+ * so a séance being marked at the pitch is deletable, and a warning that mentioned only the answers
+ * would be describing the easier half of the loss. When the count is zero the sentence says so.
  */
 export async function getTrainingDeletionHolds(
   trainingId: string,

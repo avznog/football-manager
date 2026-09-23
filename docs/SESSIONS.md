@@ -2047,7 +2047,7 @@ outside the window, and I proved that rather than asserting it: forced `canMark`
 « Tout le monde est là », then checked a Présent radio and submitted « Enregistrer les présences ».
 `training_attendance` empty after both. The scratch edit is reverted.
 
-Decision NNN. Seven new tests, 1018. Verified at 390 px in both themes on the future séance, the
+Decision 099. Seven new tests, 1018. Verified at 390 px in both themes on the future séance, the
 pointed 12 September one and the unpointed 19 September one.
 
 What I did **not** do, stated because it is a judgement and not an oversight: no date filter on

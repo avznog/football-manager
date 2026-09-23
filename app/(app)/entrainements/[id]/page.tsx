@@ -143,7 +143,7 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
           be in front of him. `PresenceSummary` had reasoned about this from the start — « before the
           session there is genuinely nothing to report » — and the coach's half of the same `if` never
           did, which is how « Tout le monde est là » ended up one tap away on a séance four days out
-          (decision NNN). */}
+          (decision 099). */}
       {isCoach ? (
         canMark ? (
           <AttendanceList
