@@ -537,3 +537,52 @@ mode's header not carrying « saisi après le match », and `docs/DEPLOY.md` §4
 
 **Next:** deployment. It still needs a Neon `DATABASE_URL` from the owner — that is the whole of what
 is left.
+
+## 2026-09-23 — the same gesture, two answers, one implementation
+
+**PR #30** — `usePitchDrag`, the debt decision 045 named when it was written.
+
+The composition editor and TERRAIN each carried their own ~80 lines of pointer bookkeeping: a local
+`Drag` type, a `TAP_SLOP`, a `PITCH_MARGIN_PX`, a `boxOfPitch`, and `beginDrag` / `continueDrag` /
+`endDrag` / `cancelDrag`. Two copies of the same code is not the interesting part. The interesting part
+is that three of the judgement calls inside them were untested, and each is one somebody could get wrong
+later: a pointer sequence under 8 px of Manhattan travel is a **tap**; the turf gets a 12 px outer margin
+so the goalkeeper's slot is reachable with a thumb; and **off the turf is an answer of its own** —
+`fromClientPoint` clamps, so a drop on the bench silently becomes a drop on the touchline unless
+`inside` is carried separately.
+
+So the split follows what can be tested. Vitest runs `environment: "node"` and only collects
+`lib/**` and `db/**`, which means anything inside a hook cannot be tested here at all. `lib/pitch/drag.ts`
+is therefore pure — no React, no DOM beyond a box somebody else measured — and has twelve tests,
+including the clamped-point-plus-`inside` trap and the box being re-measured mid-gesture.
+`components/pitch/usePitchDrag.ts` is the thin React part: pointer capture, the mouse-left-button check,
+and a subject type parameter so each screen carries what it drags.
+
+**What deliberately stayed apart.** A drop on empty grass benches a player in the composition editor and
+is a no-op in TERRAIN — the same gesture, two answers, because at 70′ a slipped thumb must not cost you
+a player (decision 045). That difference lives in each screen's `onDrop`, visible in the file that owns
+the behaviour, not behind a flag in a shared hook. The editor also passes `onMove`, which TERRAIN does
+not: a match never changes shape by gesture.
+
+**The lint rule that chose the API.** The first version returned the pitch ref from the hook, and
+`react-hooks/refs` then flagged fourteen sites — a hook that returns a ref makes *every* other property
+of the returned object a ref value, and `gesture.drag` is read on every render to draw the lifted disc.
+Inverting it — the caller owns the ref and passes it in — is what the rule was asking for.
+
+**Walked with real pointer drags at 390 px, both themes, no console errors.** In the editor: bench → slot,
+slot → slot, a swap, a drop off the pitch (« Nico retourne sur le banc »), then the tap path; and in
+`postes` mode the formation label read `1-3-1-2` *while the finger was still down*, which is the whole
+reason `onMove` exists. In TERRAIN, opened from the planned-composition prompt so nothing is written:
+bench onto an occupied slot swaps, two players on the pitch swap, a drop on the bench heading answers
+« Karim n'a pas bougé : relâchez-le sur un poste, ou utilisez « Faire sortir ». », and « Abandonner »
+leaves the match still waiting for its kick-off.
+
+One thing the browser turned up that no test would have: the announcements said « au poste de attaquant ».
+French elides `de` before a vowel and three of the eleven positions start with one, so `atPositionFr` in
+`db/reference.ts` now says « au poste d'attaquant », with its own tests. Screen readers speak these
+sentences out loud.
+
+**Debt after this:** the two-line squad row, game mode's header not carrying « saisi après le match »
+(it is built on `LiveMatchRow`, which drops `entryMode`), and `docs/DEPLOY.md` §4 and §6.
+
+**Next:** deployment. It needs a Neon `DATABASE_URL` from the owner; that is all that is left.

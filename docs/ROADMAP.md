@@ -60,6 +60,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       `components/action-sheet/terrain-sheet.tsx`): drag, tap-then-tap or keyboard, one
       `LINEUP_APPLIED` per confirmation, and « Ajuster sur le terrain » on the planned-composition
       prompt — see decision 045, which amends 032
+- [x] The drag gesture the editor and TERRAIN shared is one implementation now: the rules in
+      `lib/pitch/drag.ts` (tap under 8 px, the 12 px turf margin, « off the turf » as an answer of
+      its own) with unit tests, the React part in `components/pitch/usePitchDrag.ts`, and what a
+      drop *means* still per screen — it benches a player in the editor and is a no-op in TERRAIN,
+      on purpose (decisions 045 and 055). Both screens re-walked at 390 px in both themes
 - [x] Planned composition prompts, pre-filled and confirmed — including against a pitch that is a
       player short, where the prompt used to list nothing at all while a man walked on
 - [x] Event timeline with per-event "annuler" (VOID)

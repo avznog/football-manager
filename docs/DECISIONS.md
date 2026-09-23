@@ -771,7 +771,8 @@ third was three flows and three confirmations, which is three chances to be inte
 leave the pitch in a state the coach never intended.
 
 **Consequences.** The gesture code is duplicated between the composition editor and TERRAIN (~80 lines)
-until a `usePitchDrag` hook is extracted into `components/pitch/`. A single substitution keeps its list
+until a `usePitchDrag` hook is extracted into `components/pitch/`. *(Done — see 055.)* A single
+substitution keeps its list
 flow: TERRAIN is for the deliberate multi-change, not the routine one. The list composer stays the
 guaranteed path and must keep working for anyone who cannot drag. The planned-composition prompt gains
 a third answer, « Ajuster sur le terrain » — invariant 3 is untouched, since it pre-fills and waits
@@ -981,3 +982,39 @@ then JPEG on white, then refuses with a message rather than silently storing som
   URL per club » one.
 - If a team ever needs a large crest, or if the app grows a photo of anything, that is when an object
   store is worth adding — and this decision is what it supersedes.
+
+## 055 — The drag gesture is a pure state machine in `lib/`, and only the answer differs per screen
+**2026-09-23** · accepted · discharges the debt named in 045
+
+The pointer-event bookkeeping the composition editor and TERRAIN both need now lives in two places
+instead of two copies:
+
+- `lib/pitch/drag.ts` — a pure module, no React and no DOM beyond a measured box: `locate`, `pointOf`,
+  `startDrag`, `advanceDrag`, `boxOf`, plus the two constants that encode the judgement calls
+  (`TAP_SLOP = 8`, `PITCH_MARGIN_PX = 12`). Twelve unit tests.
+- `components/pitch/usePitchDrag.ts` — the React wrapper: pointer capture, the mouse-left-button check,
+  the `{ drag, begin, handlers }` handle, and a subject type parameter so each screen carries whatever
+  it drags (`{ memberId, fromSlotId }` in TERRAIN, `{ kind, id }` in the editor).
+
+**Why the rules move into `lib/` and the answers do not.** The three rules are the same on both screens
+and each of them is a decision somebody could get wrong later: a pointer sequence under 8 px of
+Manhattan travel is a **tap**, not a drag; the turf gets a 12 px outer margin so the goalkeeper's slot
+is reachable with a thumb; and *off the turf is a distinct answer*, not a clamped point — `fromClientPoint`
+clamps, so `inside` has to be carried separately or a drop on the bench silently becomes a drop on the
+touchline. Vitest runs `environment: "node"`, so anything inside a hook is untestable here; the rules
+had to leave React to be tested at all.
+
+What must **not** be shared is what a drop *means*. A drop on empty grass benches a player in the
+composition editor and is deliberately a no-op in TERRAIN (045) — the same gesture, two answers, on
+purpose. So `onTap`, `onDrop` and the optional `onMove` are callbacks, and the difference stays visible
+in each screen's code rather than hidden behind a flag in a shared hook.
+
+**Consequences.**
+
+- The caller owns the pitch ref and passes it in. A hook that *returned* a ref would make every other
+  property of the returned object a ref value in the eyes of `react-hooks/refs`, and `gesture.drag` is
+  read on every render to draw the lifted disc — 14 lint errors said so before the ref was inverted.
+- `onMove` exists for the editor's `postes` mode alone: the dragged slot follows the finger and the
+  formation label recomputes live (`1-3-2-1` → `1-3-1-2` while the finger is still down). TERRAIN does
+  not pass it, because a match never changes shape by gesture.
+- Both callers lost ~80 lines each and the next drag surface gets the rules for free.
