@@ -84,7 +84,23 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       `match_player_stats` through `finalizeMatchById` whenever the match is or becomes finished
 
 ## Deployment
+- [x] First-run bootstrap — `npm run db:bootstrap` writes the reference data and the one
+      super-admin account an invite-only app cannot otherwise have (decision 052). Verified
+      against an empty database: the guards refuse a short password and the demo default, and a
+      second run resets the password instead of failing
+- [x] The first team can be created from the application — `createTeam` had no UI at all, and
+      invariant 5 sends a user with no team to `/rejoindre` and nowhere else, so the form lives
+      there for a super admin. Walked in a browser at 390 px, light and dark: bootstrap → login →
+      create → all five tabs reachable, no console errors
+- [x] The club colours can be changed after creation — « Réglages de l'équipe » on `/equipe`
+      (`updateTeam` had no UI either)
+- [x] Every tab checked in the state a brand-new instance is actually in — zero matches, zero
+      players, zero trainings. The demo seed always had a season in it, so this state had never
+      been looked at; `/equipe` was an empty bordered box and now says what to do next
+- [x] `docs/DEPLOY.md` — the runbook: Neon, migrations, bootstrap, Vercel, first run, upgrades,
+      and every environment variable with where it belongs
 - [ ] **Blocked:** needs a Neon `DATABASE_URL` from the owner (interactive signup).
-      Everything else for deployment is ready — Vercel CLI is authenticated.
-- [ ] `vercel link`, env vars, production deploy
-- [ ] Verify on a real iPhone and Android in daylight
+      Everything else is ready — the Vercel CLI is authenticated as `avznog` and
+      `docs/DEPLOY.md` is step by step from there
+- [ ] `vercel link`, env vars, production deploy — `docs/DEPLOY.md` §4
+- [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6

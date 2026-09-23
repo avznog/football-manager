@@ -879,3 +879,35 @@ same submission.
 **Consequences.** The second tap on « Enregistrer » is answered as the success it is — a redirect — and
 not as an error. The replay check must therefore run **before** « cette action est déjà annulée »: after
 a correction succeeds, its target is precisely that.
+
+## 052 — A new instance is bootstrapped from the command line, and creates its first team in the app
+**2026-09-23** · accepted
+
+`npm run db:bootstrap` (`db/bootstrap.ts`) writes the reference data and **one** super-admin account,
+from `SUPER_ADMIN_USERNAME` / `SUPER_ADMIN_PASSWORD`. Everything after that happens in the browser: the
+super admin creates the first team from `/rejoindre`, then invites the squad the ordinary way.
+
+**Why.** Signing up is invite-only (decision 008) and invites are issued by a coach, so a fresh database
+was a closed loop: no coach, therefore no code, therefore no account, therefore no coach. The super
+admin used to be created by `npm run db:seed`, which refuses to run with `NODE_ENV=production` and
+should — its demo team would land in the real season's statistics. So the deployment described in
+`docs/ROADMAP.md` would have produced a site nobody could log into, including its owner.
+
+The one account is created by a script rather than by a « first user becomes admin » screen because that
+screen is a race: the window between the first deploy and the owner's first visit is a window in which a
+stranger becomes administrator of the instance.
+
+**Consequences.** Reference seeding moved to `db/seed-reference.ts`, imported by both `db/seed.ts` and
+`db/bootstrap.ts` — `db/seed.ts` runs `main()` as it loads, so importing it to reuse one function would
+have seeded a demo season as a side effect of asking for the positions table.
+
+`db:bootstrap` is idempotent, and re-running it resets the password: it is the recovery path for the one
+account that has no coach to ask. It refuses a password under `PASSWORD_MIN_LENGTH`, and refuses the
+`change-me` the demo seed defaults to.
+
+Two holes behind the same door were closed with it. `createTeam` had existed since M0 with **no UI at
+all**, and a user with no team is sent by invariant 5 to `/rejoindre` and nowhere else — so the form now
+lives on that screen, shown to a super admin, and `createTeam` redirects into the app the way the join
+actions do instead of leaving the coach on the page he had just submitted. `updateTeam` had no UI
+either, which meant the club colours that the kit discs are drawn in (decision 011) could be set at
+creation and never again; `/equipe` now carries « Réglages de l'équipe ».

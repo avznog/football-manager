@@ -12,6 +12,7 @@ import { randomBytes } from "node:crypto";
 
 import { and, eq, isNull, sql as raw } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
 import { invites, sessions, teamMembers, teams, users } from "@/db/schema";
@@ -69,7 +70,10 @@ export async function createTeam(_prev: FormState, formData: FormData): Promise<
 
   await setActiveTeam(teamId);
   revalidatePath("/equipe");
-  return undefined;
+  // Into the app, like the join actions do (`lib/auth/actions.ts`). Without this the coach stays on
+  // `/rejoindre` looking at the form he has just submitted, with no sign that anything happened:
+  // the screen he was sent to for having no team does not know he now has one.
+  redirect("/");
 }
 
 /** The handle Drizzle hands to a `db.transaction` callback. */
