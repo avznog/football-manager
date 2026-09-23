@@ -1310,3 +1310,39 @@ from 074 to 076 and then to 078, each time because a number it had already writt
 been taken on `main` in the meantime. A decision number is the one thing in this repository that
 cannot be chosen locally and then defended: whoever merges first owns it. So take the number last —
 write the entry, and renumber it against `origin/main` immediately before pushing.
+
+---
+
+## The first migration nobody ran
+
+**2026-09-23** · `docs/DEPLOY.md`, `docs/ROADMAP.md` — no code
+
+#49 merged, and the `migrate` job it adds ran against Neon for the first time. That is the only thing
+worth recording here, because it is the one part of the previous entry that was a **prediction**: every
+observation of the job until now had been a `SKIPPED` on a pull request, which proves the `if` guard
+and nothing else. On the push that merged it: `migrations applied`, exit 0, 41 seconds, after
+typecheck · lint · Vitest and the browser run.
+
+It applied the schema to a database that had none — the owner had set the `DATABASE_URL` secret but
+not run §2 by hand. So `DEPLOY.md` §2 was wrong about its own subject: it claimed the first migration
+*had* to come from a shell, "there is no schema for the application to serve against until it has
+run". True, and irrelevant — nothing has to serve against it before the job finishes. The section now
+says CI does the first one too, and keeps the manual command for the case it is actually needed, a
+database CI does not know about: a Neon branch for Preview, or a restored copy.
+
+Deployment Protection is off, so `/connexion` answers `200` with the French login form instead of a
+`302` to `vercel.com/sso-api`. Three of the four things the last entry left with the owner are done.
+
+**What is left is one command**, and it is the interesting one: `db:bootstrap` has not been run, so
+the app has a schema, twenty-one tables and no account. Every screen is reachable and none of them can
+be reached, because signing up is invite-only and invites come from a coach (decision 052). It cannot
+be run from a session and **it cannot even be checked** from one: the connection string exists only in
+Vercel, sensitive and unreadable, and in a GitHub secret, which is write-only. So « has the super
+admin been created » is a question this repository cannot answer about itself — the answer is a login
+attempt in a browser. That is the price of the sensitive flag, and it is the right price.
+
+The same run fixes the other open item for free. `db:bootstrap` is idempotent and re-hashes the
+password every time, so creating the account with a *new* password is also the reset the password
+that sat in the Vercel environment needs.
+
+**Next:** §3, then §6 on a real phone in daylight.
