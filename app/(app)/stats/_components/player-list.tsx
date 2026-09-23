@@ -13,8 +13,10 @@
 import { Card } from "@/components/ui/card";
 import type { PlayerSeasonStats, PlayerSortKey } from "@/lib/stats/aggregate";
 import {
+  ATTENDANCE_NOT_FILTERED_FR,
   NO_DATA_FR,
   appearancesLineFr,
+  attendanceHintFr,
   formatAttendance,
   formatMinutes,
   formatRating,
@@ -37,6 +39,13 @@ export function PlayerList({
   /** Matches whose ratings decision 007 keeps from this reader, so a dash is not read as "none". */
   hiddenRatingMatches: number;
 }) {
+  /**
+   * Every figure on a row is inside the competition filter except the attendance, which cannot be:
+   * a training belongs to no competition. So the rows have to say which one is the exception
+   * (decision 080).
+   */
+  const filtered = query.competition !== null;
+
   return (
     <Card
       title="Joueurs"
@@ -55,7 +64,12 @@ export function PlayerList({
       ) : (
         <ul className="divide-y divide-border/60">
           {players.map((player) => (
-            <PlayerRow key={player.teamMemberId} player={player} sort={query.sort} />
+            <PlayerRow
+              key={player.teamMemberId}
+              player={player}
+              sort={query.sort}
+              filtered={filtered}
+            />
           ))}
         </ul>
       )}
@@ -65,6 +79,7 @@ export function PlayerList({
           La présence est calculée sur les séances où le joueur a été pointé, pas sur toutes les
           séances : {markedSessions > 0 ? `${plural(markedSessions, "séance")} pointée${markedSessions > 1 ? "s" : ""} au total` : "aucune séance pointée pour l’instant"}.
           Un joueur non pointé n’est pas un absent.
+          {filtered ? ` ${ATTENDANCE_NOT_FILTERED_FR}` : ""}
         </Note>
         {hiddenRatingMatches > 0 ? (
           // Without this, a masked average is indistinguishable from an average nobody has given.
@@ -98,6 +113,7 @@ function hasMatchRecord(player: PlayerSeasonStats): boolean {
 function promoted(
   player: PlayerSeasonStats,
   sort: PlayerSortKey,
+  filtered: boolean,
 ): { value: string | null; hint?: string } {
   const played = hasMatchRecord(player);
   switch (sort) {
@@ -122,15 +138,24 @@ function promoted(
               player.attendance.marked,
               player.attendance.rate,
             ),
-            hint: "séances pointées",
+            hint: attendanceHintFr(filtered),
           }
         : { value: null };
   }
 }
 
-function PlayerRow({ player, sort }: { player: PlayerSeasonStats; sort: PlayerSortKey }) {
+function PlayerRow({
+  player,
+  sort,
+  filtered,
+}: {
+  player: PlayerSeasonStats;
+  sort: PlayerSortKey;
+  /** A competition filter is on, so the attendance figure is the odd one out on the row. */
+  filtered: boolean;
+}) {
   const played = hasMatchRecord(player);
-  const headline = promoted(player, sort);
+  const headline = promoted(player, sort, filtered);
   // The sorted figure is already promoted next to the name; repeating it in the grid would show the
   // same number twice on a 320 px row.
   const show = (key: PlayerSortKey) => key !== sort;
@@ -183,7 +208,7 @@ function PlayerRow({ player, sort }: { player: PlayerSeasonStats; sort: PlayerSo
                       )
                     : null
                 }
-                hint="séances pointées"
+                hint={attendanceHintFr(filtered)}
               />
             ) : null}
           </FigureGrid>

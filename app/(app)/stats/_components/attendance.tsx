@@ -7,12 +7,14 @@
  *   - the denominator is printed next to every rate, because a bare « 50 % » invites the reader to
  *     assume it is out of the number of sessions;
  *   - the competition filter does not apply here. A training belongs to no competition, so filtering
- *     by « Coupe » would leave this card either empty or, worse, unchanged and misread.
+ *     by « Coupe » would leave this card either empty or, worse, unchanged and misread. The sentence
+ *     that says so is `ATTENDANCE_NOT_FILTERED_FR`, shared with the per-player cards, which had the
+ *     same figure and said nothing about it (decision 080).
  */
 
 import { Card } from "@/components/ui/card";
 import type { PlayerSeasonStats } from "@/lib/stats/aggregate";
-import { formatAttendance, plural } from "@/lib/stats/format";
+import { ATTENDANCE_NOT_FILTERED_FR, formatAttendance, plural } from "@/lib/stats/format";
 
 import { CardEmpty, Note, PlayerIdentity } from "./parts";
 
@@ -83,9 +85,7 @@ export function Attendance({
           {unmarked.length > 0
             ? ` ${plural(unmarked.length, "joueur")} n’${unmarked.length > 1 ? "ont" : "a"} encore jamais été pointé${unmarked.length > 1 ? "s" : ""} : ${unmarked.map((player) => player.displayName).join(", ")}.`
             : ""}
-          {filtered
-            ? " Le filtre par compétition ne s’applique pas à cette carte : un entraînement n’appartient à aucune compétition."
-            : ""}
+          {filtered ? ` ${ATTENDANCE_NOT_FILTERED_FR}` : ""}
         </Note>
       </div>
     </Card>
