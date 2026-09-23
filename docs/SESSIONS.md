@@ -2074,3 +2074,31 @@ groups, not the three I expected to find. `leaderboard.tsx`, `keepers.tsx`, `att
 
 Decision 100. No test: this is a prop on a `<Link>` in `app/`, which Vitest does not collect, and the
 behaviour is the framework's. Outstanding, and it is the only honest check — scroll and tap on a phone.
+
+### 2026-09-23 — Every date in digits, and the formatter that ran in two time zones
+
+Second of the owner's eight remarks: « les dates doivent absolument être en francais DD/MM/YYYY,
+l'heure aussi sur un format de 24h ». The times were already right — `formatTime` has always been
+`fr-FR` with an explicit `Europe/Paris` — so this was about dates, and about the fact that the
+repository never said what a date looks like. Three screens had each decided separately.
+
+The one worth the branch: `app/(app)/equipe/invite-manager.tsx` held its own
+`Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" })` with no `timeZone`, in a `"use
+client"` file. No zone means the host's zone, and the host is the server on the first render and the
+phone afterwards — UTC on Vercel — so « expire le 30 septembre » could become « expire le 1er
+octobre » between the HTML and the hydrated page, and said which year in neither. `lib/player/injury.ts`
+spelled the month out for the injury history, and the calendar row printed « dim. 27 sept. » with no
+year in a list that runs across 1 January.
+
+`formatDate` now lives beside `formatTime`, so one file knows the shape. `2-digit` on day and month,
+because `3/10` under `27/09` is a column that does not line up; `hour12: false` spelled out on the
+time formatter even though the locale implies it. The words stay where a date is a sentence rather
+than a record — « Blessé depuis le 13 septembre » is untouched, and so are `formatDay` and
+`formatDayMonthFr`.
+
+Decision 101. Four new tests, including a zero-padded `03/10/2026` that fails under `en-US` and a
+loop over twenty-four hours against `/^([01]\d|2[0-3]):[0-5]\d$/`. 1032 unit tests.
+
+Not done, and it matters here: **no 390 px pass.** The calendar row gained a third line and grew from
+about 56 px to about 65 px, in the list on the busiest screen in the app and on the e2e happy path.
+It wants a look in both themes before anybody calls this finished.

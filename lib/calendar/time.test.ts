@@ -5,6 +5,7 @@ import {
   dayDifference,
   dayKey,
   daysFromNow,
+  formatDate,
   formatDay,
   formatDayLabel,
   formatRelativeDays,
@@ -124,9 +125,33 @@ describe("French formatting", () => {
     expect(formatDay(kickoff, kickoff)).not.toContain("2026");
   });
 
+  it("writes the date as DD/MM/YYYY", () => {
+    // The whole point: day first. An American locale would render this "9/27/2026", and a
+    // `numeric` month would render 3 October as "3/10/2026" instead of "03/10/2026".
+    expect(formatDate(kickoff)).toBe("27/09/2026");
+    expect(formatDate(new Date("2026-10-03T08:30:00Z"))).toBe("03/10/2026");
+    expect(formatDate(new Date("2027-01-09T12:00:00Z"))).toBe("09/01/2027");
+  });
+
+  it("dates by the Paris day, not the UTC one", () => {
+    // 23:30 on the 27th in Paris is already the 28th in UTC. The reader is in Paris.
+    expect(formatDate(new Date("2026-09-27T21:30:00Z"))).toBe("27/09/2026");
+  });
+
   it("writes the time on a 24-hour clock, in Paris", () => {
     expect(formatTime(kickoff)).toBe("10:30");
     expect(formatTime(new Date("2026-09-27T18:30:00Z"))).toBe("20:30");
+  });
+
+  it("never falls back to a 12-hour clock", () => {
+    // Every one of these would be a different string with hour12 — "7:00 PM", "12:00 AM".
+    expect(formatTime(new Date("2026-09-27T17:00:00Z"))).toBe("19:00");
+    expect(formatTime(new Date("2026-09-27T22:00:00Z"))).toBe("00:00");
+    expect(formatTime(new Date("2026-09-27T10:00:00Z"))).toBe("12:00");
+    for (let hour = 0; hour < 24; hour++) {
+      const time = formatTime(new Date(Date.UTC(2026, 0, 15, hour)));
+      expect(time).toMatch(/^([01]\d|2[0-3]):[0-5]\d$/);
+    }
   });
 
   it("labels the neighbouring days relatively and everything else by date", () => {

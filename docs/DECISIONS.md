@@ -2461,3 +2461,42 @@ top regardless. `scroll={false}` is an instruction to the client router. Fixing 
 mean appending a `#joueurs` fragment to every sort href, which would then follow every shared URL
 around; the no-JS fallback is a fallback, and landing at the top of a page whose numbers are correct is
 not a defect worth that.
+
+## 101 — A date is `27/09/2026`, everywhere, and a time is 24-hour
+
+**2026-09-23** · accepted
+
+« les dates doivent absolument être en francais DD/MM/YYYY, l'heure aussi sur un format de 24h ». The
+repository already said dates are handled in `Europe/Paris` for display (`CLAUDE.md`) and already had
+`formatTime` doing it correctly. It said nothing about the *shape* of a date, so three screens each
+invented one.
+
+The expensive one was `invite-manager.tsx`: a module-level `Intl.DateTimeFormat("fr-FR", { day:
+"numeric", month: "long" })` with **no `timeZone`**, inside a client component. A formatter with no
+zone uses the host's, which is the server's on the first render and the reader's after hydration — so
+the expiry of an invitation was computed twice, in two zones, and could name two different days. It
+also named no year, for a row whose whole job is to say when a code stops working. `lib/player/injury.ts`
+hand-rolled « 22 septembre 2026 » from a month array for the injury history, and the calendar row
+said « dim. 27 sept. » with no year at all, in a list that spans a season crossing 1 January: a row
+that cannot say which 27 September it means.
+
+So `formatDate` joins `formatTime` in `lib/calendar/time.ts`, with the same zone spelled out and the
+same locale spelled out, and the screens call it. Two details in it are the point rather than
+decoration. `2-digit` on both day and month, not `numeric`: in a column, `3/10` under `27/09` does
+not line up, and `tabular-nums` can align digits it has but cannot supply one it hasn't. And
+`hour12: false` is now explicit on the time formatter even though `fr-FR` already implies it — the
+locale string was the only thing standing between a kick-off and « 7:00 PM », and a locale is the
+kind of argument someone eventually parameterises.
+
+Digits do not win everywhere, and the split is by what the reader is doing rather than by taste.
+Where a date is **a fact to read off** — a list column, an expiry, a record of a day — it is digits,
+because the eye compares them without reading. Where it is **a sentence** — « Blessé depuis le 13
+septembre », « Dimanche 14 septembre à 10:30 » — the month stays a word, so `formatDayMonthFr` and
+`formatDay` are untouched. The calendar row keeps the weekday above the numeric date for the same
+reason: « dim. » is the fact a coach actually scans for, and the year underneath it is what makes the
+row unambiguous in February.
+
+`toLocalInput` and `fromLocalInput` are deliberately left in ISO. They are the wire format of
+`<input type="datetime-local">`, not something anybody reads, and the browser renders that control
+in the reader's own locale — which on a French phone is French already, and which no formatter of
+ours can change.

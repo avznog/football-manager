@@ -223,6 +223,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       banner a player reads in game mode, with the same coach addressed both ways on one screen
       (decision 074, and the rule is in `CLAUDE.md`)
 
+- [x] One shape for a date, and it is the French one: `27/09/2026`, and a 24-hour clock. The
+      invitation expiry built its own formatter with no `timeZone`, in a client component, so it
+      rendered in UTC on the server and in the reader's zone after hydration — and named no year; the
+      injury history spelled the month out where a record wants digits; the calendar row said
+      « dim. 27 sept. » in a list that crosses 1 January. `formatDate` beside `formatTime` in
+      `lib/calendar/time.ts` is now the only place that knows the shape (decision 101)
+
 ## M6 — Ratings & recap
 - [x] Rating flow: one teammate per card, 0–10, optional comment
 - [x] Results hidden until you have submitted your own
