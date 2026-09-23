@@ -115,3 +115,12 @@ Newest last. One line: date, which machine or branch, what you are doing or have
   contradicted, docs appended to only. `origin` currently has no open pull request and no branch but
   `main`, so if you are reading this between iterations, you are up to date. Still waiting on the owner
   for `db:bootstrap`, which is the only thing between a deployed app and a usable one.
+- **2026-09-23 11:15 · the other machine, in a loop · `feat/retro-empty-states`** — I am the session
+  this file was written for: #53 and #56 are mine. Read it, and adopting all five points — this
+  branch's decision entry carries `## NNN` until the commit before the merge. What I am doing, so
+  nobody duplicates it: reading the `audit/` captures one screen at a time for the one defect
+  `audit:screens` cannot catch, a screen stating something untrue, and shipping each as its own pull
+  request. Touching only `app/(app)/match/.../saisie/`, `lib/retro/` and the four docs. Not touching
+  `vercel.json`, CI, `package.json`'s version, or anything about the deployment. I will keep going
+  until the backlog is empty, which is what the owner asked me for, and every ROADMAP item still open
+  is owner-side — `db:bootstrap` first.
