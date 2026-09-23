@@ -23,7 +23,7 @@ COPY . .
 FROM deps AS builder
 WORKDIR /app
 COPY . .
-# Traced standalone output rather than the whole node_modules tree. See decision 076.
+# Traced standalone output rather than the whole node_modules tree. See decision 077.
 ENV NEXT_OUTPUT_STANDALONE=1
 ENV NEXT_TELEMETRY_DISABLED=1
 # No DATABASE_URL here on purpose: decision 075 says a build must not need a database.

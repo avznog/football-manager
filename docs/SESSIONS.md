@@ -1203,7 +1203,7 @@ and decision 016 is untouched. That was the whole question worth deciding. 016 c
 Postgres because the owner's machine had no Docker daemon and a Homebrew service needs none; that is
 still true and the development loop it produced still works, so compose is framed as **an addition**
 and `docs/DEPLOY.md` puts it in a section marked optional, after the Vercel and Neon runbook.
-Decision 076 has the reasoning, including why the three gaps it closes — seeing a production build
+Decision 077 has the reasoning, including why the three gaps it closes — seeing a production build
 before Vercel does, a machine with no Homebrew, reproducing CI's `postgres:17` — are worth a second
 documented path.
 

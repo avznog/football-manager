@@ -228,5 +228,5 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       (named volume, `pg_isready` healthcheck, the credentials `.env.example` and CI already use)
       and a multi-stage production image of the app, which waits for the database to be healthy and
       for the migrations to have applied. Development is still `npm run dev` against the Homebrew
-      Postgres: decision 076 adds compose, it does not supersede 016. `output: "standalone"` is
+      Postgres: decision 077 adds compose, it does not supersede 016. `output: "standalone"` is
       gated on `NEXT_OUTPUT_STANDALONE` so Vercel builds unchanged

@@ -1,7 +1,7 @@
 # An optional, self-contained way to run the whole stack: Postgres 17 and the built app.
 #
 # It does not replace `npm run dev` against the Homebrew Postgres — that is still the documented
-# development loop (decisions 016 and 076). Use this when you want the app running the way it runs
+# development loop (decisions 016 and 077). Use this when you want the app running the way it runs
 # in production, or on a machine with no Homebrew.
 #
 #   docker compose up -d db        # Postgres only, for `npm run dev` on the host

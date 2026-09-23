@@ -157,7 +157,7 @@ serving traffic for a few seconds.
 Vercel plus Neon is the deployment. `compose.yaml` is something else: a way to run the app the way
 production runs it — a real production build, a real Postgres 17 — without Vercel, Neon, or a
 Homebrew service. It is **an addition, not a replacement**. `npm run dev` against the Homebrew
-Postgres is still the development loop (decisions 016 and 076).
+Postgres is still the development loop (decisions 016 and 077).
 
 Three things it is good for: checking a production build before pushing, giving a machine with no
 Homebrew a database, and reproducing what CI's `postgres:17` service does.

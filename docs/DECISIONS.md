@@ -1601,7 +1601,7 @@ Worth naming, because it is the fourth time: **the blank screen passed every mec
 that what it cannot catch is a screen stating something untrue — and a screen saying nothing about
 something that happened is a member of that family, not an exception to it.
 
-## 076 — Docker Compose is an additional way to run the stack, not the development loop
+## 077 — Docker Compose is an additional way to run the stack, not the development loop
 **2026-09-23** · accepted
 
 `compose.yaml`, `Dockerfile` and `.dockerignore` bring up Postgres 17 and a production build of the
@@ -1618,7 +1618,8 @@ contributing.
 differently from `next dev` — standalone output, `NODE_ENV=production`, no HMR — and the only way to
 see that before Vercel does was `npm run build && npm run start`, which still needs the host set up.
 A machine without Homebrew (Linux, CI-like, a second laptop) had no documented path to a database at
-all. And CI runs against a `postgres:17` service image, so a container is the closest local
+all — `npm run db:start` is `brew services`, so it is macOS-only, and on Linux `npm run docker:db` is
+now the equivalent. And CI runs against a `postgres:17` service image, so a container is the closest local
 reproduction of the environment the e2e job fails in.
 
 **How it is arranged.**
