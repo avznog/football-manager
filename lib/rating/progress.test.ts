@@ -4,6 +4,7 @@ import type { SquadRole } from "@/db/schema";
 import {
   isOnRateableSheet,
   isRateableRole,
+  playedLabelFr,
   rateableMemberIds,
   ratingProgress,
   ratingVisibility,
@@ -126,5 +127,26 @@ describe("ratingVisibility", () => {
       visible: true,
       reason: "not-a-rater",
     });
+  });
+});
+
+describe("playedLabelFr", () => {
+  it("says what the log says, not what the sheet planned", () => {
+    expect(playedLabelFr(42)).toBe("42’");
+    // The bug: a named substitute who spent the hour on the bench was labelled « entré en jeu »,
+    // because the badge was read off his sheet role rather than off his minutes.
+    expect(playedLabelFr(0)).toBe("non entré");
+  });
+
+  it("claims nothing about a match nobody recorded", () => {
+    // No log means no minutes, and « non entré » would be the same invention as a « 0 – 0 » for a
+    // match whose events do not exist (decision 013).
+    expect(playedLabelFr(null)).toBeNull();
+  });
+
+  it("does not round a cameo up to a minute, and does not round it away either", () => {
+    // The reducer hands over whole minutes; a 40-second appearance arrives here as 0 and reads
+    // « non entré », which is the same rule the season stats use (`lib/stats/aggregate.ts` rule 3).
+    expect(playedLabelFr(1)).toBe("1’");
   });
 });

@@ -136,3 +136,24 @@ export function ratingVisibility(input: {
   if (input.progress.complete) return { visible: true, reason: "complete" };
   return { visible: false, reason: "incomplete" };
 }
+
+/* -------------------------------------------------------------------------- */
+/* What the rater is told about the man he is rating                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * « 42’ », « non entré », or nothing at all.
+ *
+ * The card used to show « entré en jeu » to anybody listed as a substitute, which is a statement
+ * about what happened deduced from what the coach *planned*. In an amateur seven-a-side squad the
+ * commonest fate of a named substitute is to stay on the bench for the whole hour, and he was being
+ * told — and his team-mates with him, as they rated him — that he had come on.
+ *
+ * So the sheet does not answer this: the log does, through `PlayerMatchState.minutes`. Pass `null`
+ * when there is no log to read — a finished match nobody recorded (decision 013) — because « non
+ * entré » about a match whose events do not exist is the same invention as « 0 – 0 » for its score.
+ */
+export function playedLabelFr(minutes: number | null): string | null {
+  if (minutes === null) return null;
+  return minutes > 0 ? `${minutes}’` : "non entré";
+}

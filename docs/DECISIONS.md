@@ -911,3 +911,35 @@ lives on that screen, shown to a super admin, and `createTeam` redirects into th
 actions do instead of leaving the coach on the page he had just submitted. `updateTeam` had no UI
 either, which meant the club colours that the kit discs are drawn in (decision 011) could be set at
 creation and never again; `/equipe` now carries « Réglages de l'équipe ».
+
+## 053 — The match sheet records the coach's intention; the log records what happened. Neither corrects the other
+**2026-09-23** · accepted
+
+`match_squad.role` — titulaire / remplaçant / supporter — is what the coach wrote before the match, and it
+is **never rewritten** afterwards, by game mode or by a retro entry. Whether a player actually started,
+came on, or never left the bench is derived from `match_events` alone (`PlayerMatchState.startedMatch`,
+`playedMatch`, `minutes`).
+
+**Why.** They are different facts and both are worth keeping. "I was named a substitute and ended up
+playing the whole match" is a true sentence about a season, and it is only expressible if the sheet still
+says substitute. Overwriting the sheet to agree with the log would also make the selection unauditable:
+the coach's own list of who he picked would silently rearrange itself after every match, which is exactly
+the property invariant 1 protects the event log from.
+
+**Consequences, and the rule for every screen.** A screen must take each fact from its own source, and
+this is the trap: the sheet is easier to reach, so it gets used to answer questions it cannot answer.
+
+- Selections — « 7 titulaires, 2 remplaçants », the season's `appearances.starter` — come from the sheet.
+  `lib/stats/aggregate.ts` rule 4 already says so.
+- Anything about what happened — minutes, who started, who came on — comes from the log, through the
+  reducer.
+
+`lib/rating/progress.ts` had the defect that named this decision: the notation card showed « entré en jeu »
+to every player listed as a substitute, so the unused substitute — the commonest kind in an amateur squad
+— was announced as having come on, to his whole team, at the moment they were rating him. It now shows
+« 42’ » or « non entré » from his minutes, and nothing at all when the match has no log to read, since
+« non entré » about events that do not exist is the same invention as « 0 – 0 » for their score
+(decision 013).
+
+The retro path is therefore correct as it stands: a listed substitute who actually started keeps
+`squad_role = 'substitute'`, and every screen that cares whether he started asks the log.
