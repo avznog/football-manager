@@ -148,6 +148,25 @@ async function discover(): Promise<{ coach: string; player: string; targets: Tar
     await sql<{ id: string }[]>`
       select id from trainings where team_id = ${team.id} order by starts_at desc limit 1`,
   );
+  // A session that is over has two states and they are not the same fact: the coach ticked the list,
+  // or he never did. Only the upcoming one used to be visited, so neither had ever been looked at —
+  // `PresenceSummary`, `departedMarksNoteFr` and the « jamais pointée » case were all unaudited.
+  const markedTraining = await one(
+    "une séance passée et pointée",
+    await sql<{ id: string }[]>`
+      select t.id from trainings t
+      where t.team_id = ${team.id} and t.starts_at < now()
+        and exists (select 1 from training_attendance a where a.training_id = t.id)
+      order by t.starts_at limit 1`,
+  );
+  const unmarkedTraining = await one(
+    "une séance passée jamais pointée",
+    await sql<{ id: string }[]>`
+      select t.id from trainings t
+      where t.team_id = ${team.id} and t.starts_at < now()
+        and not exists (select 1 from training_attendance a where a.training_id = t.id)
+      order by t.starts_at desc limit 1`,
+  );
 
   return {
     coach: coach.username,
@@ -160,6 +179,8 @@ async function discover(): Promise<{ coach: string; player: string; targets: Tar
       { name: "stats-coupe-buts", path: "/stats?competition=cup&tri=buts", audience: "everyone" },
       { name: "entrainements", path: "/entrainements", audience: "everyone" },
       { name: "entrainement", path: `/entrainements/${training.id}`, audience: "everyone" },
+      { name: "entrainement-pointe", path: `/entrainements/${markedTraining.id}`, audience: "everyone" },
+      { name: "entrainement-non-pointe", path: `/entrainements/${unmarkedTraining.id}`, audience: "everyone" },
       { name: "entrainement-nouveau", path: "/entrainements/nouveau", audience: "coach" },
       { name: "entrainement-modifier", path: `/entrainements/${training.id}/modifier`, audience: "coach" },
       { name: "moi", path: "/moi", audience: "everyone" },

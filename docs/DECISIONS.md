@@ -1566,3 +1566,37 @@ failing loudly at build. That is the right trade — a build is not a run, previ
 touches no data should not need a database, and the runtime error is explicit rather than silent —
 but it is a real change in where the mistake surfaces, so `docs/DEPLOY.md` §4 now says a green build
 is not evidence the variable is set, and what the symptom looks like when it is not.
+
+## 076 — A session nobody pointed says so
+**2026-09-23** · accepted
+
+The demo season has four trainings, and one of them — 19 September — exists precisely because it was
+**never pointed**: not one row in `training_attendance`. It is not the same fact as 12 September,
+where the pitch was unplayable and thirteen rows say `present = false`, and decision 020 already
+insisted the attendance rate treat the two differently. The screens did not.
+
+**On a list row** both printed the same thing, which was nothing: `attendanceSummary` returned `null`
+whenever `marked === 0`. So « 0 présent sur 13 pointés » sat above a silent row, and the silence read
+as either a session where nobody came or a bug. It now says « Présences pas encore pointées » — on a
+session that is *over*. Before the evening the silence is correct: the coach has not failed to do
+anything yet, which is why `attendanceLineFr` takes `isPast` rather than guessing from the counts.
+
+**On the session's own page** it was worse. A player opening 19 September got the date, the time, the
+venue, and eleven hundred pixels of blank — `PresenceSummary` returns `null` with no marks, and the
+availability grid is hidden when nobody answered (decision 069), so between them the page said
+nothing at all about a session that had happened. It says it now, and says the part that matters:
+« Aucune présence n'a été pointée pour cette séance. Elle ne compte donc dans aucun taux de
+présence. » Without that second sentence the first invites the reading that everybody was marked
+absent, and a player who trained that evening should not have to wonder whether the app has him down
+as a no-show.
+
+**The audit had never looked at it.** `scripts/audit-screens.ts` picked its training with
+`order by starts_at desc limit 1` — always the session still to come. A past session's page, in
+either of its two states, had not been screenshotted once, which is why `PresenceSummary`,
+`departedMarksNoteFr` and the blank page were all unexamined. Two targets now: a past session that
+was pointed and a past session that was not. 100 visits instead of 92.
+
+Worth naming, because it is the fourth time: **the blank screen passed every mechanical check.** An
+`h1`, no console error, nothing outside the viewport, no English. The script says in its own output
+that what it cannot catch is a screen stating something untrue — and a screen saying nothing about
+something that happened is a member of that family, not an exception to it.

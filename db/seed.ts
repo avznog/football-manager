@@ -303,8 +303,9 @@ async function seedDemo(): Promise<void> {
    *   called off on the spot. 13 rows, all `present = false`.
    * - **T3** — **never marked**: not one row in `training_attendance`. This is *not* the same fact
    *   as T2, and the attendance rate must treat it as such — « présent / pointé », never
-   *   « présent / effectif ». Both sessions look identical in the list; only the stats can tell
-   *   them apart, which is exactly the bug this fixture exists to catch.
+   *   « présent / effectif ». The two used to look identical on a list row, and T3's own page was
+   *   blank for a player; the list says « Présences pas encore pointées » now and the page says why
+   *   it counts nowhere (decision 076). Which is what this fixture is for.
    * - **T4** — still to come: declared availability, nothing marked, two non-responders.
    */
   const createdTrainings = await db
