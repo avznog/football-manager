@@ -1772,3 +1772,39 @@ commit subject, and the history is the changelog. The first tag it cuts is `v0.1
 version the field has held since M0 — the number is honest about an app that has never been used by
 the team it was written for, and bumping it to `1.0.0` is a one-line change on the day the squad
 actually walks a match with it.
+
+## 082 — A figure the competition filter cannot reach says so where it is printed
+**2026-09-23** · accepted
+
+`/stats` has a competition filter, and a training belongs to no competition (decision 020), so
+`getAttendanceMarks` takes no filter: the attendance rate is the season's whatever chip is selected.
+Decision 020 already knew this was a trap and put a sentence on the « Présence aux entraînements »
+card — « Le filtre par compétition ne s'applique pas ». The per-player cards print the *same figure*
+a few hundred pixels higher and said nothing.
+
+On the « Coupe » tab of the demo season, Ali's card reads:
+
+```
+MATCHS —   BUTS —   PASSES DÉC. —   MINUTES —   NOTE —
+PRÉSENCE 1/2 · 50 %
+```
+
+Five dashes meaning « nothing in this selection », and one number that means something else entirely.
+Fabien's row is the same shape with a hard « 0/2 · 0 % » in it. Both are true statements about the
+season and false statements about the cup, and the row gives the reader no way to tell which he is
+looking at.
+
+The rule this settles, because the app will meet it again: **a figure outside the current filter is
+qualified where it is printed, not in a note at the bottom of the card.** The « Joueurs » card is four
+thousand pixels tall; its note sits under the last player. Nobody misreading row nine reads it. So the
+hint under the rate becomes « séances pointées, toute la saison » as soon as a filter is on — the
+denominator it already carried, plus the scope — and the reason stays in the note, where a reason
+belongs.
+
+One wording for the reason, `ATTENDANCE_NOT_FILTERED_FR`, shared by the two cards so they cannot come
+to disagree (the same move as decision 073). That meant dropping « cette carte » from decision 020's
+sentence: on a player's card the filter applies to everything *except* the presence, so naming a card
+would have been wrong in the new place and vague in the old one.
+
+Both strings are pure functions in `lib/stats/format.ts` with tests, for the reason that keeps
+recurring: Vitest does not look under `app/`, so copy that matters has to leave the component.

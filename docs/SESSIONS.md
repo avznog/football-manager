@@ -1458,3 +1458,28 @@ would have saved the last two hours, of which the first is: **take a decision nu
 never before.** It deliberately does not tell the other session to stop working — it is doing good
 work, the owner cannot stop it before tonight, and a loop would restart it anyway. It asks for the five
 cheap things instead, and ends with a log both sides can append a line to.
+
+### Five dashes and one number
+
+Reading the audit captures screen by screen, in the `stats-coupe-buts` one: Ali's card under the
+« Coupe » chip had MATCHS —, MINUTES —, BUTS —, PASSES DÉC. —, NOTE — and PRÉSENCE « 1/2 · 50 % ».
+The dashes mean « nothing in this selection ». The number means the whole season, because a training
+belongs to no competition (decision 020) and `getAttendanceMarks` consequently takes no filter. Fabien
+had the same row with « 0/2 · 0 % » in it, which is worse: a zero reads as a measurement.
+
+Decision 020 had seen this coming and answered it on the « Présence aux entraînements » card, which
+says the filter does not apply. The per-player cards print the same figure higher up the same page and
+said nothing about it. The interesting part is that the fix was *not* to add the sentence to the second
+card's note: the « Joueurs » card is four thousand pixels tall and its note is under the last player,
+which is no use to somebody misreading row nine. The qualification has to be on the row. So the hint
+under the rate carries it — « séances pointées, toute la saison » when a filter is on — and the note
+carries the reason. Written down as decision 082, because the shape of it will recur the next time a
+figure sits outside a filter.
+
+`ATTENDANCE_NOT_FILTERED_FR` is now one sentence used by both cards, which cost decision 020's wording
+its « cette carte »: on a player's card the filter applies to everything except the presence.
+
+Both strings went into `lib/stats/format.ts` with tests, for the reason that keeps coming up — Vitest
+does not collect anything under `app/`. 888 unit tests, 44 files. Looked at in both themes at 390 px,
+filtered and unfiltered: « toute la saison » wraps onto two short lines inside the 110 px column and
+the unfiltered screens are unchanged.
