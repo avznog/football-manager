@@ -2641,3 +2641,53 @@ them. A preposition on a link that is really a breadcrumb is noise.
 All of it is derived in `lib/calendar/labels.ts` and `lib/stats/format.ts` and pinned by unit tests,
 because Vitest collects nothing under `app/` (decision 097). The inline ternary in game mode is the
 argument: it was both a third wording and a sentence no test could see.
+
+## 105 — The bench is docked, and the pitch is capped to fit above it
+
+**2026-09-23** · accepted
+
+On the composition editor the turf is capped at 280 px wide — 410 px tall at its fixed 1080:1580
+ratio — and the bench, the blocking errors and the confirm button are a single sticky dock pinned
+just above the tab bar. The bench is one horizontally scrollable strip of 64 px discs, titulaires
+first, then a hairline, then remplaçants.
+
+**Why.** « il faut que ce soit plus compact, pcq actuellement les joueurs sur le banc sortent de
+l'écran, donc c'est pas trop possible de les drag and drop. » At 390 px the card interior is 326 px
+and the pitch was `w-full`, so the turf was 477 px tall; above it sat a page header, a settings card
+of stacked fields and a mode control, and below it two headed sections of wrapping rows worth about
+300 px. The bench therefore started some 800 px down a 740 px viewport. **A drag whose source and its
+target cannot be on screen at the same time is not a cramped layout, it is a broken feature**, and it
+shipped that way.
+
+The cap has a floor as well as a ceiling, and the floor is why the discs did not shrink. The playing
+area is `1000/1080` of the box, so a 48 px disc spans `48 × 1000 / (0.926 × 280)` = 185 pitch units,
+under the 195-unit `MIN_MARKER_DISTANCE` that guarantees two slots are apart: at 280 px the discs
+still cannot touch, and below 266 px they would. So the discs stay 48 px, above the 44 px minimum —
+**compactness is never bought out of the drop target.** From `sm` the dock returns to the flow and
+the turf grows to 384 px wide, rather than staying phone-sized on a laptop.
+
+Docking also repairs something already shipped: the save bar was `sticky bottom-3`, which is
+*underneath* the fixed tab bar. One sticky element at the tab bar's own offset — the one game mode
+already uses — removes that arithmetic instead of adjusting it. At 390 × 740 the dock is at most
+~196 px, so 740 − 56 − 72 − 196 = 416 px remain for 410 px of pitch: turf, bench and « Créer la
+composition » with no scrolling at all.
+
+**Consequences.** The strip is the one scroll container that could eat the gesture, so its discs are
+`touch-pan-x` rather than `touch-none`: the browser may take a sideways swipe to scroll the strip (we
+get `pointercancel` and write nothing), while a vertical lift onto the turf and a tap both stay with
+our pointer capture. Decision 073's argument for a wrapping bench — a player off the right edge is a
+player forgotten — is answered in words instead of in pixels: `benchHintFr` always says how many are
+waiting and how many posts are open, « 9 au banc, 3 postes libres ». And the tap path is now the one
+the screen leads with (« Appuie sur un joueur puis sur un poste »), the drag being the shortcut rather
+than the instruction — which is also the path the e2e suite drives.
+
+Two things gave up their line to pay for this. The gesture commentary is now `sr-only`: everything it
+says is visible on the turf a centimetre above, so on screen it was a duplicate costing the one
+currency this layout has none of, while for a screen reader it is the only account of what the
+gesture did and so it stays announced. And « À partir de la minute » is labelled « Minute », because
+in a 157 px column it wrapped to three lines while the card's own title already reads « À partir de
+la 30ᵉ minute ».
+
+The sentences are derived in `lib/composition/hints.ts` (decision 097), including the branch the old
+screen did not have: a bench with nobody on it used to print « Appuie sur un joueur puis sur un poste »
+regardless.

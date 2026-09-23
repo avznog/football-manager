@@ -164,12 +164,14 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(page.getByText("Le terrain est vide")).toBeVisible();
 
     await page.getByRole("link", { name: "Composition de départ" }).click();
-    await expect(page.getByLabel("À partir de la minute")).toHaveValue("0");
+    await expect(page.getByLabel("Minute", { exact: true })).toHaveValue("0");
 
     for (const [key, slot] of STARTERS) {
       await place(page, playerOf(fixture, key), slot);
     }
-    await expect(page.getByText("Tous les titulaires sont sur le terrain.")).toBeVisible();
+    // The bench strip states what is left rather than heading a section per squad role: with the seven
+    // placed, the only thing left to say is that the postes are taken (`benchHintFr`).
+    await expect(page.getByText("tous les postes pris")).toBeVisible();
 
     await page.getByRole("button", { name: "Créer la composition" }).click();
 
@@ -181,7 +183,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   await test.step("the coach plans one change at the 30th minute", async () => {
     await page.getByRole("link", { name: "Nouvelle composition" }).click();
     // Half of a 2×30 — the app proposes the minute, and the scenario needs exactly this one.
-    await expect(page.getByLabel("À partir de la minute")).toHaveValue("30");
+    await expect(page.getByLabel("Minute", { exact: true })).toHaveValue("30");
 
     for (const [key, slot] of SECOND_HALF) {
       await place(page, playerOf(fixture, key), slot);
@@ -415,11 +417,24 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
  * pointer-move heuristics.
  */
 async function place(page: Page, player: FixturePlayer, positionFr: string): Promise<void> {
+  // `exact: false`: a bench disc now says its squad role too — « …, numéro 8, remplaçant » — because
+  // the strip carries titulaire-or-remplaçant by its order alone, which a screen reader cannot see.
+  // The pitch buttons name themselves « Nom, poste », with no number, so this cannot match two.
   await page
-    .getByRole("button", { name: `${player.displayName}, numéro ${player.jerseyNumber}` })
+    .getByRole("button", {
+      name: `${player.displayName}, numéro ${player.jerseyNumber}`,
+      exact: false,
+    })
+    .first()
     .click();
   // The 1-3-2-1 has two « milieu central » slots; the first free one is the earlier of the two.
-  await page.getByRole("button", { name: `Poste libre : ${positionFr}` }).first().click();
+  const slot = page.getByRole("button", { name: `Poste libre : ${positionFr}` }).first();
+  // Centred explicitly, not left to Playwright's scroll-if-needed: the bench and the confirm button
+  // are a sticky dock over the bottom ~270 px of a 390 × 844 viewport, and « if needed » counts an
+  // occluded element as visible and scrolls nothing. Centring puts the slot at y ≈ 420, clear of
+  // both the dock and the sticky app header.
+  await slot.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  await slot.click();
   await expect(
     page.getByRole("button", { name: `${player.displayName}, ${positionFr}` }),
   ).toBeVisible();

@@ -180,6 +180,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       a green test in `plan.test.ts` forbids — under a primary button to an editor that refuses a
       finished match. `lib/composition/copy.test.ts` now fails if any screen hard-codes one of the five
       status-dependent sentences again (decision 097)
+- [x] The bench and the pitch fit on one phone screen. The pitch was `w-full` on a 1080:1580 ratio, so
+      at 390 px it was 477 px of turf and the bench's wrapping rows began below the fold: a drag whose
+      source and target cannot be on screen together is a broken feature, not a cramped layout. The
+      turf is capped at 280 px wide (410 px tall — still wide enough that two 48 px discs cannot touch,
+      which happens below 266 px), and the bench, the blocking errors and the confirm button are one
+      sticky dock above the tab bar, where the save bar used to sit *under* it (decision 105)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses

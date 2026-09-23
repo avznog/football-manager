@@ -27,6 +27,33 @@
  * 3. **Nothing** — the whole state also travels in hidden fields, so a submit works even if the
  *    JavaScript that handles gestures has failed.
  *
+ * ## Why the bench is docked, and the pitch capped
+ *
+ * A drag whose source and target cannot be on screen together is not a cramped layout, it is a
+ * broken feature — and that is what this screen shipped as: at 390 px the pitch is `w-full` with a
+ * 1080:1580 aspect ratio, so 326 px of card interior became 477 px of turf and the bench rows landed
+ * below the fold, out of reach of the finger that was supposed to drag them.
+ *
+ * Two changes fix it, and the arithmetic is the design:
+ *
+ * - **The pitch box is capped at 280 px wide** (`PITCH_MAX_WIDTH`), so 280 × 1580 / 1080 = 410 px
+ *   tall. The cap has a floor as well as a ceiling: the playing area is `1000 / 1080` of the box, so
+ *   one pitch unit is `0.926 × 280 / 1000` px and a 48 px disc spans `48 × 1000 / (0.926 × 280)`
+ *   = 185 units — under the 195-unit `MIN_MARKER_DISTANCE` two slots are guaranteed to be apart, so
+ *   the discs still do not touch. Any narrower than 266 px and they would. The discs stay `md`
+ *   (48 px, above the 44 px minimum): compactness is never bought out of the drop target.
+ * - **The bench, the errors and the confirm button are one sticky dock**, pinned above the tab bar.
+ *   At 390 × 740 the dock is at most ~196 px tall (a two-line hint, a 76 px strip, a 48 px button
+ *   row) and the tab bar is 72 px, which leaves 740 − 56 (app header) − 72 − 196 = 416 px between
+ *   the header and the dock: the whole 410 px pitch, the whole bench and « Créer la composition »,
+ *   with no scrolling. One sticky element rather than two also removes the stacking arithmetic that
+ *   put the old save bar *underneath* the fixed tab bar at `bottom-3`.
+ *
+ * The dock's strip scrolls sideways when there are more players than fit, which is the one place a
+ * scroll container could eat the gesture. Each disc is `touch-pan-x`, not `touch-none`: the browser
+ * may take a horizontal swipe to scroll the strip (we get `pointercancel` and write nothing), and
+ * everything else — the vertical lift onto the turf, and the tap — stays with our pointer capture.
+ *
  * ## Why the state is what it is
  *
  * `shape` is the seven slots being edited and `assignments` the `(slot, player)` pairs. "The coach
@@ -45,6 +72,7 @@ import {
   PlayerDisc,
   usePitchDrag,
   type KitColors,
+  type PitchDragHandle,
   type PitchSlot,
 } from "@/components/pitch";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +96,11 @@ import {
   type SlotAssignment,
 } from "@/lib/composition/editor";
 import {
+  benchHintFr,
+  benchPlayerLabelFr,
+  minuteFieldHintFr,
+} from "@/lib/composition/hints";
+import {
   deduceChanges,
   findPlanIssues,
   nameOfMembers,
@@ -76,6 +109,7 @@ import {
   planTitleFr,
   type PlannedLineup,
 } from "@/lib/composition/plan";
+import { abbreviateName } from "@/lib/pitch/names";
 import {
   customFormationNameFr,
   moveShapeSlot,
@@ -160,6 +194,26 @@ type Selection =
 const NUDGE = 20;
 const NUDGE_FAST = 100;
 
+/**
+ * Widest the pitch box may be — see the header comment for the two arithmetics it satisfies. It caps
+ * the *height* in practice: the aspect ratio is fixed, so width is the only handle, and 280 px of
+ * width is 410 px of turf, which fits above the docked bench on a phone.
+ *
+ * From `sm` the dock is back in the flow and the screen is taller, so the turf grows to 384 px wide
+ * (562 px tall) rather than staying phone-sized on a laptop.
+ */
+const PITCH_MAX_WIDTH = "max-w-[280px] sm:max-w-sm";
+
+/**
+ * The sticky dock: the bench, the blocking errors and the confirm button, pinned just above the
+ * fixed tab bar (`4.5rem` + the home indicator, the offset game mode already uses) and back in the
+ * flow from `md`, where the screen is tall enough not to need it.
+ */
+const DOCK_CLASS =
+  "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] z-20 -mx-4 space-y-2 " +
+  "border-t border-border/60 bg-canvas/95 px-4 pt-2 pb-2 backdrop-blur " +
+  "md:static md:mx-0 md:rounded-2xl md:border md:px-4 md:py-3";
+
 /* -------------------------------------------------------------------------- */
 /* The editor                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -213,6 +267,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
   const bench = benchOf(selectable, assignments);
   const starters = bench.filter((member) => member.squadRole === "starter");
   const substitutes = bench.filter((member) => member.squadRole === "substitute");
+  const freeSlots = shape.filter((slot) => memberInSlot(assignments, slot.key) === null).length;
 
   const issues = findPlanIssues({ assignments, slots: planSlots, members });
   const blocking = issues.filter((issue) => issue.blocking);
@@ -462,7 +517,11 @@ export function CompositionEditor(props: CompositionEditorProps) {
           <Badge variant={isCustom ? "warning" : "neutral"}>{label}</Badge>
         }
       >
-        <div className="grid gap-3 sm:grid-cols-2">
+        {/* Two columns from 390 px, not from `sm`: stacked, these two fields plus their hint were
+            220 px of screen above a pitch that has none to spare. At 390 px the card interior is
+            326 px, so each column is (326 − 12) / 2 = 157 px — room for « 1-3-2-1 » and for a
+            two-digit minute. */}
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="formation">Formation</Label>
             <Select
@@ -495,7 +554,10 @@ export function CompositionEditor(props: CompositionEditorProps) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="fromMinute">À partir de la minute</Label>
+            {/* « À partir de la minute » wrapped onto three lines in a 157 px column and pushed the
+                select out of line with it. The card's own title says « À partir de la 30e minute »,
+                and the hint below says what 0 means, so the field itself only needs its unit. */}
+            <Label htmlFor="fromMinute">Minute</Label>
             <Input
               id="fromMinute"
               name="fromMinute"
@@ -510,35 +572,37 @@ export function CompositionEditor(props: CompositionEditorProps) {
               onChange={(event) => setFromMinute(clampMinute(event.target.value))}
               disabled={pending}
             />
-            <p id="fromMinute-hint" className="text-sm text-ink-muted">
-              0 pour la composition de départ. Le match dure {props.totalMinutes} minutes et les
-              minutes sont continues.
-            </p>
-            {minuteClash ? (
+          </div>
+
+          {/* Full width under both fields: a hint squeezed into a 157 px column is five lines tall. */}
+          <p id="fromMinute-hint" className="col-span-2 text-xs text-ink-muted">
+            {minuteFieldHintFr(props.totalMinutes)}
+          </p>
+          {minuteClash ? (
+            <div className="col-span-2">
               <FieldError>
                 {fromMinute === 0
                   ? "Il y a déjà une composition de départ."
                   : `Une composition démarre déjà à la ${ordinalFr(fromMinute)} minute.`}
               </FieldError>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </Card>
 
       {/* --- the pitch --- */}
       <Card
         title="Terrain"
-        description={
-          mode === "players"
-            ? "Fais glisser un joueur sur un poste. Sur un poste occupé, les deux joueurs échangent."
-            : "Fais glisser un poste pour dessiner ta formation. Chaque poste prend le rôle de l’endroit où il arrive."
-        }
-      >
-        <div className="space-y-3">
+        /* The mode switch lives in the header rather than on a row of its own: the control is 54 px
+           tall with its track, and next to the title it costs nothing. Its legend goes back to
+           `sr-only`, which is what the two visible labels already say. */
+        action={
           <SegmentedControl
             name="editor-mode"
             legend="Que veux-tu déplacer ?"
-            hideLegend={false}
+            /* 160 px: the track's padding and border take 10, leaving 75 per segment for « Joueurs »
+               at 14 px — and 154 px of the 326 px header for the title, which needs 60. */
+            className="w-[10rem]"
             value={mode}
             onChange={(next) => {
               setMode(next);
@@ -550,10 +614,16 @@ export function CompositionEditor(props: CompositionEditorProps) {
             ]}
             disabled={pending}
           />
-
-          {/* The wrapper has the pitch's exact box (`Pitch` is `w-full` with a fixed aspect
-              ratio), which is what `fromClientPoint` needs to convert a finger into a point. */}
-          <div ref={pitchRef} className="relative">
+        }
+      >
+        <div className="space-y-2">
+          {/* The wrapper has the pitch's exact box (`Pitch` is `w-full` with a fixed aspect ratio),
+              which is what `fromClientPoint` needs to convert a finger into a point — so the cap
+              goes *here*, on the measured element, and the pitch stays `w-full` inside it. A
+              `max-w` on a centred box keeps those two rectangles identical; capping the height
+              instead would leave the ref box wider than the turf and every drop would land left of
+              where the finger was. */}
+          <div ref={pitchRef} className={cn("relative mx-auto w-full", PITCH_MAX_WIDTH)}>
             <PitchLayout
               slots={slots}
               kit={kit}
@@ -601,51 +671,36 @@ export function CompositionEditor(props: CompositionEditorProps) {
             />
           </div>
 
-          <p aria-live="polite" role="status" className="min-h-5 text-sm text-ink-muted">
-            {announcement}
-          </p>
-
           {shapeProblems.length > 0 ? <FieldError>{shapeProblems}</FieldError> : null}
-        </div>
-      </Card>
 
-      {/* --- the bench --- */}
-      <Card
-        title="Banc"
-        description={
-          mode === "shape"
-            ? "Repasse en « Joueurs » pour placer quelqu’un."
-            : "Appuie sur un joueur puis sur un poste, ou fais-le glisser."
-        }
-        action={<Badge variant="neutral">{bench.length} en attente</Badge>}
-      >
-        <div className="space-y-4">
-          <BenchGroup
-            title="Titulaires à placer"
-            members={starters}
-            emptyFr="Tous les titulaires sont sur le terrain."
-            kit={kit}
-            selection={selection}
-            disabled={pending || mode === "shape"}
-            onPointerDown={(event, memberId) => gesture.begin(event, { kind: "player", id: memberId })}
-            onPointerMove={gesture.handlers.onPointerMove}
-            onPointerUp={gesture.handlers.onPointerUp}
-            onPointerCancel={gesture.handlers.onPointerCancel}
-            onKeyDown={onPlayerKeyDown}
-          />
-          <BenchGroup
-            title="Remplaçants"
-            members={substitutes}
-            emptyFr="Aucun remplaçant sur la feuille."
-            kit={kit}
-            selection={selection}
-            disabled={pending || mode === "shape"}
-            onPointerDown={(event, memberId) => gesture.begin(event, { kind: "player", id: memberId })}
-            onPointerMove={gesture.handlers.onPointerMove}
-            onPointerUp={gesture.handlers.onPointerUp}
-            onPointerCancel={gesture.handlers.onPointerCancel}
-            onKeyDown={onPlayerKeyDown}
-          />
+          {/* The two undo-shaped actions, next to what they undo rather than in the dock, where they
+              would push the confirm button onto a second row. */}
+          {assignments.length > 0 || dirty ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              {assignments.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearPitch}
+                  disabled={pending}
+                >
+                  Tout vider
+                </Button>
+              ) : null}
+              {dirty ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetEverything}
+                  disabled={pending}
+                >
+                  Rétablir
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </Card>
 
@@ -656,8 +711,65 @@ export function CompositionEditor(props: CompositionEditorProps) {
         warningsFr={warnings.map((issue) => issue.messageFr)}
       />
 
-      {/* --- save --- */}
-      <div className="sticky bottom-3 z-10 space-y-2 rounded-2xl border border-border/60 bg-surface/95 p-3 shadow-lg backdrop-blur">
+      {/* --- the dock: the bench and the confirm button, both always on screen --- */}
+      <div className={DOCK_CLASS}>
+        {/* One line for the two things that are true of the whole screen: what a thumb can do next,
+            and whether anything is unsaved. They were two blocks of their own before — 60 px between
+            the pitch and the bench for two short sentences. */}
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 flex-1 text-xs leading-snug text-ink-muted">
+            {benchHintFr({ mode, benchCount: bench.length, freeSlots })}
+          </p>
+          <p aria-live="polite" className="shrink-0 text-xs font-medium text-ink-subtle">
+            {dirty ? "Non enregistré" : "À jour"}
+          </p>
+        </div>
+
+        {/* The gesture commentary is `sr-only` now, where it used to be a visible line under the
+            pitch. Everything it says — a player placed, two swapped, the turf emptied — is already
+            on the turf a centimetre above, so on screen it was a duplicate paying for itself in the
+            one currency this layout has none of. For a screen reader it is the only account of what
+            the gesture did, so it stays, announced. */}
+        <p aria-live="polite" role="status" className="sr-only">
+          {announcement}
+        </p>
+
+        {/* The bench itself: one strip, titulaires then remplaçants, scrolling sideways when there
+            are more than the five that fit. `benchPlayerLabelFr` is what says which is which to a
+            screen reader, since the strip carries it by order alone. */}
+        {bench.length > 0 ? (
+          <ul
+            aria-label="Banc : appuie sur un joueur puis sur un poste, ou fais-le glisser sur le terrain."
+            className="flex snap-x gap-2 overflow-x-auto overscroll-x-contain pb-1"
+          >
+            {starters.map((member) => (
+              <BenchDisc
+                key={member.membershipId}
+                member={member}
+                kit={kit}
+                selected={selection?.kind === "member" && selection.id === member.membershipId}
+                disabled={pending || mode === "shape"}
+                gesture={gesture}
+                onKeyDown={onPlayerKeyDown}
+              />
+            ))}
+            {starters.length > 0 && substitutes.length > 0 ? (
+              <li aria-hidden className="my-1 w-px shrink-0 self-stretch bg-border/70" />
+            ) : null}
+            {substitutes.map((member) => (
+              <BenchDisc
+                key={member.membershipId}
+                member={member}
+                kit={kit}
+                selected={selection?.kind === "member" && selection.id === member.membershipId}
+                disabled={pending || mode === "shape"}
+                gesture={gesture}
+                onKeyDown={onPlayerKeyDown}
+              />
+            ))}
+          </ul>
+        ) : null}
+
         {state?.error ? (
           <p role="alert" className="text-sm font-medium text-danger">
             {state.error}
@@ -665,26 +777,15 @@ export function CompositionEditor(props: CompositionEditorProps) {
         ) : null}
         <FieldError>{blocking.map((issue) => issue.messageFr)}</FieldError>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" pending={pending} disabled={!canSave}>
+        {/* Grid, not a flex row: `Button` is `shrink-0`, and the flex version of this row is how a
+            confirm button ended up 8 px off a 390 px screen once already. */}
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <Button type="submit" pending={pending} disabled={!canSave} fullWidth>
             {props.lineupId ? "Enregistrer" : "Créer la composition"}
           </Button>
-          <ButtonLink href={props.cancelHref} variant="ghost">
+          <ButtonLink href={props.cancelHref} variant="secondary">
             Annuler
           </ButtonLink>
-          {assignments.length > 0 ? (
-            <Button type="button" variant="ghost" onClick={clearPitch} disabled={pending}>
-              Tout vider
-            </Button>
-          ) : null}
-          {dirty ? (
-            <Button type="button" variant="ghost" onClick={resetEverything} disabled={pending}>
-              Rétablir
-            </Button>
-          ) : null}
-          <p aria-live="polite" className="text-sm text-ink-muted">
-            {dirty ? "Modifications non enregistrées." : "À jour."}
-          </p>
         </div>
       </div>
     </form>
@@ -695,82 +796,73 @@ export function CompositionEditor(props: CompositionEditorProps) {
 /* The bench                                                                  */
 /* -------------------------------------------------------------------------- */
 
-type BenchGroupProps = {
-  title: string;
-  members: readonly EditorMember[];
-  emptyFr: string;
+type BenchDiscProps = {
+  member: EditorMember;
   kit: KitColors;
-  selection: Selection;
+  selected: boolean;
   disabled: boolean;
-  onPointerDown: (event: React.PointerEvent<HTMLElement>, memberId: string) => void;
-  onPointerMove: (event: React.PointerEvent<HTMLElement>) => void;
-  onPointerUp: (event: React.PointerEvent<HTMLElement>) => void;
-  onPointerCancel: () => void;
+  gesture: PitchDragHandle<Carried>;
   onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, memberId: string) => void;
 };
 
 /**
- * A row of players waiting to come on. It **wraps** rather than scrolls sideways: a player hidden
- * off the edge of a 320 px screen is a player the coach forgets, and thirteen discs fit in four
- * rows.
+ * One player waiting to come on, as a 64 px cell of the bench strip.
+ *
+ * ## Why it is a cell and not a row
+ *
+ * The bench used to be two headed sections of wrapping rows, on the argument that a player hidden
+ * off the edge of the screen is a player the coach forgets. True — but thirteen discs in four rows
+ * is 300 px of screen, which pushed the whole bench *below the fold*, and a player nobody can even
+ * scroll to while holding a drag is worse than one he has to swipe to. So: one row, five cells
+ * visible at 390 px (5 × 64 + 4 × 8 = 352 of the 358 available), the rest a swipe away, and the
+ * count of who is left is stated in words above the strip.
+ *
+ * `showName={false}` plus our own 10 px name is not decoration: `PlayerDisc`'s own chip is 88 px
+ * wide by inline style, which would bleed 12 px over the neighbouring cell on each side.
+ *
+ * `touch-pan-x`, not `touch-none`: the browser needs to be allowed to scroll the strip, and nothing
+ * else. A sideways swipe pans and we get a `pointercancel` (writing nothing, which is right — the
+ * coach was scrolling); a lift towards the turf, or a tap, stays with our pointer capture.
  */
-function BenchGroup({
-  title,
-  members,
-  emptyFr,
-  kit,
-  selection,
-  disabled,
-  onPointerDown,
-  onPointerMove,
-  onPointerUp,
-  onPointerCancel,
-  onKeyDown,
-}: BenchGroupProps) {
+function BenchDisc({ member, kit, selected, disabled, gesture, onKeyDown }: BenchDiscProps) {
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-semibold text-ink">{title}</h3>
-      {members.length === 0 ? (
-        <p className="text-sm text-ink-muted">{emptyFr}</p>
-      ) : (
-        <ul className="flex flex-wrap gap-2">
-          {members.map((member) => {
-            const isSelected = selection?.kind === "member" && selection.id === member.membershipId;
-            return (
-              <li key={member.membershipId}>
-                <button
-                  type="button"
-                  aria-pressed={isSelected}
-                  disabled={disabled}
-                  className={cn(
-                    "flex min-h-11 min-w-11 touch-none flex-col items-center gap-1 rounded-xl border p-1.5",
-                    isSelected ? "border-accent bg-accent/10" : "border-transparent bg-surface-2",
-                    "disabled:opacity-50",
-                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                  )}
-                  onPointerDown={(event) => onPointerDown(event, member.membershipId)}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                  onPointerCancel={onPointerCancel}
-                  onKeyDown={(event) => onKeyDown(event, member.membershipId)}
-                >
-                  <PlayerDisc
-                    name={member.name}
-                    jerseyNumber={member.jerseyNumber}
-                    primaryColor={kit.primaryColor}
-                    secondaryColor={kit.secondaryColor}
-                    variant={member.isInjured ? "unavailable" : isSelected ? "selected" : "normal"}
-                    statusLabel={statusLabelOf(member)}
-                    positionCode={member.primaryPositionCode ?? undefined}
-                    size="md"
-                  />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
+    <li className="shrink-0 snap-start">
+      <button
+        type="button"
+        aria-pressed={selected}
+        aria-label={benchPlayerLabelFr(member)}
+        disabled={disabled}
+        className={cn(
+          "flex w-16 touch-pan-x flex-col items-center gap-1 rounded-xl border p-1",
+          selected ? "border-accent bg-accent/10" : "border-transparent bg-surface-2",
+          "disabled:opacity-50",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        )}
+        onPointerDown={(event) =>
+          gesture.begin(event, { kind: "player", id: member.membershipId })
+        }
+        {...gesture.handlers}
+        onKeyDown={(event) => onKeyDown(event, member.membershipId)}
+      >
+        <PlayerDisc
+          name={member.name}
+          jerseyNumber={member.jerseyNumber}
+          primaryColor={kit.primaryColor}
+          secondaryColor={kit.secondaryColor}
+          variant={member.isInjured ? "unavailable" : selected ? "selected" : "normal"}
+          statusLabel={statusLabelOf(member)}
+          positionCode={member.primaryPositionCode ?? undefined}
+          size="md"
+          showName={false}
+        />
+        <span
+          aria-hidden
+          className="max-w-full truncate text-[0.625rem] leading-tight font-medium text-ink"
+        >
+          {abbreviateName(member.name, 9)}
+        </span>
+      </button>
+    </li>
   );
 }
 
