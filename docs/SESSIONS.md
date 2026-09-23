@@ -1143,7 +1143,7 @@ off, and §6 — the phone in daylight — says it waits on this, because a phon
 sees a Vercel login form.
 
 **The database has no tables.** The owner attached Neon through Vercel's marketplace, which set
-`DATABASE_URL` for production and preview (plus fifteen `FOOTBALL_MANAGER_*` variables the app reads
+`DATABASE_URL` for production and preview (plus eighteen `FOOTBALL_MANAGER_*` variables the app reads
 none of). But §2's migrations and §3's `db:bootstrap` have not been run, and they cannot be run from
 here: marketplace variables are stored sensitive, and `vercel env pull` writes them back as
 `DATABASE_URL=""` — Vercel will not hand a sensitive value back out even to the account that owns it.
@@ -1272,7 +1272,7 @@ existing jobs, with `cancel-in-progress: false` of its own — the workflow's gr
 superseded test run and wrong to cancel a migration mid-statement. Deliberately **not** the Vercel
 build command, the obvious place: that needs `DATABASE_URL` at build time, which decision 075 exists
 to avoid, and every preview build would migrate whatever it points at. Deliberately not ordered
-against Vercel either, which is a real gap accepted on the record in decision 076, along with the
+against Vercel either, which is a real gap accepted on the record in decision 078, along with the
 migration that would force it open — the first one that cannot be additive.
 
 **Three variables removed from the Vercel project**, where the first attempt had left them:
@@ -1302,7 +1302,11 @@ secret so the `migrate` job can work. Then walk §5 on the production URL, reset
 password, and give Preview its own Neon branch.
 
 **One process note.** Two sessions worked this repository at the same time with no knowledge of each
-other, and independently wrote the same fix; four pull requests landed on `main` while this branch was
+other, and independently wrote the same fix; five pull requests landed on `main` while this branch was
 open. It cost two rebases and nearly cost a duplicated `DEPLOY.md`. If sessions are going to overlap,
-they need disjoint files — and the decision numbers are the sharpest edge: 074, 075 and 076 were all
-claimed within the same half hour.
+they need disjoint files — and the decision numbers are the sharpest edge: **074 through 078 were
+claimed by three sessions inside an hour**, and the entry below was renumbered twice before it landed,
+from 074 to 076 and then to 078, each time because a number it had already written into four files had
+been taken on `main` in the meantime. A decision number is the one thing in this repository that
+cannot be chosen locally and then defended: whoever merges first owns it. So take the number last —
+write the entry, and renumber it against `origin/main` immediately before pushing.

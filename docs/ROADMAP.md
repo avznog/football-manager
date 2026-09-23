@@ -219,7 +219,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       of them could have caught it
 - [x] Continuous delivery: the `migrate` job applies the committed SQL to Neon on pushes to `main`,
       after typecheck · lint · Vitest · the browser run, with its own no-cancel concurrency group
-      (decision 076). Not in the Vercel build command and not ordered against Vercel's own build —
+      (decision 078). Not in the Vercel build command and not ordered against Vercel's own build —
       the decision says why, and names the migration that would force a rethink
 - [x] `SUPER_ADMIN_PASSWORD`, `SUPER_ADMIN_USERNAME` and `TEST_DATABASE_URL` removed from the Vercel
       project, where the first attempt had left them. The first two are read only by `db/bootstrap.ts`

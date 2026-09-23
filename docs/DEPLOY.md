@@ -27,7 +27,7 @@ Interactive signup, so the owner does this. **Done** for the live instance.
 
 **After the first one, CI does this.** The `migrate` job in `.github/workflows/ci.yml` applies the
 committed SQL to Neon on every push to `main`, once typecheck, lint, Vitest and the browser run have
-passed (decision 076). It needs one repository secret, set once — the Vercel copy of the string
+passed (decision 078). It needs one repository secret, set once — the Vercel copy of the string
 cannot be read back, so it has to be pasted here separately:
 
 ```bash
@@ -78,7 +78,7 @@ rewrite every team on the instance.
 The project is `avznog-team/football-manager`, connected to `avznog/football-manager`. **Deploys come
 from git**: a push to `main` is a production deploy, a pull request is a preview. `vercel --prod` from
 a laptop still works and is the way to ship a commit that is not on `main`, but it should stay the
-exception — the point of decision 076 is that the schema and the code move on the same push.
+exception — the point of decision 078 is that the schema and the code move on the same push.
 
 If it ever has to be re-linked:
 
@@ -88,7 +88,7 @@ vercel git connect --yes
 ```
 
 Next.js is detected without configuration; there is no `vercel.json` and none is needed. The build
-command is the default `npm run build`, and it deliberately does not migrate — decision 076 says why.
+command is the default `npm run build`, and it deliberately does not migrate — decision 078 says why.
 
 ### The one variable, and the trap in it
 

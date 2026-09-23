@@ -81,7 +81,7 @@ jobs:
           retention-days: 7
 
   # Production migrations, applied from `main` only, and only once both jobs above have passed:
-  # the schema must never move ahead of a commit that cannot typecheck (decision 076).
+  # the schema must never move ahead of a commit that cannot typecheck (decision 078).
   #
   # This does not order itself against Vercel, which starts building the same push immediately.
   # See docs/DEPLOY.md §4 — the migrations are written to be safe against the previous version

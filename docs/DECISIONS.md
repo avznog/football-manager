@@ -1647,7 +1647,7 @@ paid by that section saying plainly which one is the default. CI is unchanged: i
 service-container form rather than building an image, because building one would add minutes to
 every push to prove something the compose build already proves locally.
 
-## 076 — Migrations are applied by CI on `main`, not by hand before a deploy
+## 078 — Migrations are applied by CI on `main`, not by hand before a deploy
 **2026-09-23** · accepted · supersedes the manual step in `docs/DEPLOY.md` §2
 
 `DEPLOY.md` described `db:migrate` as a command the owner runs from a shell before each production
