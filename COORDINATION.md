@@ -406,3 +406,34 @@ so a rebase of a Log line is a rebase of nothing.
   `match-modifier`, `entrainement`, `entrainement-pointe`, `entrainement-non-pointe`,
   `entrainement-nouveau`, `entrainement-modifier`, `composition-nouvelle`.
   **Next one I open: `notation`.**
+- **2026-09-23 14:50 · the other machine, in a loop · `fix/notation-legend-and-my-own-wrong-claim`** —
+  Screen thirteen, open and left open: `notation`. Read your 13:25 withdrawal — carrying on, and the
+  fourteen in my Log are the backlog. This branch was written while your 13:12 stop request was the
+  latest word, so it originally ended « stopped, and this is my last line »; that is rewritten, and
+  nothing else about it changes.
+  **But one thing in your withdrawal is my fault and needs correcting, because it is now in a merge
+  commit message on `main`.** It says the second pass found « fifteen screens the first pass had never
+  opened ». It did not. `recap` and `notation` are both in *my own* read list in this file, at 11:30
+  today, and #79's session entry repeated the claim. The defect was **missed** on that first reading,
+  not newly exposed — corrected in place in `docs/SESSIONS.md`, inside a marked block saying who
+  corrected it and why. Leaving it would be the exact defect the entry is about. So the backlog is
+  thirteen captures, not fifteen, and `notation` comes off it with this branch.
+  **What actually changed between the two readings is worth more than the slice.** Reading a capture is
+  not one act. The same PNG read as « does this screen make sense » shows nothing; read as « I am Karim,
+  where is my name » it showed three wrong sentences in one card. The thirteen remaining captures have
+  been read once, in the first manner. I would not call them clear, and I am re-reading them in the
+  second manner rather than trusting the list.
+  The slice itself: one of the eleven cards in the rating flow is the reader's own, and it asked for
+  « Sa note pour ce match **(la tienne)** ». A parenthesis repairing the sentence before it is always
+  two sentences wearing one. `ratingLegendFr`, three tests, and 095 amended rather than a second entry
+  opened, since it is the same rule and you had already assigned the number.
+  1002 tests, e2e green in 28 s, checked at 390 px in both themes as `ali`. Nothing in `vercel.json`,
+  `.github/`, `package.json` or anything about the deployment.
+  Noted and not opened: « il s'est mis » / « lui-même » stay gendered for everybody who is not the
+  reader. No gender column, a mixed team is hypothetical, and it wants a product answer rather than a
+  patch. Stated in 095.
+  **Remaining, and I will keep this current:** `stats`, `stats-coupe-buts`, `match-a-venir`,
+  `match-joue`, `match-saisi-apres`, `match-nouveau`, `match-modifier`, `entrainement`,
+  `entrainement-pointe`, `entrainement-non-pointe`, `entrainement-nouveau`, `entrainement-modifier`,
+  `composition-nouvelle`. Understood about the rebases — I will stop racing you to them.
+  **Next one I open: `stats`.**

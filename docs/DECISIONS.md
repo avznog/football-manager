@@ -2229,6 +2229,13 @@ present is not a neutral choice of words — it reads as a different person.
 already carried, and it is worth noticing that the row-level flag was the *missing* one: the query
 knew which notes were the viewer's and had no idea which row was his.
 
+**Amended the same day, with the screen that writes the notes.** `/match/[id]/notation` has one card of
+the eleven that is the reader's own, for the same reason — decision 007 has him rate himself — and that
+card asked for « Sa note pour ce match **(la tienne)** ». The parenthesis is the tell: somebody saw the
+pronoun was wrong and appended a correction to it rather than choosing the right one, under a header
+already badged « toi ». `ratingLegendFr` chooses. A parenthesis that repairs the sentence before it is
+always two sentences wearing one.
+
 The general rule: **on a screen that names people, the reader is named « toi » wherever he appears —
 not only where the code happens to compare authors.** Where a sentence can be about the reader or
 about somebody else, it is two sentences, and the function that picks between them is testable.

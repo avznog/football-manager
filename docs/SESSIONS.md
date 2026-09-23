@@ -1858,10 +1858,15 @@ only then discovering what it said. The cheapest future guard is the same one: a
 
 ### « 4 notes · il s’est mis 8 », three rows under « 8 Karim (toi) »
 
-The twelfth slice, and the first of a **second** `audit/` pass: `npm run db:reset` then
-`npm run audit:screens` against a tree holding all eleven of the first pass's slices, which
-photographs a hundred screens in about a minute. The first pass had a list of eleven screens and read
-them; this one starts from the captures the first pass never opened, and `recap` is one of them.
+The twelfth slice: `npm run db:reset` then `npm run audit:screens` against a tree holding all eleven of
+the first pass's slices, which photographs a hundred screens in about a minute.
+
+> **Corrected after the fact**, by the session that wrote it, because leaving it would be the exact
+> defect the entry is about. This paragraph first said the second pass « starts from the captures the
+> first pass never opened, and `recap` is one of them ». That is untrue: `COORDINATION.md` records
+> `recap` and `notation` in the read list at 11:30 the same day. The defect below was **missed** on
+> that reading, not newly exposed. What changed the second time is that the capture was read as a
+> *named reader* rather than as "a coach" — see the last paragraph of this entry.
 
 The recap's « Les notes » card names the author of every note, because decision 007 says anonymity in
 a team of thirteen only invites a 2 nobody has to own. That makes the reader a member of the list he
@@ -1882,10 +1887,36 @@ third person.
 
 Verified by loading the recap at 390 px in both themes as two different readers: as `karim`, whose row
 now reads « 4 notes · tu t’es mis 8 » with « 8 toi », and as `hugo`, who sees « tu t’es mis 9 » on his
-own row and « il s’est mis 8 » with « lui-même » on Karim's. 986 tests, eleven new. `npm run test:e2e`
-green in 27 s — the happy path walks the recap, so it had to be.
+own row and « il s’est mis 8 » with « lui-même » on Karim's. Eleven new tests — 986 on the branch as
+written, 999 in the suite on `main` once it landed. `npm run test:e2e` green in 27 s — the happy path
+walks the recap, so it had to be.
 
 Left in on purpose, and written into the decision rather than quietly: « il s’est mis » and
 « lui-même » stay gendered for everybody who is not the reader. The app has no gender column, the
 question is about a team that does not exist yet, and degendering six screens on the way past a
 ratings card would be a product decision taken sideways.
+
+### « Sa note pour ce match (la tienne) » — the same rule, one screen earlier
+
+The follow-up to the entry above, and the last change of this session. The pull request holding the
+recap fix was merged while this was being written, so the notation half arrives separately rather than
+as a second commit on the same branch.
+
+Decision 007 has every rater rate himself, so one of the eleven cards in `/match/[id]/notation` is the
+reader's own. That card asked for « Sa note pour ce match **(la tienne)** ». The parenthesis is the
+whole story: somebody saw the pronoun was wrong and appended a correction to it instead of choosing the
+right one — under a card header that already wears a « toi » badge and a « 12’ » badge. `ratingLegendFr`
+now chooses between « Ta note pour ce match » and « Sa note pour ce match », and the parenthesis is
+gone. Three tests, one of which asserts that neither form needs a parenthesis to say whose note it is.
+
+And the paragraph above it, corrected in place. The first version of the previous entry claimed this
+pass started from captures the first pass had never opened. It did not: `recap` and `notation` were
+both in the read list from 11:30 the same day, and this defect was missed then. **That is the useful
+part of both entries.** Reading a capture is not one act — the same PNG read as "does this screen make
+sense" shows nothing, and read as "I am Karim, where is my name" shows three wrong sentences in one
+card. Thirteen captures on this repository's audit list have been read exactly once, in the first
+manner. They should not be considered clear.
+
+Verified at 390 px in both themes as `ali`, whose own card is « joueur 8 sur 11 » and now reads « Ta
+note pour ce match ». 1002 tests, three new. `npm run test:e2e` green in 28 s — the happy path walks
+the notation flow.

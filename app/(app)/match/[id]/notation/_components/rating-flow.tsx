@@ -284,7 +284,7 @@ function RatingCard({
         <div className="space-y-3">
           <fieldset>
             {/* « Sa note pour ce match (la tienne) » patched the pronoun instead of choosing it,
-                under a card already badged « toi » (decision NNN). */}
+                under a card already badged « toi » (decision 095). */}
             <legend className="mb-2 text-sm text-ink-muted">
               {ratingLegendFr(target.isSelf)}
             </legend>

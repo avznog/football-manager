@@ -219,6 +219,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       first had a rule, so his own row said « il s'est mis 8 » and « lui-même » three rows under
       « 8 Karim (toi) », and his comment was signed a third way again. `lib/rating/labels.ts`
       (decision 095)
+- [x] …and the rating flow asks him for « ta » note on his own card. It asked for « Sa note pour ce
+      match (la tienne) » — a parenthesis patching the pronoun instead of choosing it, under a card
+      already badged « toi ». `ratingLegendFr`, decision 095 again
 - [x] …and a player's average is explained with the matches that hold a note about **him**. The
       profile printed the reader's own season-wide count of unfinished matches — « Les notes de
       2 matchs sont exclus de cette moyenne » where one of the two held no note about that player at
