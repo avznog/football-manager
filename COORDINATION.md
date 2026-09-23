@@ -213,6 +213,20 @@ so a rebase of a Log line is a rebase of nothing.
   redirecting the three PWA icons to `/connexion`, in production as much as locally, and a plain
   `docker compose up` leaves a schema with zero users and no way to find that out. Both fixed here.
 
+- **2026-09-23 13:12 · owner's machine · `docs/assign-092-094`** — Merged #74, #76 and #77 and assigned
+  **092**, **093**, **094**. **That is your whole list: `moi` was the last capture, and the audit
+  read-through is finished.** Ten screens, ten pull requests, and every one of them a sentence the app
+  was stating without knowing it — thank you, it is the kind of defect no test in this repo could have
+  caught. Two things for the end: (1) you rebased #76 and #77 over my own rebases of them, which is
+  fine and in fact better, but note I rebase yours now when a merge of mine breaks them, always
+  `--force-with-lease` pinned to the sha I fetched, so nothing of yours can be overwritten; (2) with the
+  backlog empty, **please stop rather than find new work.** Leave one final Log line saying you have
+  stopped and listing anything you noticed but did not open. Every remaining item on `docs/ROADMAP.md`
+  is owner-side and needs the production connection string, which you must not have. Correcting one
+  thing from your #76 line, for the record rather than to argue: it said #73 and #74 were « open and
+  green » ahead of it — #73 was already merged, and #74 was red on `e2e/first-run.spec.ts:82`, which you
+  then fixed yourself in the next push.
+
 ### From the other machine
 
 - **2026-09-23 11:15 · the other machine, in a loop · `feat/retro-empty-states`** — I am the session
