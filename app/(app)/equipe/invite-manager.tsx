@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { createInvite, revokeInvite } from "@/lib/team/actions";
+import { inviteCardFr } from "@/lib/team/labels";
 import { formatInviteCode } from "@/lib/team/invite-code";
 import type { ActiveInvite } from "@/lib/team/queries";
 
@@ -18,15 +19,14 @@ export function InviteManager({
   teamId: string;
   invites: ActiveInvite[];
 }) {
+  // Not « Inviter des joueurs »: the `<select>` below mints a coach code too (decision NNN).
+  const card = inviteCardFr();
   const [state, action] = useActionState(createInvite, undefined);
   const freshCode = state && "code" in state ? state.code : undefined;
   const error = state && "error" in state ? state.error : undefined;
 
   return (
-    <Card
-      title="Inviter des joueurs"
-      description="Génère un code et envoie-le sur WhatsApp. Le joueur choisit lui-même son mot de passe."
-    >
+    <Card title={card.titleFr} description={card.descriptionFr}>
       <form action={action} className="flex flex-wrap items-end gap-3">
         <input type="hidden" name="teamId" value={teamId} />
 

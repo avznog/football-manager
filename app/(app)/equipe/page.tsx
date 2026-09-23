@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { staffCardFr } from "@/lib/team/labels";
 import { getActiveInvites, getSquad } from "@/lib/team/queries";
 import { InviteManager } from "./invite-manager";
 import { MemberRow } from "./member-row";
@@ -17,6 +18,10 @@ export default async function TeamPage() {
 
   const players = squad.filter((member) => member.isPlayer);
   const staff = squad.filter((member) => !member.isPlayer);
+  // « Encadrement » is true of every row under it and still not the whole staff: a coach who plays is
+  // in the list above, with his « coach » badge. The card says so rather than letting the reader
+  // conclude the touchline is one person.
+  const staffCard = staffCardFr(players.filter((member) => member.role === "coach").length);
 
   return (
     <div className="space-y-6">
@@ -56,7 +61,7 @@ export default async function TeamPage() {
       </Card>
 
       {staff.length > 0 ? (
-        <Card title="Encadrement" flush>
+        <Card title={staffCard.titleFr} description={staffCard.descriptionFr} flush>
           <ul className="divide-y divide-border/60">
             {staff.map((member) => (
               <MemberRow key={member.membershipId} member={member} />
