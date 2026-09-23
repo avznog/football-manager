@@ -494,3 +494,46 @@ match page, which now says it one screen earlier. The rest is unchanged — no c
 `usePitchDrag` duplication of decision 045, the two-line squad row, and `docs/DEPLOY.md` §4 and §6.
 
 **Next:** deployment, and nothing else. It needs a Neon `DATABASE_URL` from the owner.
+
+## 2026-09-23 — the column that had waited since M0 for a bucket it did not need
+
+**PR #29** — the club crest.
+
+`teams.crest_url` was written by the schema in M0 and by nothing since. The reason it had never been
+built is not that nobody wanted it: it is that an upload needs somewhere to put the file, and adding an
+object store means a second service, a second set of credentials in the runbook, a lifecycle for the
+crest a coach replaces, and a signed-upload round trip — for **one image per team**, changed maybe once
+a season. So the slice's real content was never the form. It was deciding not to provision anything
+(decision 054): the image is resized to 96 px in the coach's own browser and stored in the row as a
+`data:` URL.
+
+`lib/team/crest.ts` holds the arithmetic, pure and isomorphic so it is testable on both sides:
+`fitWithin` contains rather than crops, never enlarges — blowing 40 px of artwork up to 96 stores only
+the blur — and clamps to at least one pixel, because a 2000×3 banner scales to 0.14 px of height and a
+zero-height canvas throws. `app/(app)/equipe/crest-field.tsx` does the re-encoding: PNG first, since a
+crest is flat colour on transparency; JPEG **on white** if the PNG is over the ceiling, because an
+unfilled canvas would give a black square; a message the coach can act on if even that is too heavy.
+
+**Two things the ceiling is actually protecting.** `lib/auth/dal.ts` reads the team row on every
+authenticated request to draw the shell, so this is not a column read when someone opens a gallery — it
+is on the hot path of every page. And the value ends up as the `src` of an `<img>`, so only
+`image/png` and `image/jpeg` are accepted: `data:image/svg+xml` is the one shape of this string that can
+carry markup, and refusing it at the boundary is cheaper than reasoning about it downstream.
+
+The field is three-state — `""` keep, `"none"` remove, a data URL replace — which maps onto Drizzle's
+`undefined` / `null` / value. A two-state field would have meant renaming the team cost it its crest,
+so a browser check walks exactly that: put a crest on, reload, save the form without touching it, crest
+still there.
+
+**Looked at, at 390 px, in both themes.** A 512×512 PNG badge lands at 3 318 chars and shows in the
+header in place of the coloured disc. A 2400×1600 photograph resizes to 96×64 and 28 482 chars — under
+the ceiling, so the PNG path holds. Forcing the fallback took a maximally incompressible 96×96 image,
+whose PNG is over the limit and comes back as a 9 859-char JPEG: the path works, and in practice
+nothing that looks like a crest will reach it. « Retirer » puts the initials disc back, and the preview
+is 40 px in both states so the row does not jump. No console errors.
+
+**Debt, unchanged:** the `usePitchDrag` duplication of decision 045, the two-line squad row, game
+mode's header not carrying « saisi après le match », and `docs/DEPLOY.md` §4 and §6.
+
+**Next:** deployment. It still needs a Neon `DATABASE_URL` from the owner — that is the whole of what
+is left.
