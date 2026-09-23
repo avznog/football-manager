@@ -212,15 +212,22 @@ export function deduceChanges(
     ),
   };
 
-  const lines = describeLineupDiffFr(meaningful, nameOf, options);
+  /*
+   * With no earlier composition there is nothing to deduce, and saying so has to be explicit: the
+   * diff against an empty pitch is seven arrivals, and « Hugo entre, Nico entre, … » under the
+   * starting sheet is the « 7 changements » lie in another form. It used to be suppressed by
+   * `describeLineupDiffFr` omitting unpaired arrivals altogether, which was a bug everywhere else.
+   */
+  const hasPrevious = (previous?.assignments.length ?? 0) > 0;
+  const lines = hasPrevious ? describeLineupDiffFr(meaningful, nameOf, options) : [];
 
   return {
     substitutions: meaningful.substitutions,
     positionChanges: meaningful.positionChanges,
     lines,
-    summary: summariseLineupDiffFr(meaningful, nameOf, options),
+    summary: hasPrevious ? summariseLineupDiffFr(meaningful, nameOf, options) : "Aucun changement",
     isEmpty: lines.length === 0,
-    hasPrevious: (previous?.assignments.length ?? 0) > 0,
+    hasPrevious,
   };
 }
 

@@ -558,12 +558,49 @@ describe("the planned-composition prompt", () => {
     expect(state.onPitch.map((entry) => entry.memberId)).toContain("ali");
   });
 
-  it("titles the starting composition as such", () => {
+  it("titles the starting composition as such, and does not call it seven changes", () => {
     const initial = { ...planned, id: "l-0", fromMinute: 0, isInitial: true };
     const state = reduceLive(live(log([]), { lineups: [initial] }), [], T0);
     const view = pendingLineupView(state.pendingLineup, [initial], index);
 
     expect(view?.title).toBe("Composition de départ");
+    // The diff against an empty pitch is seven arrivals; the ghost pitch beside this list is where
+    // the coach reads the team sheet, and « Hugo entre, Nico entre, … » under it says nothing.
+    expect(view?.changes).toEqual([]);
+  });
+
+  it("spells out a man walking on when the team is a player short", () => {
+    /*
+     * The case this prompt used to describe with an empty list. Julien goes off injured at the 20th
+     * with nobody to replace him, so the team plays on with six; at the 45th the planned composition
+     * brings Yanis on. That is one arrival paired with no departure, and it is the only thing that
+     * happens — so a silent list meant the coach confirmed a change he had never been shown.
+     */
+    const planWithSix = {
+      ...planned,
+      slots: [
+        ...STARTING_SEVEN.filter((entry) => entry.slotId !== SLOT.at && entry.slotId !== SLOT.mc2),
+        { slotId: SLOT.mc2, memberId: "karim" },
+        { slotId: SLOT.at, memberId: "yanis" },
+      ],
+    };
+    const withInjury = log([
+      ...KICKED_OFF,
+      // A SUBSTITUTION always has two halves, so a man leaving unreplaced is a six-player sheet.
+      {
+        type: "LINEUP_APPLIED",
+        min: 20,
+        payload: lineupPayload(STARTING_SEVEN.filter((entry) => entry.memberId !== "julien")),
+      },
+      { type: "PERIOD_END", min: 30, period: 1 },
+      { type: "KICKOFF", min: 30, period: 2 },
+    ]);
+    const state = reduceLive(live(withInjury, { lineups: [planWithSix] }), [], T0 + 46 * MIN);
+    const view = pendingLineupView(state.pendingLineup, [planWithSix], index);
+
+    expect(state.onPitch).toHaveLength(6);
+    expect(view?.isEmpty).toBe(false);
+    expect(view?.changes).toEqual(["Yanis entre"]);
   });
 });
 

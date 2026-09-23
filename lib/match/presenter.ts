@@ -669,7 +669,13 @@ export function pendingLineupView(
     title: pending.isInitial
       ? "Composition de départ"
       : `Composition prévue à la ${pending.fromMinute}’`,
-    changes: describeLineupDiffFr(pending.diff, players.nameOf),
+    /*
+     * The starting composition is not a set of changes — it is the team sheet, and the ghost pitch
+     * beside this list already shows it. Listing seven arrivals under « Composition de départ »
+     * would be the « 7 changements » lie again. For every later plan the list is complete, unpaired
+     * arrivals included: this diff is against the *pitch*, which may be down to six.
+     */
+    changes: pending.isInitial ? [] : describeLineupDiffFr(pending.diff, players.nameOf),
     warnings: flags.map((flag) => `${players.nameOf(flag.memberId)} est ${flagLabelFr(flag.reason)}`),
     flags,
     slots: lineup.slots,

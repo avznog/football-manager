@@ -488,6 +488,25 @@ export function hasSlotConflict(assignments: readonly SlotAssignment[]): boolean
 /* French summaries                                                           */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The arrivals and departures no substitution accounts for.
+ *
+ * `comingOn` and `goingOff` list everybody who crosses the touchline, including the two halves of
+ * each substitution. When the two compositions field the same number of players every crossing is
+ * paired and both of these are empty — but the pitch is not always full: a side plays on with six
+ * after an injury, and a seventh man walking on is an arrival that replaces nobody.
+ */
+export function unpairedMovements(diff: LineupDiff): {
+  goingOff: readonly string[];
+  comingOn: readonly string[];
+} {
+  const paired = new Set(diff.substitutions.flatMap((substitution) => [substitution.outId, substitution.inId]));
+  return {
+    goingOff: diff.goingOff.filter((memberId) => !paired.has(memberId)),
+    comingOn: diff.comingOn.filter((memberId) => !paired.has(memberId)),
+  };
+}
+
 /** How the composition editor reads out a substitution: « Léo → Yanis ». */
 export function describeSubstitutionFr(
   substitution: Substitution,
@@ -511,14 +530,31 @@ export function describePositionChangeFr(
   return `${name} passe ${label}`;
 }
 
-/** One French line per change, in the order a coach would carry them out. */
+/**
+ * One French line per change, in the order a coach would carry them out.
+ *
+ * Every crossing of the touchline gets a line, including the ones no substitution pairs up: a change
+ * the list leaves out is a change the coach confirms without having read it. That case used to be
+ * spelled out in `lib/match/terrain.ts` alone, on the grounds that a planned composition always
+ * fields the same seven as the previous one — which is true of two plans compared with each other,
+ * and false of a plan compared with the pitch. A team playing on with six after an injury, handed
+ * the composition it planned for the 30th minute, was shown an empty list while a seventh man
+ * walked on.
+ *
+ * Callers comparing against an **empty** pitch — the starting composition — should not use this as a
+ * change list: seven arrivals are the team sheet, not seven changes. `deduceChanges` and
+ * `pendingLineupView` both say so explicitly.
+ */
 export function describeLineupDiffFr(
   diff: LineupDiff,
   nameOf: (memberId: string) => string,
   options: { long?: boolean } = {},
 ): string[] {
+  const unpaired = unpairedMovements(diff);
   return [
     ...diff.substitutions.map((substitution) => describeSubstitutionFr(substitution, nameOf)),
+    ...unpaired.goingOff.map((memberId) => `${nameOf(memberId)} sort`),
+    ...unpaired.comingOn.map((memberId) => `${nameOf(memberId)} entre`),
     ...diff.positionChanges.map((change) => describePositionChangeFr(change, nameOf, options)),
   ];
 }
