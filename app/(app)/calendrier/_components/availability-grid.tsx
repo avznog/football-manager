@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { AvailabilityStatus } from "@/db/schema";
+import { availabilityCountFr } from "@/lib/calendar/labels";
 import type { AvailabilityTally, Responder } from "@/lib/calendar/timeline";
 
 type GroupKey = AvailabilityStatus | "pending";
@@ -32,13 +33,25 @@ export type AvailabilityGridProps = {
   notes?: ReadonlyMap<string, string | null>;
   /** Highlights the viewer's own line, so they can see their answer landed. */
   selfMembershipId?: string | null;
+  /**
+   * The event has kicked off. The list is then a record of what people answered beforehand and not a
+   * question anybody can still act on, so it says so — and the match page moves the card below the
+   * things that can still be done.
+   */
+  past?: boolean;
 };
 
-export function AvailabilityGrid({ tally, notes, selfMembershipId }: AvailabilityGridProps) {
+export function AvailabilityGrid({
+  tally,
+  notes,
+  selfMembershipId,
+  past = false,
+}: AvailabilityGridProps) {
+  const count = availabilityCountFr(tally.answered, tally.total);
   return (
     <Card
       title="Disponibilités"
-      description={`${tally.answered} réponse${tally.answered > 1 ? "s" : ""} sur ${tally.total} joueur${tally.total > 1 ? "s" : ""}`}
+      description={past ? `Avant le match · ${count}` : count}
       flush
     >
       <div className="divide-y divide-border/60">

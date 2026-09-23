@@ -29,6 +29,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       timeline, game mode's timeline and `lib/stats/format.ts` each built their own with a hyphen, so
       a recap showed « 2 – 0 » and « 2 - 0 » three cards apart. `formatScore` deleted, decision 061
       amended by 064 rather than left standing as a claim that was not true
+- [x] A played match leads with what can still be done, not with the pre-match availability
+      roll-call — « Après le match » was nine hundred pixels down a phone, and it is the one card
+      with a deadline (decision 068)
 - [x] A brand-new match sheet no longer shows thirteen red « — » — nobody has been left out of a
       sheet nobody has filled. « Hors feuille », a `neutral` segment tone, and a summary that
       accounts for every player (decision 067)
