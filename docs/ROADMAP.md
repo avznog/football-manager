@@ -267,6 +267,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       profile printed the reader's own season-wide count of unfinished matches — « Les notes de
       2 matchs sont exclus de cette moyenne » where one of the two held no note about that player at
       all, and under a « — » where nothing was excluded from anything (decision 093)
+- [x] …and noting is two taps: choose, then « Suivant ». Tapping a score advanced the card in the
+      same handler, so the number the reader had just chosen was replaced by the next teammate before
+      it could look chosen — a pad with a correct selected state that was never once on screen. The
+      selection is now a fill, a ring, a bolder digit and « Note choisie : 8 / 10 » in an
+      `aria-live` region; the forward button says « Passer sans noter » on a card with no score, and
+      the last card has none at all (decision 102)
 
 ## M7 — Retro-entry & amendments
 - [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet
