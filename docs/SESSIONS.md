@@ -1678,3 +1678,57 @@ now sits under « From the other machine », which is what the two lanes are for
 in passing, in a file this branch already touches: #68's own test comment said the demo season
 interleaves « five sessions » with the matches. `psql` says four — 29 August, 12 and 19 September, and
 26 September to come.
+
+### Three PWA icons redirected to the login page, and a stack nobody could log into
+
+Two defects the owner hit while running the app out of `compose.yaml`, both of them things no test
+was ever going to notice.
+
+**The icons.** `proxy.ts`'s matcher excluded static files by naming six of them, and the three files
+actually in `public/` were not among the six. So the guard ran on `/icon-192.png`, and the browser
+got `307 → /connexion?suivant=%2Ficon-192.png`, followed it, was handed HTML and reported an invalid
+image. Confirmed with `curl -sD-` against the compose stack before the change, and again after:
+
+```
+$ curl -sD- -o /dev/null http://localhost:3000/icon-192.png
+HTTP/1.1 200 OK
+Content-Type: image/png
+Content-Length: 4693
+$ curl -sD- -o /dev/null http://localhost:3000/calendrier
+HTTP/1.1 307 Temporary Redirect
+location: /connexion?suivant=%2Fcalendrier
+```
+
+Production answered the same `307` as localhost, so the install prompt has had no icon from the
+beginning — which is the interesting part: this was a live defect for weeks and cost nothing anyone
+could see, because a manifest icon that fails to download breaks no page and no assertion. The fix
+excludes the class rather than the names — any path ending in `.<ext>` — and the decision entry is
+about that shape, not about the six names. Every route here is a French word with no dot in it.
+
+New file `proxy.test.ts`, twelve tests, and the one that matters reads `public/` with `node:fs` and
+asserts nothing in it is matched: hardcoding the three names would have rebuilt the same stale list
+one layer down. It also asserts `/calendrier` and `/match/1/jeu` *are* matched, so the exclusion
+cannot quietly swallow the guard, and drives `proxy()` with real `NextRequest`s — the redirect
+behaviour had no test at all until now. `vitest.config.ts` gained `"*.test.ts"` so a test at the
+root is actually collected.
+
+**The stack with no accounts.** `docker compose up` starts `db`, `migrate` and `app`; both services
+that create users are in the `setup` profile, so `users` is empty and the app is unloggable. The
+owner tried `admin`/`admin` and `admin`/`change-me`, and neither can ever work on a fresh `up`:
+nothing exists, and `db/bootstrap.ts` refuses `change-me` and refuses a password as short as `admin`
+by design (052). `admin`/`change-me` is a *seed* account. Nothing said any of this anywhere.
+
+So `compose.yaml` gained a `seed` service beside `bootstrap`, same profile, same `DATABASE_URL`,
+same `depends_on: db healthy`, built from `tools` — which sets no `NODE_ENV`, so `db/seed.ts`'s
+production guard lets it run without being weakened; the guard is what keeps `motdepasse` off a real
+database and it is untouched. `npm run docker:seed` in `package.json`, and the header comment, the
+`bootstrap` comment and `docs/DEPLOY.md` now all say out loud that `up` leaves a schema with no
+accounts, and give the two ways out: seed for a demo season you can click through, bootstrap for one
+real super admin.
+
+Verified with `docker compose --profile setup config seed` — the service resolves with the intended
+image target, command and dependency. **The seed itself was not run**: this session does not run
+`db:*`, and the compose database currently holds the owner's data.
+
+937 tests, typecheck and lint clean. Nothing here touches the match flow, so the browser suite was
+not run.

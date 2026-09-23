@@ -267,11 +267,31 @@ npm run docker:logs                   # follow it
 npm run docker:down                   # stop; add docker:reset to drop the volume too
 ```
 
-An empty database needs the reference data and the first account, as in step 3:
+### `up` leaves a schema with nobody in it
+
+`docker compose up` starts `db`, `migrate` and `app` — and that is all. Both services that create
+users sit in the `setup` profile, which `up` does not start, so the app comes up on port 3000 with a
+migrated schema and zero rows in `users`. There is no password that works, and the login screen
+cannot say so: **`admin`/`admin` and `admin`/`change-me` both fail on a freshly `up`ped stack.** The
+first because no account exists at all; and even after `db:bootstrap`, `change-me` is refused by
+design — `db/bootstrap.ts` blacklists the demo password and enforces a minimum length, so `admin` as
+a password is refused too (decision 052). `admin`/`change-me` is a *seed* account: it exists only if
+you ran the seed.
+
+Two ways out, and they are different things:
 
 ```bash
+# A demo season you can click through: `admin` / `change-me`, and the squad on `motdepasse`.
+npm run docker:seed
+
+# Or one real super admin and reference data, no demo data — the production path, as in step 3.
 SUPER_ADMIN_USERNAME=admin SUPER_ADMIN_PASSWORD='…' docker compose run --rm bootstrap
 ```
+
+Take the seed when you want to see the app full of a season; take bootstrap when you want the local
+stack to behave like the deployment, where the first account is the only account. The seed is local
+only: it is built from the `tools` image, which sets no `NODE_ENV`, and `db/seed.ts` refuses to run
+under `NODE_ENV=production` precisely so known passwords cannot reach a real database.
 
 Notes worth having before something surprises you:
 

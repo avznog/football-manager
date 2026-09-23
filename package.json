@@ -25,6 +25,7 @@
     "db:reset": "tsx db/reset.ts && npm run db:migrate && npm run db:seed",
     "docker:db": "docker compose up -d db",
     "docker:up": "docker compose up -d --build app",
+    "docker:seed": "docker compose run --rm seed",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v",
     "docker:logs": "docker compose logs -f app",
