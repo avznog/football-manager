@@ -20,6 +20,8 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { matchNameFr } from "@/lib/calendar/labels";
+import { capitalizeFirst } from "@/lib/calendar/time";
 import { deleteLineup } from "@/lib/composition/actions";
 import {
   appliedNoticeFr,
@@ -88,7 +90,11 @@ export default async function CompositionsPage({
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-ink">Compositions</h1>
         <p className="text-sm text-ink-muted">
-          {squadSummaryFr(counts)} ·{" "}
+          {/* Which match these compositions are for, said in the header rather than only in the back
+              link: a coach arrives here from the sheet and places seven players for a fixture whose
+              side he is entitled to see without going back a screen. */}
+          {capitalizeFirst(matchNameFr(match.opponentName, match.isHome))} · {squadSummaryFr(counts)}{" "}
+          ·{" "}
           <Link
             href={`/match/${match.id}/feuille`}
             className="font-medium text-accent hover:underline"

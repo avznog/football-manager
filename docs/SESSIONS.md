@@ -2167,3 +2167,36 @@ Not done: **no 390 px pass in either theme**, and the visual is most of this cha
 not touched, because it predates this and is a different argument: the submit button carries
 `disabled` when nothing is selected, so with JavaScript off it is server-rendered disabled, which
 contradicts the file's own claim to work without JavaScript.
+
+### 2026-09-23 — Where the match is played, on every screen that names it
+
+Fourth of the owner's eight remarks: « il n'y a pas de différence entre les matches "à domicile" ou
+"à l'extérieur" ». Half the premise turned out to be wrong and the other half worse than reported.
+
+Wrong half: `is_home` was not unused. The column is in the first migration, `match-form.tsx` has
+always offered a `SegmentedControl` for it, `matchSideSchema` validates it in words rather than as a
+checkbox, both `createMatch` and `updateMatch` write it, and the match page, the recap header and
+game mode's scoreboard all badge it. `scoreLineFr` is documented and tested as ours-first whether or
+not we are at home, and both scoreboards comply — **no screen assumes the team is at home.** So there
+was nothing to add to the model and no migration.
+
+Worse half: every screen that *names* the fixture printed the bare opponent. A season of calendar rows
+read identically. `/stats`' form guide had the fact **only in a `title` attribute** — decision 072's
+exact defect, invisible on a phone — and its sr-only text said « contre » about away matches. Game
+mode's final whistle said « contre X » about a match at X's ground; `jeu/page.tsx` had an inline
+`{isHome ? "contre" : "chez"}`, a third vocabulary nothing else used and nothing could test; the
+availability legend said « Ta disponibilité contre X »; and the WhatsApp reminder — the message a
+dozen players actually read — named the opponent, the competition and the kick-off but never the
+ground.
+
+The wording is a preposition, not a pill: « contre X », « à X ». Five characters instead of forty on
+a truncating row, and it is what a coach says. `venuePhraseFr` keeps the side and the free-text venue
+together, side first, so « Stade du Parc » never appears without saying whose it is. The « Terrain »
+field gained a hint that follows the side chosen above it, via the same uncontrolled-input-plus-mirror
+idiom the periods hint already uses, so the no-JS post is unaffected.
+
+Decision 103. `lib/calendar/labels.ts` and `lib/stats/format.ts`, 1035 unit tests. Sixteen files, no
+schema change.
+
+Not done: **no 390 px pass.** The calendar row titles grew by a word, which is precisely where the
+truncation argument lives, and `/calendrier` is the busiest screen in the app.

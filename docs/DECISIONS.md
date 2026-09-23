@@ -2601,3 +2601,43 @@ left to find that out for himself.
 Labels, enablement and the derived sentences live in `lib/rating/flow.ts` (decision 097). The
 Playwright happy path now taps twice per teammate and asserts the card did *not* move between the two
 taps, which is the regression itself.
+
+## 103 — Home and away are said in words, in a preposition, everywhere a match is named
+
+**2026-09-23** · accepted
+
+`matches.is_home` has existed since the first migration, the match form has always asked for it, and
+two screens badged it. The owner still wrote « il n'y a pas de différence entre les matches "à
+domicile" ou "à l'extérieur" » — and about the screens he was right. Everywhere a fixture was
+*named*, the app printed the bare opponent, so a season of calendar rows read identically whether the
+team travelled or received. `/stats`' form guide stated it **only inside a `title` attribute**, which
+on a phone is nowhere (decision 072), and said « contre » about away matches anyway. Game mode's
+final-whistle sheet said « Score final 3 – 1 contre X » about a match played at X's ground, `jeu/page.tsx`
+carried an inline `{isHome ? "contre" : "chez"}` — a third vocabulary, in a `.tsx` file no test reads
+— and the availability control asked for « Ta disponibilité contre X ». The WhatsApp reminder named
+the opponent, the competition and the kick-off, and not the ground: the one thing the app knows that
+the group chat does not.
+
+**A team names its own fixtures with a preposition: « contre X » at home, « à X » away**
+(`matchNameFr`). It is what a coach says out loud, and it is what fits — on a 390 px row that
+truncates, the difference costs five characters where a badge costs forty, and it lands on the line
+nothing truncates instead of in a 12 px subtitle. Capitalised in a heading, because then the first
+letter *is* the difference, which is the letter the eye lands on down a column.
+
+Two rules come with it. The side is never reordered into the score: `scoreLineFr` stays ours-first at
+home and away (decision 061). And `venuePhraseFr` binds the free-text `venue` to the side that gives
+it meaning — the side always leads, the pitch is only ever appended, and a match with no venue still
+reads « à domicile », which is true and is the fact the reader came for. « Stade du Parc » alone is
+our ground or theirs depending on a boolean the row never showed.
+
+The match form's « Terrain » hint follows the control above it (`venueFieldHintFr`): « Le terrain où
+tu reçois. » / « Le terrain de l'adversaire. » A free-text pitch name cannot be verified, but the
+field can say which pitch it is asking for, which is the only contradiction this pair can produce.
+
+Left bare on purpose: the back links `← Étoile du Parc`, which are navigation labels pointing at a
+page whose `h1` is that name, and the match and recap `h1`s, which have the badge immediately above
+them. A preposition on a link that is really a breadcrumb is noise.
+
+All of it is derived in `lib/calendar/labels.ts` and `lib/stats/format.ts` and pinned by unit tests,
+because Vitest collects nothing under `app/` (decision 097). The inline ternary in game mode is the
+argument: it was both a third wording and a sentence no test could see.

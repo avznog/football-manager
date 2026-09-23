@@ -24,7 +24,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { COMPETITION_LABELS, pluralize } from "@/lib/calendar/labels";
+import { COMPETITION_LABELS, matchNameFr, pluralize } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import { getMatch } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
@@ -74,7 +74,8 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
           Noter mes coéquipiers
         </h1>
         <p className="text-sm text-ink-muted">
-          {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)} · {match.opponentName}
+          {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)} ·{" "}
+          {matchNameFr(match.opponentName, match.isHome)}
         </p>
       </header>
 

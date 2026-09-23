@@ -9,6 +9,7 @@
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
+import { matchNameFr } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatRelativeDays, formatWhen } from "@/lib/calendar/time";
 import type { CalendarEvent } from "@/lib/calendar/timeline";
 import { isOngoing } from "@/lib/calendar/timeline";
@@ -81,7 +82,7 @@ export function NextEventCard({ event, teamId, canDeclare, now }: NextEventCardP
             value={event.myAvailability}
             legend={
               event.kind === "match"
-                ? `Ta disponibilité pour le match contre ${event.opponentName}`
+                ? `Ta disponibilité pour le match ${matchNameFr(event.opponentName, event.isHome)}`
                 : "Ta disponibilité pour cet entraînement"
             }
           />

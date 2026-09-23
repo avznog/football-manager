@@ -17,6 +17,8 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BUILTIN_FORMATIONS } from "@/db/reference";
 import type { ActiveTeam } from "@/lib/auth/dal";
+import { matchNameFr } from "@/lib/calendar/labels";
+import { capitalizeFirst } from "@/lib/calendar/time";
 import {
   appliedNoticeFr,
   lineupsFrozenFr,
@@ -194,7 +196,8 @@ function Shell({
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-ink">{title}</h1>
         <p className="text-sm text-ink-muted">
-          {match.opponentName} · {match.periodsCount}×{match.periodMinutes} minutes
+          {capitalizeFirst(matchNameFr(match.opponentName, match.isHome))} · {match.periodsCount}×
+          {match.periodMinutes} minutes
         </p>
       </header>
       {children}

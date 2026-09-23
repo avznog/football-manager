@@ -21,7 +21,7 @@ import { Card } from "@/components/ui/card";
 import { positionLabelFr } from "@/db/reference";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { MATCH_STATUS_LABELS } from "@/lib/calendar/labels";
+import { MATCH_STATUS_LABELS, venuePhraseFr } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import { countSquadRoles, isSheetCandidate, sheetNextStepFr } from "@/lib/composition/plan";
 import { getCompositionMembers, getFieldedMemberIds } from "@/lib/composition/queries";
@@ -98,8 +98,13 @@ export default async function MatchSheetPage({
             </Badge>
           ) : null}
         </div>
+        {/* Where, under the date: the sheet is filled in while deciding who can come, and « à
+            l’extérieur, Stade du Parc » is half of that decision. The venue never stands on its own —
+            `venuePhraseFr` leads with the side, which stays true even when the pitch is unnamed. The
+            opponent is the link above, so the line does not name him twice. */}
         <p className="text-sm text-ink-muted">
-          {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)}
+          {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)} ·{" "}
+          {venuePhraseFr(match.isHome, match.venue)}
         </p>
       </header>
 

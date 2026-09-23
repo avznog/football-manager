@@ -95,6 +95,27 @@ export function resultLabelOf(result: "win" | "draw" | "loss"): string {
   return result === "win" ? "Victoire" : result === "loss" ? "Défaite" : "Match nul";
 }
 
+/**
+ * One badge of the form guide, spelled out: « Victoire 3 – 1 contre Étoile du Parc, dim. 14 sept. ».
+ *
+ * A `V` and a scoreline is all the guide has room to print, so this is what the badge is *called* —
+ * the announced name of the row, and the tooltip, which under decision 072 may only ever duplicate
+ * something already announced. It used to be a `title` attribute alone, which is the one place a
+ * phone cannot read: the only statement of home or away on the whole of `/stats` was hidden behind a
+ * hover that does not exist, and it said « contre » about away matches anyway.
+ *
+ * The fixture comes in already worded, by `matchNameFr`, and the day already formatted: this joins
+ * them, it does not invent a second way of saying either.
+ */
+export function formEntryLabelFr(input: {
+  result: "win" | "draw" | "loss";
+  scoreFr: string;
+  fixtureFr: string;
+  dayFr: string;
+}): string {
+  return `${resultLabelOf(input.result)} ${input.scoreFr} ${input.fixtureFr}, ${input.dayFr}`;
+}
+
 /** A plural `s` only when it is needed: « 1 match », « 3 matchs », « 1 but », « 2 buts ». */
 export function plural(count: number, singular: string, many = `${singular}s`): string {
   return `${count} ${count > 1 ? many : singular}`;

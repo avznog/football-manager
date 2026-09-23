@@ -24,6 +24,7 @@ import {
   COMPETITION_LABELS,
   COMPETITION_ORDER,
   matchLengthHintFr,
+  venueFieldHintFr,
 } from "@/lib/calendar/labels";
 import { createMatch, updateMatch } from "@/lib/match/actions";
 
@@ -52,6 +53,10 @@ export function MatchForm({ teamId, matchId, defaults }: MatchFormProps) {
   // The two fields stay uncontrolled — `defaultValue`, so the no-JavaScript post still carries what
   // was typed — and this mirror exists only to write the sentence under them. `Number("")` is 0 and
   // `Number("x")` is NaN; `matchLengthHintFr` refuses both rather than compute a duration from them.
+  // Same trick for the side, and for the same reason: the radio stays uncontrolled so the
+  // no-JavaScript post still carries it, and this mirror only writes the hint on « Terrain » —
+  // which pitch the field is asking for depends on the answer above it.
+  const [isHome, setIsHome] = useState(defaults.isHome);
   const [periodsCount, setPeriodsCount] = useState(defaults.periodsCount);
   const [periodMinutes, setPeriodMinutes] = useState(defaults.periodMinutes);
   const lengthHint = matchLengthHintFr(periodsCount, periodMinutes);
@@ -107,6 +112,7 @@ export function MatchForm({ teamId, matchId, defaults }: MatchFormProps) {
             { value: "away", label: "À l’extérieur" },
           ]}
           defaultValue={defaults.isHome ? "home" : "away"}
+          onChange={(value) => setIsHome(value === "home")}
         />
       </div>
 
@@ -128,7 +134,16 @@ export function MatchForm({ teamId, matchId, defaults }: MatchFormProps) {
         )}
       </Field>
 
-      <Field htmlFor="venue" label="Terrain" optional error={state?.fieldErrors?.venue}>
+      {/* The hint follows the side chosen above: a venue and a side that tell different stories is
+          the one contradiction this pair can produce, and the form cannot check a free-text pitch
+          name — it can only say which pitch it is asking for. */}
+      <Field
+        htmlFor="venue"
+        label="Terrain"
+        optional
+        hint={venueFieldHintFr(isHome)}
+        error={state?.fieldErrors?.venue}
+      >
         {({ id, describedBy, invalid }) => (
           <Input
             id={id}

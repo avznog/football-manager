@@ -18,7 +18,7 @@ import {
 import { PitchLayout } from "@/components/pitch/PitchLayout";
 import { Badge, Button, ButtonLink, Card, EmptyState } from "@/components/ui";
 import { positionLabelFr } from "@/db/reference";
-import { entryModeBadgeFr } from "@/lib/calendar/labels";
+import { entryModeBadgeFr, matchNameFr } from "@/lib/calendar/labels";
 import type { MatchEventType } from "@/lib/match/events";
 import { createOutbox, toWireEvent, type OutboxRecord, type OutboxState } from "@/lib/match/outbox";
 import {
@@ -733,7 +733,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           onConfirm={() => finish("FINAL_WHISTLE", {})}
         >
           <p className="text-sm text-ink">
-            Score final {state.scoreLabel} contre {live.match.opponentName}.
+            Score final {state.scoreLabel} {matchNameFr(live.match.opponentName, live.match.isHome)}.
           </p>
         </ConfirmSheet>
       ) : null}

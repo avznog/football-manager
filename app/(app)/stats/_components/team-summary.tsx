@@ -8,15 +8,15 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { scoreLineFr } from "@/lib/calendar/labels";
+import { matchNameFr, scoreLineFr } from "@/lib/calendar/labels";
 import { formatShortDay } from "@/lib/calendar/time";
 import type { FormEntry, TeamSeasonStats } from "@/lib/stats/aggregate";
 import {
   formatRecord,
   formatSigned,
+  formEntryLabelFr,
   matchCount,
   plural,
-  resultLabelOf,
   resultLetterOf,
 } from "@/lib/stats/format";
 
@@ -109,6 +109,16 @@ function LiveNote({ count }: { count: number }) {
   );
 }
 
+/** « Défaite 0 – 2 à CS Morvan, dim. 14 sept. » — the whole of one badge, for both readers of it. */
+function labelOf(entry: FormEntry): string {
+  return formEntryLabelFr({
+    result: entry.result,
+    scoreFr: scoreLineFr(entry.goalsFor, entry.goalsAgainst),
+    fixtureFr: matchNameFr(entry.opponentName, entry.isHome),
+    dayFr: formatShortDay(new Date(entry.kickoffAt)),
+  });
+}
+
 /** Most recent first: the way a form guide is always read. */
 function Form({ entries }: { entries: FormEntry[] }) {
   return (
@@ -117,15 +127,14 @@ function Form({ entries }: { entries: FormEntry[] }) {
       <ol className="mt-1.5 flex flex-wrap gap-1.5">
         {entries.map((entry) => (
           <li key={entry.matchId}>
-            <span
-              className="inline-flex flex-col items-center gap-0.5"
-              title={`${resultLabelOf(entry.result)} ${scoreLineFr(entry.goalsFor, entry.goalsAgainst)} — ${entry.isHome ? "domicile" : "extérieur"} contre ${entry.opponentName}, ${formatShortDay(new Date(entry.kickoffAt))}`}
-            >
+            {/* One sentence, announced and shown on hover alike: a `title` may only ever duplicate
+                what is already there (decision 072), and this one used to be the single statement of
+                home or away anywhere on `/stats` — hidden behind a hover a phone does not have, and
+                saying « contre » about away matches into the bargain. */}
+            <span className="inline-flex flex-col items-center gap-0.5" title={labelOf(entry)}>
               <Badge variant={RESULT_VARIANT[entry.result]} solid className="justify-center px-2">
                 <span aria-hidden="true">{resultLetterOf(entry.result)}</span>
-                <span className="sr-only">
-                  {resultLabelOf(entry.result)} contre {entry.opponentName}
-                </span>
+                <span className="sr-only">{labelOf(entry)}</span>
               </Badge>
               <span className="font-mono text-[0.625rem] text-ink-subtle tabular-nums">
                 {scoreLineFr(entry.goalsFor, entry.goalsAgainst)}

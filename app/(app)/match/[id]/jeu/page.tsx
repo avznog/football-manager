@@ -22,6 +22,7 @@ import Link from "next/link";
 
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { matchNameFr } from "@/lib/calendar/labels";
 import { finalizeMatchById } from "@/lib/match/finalize";
 import { getLiveMatch } from "@/lib/match/live";
 import { reduceLive } from "@/lib/match/presenter";
@@ -30,7 +31,11 @@ import { GameMode } from "./_components/game-mode";
 export async function generateMetadata({ params }: PageProps<"/match/[id]/jeu">) {
   const [{ team }, { id }] = await Promise.all([requireTeamContext(), params]);
   const live = await getLiveMatch(team.id, id);
-  return { title: live ? `Mode match · ${live.match.opponentName}` : "Match introuvable" };
+  return {
+    title: live
+      ? `Mode match · ${matchNameFr(live.match.opponentName, live.match.isHome)}`
+      : "Match introuvable",
+  };
 }
 
 export default async function GameModePage({ params }: PageProps<"/match/[id]/jeu">) {
@@ -63,7 +68,7 @@ export default async function GameModePage({ params }: PageProps<"/match/[id]/je
          * nothing to announce. `sr-only` is the same answer the recap table and the squad rows give.
          */}
         <h1 className="sr-only">
-          Mode match · {live.match.isHome ? "contre" : "chez"} {live.match.opponentName}
+          Mode match · {matchNameFr(live.match.opponentName, live.match.isHome)}
         </h1>
         <Link
           href={`/match/${live.match.id}`}

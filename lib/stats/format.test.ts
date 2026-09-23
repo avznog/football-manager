@@ -12,6 +12,7 @@ import {
   formatRating,
   formatRecord,
   formatSigned,
+  formEntryLabelFr,
   hiddenRatingsNoteFr,
   matchCount,
   plural,
@@ -89,6 +90,19 @@ describe("results", () => {
     expect(resultLabelOf("win")).toBe("Victoire");
     expect(resultLabelOf("draw")).toBe("Match nul");
     expect(resultLabelOf("loss")).toBe("Défaite");
+  });
+});
+
+describe("formEntryLabelFr", () => {
+  it("says the result, the score, whose ground it was and when", () => {
+    expect(
+      formEntryLabelFr({
+        result: "loss",
+        scoreFr: "0 – 2",
+        fixtureFr: "à CS Morvan",
+        dayFr: "dim. 14 sept.",
+      }),
+    ).toBe("Défaite 0 – 2 à CS Morvan, dim. 14 sept.");
   });
 });
 
