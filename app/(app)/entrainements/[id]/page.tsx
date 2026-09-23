@@ -16,11 +16,14 @@ import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import {
   attendanceCountFr,
+  attendanceNotOpenFr,
   departedMarksNoteFr,
   unmarkedSessionNoteFr,
 } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
 import {
+  ATTENDANCE_OPENS_MINUTES_BEFORE,
+  attendanceIsOpen,
   buildReminderMessage,
   tallyAvailability,
   trainingWindowMinutes,
@@ -55,6 +58,7 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
   const startsAt = new Date(training.startsAt);
   const now = new Date();
   const over = startsAt.getTime() + trainingWindowMinutes() * 60_000 <= now.getTime();
+  const canMark = attendanceIsOpen(startsAt, now);
 
   const activePlayers = squad.filter((member) => member.isPlayer);
   const responders: Responder[] = activePlayers.map((member) => ({
@@ -135,13 +139,26 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
 
       {isCoach && !over ? <ReminderCard message={reminder} pending={tally.pending.length} /> : null}
 
+      {/* A coach only gets the marking list once the séance is close enough for the people in it to
+          be in front of him. `PresenceSummary` had reasoned about this from the start — « before the
+          session there is genuinely nothing to report » — and the coach's half of the same `if` never
+          did, which is how « Tout le monde est là » ended up one tap away on a séance four days out
+          (decision NNN). */}
       {isCoach ? (
-        <AttendanceList
-          teamId={team.id}
-          trainingId={training.id}
-          players={players}
-          marks={marks}
-        />
+        canMark ? (
+          <AttendanceList
+            teamId={team.id}
+            trainingId={training.id}
+            players={players}
+            marks={marks}
+          />
+        ) : (
+          <Card title="Présences">
+            <p className="text-sm text-ink-muted">
+              {attendanceNotOpenFr(ATTENDANCE_OPENS_MINUTES_BEFORE)}
+            </p>
+          </Card>
+        )
       ) : (
         <PresenceSummary marks={marks} squadSize={players.length} over={over} />
       )}

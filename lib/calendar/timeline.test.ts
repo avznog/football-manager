@@ -4,6 +4,8 @@ import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
 import {
   addMinutes,
   answersLineFr,
+  ATTENDANCE_OPENS_MINUTES_BEFORE,
+  attendanceIsOpen,
   availabilityIsWorthShowing,
   buildReminderMessage,
   byStartAscending,
@@ -435,5 +437,31 @@ describe("reminderCardFr", () => {
       titleFr: "Personne à relancer",
       descriptionFr: "Tout le monde a répondu. Rien à faire.",
     });
+  });
+});
+
+describe("attendanceIsOpen", () => {
+  const startsAt = new Date("2026-09-26T19:00:00+02:00");
+  const minutes = (n: number) => new Date(startsAt.getTime() + n * 60_000);
+
+  it("is closed four days before the séance", () => {
+    // The demo season's 26 September training, read on the 22nd — the state the audit screenshotted,
+    // where « Tout le monde est là » was one tap and put 13 rows in `training_attendance`.
+    expect(attendanceIsOpen(startsAt, new Date("2026-09-22T14:00:00+02:00"))).toBe(false);
+  });
+
+  it("is closed an hour before, and open half an hour before", () => {
+    expect(attendanceIsOpen(startsAt, minutes(-60))).toBe(false);
+    expect(attendanceIsOpen(startsAt, minutes(-ATTENDANCE_OPENS_MINUTES_BEFORE))).toBe(true);
+  });
+
+  it("is open at kick-off and during the séance", () => {
+    expect(attendanceIsOpen(startsAt, startsAt)).toBe(true);
+    expect(attendanceIsOpen(startsAt, minutes(45))).toBe(true);
+  });
+
+  it("never closes again, because a coach who forgot last Thursday must still be able to", () => {
+    // Decision 076's « Présences pas encore pointées » only makes sense if the marking stays open.
+    expect(attendanceIsOpen(startsAt, minutes(60 * 24 * 30))).toBe(true);
   });
 });

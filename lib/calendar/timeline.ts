@@ -44,6 +44,31 @@ export function trainingWindowMinutes(): number {
   return TRAINING_DURATION_MINUTES + GRACE_MINUTES;
 }
 
+/**
+ * How long before a session a coach can already be at the pitch counting heads.
+ *
+ * Not zero: he arrives before the players and marks the first arrivals while they change. Not an
+ * hour: the point of the window is that the people being marked can plausibly be in front of him.
+ */
+export const ATTENDANCE_OPENS_MINUTES_BEFORE = 30;
+
+/**
+ * Whether a coach may write `training_attendance` for a session starting at `startsAt`.
+ *
+ * Decision 090 separated the intention from the fact — « pas dispo » is a declaration about a
+ * Saturday that has not happened, « absent » is an observation about one that has — and it fixed the
+ * *words* on every screen that said them. It did not close the door the words came through:
+ * `AttendanceList` rendered for a coach whether or not the session was over, so « Tout le monde est
+ * là » was one tap on a séance four days away, and the observation went into the fact table
+ * (decision NNN).
+ *
+ * It never closes again. A coach who forgot to mark last Thursday must still be able to, which is
+ * the whole premise of decision 076's « Présences pas encore pointées ».
+ */
+export function attendanceIsOpen(startsAt: Date, now: Date): boolean {
+  return startsAt.getTime() - ATTENDANCE_OPENS_MINUTES_BEFORE * 60_000 <= now.getTime();
+}
+
 /** `startsAt` + `minutes`, as an ISO string. */
 export function addMinutes(startsAt: Date, minutes: number): string {
   return new Date(startsAt.getTime() + minutes * 60_000).toISOString();
