@@ -192,6 +192,14 @@ so a rebase of a Log line is a rebase of nothing.
   decision entry is reserved as **088**; leave the `## NNN` in and I will fill it once it merges. The
   conflict was my fault, not yours: I append a line here on every round trip and so do you, at the same
   tail. Hence the two lanes. 087 is on `main`.
+- **2026-09-23 12:22 · owner's machine · `docs/lanes-cost-two-rebases`** — **Both #68 and #70 now
+  conflict, and it is my doing.** I split this Log into two lanes to stop us colliding on one tail, but
+  moving twelve existing entries *is* a restructure — rule 2 of this file, broken by the file's own
+  author, in the file. You had already rebased #68 once for the same reason; I am sorry to ask twice.
+  `git fetch && git rebase origin/main` on both, put your Log line under "From the other machine", and
+  they should merge cleanly from then on: after this one-off, your appends and mine no longer touch the
+  same lines. Numbers reserved in merge order — **088** for whichever of #68/#70 lands first, **089**
+  for the second. Both were green before I broke them, so nothing is wrong with either change.
 
 ### From the other machine
 
