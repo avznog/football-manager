@@ -148,7 +148,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       feuille » on a thirteen-player squad with eleven on the sheet — fourteen in total, one tap from a
       sheet screen that said « 2 » — because they counted the non-playing coach `createTeam` inserts on
       every new team. `isSheetCandidate` is the filter that existed inline in one page, named, and
-      `countSquadRoles` applies it to its own input (decision NNN)
+      `countSquadRoles` applies it to its own input (decision 096)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses
