@@ -118,3 +118,68 @@ planned compositions with the diff) and M4 (game mode: clock, ACTION sheet, TERR
 idempotent ingestion, the IndexedDB outbox, the timeline with VOID, final whistle freezing
 `match_player_stats`). Both build on `lib/match/`, which is why it landed first. Deployment is
 still blocked on a Neon `DATABASE_URL` from the owner.
+
+---
+
+## 2026-09-23 — wave 3: M3, M4, and the leak the gate had
+
+Five PRs, each squash-merged: **#9** the rating gate unified, **#10** M3 compositions, **#11** a
+`Card` type fix, **#12** M4 game mode, **#13** the recap and rating flow wired into the app. `main`
+is green on `typecheck` / `lint` / `test` / `build`, with **704 unit tests** in 35 files (391 before
+this session).
+
+Two subagents wrote M3 and M4 concurrently on disjoint file sets while this session landed the
+slices; as in wave 2 they ran no git at all. The tree was snapshotted off-machine between reports
+with `commit-tree` plumbing rather than a commit, and each slice was verified in a **detached
+worktree at its own commit** — `git worktree add` plus a hardlinked `node_modules` (`cp -al`; a
+symlink makes Turbopack panic with *"points out of the filesystem root"*). That matters more than it
+sounds: another agent's half-written file in the shared tree can both mask a real failure and invent
+a fake one, and twice it did.
+
+### What exists that did not before
+
+- **M3.** `/match/[id]/feuille` (the sheet), `/match/[id]/composition*` (the list and the editor).
+  Three pure modules carry the rules — `lib/formation/shape.ts`, `lib/composition/plan.ts`,
+  `lib/composition/editor.ts` — and the components are thin over them. Drag is hand-rolled pointer
+  events composing the existing turf pitch, with a tap-then-tap fallback and arrow-key nudging.
+- **M4.** `/match/[id]/jeu` and `POST /api/match-events`. `lib/match/ingest.ts` is the pure half of
+  ingestion, `lib/match/append.ts` is the **only** writer of `match_events`, `lib/match/presenter.ts`
+  is everything the screen shows (pure), `lib/match/outbox.ts` is the FIFO IndexedDB queue, and
+  `lib/match/finalize.ts` freezes `match_player_stats`.
+- The recap and the rating flow are now reachable: an « Après le match » card on the match page, and
+  a past calendar row that opens the recap rather than the organising page.
+
+### Decisions added
+
+026–028 (M3: coach-only screens, a dragged slot is retyped, only an unfinished lineup blocks a save)
+and 029–036 (M4: a route handler rather than a Server Action, FIFO with an isolated refusal, stamped
+at the tap that opened it, no drag-and-drop in game mode, open to everybody read-only, a stale status
+self-heals, injury flags merge the roster outside the reducer, a goal may have no scorer).
+
+### Worth knowing before the next session
+
+1. **The gate had a real leak, and duplication is what caused it.** `lib/stats/ratings.ts` had its own
+   copy of decision 007's rule and treated *"has submitted at least one rating"* as having submitted.
+   That was equivalent until decision 023 chose to keep partial sets — after which one note earned a
+   player every season average. Fixed in #9 by deleting the copy and delegating to
+   `lib/rating/progress.ts`. The gate now also runs **in the query**: `getRatingAuthors` selects no
+   `score` column at all, and scores are read in a second round trip naming only the opened matches.
+   If you find yourself restating a rule that already exists, that is the bug, not the boilerplate.
+2. **Invariant 2 nearly lost its purity to an injury.** `reduceMatch` only sees this match's log, so
+   an injury declared on Tuesday is invisible to it — and that is the common case for a Thursday plan.
+   The fix was to merge the roster in the *presenter* (decision 035), not to let the reducer read the
+   database. Any future "the reducer just needs one more input" should get the same treatment.
+3. `Card`'s `title` was typed `ReactNode` intersected with the intrinsic `section` props, which
+   include `title?: string` — so it was `string`. Every element has a `title` attribute; `Omit` it
+   before redeclaring (#11).
+4. **The seed is still the weak point**, now more visibly: the notation window of the older finished
+   match is legitimately closed (the next match has kicked off), so exercising the rating CTA needs
+   the newer one. There is still no defeat, no draw, no keeper change, no supporter on a sheet, no
+   empty-log finished match and no unmarked training. A wave-4 agent is fixing exactly this.
+5. **Nobody has tapped game mode in a real browser.** The outbox is proven by 18 unit tests against an
+   in-memory fake and the four SSR states were fetched over HTTP, but the Playwright happy path and
+   the by-hand offline check from `docs/PLAN.md` are still open.
+
+**Next:** wave 4 is four agents — M7 (retro-entry and amendments), TERRAIN fast-change inside game
+mode composing M3's editor, the seed fixtures above, and the Playwright happy path. Deployment is
+still blocked on a Neon `DATABASE_URL` from the owner; the Vercel CLI is already authenticated.
