@@ -2501,70 +2501,6 @@ row unambiguous in February.
 in the reader's own locale — which on a French phone is French already, and which no formatter of
 ours can change.
 
-## 104 — One garment, two permissions: the coach hands out the number, the player owns the name
-
-**2026-09-23** · accepted
-
-« fiche d'un joueur, possibilité de mettre son nom sur le maillot en plus du numéro. » The obvious
-implementation is a second field in `JerseyForm`, which posts to `updateMember`, which is gated on
-`member:update` — and `member:update` is a coach. That would have shipped a screen on which Momo
-cannot change the word printed on Momo's own back, on the page whose subject is Momo (decision 093).
-
-The two values look like one thing and are not, and the difference is not about seniority:
-
-- A **number** has to agree with the twelve other numbers in the squad. `updateMember` has refused
-  one already worn since M0 (« Ce numéro est déjà porté par un coéquipier. »), and the profile has
-  told a player « les numéros sont attribués par le coach : demande-lui si tu veux changer. » A
-  number is inventory, and inventory is administered.
-- A **flocage** agrees with nothing and nobody. Two players may both be floqués « JUNIOR » and
-  neither is wrong. It is rarely even a name — « MOMO », « BENJI », « EL PROFESSOR » — which is why
-  it cannot be derived from `users.display_name` and has to be its own column.
-
-So `profile:editShirtName` joins `SELF_ACTIONS`, and `updateShirtName` uses the `assertCanActFor`
-shape the preferred positions already use: the self action first, the coach's `member:update` as the
-fallback. A player edits his own, a coach may type a nickname for a teammate, and `can()` takes both
-decisions — no ad-hoc check (invariant 4). Deliberately **not** a wrapper around `updateMember` the
-way `updateJerseyNumber` is: wrapping it would have re-imposed `member:update` and produced exactly
-the screen this entry exists to avoid. One consequence, stated rather than discovered later: `can()`
-refuses every `SELF_ACTIONS` entry to `is_player = false`, so a member of the encadrement cannot
-invent a flocage for a maillot he has not got — only a coach can. That is the asymmetry the jersey
-number already has, and `shirtNameHintFr` says so in the same words `jerseyHintFr` does.
-
-The rule: **when two fields of one record answer to two different owners, they are two forms and two
-actions, not one form gated on the stricter of them.** A single form has to be shown to whoever may
-change the most restricted field in it, so every other field in it silently becomes that restricted.
-
-Three smaller choices, each of which had a wrong answer available:
-
-**12 characters, checked in the database.** `char_length between 1 and 12`, beside
-`team_members_jersey_range`'s `between 1 and 99`. The limit is the shirt and not the column: the
-flocage prints across the width of a 7-a-side back above the number, and past a dozen characters the
-printer shrinks it to something unreadable or refuses. The `1` matters as much as the `12` — it
-rejects `''`, so « no flocage » has exactly one representation and no screen has to tell `''` from
-`null`. Enforced three times (the constant, the Zod schema, the check), and `shirt.test.ts` reads
-`db/schema.ts` to assert the number has not drifted, because a form that accepts what the column
-refuses is a 500 on save rather than a validation error.
-
-**Uppercased at display time, stored as typed.** A real shirt is printed in capitals, so
-`shirtNameDisplay` uppercases — with `toLocaleUpperCase("fr-FR")`, so « é » becomes « É » like the
-flocking machine does. It does not uppercase on the way into the column: the player typed « El
-Professor », that is his, and a column holding a display artefact is a column that cannot be
-displayed a second way later.
-
-**Null is the normal case, and it is the case that was designed.** Most members will never have a
-flocage. So nothing renders a dash: the fiche reads « Nom sur le maillot : aucun », matching the
-« non attribué » the number line above it already uses, and `shirtNameRowFr` returns `null` rather
-than `""` for a squad row so the caller *cannot* emit the stray « · » an empty string would have
-produced between the username and the position codes. The demo fixture sets a flocage on three
-players of fourteen for the same reason: a seed where everybody has one cannot show whether the empty
-case reads correctly, which is the failure mode of the last ten defects in this repository.
-
-Shown on two screens and no more: the fiche, where it is set, and the `/equipe` squad row, which is
-the list a coach reads when he orders a set of shirts — as « floqué MOMO », because « MOMO » alone
-between two « · » separators reads as another position code. Not on the pitch discs, and that is a
-choice rather than an omission: a disc is a 44 px target that already carries a number and a short
-name, and the flocage would be the same person printed on it twice.
-
 ## 102 — Noter est deux gestes : choisir, puis avancer
 
 **2026-09-23** · accepted
@@ -2641,6 +2577,70 @@ them. A preposition on a link that is really a breadcrumb is noise.
 All of it is derived in `lib/calendar/labels.ts` and `lib/stats/format.ts` and pinned by unit tests,
 because Vitest collects nothing under `app/` (decision 097). The inline ternary in game mode is the
 argument: it was both a third wording and a sentence no test could see.
+
+## 104 — One garment, two permissions: the coach hands out the number, the player owns the name
+
+**2026-09-23** · accepted
+
+« fiche d'un joueur, possibilité de mettre son nom sur le maillot en plus du numéro. » The obvious
+implementation is a second field in `JerseyForm`, which posts to `updateMember`, which is gated on
+`member:update` — and `member:update` is a coach. That would have shipped a screen on which Momo
+cannot change the word printed on Momo's own back, on the page whose subject is Momo (decision 093).
+
+The two values look like one thing and are not, and the difference is not about seniority:
+
+- A **number** has to agree with the twelve other numbers in the squad. `updateMember` has refused
+  one already worn since M0 (« Ce numéro est déjà porté par un coéquipier. »), and the profile has
+  told a player « les numéros sont attribués par le coach : demande-lui si tu veux changer. » A
+  number is inventory, and inventory is administered.
+- A **flocage** agrees with nothing and nobody. Two players may both be floqués « JUNIOR » and
+  neither is wrong. It is rarely even a name — « MOMO », « BENJI », « EL PROFESSOR » — which is why
+  it cannot be derived from `users.display_name` and has to be its own column.
+
+So `profile:editShirtName` joins `SELF_ACTIONS`, and `updateShirtName` uses the `assertCanActFor`
+shape the preferred positions already use: the self action first, the coach's `member:update` as the
+fallback. A player edits his own, a coach may type a nickname for a teammate, and `can()` takes both
+decisions — no ad-hoc check (invariant 4). Deliberately **not** a wrapper around `updateMember` the
+way `updateJerseyNumber` is: wrapping it would have re-imposed `member:update` and produced exactly
+the screen this entry exists to avoid. One consequence, stated rather than discovered later: `can()`
+refuses every `SELF_ACTIONS` entry to `is_player = false`, so a member of the encadrement cannot
+invent a flocage for a maillot he has not got — only a coach can. That is the asymmetry the jersey
+number already has, and `shirtNameHintFr` says so in the same words `jerseyHintFr` does.
+
+The rule: **when two fields of one record answer to two different owners, they are two forms and two
+actions, not one form gated on the stricter of them.** A single form has to be shown to whoever may
+change the most restricted field in it, so every other field in it silently becomes that restricted.
+
+Three smaller choices, each of which had a wrong answer available:
+
+**12 characters, checked in the database.** `char_length between 1 and 12`, beside
+`team_members_jersey_range`'s `between 1 and 99`. The limit is the shirt and not the column: the
+flocage prints across the width of a 7-a-side back above the number, and past a dozen characters the
+printer shrinks it to something unreadable or refuses. The `1` matters as much as the `12` — it
+rejects `''`, so « no flocage » has exactly one representation and no screen has to tell `''` from
+`null`. Enforced three times (the constant, the Zod schema, the check), and `shirt.test.ts` reads
+`db/schema.ts` to assert the number has not drifted, because a form that accepts what the column
+refuses is a 500 on save rather than a validation error.
+
+**Uppercased at display time, stored as typed.** A real shirt is printed in capitals, so
+`shirtNameDisplay` uppercases — with `toLocaleUpperCase("fr-FR")`, so « é » becomes « É » like the
+flocking machine does. It does not uppercase on the way into the column: the player typed « El
+Professor », that is his, and a column holding a display artefact is a column that cannot be
+displayed a second way later.
+
+**Null is the normal case, and it is the case that was designed.** Most members will never have a
+flocage. So nothing renders a dash: the fiche reads « Nom sur le maillot : aucun », matching the
+« non attribué » the number line above it already uses, and `shirtNameRowFr` returns `null` rather
+than `""` for a squad row so the caller *cannot* emit the stray « · » an empty string would have
+produced between the username and the position codes. The demo fixture sets a flocage on three
+players of fourteen for the same reason: a seed where everybody has one cannot show whether the empty
+case reads correctly, which is the failure mode of the last ten defects in this repository.
+
+Shown on two screens and no more: the fiche, where it is set, and the `/equipe` squad row, which is
+the list a coach reads when he orders a set of shirts — as « floqué MOMO », because « MOMO » alone
+between two « · » separators reads as another position code. Not on the pitch discs, and that is a
+choice rather than an omission: a disc is a 44 px target that already carries a number and a short
+name, and the flocage would be the same person printed on it twice.
 
 ## 105 — The bench is docked, and the pitch is capped to fit above it
 

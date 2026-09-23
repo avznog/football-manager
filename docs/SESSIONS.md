@@ -2299,3 +2299,8 @@ Tags now come with releases: the `tag` job publishes a GitHub release for the ta
 the squashed subjects since the previous tag (decision 108, superseding 081's one sentence that said
 CI would not write release notes). Asked for by the owner, and cheap because the squash subjects are
 already one line per slice.
+
+Housekeeping: `docs/DECISIONS.md` entries 101–108 are back in ascending order. They had drifted out of
+it because the eight remarks were merged in the order their CI went green rather than the order they
+were numbered — 104 landed before 102 — and the file is read top to bottom by every session that
+opens it. Whole blocks moved, nothing edited: `git diff --numstat` is 64 lines each way.
