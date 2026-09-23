@@ -1313,3 +1313,31 @@ used by both the calendar row and the coach's marking card, and `labels.test.ts`
 panel of text, and `cursor-pointer` says nothing to a thumb. It is now accent-coloured with a chevron
 that turns on `group-open`. The panel stays closed by default for the reason it always was — declaring
 an injury is the exception, not the routine.
+
+## 066 — « 2 par défaut. » said nothing; the form now says what the two numbers come to
+**2026-09-23** · accepted
+
+The « nouveau match » form had two number fields side by side, « Périodes » hinted « 2 par défaut. »
+and « Minutes » hinted « 30 par défaut. », over fields already holding 2 and 30. The hint was
+therefore redundant when creating a match — and **wrong** when editing one: a match set up as 3×20
+kept being told, under its own values, that the default was 2 and 30.
+
+Worse, neither hint said the thing a coach can actually get wrong. « Minutes » is per period, not the
+length of the match, and this app's clock is continuous (decision 009): the second half of a 2×30
+runs 30′→60′, and there is nowhere else in the product where a coach learns that before game mode
+shows it to them.
+
+So both hints are gone. The field is labelled « Minutes par période », and one sentence under the
+pair states the consequence, recomputed as you type:
+
+> 2×30 minutes : 60 minutes de jeu, et la 2ᵉ période va de la 30ᵉ à la 60ᵉ minute.
+
+It is built by `matchLengthHintFr` in `lib/calendar/labels.ts` — pure, tested, and it returns `null`
+rather than a sentence when the pair cannot be read. `Number("")` is `0` and a half-typed field is
+`NaN`; « 0×30 minutes : 0 minutes de jeu » is exactly the class of untrue statement this whole audit
+exists to catch, and the form would have printed it on the way to every valid value. Both inputs
+point at the sentence with `aria-describedby`, so whichever number is being edited, the consequence is
+announced with it.
+
+The fields stay uncontrolled (`defaultValue`): the mirrored state exists only to write the sentence,
+and the form still posts what was typed with JavaScript off.

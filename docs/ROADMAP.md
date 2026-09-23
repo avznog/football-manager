@@ -29,6 +29,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       timeline, game mode's timeline and `lib/stats/format.ts` each built their own with a hyphen, so
       a recap showed « 2 – 0 » and « 2 - 0 » three cards apart. `formatScore` deleted, decision 061
       amended by 064 rather than left standing as a claim that was not true
+- [x] The match form says what its two numbers come to — « 2×30 minutes : 60 minutes de jeu, et la
+      2ᵉ période va de la 30ᵉ à la 60ᵉ minute » — instead of hinting « 2 par défaut. » under a field
+      already holding 2, which was false on the edit form of any match that runs something else
+      (decision 066)
 - [x] The audit browser speaks French to its *form controls* too — `--lang=fr-FR`, because
       `context.locale` does not reach the native date picker, so every date field had been
       screenshotted `mm/dd/yyyy` in a French app (decision 065)

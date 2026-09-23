@@ -137,3 +137,32 @@ export function pluralize(count: number, singular: string, plural = `${singular}
 export function periodsLabel(periodsCount: number, periodMinutes: number): string {
   return `${periodsCount}×${periodMinutes} minutes`;
 }
+
+/**
+ * What the two numbers on the match form actually mean: « 2×30 minutes : 60 minutes de jeu, et la
+ * 2ᵉ période va de la 30ᵉ à la 60ᵉ minute. »
+ *
+ * The form used to hint « 2 par défaut. » and « 30 par défaut. » under fields already holding 2 and
+ * 30 — a sentence that says nothing when creating a match and is false when editing one that runs
+ * 3×20. Neither said the thing a coach might get wrong: « Minutes » is *per period*, and the clock
+ * this app shows is continuous (decision 009), so the last period ends at the total and not at
+ * `periodMinutes`. Stating both here is cheaper than a coach discovering it in game mode.
+ *
+ * Returns `null` while the pair cannot be read — an emptied field, a half-typed number — because a
+ * duration computed from `NaN` is exactly the kind of sentence this function exists to prevent.
+ */
+export function matchLengthHintFr(periodsCount: number, periodMinutes: number): string | null {
+  if (!Number.isInteger(periodsCount) || !Number.isInteger(periodMinutes)) return null;
+  if (periodsCount < 1 || periodMinutes < 1) return null;
+
+  const total = periodsCount * periodMinutes;
+  const head = `${periodsLabel(periodsCount, periodMinutes)} : ${pluralize(total, "minute")} de jeu`;
+  // One period runs 0′→total, so there is nothing to warn about: the continuous clock and a clock
+  // that resets are the same clock, and the sentence would only be noise.
+  if (periodsCount === 1) return `${head}.`;
+
+  return (
+    `${head}, et la ${periodsCount}ᵉ période va de la ${total - periodMinutes}ᵉ ` +
+    `à la ${total}ᵉ minute.`
+  );
+}
