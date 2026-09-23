@@ -2200,3 +2200,38 @@ schema change.
 
 Not done: **no 390 px pass.** The calendar row titles grew by a word, which is precisely where the
 truncation argument lives, and `/calendrier` is the busiest screen in the app.
+
+### 2026-09-23 — A drag with its two ends on different screens
+
+Sixth of the owner's eight remarks, and the only one that is purely a layout: « les joueurs sur le
+banc sortent de l'écran, donc c'est pas trop possible de les drag and drop ».
+
+First thing checked was the gesture, because a layout change that breaks it is worse than the
+complaint. It is hand-written pointer events with `setPointerCapture` — `components/pitch/usePitchDrag.ts`
+over the pure `lib/pitch/drag.ts` — and the drop target is not a DOM hit-test but `nearestSlot(shape,
+point)` in 0..1000 pitch coordinates, converted by `fromClientPoint` from a `getBoundingClientRect()`
+read on **every** event. So scrolling mid-drag was already safe, and the two real constraints are
+that the ref'd element must be exactly the turf rectangle and that no container between finger and
+turf may claim the touch.
+
+Hence the cap is on the measured element (`max-w-[280px]` on the `pitchRef` box, pitch still
+`w-full` inside it) rather than on the height: capping the height would have left the ref box wider
+than the turf and every drop would have landed left of the finger. And the bench strip's discs are
+`touch-pan-x`, not `touch-none`, so a sideways swipe scrolls the strip and we get `pointercancel`,
+while the lift onto the turf stays ours.
+
+The arithmetic: 280 × 1580/1080 = 410 px of turf; the dock is at most ~196 px; 740 − 56 − 72 − 196 =
+416. The floor on the cap is the one worth keeping — a 48 px disc is 185 pitch units at 280 px, under
+`MIN_MARKER_DISTANCE`'s 195, so the discs still cannot touch; below 266 px they would, which is why
+they stayed 48 px instead of shrinking.
+
+Docking the save bar also fixed a defect nobody had reported: it was `sticky bottom-3`, i.e. under the
+fixed tab bar — the second confirm button in this repo to sit off the edge of a phone.
+
+Decision 105. `lib/composition/hints.ts`, 12 tests including a source-scan that the editor imports
+them rather than hard-coding them; 1044 in all.
+
+**Every number above is arithmetic, not an observation.** No browser was opened: the 390 px pass in
+both themes is outstanding, and on this change it is the whole point. Also noted and not fixed, both
+pre-existing: `PlayerDisc`/`SlotTarget` still carry meaning in `title` attributes (decision 072), and
+`components/action-sheet/lineup-composer.tsx` still vouvoies (« Placez au moins un joueur »).
