@@ -1621,3 +1621,27 @@ deleted it: two screens inventing their own wording for one state is the defect 
 as `hugo`, and the recap of the unrecorded match re-read to make sure the two screens now agree. The
 e2e suite passes — `/calendrier` is on the happy path, and its fixture history is all played matches,
 so it still reads « Déjà joué ».
+
+### A confirmation credited to a match nobody watched
+
+Seventh screen, the two composition dead ends — `audit/dark-compo-appliquee.png` and
+`audit/light-compo-introuvable.png`. « Composition introuvable » is honest and was left alone. The other
+one says « Elle a été confirmée pendant le match », and the capture was taken on **FC Rivière**, which
+is `entry_mode = 'retro'`: a match somebody typed up afterwards.
+
+It is not a seed artifact. `lib/retro/log.ts` emits a `LINEUP_APPLIED` at 0′ deliberately, so that the
+seven on the sheet count as starters and the goalkeeper is known to the reducer, and `psql` confirms the
+starting composition of FC Rivière carries one. Every applied composition on every retro match has been
+credited to a confirmation since M7.
+
+The part worth keeping in mind: the fourth place saying it was `LINEUPS_FROZEN_FR`, which I wrote
+yesterday *to stop this screen inventing things*, and which invented « le mode match » on a match
+nobody watched. A sentence written to fix a class of defect is a member of that class.
+
+Both are functions of `entry_mode` now, in `lib/composition/plan.ts`, so the list, the editor's dead end
+and `saveLineup`'s refusal cannot drift apart. The « appliquée » badge stays: vague is not false, and it
+does not explain anything. 927 tests, six new. Looked at FC Rivière (retro) and CS Morvan (live) at
+390 px in both themes, list and editor, plus FC des Deux-Ponts, which is retro with no composition at
+all and reads « Saisi sans composition » from decision 085. e2e green — the happy path applies a
+composition in game mode, which is the `live` wording.
+
