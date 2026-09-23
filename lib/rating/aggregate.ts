@@ -19,7 +19,8 @@
  * 1. **Self-ratings count.** Decision 007 lets a player rate himself, so his own note is one note
  *    among the others. Excluding it would make the count depend on who happened to be rating, and
  *    silently discarding a row the app asked the player to write is worse than the small bias of
- *    keeping it. `selfScore` exposes it separately so the UI can show « il s'est mis 8 ».
+ *    keeping it. `selfScore` exposes it separately so the UI can show « il s'est mis 8 » — the
+ *    wording itself lives in `labels.ts`, because it is « tu t'es mis 8 » on the reader's own row.
  *
  * 2. **Averages are compared exactly, not as displayed.** `24/3` and `16/2` are the same average
  *    and tie; `22/3` and `7.3` do not, even though both print « 7,3 ». Comparison is integer

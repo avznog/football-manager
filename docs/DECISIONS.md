@@ -2203,3 +2203,39 @@ qu'administrateur. »
 The rule, and it is the reason to write this down rather than just fix it: **when the database needs
 two columns to say what something is, so does the sentence.** A label derived from one of them is not
 a simplification, it is a claim about the other one.
+
+## NNN — A screen that names people names the reader as « toi », in every sentence
+
+**2026-09-23.** Decision 007 makes the authors of ratings visible to everyone, which is what turns
+the recap's « Les notes » card into a list the reader appears in twice: once as the author of the
+four notes he gave, and once as the subject of the row about him. `RatingsPanel` had a rule for the
+first appearance and none for the second.
+
+On the demo season, read as `karim`, that produced three different shapes for one man inside one
+card. Ali's row: « 8 **Karim (toi)** ». Karim's own row, three rows down: « 4 notes · **il** s'est mis
+8 », with the chip « 8 **lui-même** ». And the comment he had written about Julien was signed
+« — Karim », because the attribution branch never had the `(toi)` suffix the chip branch did. Nothing
+here is a wrong number. Every one of them is the app talking about the person holding the phone as
+though he were a fourth teammate, on the one screen the whole squad opens after a match — and it is
+the same defect as the app's second-person rewrite (decision 074) left behind, in a place that
+rewrite never reached because it was reading ratings, not addressing a reader.
+
+`lib/rating/labels.ts` now answers both questions, once: `noteAuthorFr` for who signed a note, and
+`ratingCountNoteFr` for the line under a name. **« toi » wins over « lui-même »** when both are true.
+A self-note written by the reader is still the reader's, and the third person about a person who is
+present is not a neutral choice of words — it reads as a different person.
+
+`RatedPlayer` gained the `isViewer` this needed. It is the same one-line addition as `RatingReceived`
+already carried, and it is worth noticing that the row-level flag was the *missing* one: the query
+knew which notes were the viewer's and had no idea which row was his.
+
+The general rule: **on a screen that names people, the reader is named « toi » wherever he appears —
+not only where the code happens to compare authors.** Where a sentence can be about the reader or
+about somebody else, it is two sentences, and the function that picks between them is testable.
+
+What this deliberately does *not* do is degender « il s'est mis 8 » and « lui-même » for everybody
+else. That is a real limitation — the app has no gender column and a mixed team would read wrongly —
+but it is a product question about a team that does not exist yet, not a false sentence about the team
+that does, and inventing « iel » or a genderless rewrite of six screens on the way past a ratings
+card would be a decision taken sideways. Written down here so the next session finds it stated rather
+than missed.

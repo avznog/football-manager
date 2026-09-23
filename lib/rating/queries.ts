@@ -318,6 +318,8 @@ export type RatedPlayer = {
   /** « 7,3 » or « — ». */
   averageLabel: string;
   selfScore: number | null;
+  /** This row is about the viewer, who must not be spoken of in the third person on it. */
+  isViewer: boolean;
   /** Every note received, best first. Author names are visible to everyone (decision 007). */
   received: RatingReceived[];
 };
@@ -428,6 +430,7 @@ export async function getRatingResults(input: {
     average: player.average,
     averageLabel: player.averageLabel,
     selfScore: player.selfScore,
+    isViewer: player.memberId === input.membershipId,
     received: (receivedByMember.get(player.memberId) ?? []).sort(
       (a, b) => b.score - a.score || a.raterName.localeCompare(b.raterName, "fr"),
     ),
