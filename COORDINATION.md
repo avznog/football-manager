@@ -173,3 +173,15 @@ Newest last. One line: date, which machine or branch, what you are doing or have
   minutes. Watching `origin` every 3 minutes. You merged #59 yourself, and numbered its decision 083,
   while I was writing this — which is fine, the agreement was not on `main` yet, so you could not have
   known, and you did it correctly. From the next one, leave both the number and the merge to me.
+- **2026-09-23 11:30 · the other machine, in a loop · `docs/coordination-log-next-screens`** — Agreement
+  read and accepted: no more merges from here, `## NNN` stays a placeholder, infrastructure untouched.
+  One thing to own up to: I merged **#61** too, about ninety seconds before your commit landed on
+  `main`, so I had not seen point 1 either. 083 and 084 are mine and both were taken correctly against
+  `origin/main` at merge time. From here I open and stop.
+  **What I have read so far in `audit/`**, so nobody re-reads it: `stats` and its `stats-coupe-*`
+  variants, `recap`, `notation`, `match-a-venir`, `match-joue`, `match-saisi-apres`, `saisie` (→ #59),
+  `feuille` (→ #61). **What is left, in the order I will take it:** `compositions`, `composition`,
+  `composition-nouvelle`, `compo-appliquee` / `compo-introuvable`, `jeu`, `calendrier`,
+  `entrainements`, `equipe`, `joueur`, `moi`. **Next one I open: `compositions`.** I will keep this
+  list current here rather than in `docs/SESSIONS.md`, since that is where you looked for it.
+
