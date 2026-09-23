@@ -14,6 +14,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { attendanceCountFr } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
 import {
   buildReminderMessage,
@@ -123,7 +124,10 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
         </Card>
       ) : null}
 
-      <AvailabilityGrid tally={tally} selfMembershipId={team.membershipId} />
+      {/* Before the session, the question is who is coming: the list of answers leads. Once it is
+          over, what happened is the answer and the list of intentions is history, so it goes last —
+          the same ordering the match page settled on (decision 068). */}
+      {over ? null : <AvailabilityGrid tally={tally} selfMembershipId={team.membershipId} />}
 
       {isCoach && !over ? <ReminderCard message={reminder} pending={tally.pending.length} /> : null}
 
@@ -135,22 +139,33 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
           marks={marks}
         />
       ) : (
-        <PresenceSummary marks={marks} total={players.length} />
+        <PresenceSummary marks={marks} />
       )}
+
+      {over ? (
+        <AvailabilityGrid tally={tally} selfMembershipId={team.membershipId} past="training" />
+      ) : null}
     </div>
   );
 }
 
-/** What a player sees instead of the marking list: the count, once the coach has pointed. */
-function PresenceSummary({ marks, total }: { marks: Map<string, boolean>; total: number }) {
+/**
+ * What a player sees instead of the marking list: the count, once the coach has pointed.
+ *
+ * The same sentence as the coach's card, from the same map, deliberately. It used to count the
+ * présents out of the **squad** — « 11 présents sur 13 joueurs », where the calendar row for that
+ * same 29 August session says « 11 présents sur 14 pointés » — and the squad is the wrong
+ * denominator twice over: an unmarked player is not an absent one (decision 020), and the numerator
+ * was read off every attendance row while the denominator was today's squad, so a player marked
+ * présent who has since left the club counted towards a total he was no longer part of.
+ */
+function PresenceSummary({ marks }: { marks: ReadonlyMap<string, boolean> }) {
   if (marks.size === 0) return null;
   const present = [...marks.values()].filter(Boolean).length;
 
   return (
     <Card title="Présences">
-      <p className="text-sm text-ink-muted">
-        {present} présent{present > 1 ? "s" : ""} sur {total} joueur{total > 1 ? "s" : ""}.
-      </p>
+      <p className="text-sm text-ink-muted">{attendanceCountFr(present, marks.size)}.</p>
     </Card>
   );
 }

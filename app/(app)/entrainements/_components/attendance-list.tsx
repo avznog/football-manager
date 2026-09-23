@@ -67,8 +67,12 @@ export type AttendanceListProps = {
 };
 
 export function AttendanceList({ teamId, trainingId, players, marks }: AttendanceListProps) {
-  const present = players.filter((player) => marks.get(player.membershipId) === true).length;
-  const judged = players.filter((player) => marks.has(player.membershipId)).length;
+  // Counted over the marks, not over `players`: the coach pointed fourteen men on 29 August and one
+  // of them had left the club by September, so filtering by the current squad would make this line
+  // disagree with the calendar row — and with the evening itself — about a session already played.
+  // It is also why the denominator can be larger than the number of rows below it.
+  const present = [...marks.values()].filter(Boolean).length;
+  const judged = marks.size;
 
   return (
     <Card

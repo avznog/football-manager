@@ -139,6 +139,28 @@ export function availabilityCountFr(answered: number, total: number): string {
   return `${pluralize(answered, "réponse")} sur ${pluralize(total, "joueur")}`;
 }
 
+/**
+ * The same line once the event has happened: « Avant le match · 11 réponses sur 13 joueurs ».
+ *
+ * A list of who *said* they would come outlives the question it answered, and on a past event it is
+ * the only thing on the screen that is no longer actionable — « Sans réponse : 2 » about a session
+ * that finished on Tuesday is not a list to chase, it is a record. Naming the moment is what keeps a
+ * reader from taking it for the present tense, and the pages that show it put the card *below* what
+ * actually happened (decision 068).
+ *
+ * « la séance » rather than « l’entraînement » because the card is already inside a training page:
+ * the shorter word is the one a coach says, and it does not repeat the page title.
+ */
+export function availabilitySubtitleFr(
+  answered: number,
+  total: number,
+  past: "match" | "training" | null,
+): string {
+  const count = availabilityCountFr(answered, total);
+  if (past === null) return count;
+  return `${past === "match" ? "Avant le match" : "Avant la séance"} · ${count}`;
+}
+
 /** A plural `s` only when it is needed: `pluralize(1, "joueur")` → « 1 joueur ». */
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count > 1 ? plural : singular}`;

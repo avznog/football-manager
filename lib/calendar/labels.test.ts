@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   attendanceCountFr,
   availabilityCountFr,
+  availabilitySubtitleFr,
   entryModeBadgeFr,
   matchLengthHintFr,
   periodsLabel,
@@ -126,5 +127,24 @@ describe("availabilityCountFr", () => {
     expect(availabilityCountFr(1, 13)).toBe("1 réponse sur 13 joueurs");
     expect(availabilityCountFr(0, 13)).toBe("0 réponse sur 13 joueurs");
     expect(availabilityCountFr(1, 1)).toBe("1 réponse sur 1 joueur");
+  });
+});
+
+describe("availabilitySubtitleFr", () => {
+  it("says nothing about the moment while the event is still to come", () => {
+    expect(availabilitySubtitleFr(11, 13, null)).toBe("11 réponses sur 13 joueurs");
+  });
+
+  /**
+   * The point of the prefix: without it the card reads as a live question about an event that
+   * finished days ago, and « Sans réponse : 2 » looks like two people to chase tonight.
+   */
+  it("dates the list once the event has happened, in the words of that event", () => {
+    expect(availabilitySubtitleFr(11, 13, "match")).toBe(
+      "Avant le match · 11 réponses sur 13 joueurs",
+    );
+    expect(availabilitySubtitleFr(9, 13, "training")).toBe(
+      "Avant la séance · 9 réponses sur 13 joueurs",
+    );
   });
 });
