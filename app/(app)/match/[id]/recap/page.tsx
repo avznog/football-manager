@@ -92,7 +92,6 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
       <Scoreboard
         recap={recap}
         opponentName={match.opponentName}
-        isHome={match.isHome}
         status={match.status}
       />
 

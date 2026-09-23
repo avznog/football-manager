@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import type { MatchStatus } from "@/db/schema";
+import { scoreLineFr } from "@/lib/calendar/labels";
 import type { MatchRecap } from "@/lib/rating/recap";
 
 const RESULT_TONE: Record<"win" | "draw" | "loss", string> = {
@@ -29,12 +30,10 @@ const RESULT_TONE: Record<"win" | "draw" | "loss", string> = {
 export function Scoreboard({
   recap,
   opponentName,
-  isHome,
   status,
 }: {
   recap: MatchRecap;
   opponentName: string;
-  isHome: boolean;
   /** The row's own status: the only thing that can tell « terminé sans rien saisi » from « en cours ». */
   status: MatchStatus;
 }) {
@@ -45,9 +44,9 @@ export function Scoreboard({
   return (
     <Card>
       <div className="flex flex-col items-center gap-2 py-2 text-center">
-        <p className="text-sm text-ink-muted">
-          {isHome ? `${us} — ${opponentName}` : `${opponentName} — ${us}`}
-        </p>
+        {/* Our side first, to match the figures below — `scoreLineFr` says why. The venue is on its
+            own badge on the match header, in words. */}
+        <p className="text-sm text-ink-muted">{`${us} — ${opponentName}`}</p>
 
         <p
           className={cn(
@@ -55,11 +54,7 @@ export function Scoreboard({
             recap.result ? RESULT_TONE[recap.result] : "text-ink",
           )}
         >
-          {unrecorded
-            ? "? – ?"
-            : isHome
-              ? `${recap.goalsFor} – ${recap.goalsAgainst}`
-              : `${recap.goalsAgainst} – ${recap.goalsFor}`}
+          {unrecorded ? "? – ?" : scoreLineFr(recap.goalsFor, recap.goalsAgainst)}
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-2">

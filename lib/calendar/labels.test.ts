@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { entryModeBadgeFr, periodsLabel, resultLabel, resultLetter } from "./labels";
+import {
+  entryModeBadgeFr,
+  periodsLabel,
+  resultLabel,
+  resultLetter,
+  scoreLineFr,
+} from "./labels";
 
 describe("entryModeBadgeFr", () => {
   it("says so for a match typed up afterwards", () => {
@@ -37,5 +43,20 @@ describe("the labels the match header shares with the calendar", () => {
 
   it("spells the periods the way the owner writes them", () => {
     expect(periodsLabel(2, 30)).toBe("2×30 minutes");
+  });
+
+  /*
+   * The one thing worth asserting about a scoreline is what it does *not* do. Both scoreboards used
+   * to put the home side first, so an away win read « 0 – 2 » in 36 px numerals over a 12 px caption
+   * that truncated — and, on the recap, over a timeline that had written the same match « 2 – 0 ».
+   * There is deliberately no orientation argument; if one is ever added, this test is the reason it
+   * should not be.
+   */
+  it("always writes our goals first, home or away", () => {
+    expect(scoreLineFr(2, 0)).toBe("2 – 0");
+    expect(scoreLineFr(0, 2)).toBe("0 – 2");
+    // An en dash, not a hyphen: it is a score, not a range of two numbers.
+    expect(scoreLineFr(1, 1)).toContain("–");
+    expect(scoreLineFr(1, 1)).not.toContain("-");
   });
 });

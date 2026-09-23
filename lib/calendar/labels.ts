@@ -80,6 +80,26 @@ export function venueSideShortLabel(isHome: boolean): string {
   return isHome ? "Dom." : "Ext.";
 }
 
+/**
+ * A scoreline: **our goals first, always**, whether the match was at home or away.
+ *
+ * There is no `isHome` parameter, and that is the decision this function exists to hold. Two
+ * conventions had grown up side by side: the calendar pill and the match page wrote our goals first,
+ * while both scoreboards — game mode's and the recap's — put the *home* side first, the way a
+ * broadcast does. An audit of the recap at 390 px caught what that costs: the scoreboard read
+ * « CS Morvan — Nous · 0 – 2 » over a timeline reading « 2 – 0 », one screen, one match, two
+ * scorelines, and the big numerals handed the win to the opponent.
+ *
+ * Broadcast convention is the wrong one here. This is one team's tool, not a league table: every
+ * number on every screen is about *this* team. In game mode the score is 36 px and the caption that
+ * names the sides is 12 px and truncates, so a coach reading it at arm's length in daylight would
+ * have to work out which figure was his — at 58’, while the ball is in play. Who is at home is said
+ * in words instead, by `venueSideLabel` and the badges that use it.
+ */
+export function scoreLineFr(goalsFor: number, goalsAgainst: number): string {
+  return `${goalsFor} – ${goalsAgainst}`;
+}
+
 /** « Victoire » / « Défaite » / « Match nul », from a derived score. */
 export function resultLabel(goalsFor: number, goalsAgainst: number): string {
   if (goalsFor > goalsAgainst) return "Victoire";

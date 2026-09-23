@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui";
+import { scoreLineFr, venueSideShortLabel } from "@/lib/calendar/labels";
 import type { ClockReading } from "@/lib/match/clock";
 
 export type ScoreboardProps = {
@@ -30,6 +31,11 @@ export type ScoreboardProps = {
  * log the caption under the clock carries « saisi après le match », for the same reason the match
  * page and the recap do (decision 013). Without it the biggest number on the screen is the one
  * number a reader has no way to qualify.
+ *
+ * The score is **ours first** (`scoreLineFr`), and `isHome` says where we are playing in words rather
+ * than by reordering the figures. It used to put the home side first: on an away match the 36 px
+ * numerals read « 0 – 2 » for a team two goals up, and the only thing saying which way round that was
+ * meant is the 12 px caption underneath, which truncates.
  */
 export function Scoreboard({
   reading,
@@ -41,11 +47,6 @@ export function Scoreboard({
   pendingLabel,
   entryBadge,
 }: ScoreboardProps) {
-  const home = isHome ? "Nous" : opponentName;
-  const away = isHome ? opponentName : "Nous";
-  const homeGoals = isHome ? goalsFor : goalsAgainst;
-  const awayGoals = isHome ? goalsAgainst : goalsFor;
-
   return (
     <section
       aria-label="Chrono et score"
@@ -70,16 +71,17 @@ export function Scoreboard({
                 en cours
               </span>
             ) : null}
+            <Badge variant={isHome ? "neutral" : "warning"}>{venueSideShortLabel(isHome)}</Badge>
             {entryBadge !== null ? <Badge variant="neutral">{entryBadge}</Badge> : null}
           </span>
         </p>
 
         <p className="shrink-0 text-right">
           <span className="block font-mono text-4xl leading-none font-bold text-ink tabular-nums">
-            {homeGoals} – {awayGoals}
+            {scoreLineFr(goalsFor, goalsAgainst)}
           </span>
           <span className="mt-1 block truncate text-xs text-ink-muted">
-            {home} – {away}
+            Nous – {opponentName}
           </span>
         </p>
       </div>
