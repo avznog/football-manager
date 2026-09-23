@@ -303,3 +303,59 @@ Neon `DATABASE_URL` from the owner.
 **Next:** deployment, and nothing else — `vercel link`, the environment variables, a production deploy
 and a run through a real match on an iPhone and an Android in daylight. It needs a Neon
 `DATABASE_URL` from the owner (interactive signup); the Vercel CLI is authenticated as `avznog`.
+
+## 2026-09-23 — the deployment nobody could have logged into
+
+**Shipped.** PR #23 (CLAUDE.md knows about the e2e suite and CI), PR #24 (first-run bootstrap).
+
+The backlog was M0–M7 all ticked, with only three Deployment lines left, all marked blocked on the
+owner's Neon URL. Checking that claim rather than repeating it is what this session was:
+`grep process.env` over the repo, to see what a production instance would actually need. Two of the
+three lines were indeed blocked. The section above them was not, and it was wrong.
+
+**A fresh production database could not be logged into, by anybody, including its owner.** Signing up
+is invite-only (decision 008); invites are issued by a coach; an empty database has no coach. The
+super admin was created inside `seedDemo()`, and `main()` refuses to run it when
+`NODE_ENV=production` — correctly, since a fake team of fourteen would land in the real season's
+statistics. So the loop was closed: no coach → no code → no account → no coach.
+
+`npm run db:bootstrap` (`db/bootstrap.ts`) opens it, and does nothing else: reference data, one
+super-admin account, stop. Proving it meant creating an empty database and walking the first run in a
+browser at 390 px, which turned up two more holes behind the same door:
+
+- **`createTeam` had no UI at all.** It has existed since M0, unreferenced by any `.tsx`. Since
+  invariant 5 sends a user with no team to `/rejoindre` and nowhere else, a super admin on a new
+  instance was in a dead end: the one screen he could reach asked for a code from a coach who did not
+  exist. The form now lives on that screen.
+- **`createTeam` did not redirect.** Submitting it created the team, set the cookie, and re-rendered
+  the same form — the join actions in `lib/auth/actions.ts` both `redirect("/")` and this one
+  returned `undefined`. Found by a `waitForURL` that timed out while the database showed the team had
+  been created perfectly.
+- **`updateTeam` had no UI either**, so the two club colours the kit discs are drawn in (decision 011)
+  could be set at creation and never again. `/equipe` now carries « Réglages de l'équipe ».
+
+**Worth knowing.**
+
+- The state a brand-new instance is in — zero players, zero matches, zero trainings — had never been
+  looked at, because the demo seed always has a season in it. Every tab was checked in it, both
+  themes. Four of the five read honestly already (« Rien de prévu », « 0 match terminé »); `/equipe`
+  showed an empty bordered box under « Effectif » and now says to generate an invite code.
+- Reference seeding had to move to `db/seed-reference.ts`. `db/seed.ts` calls `main()` as it loads, so
+  importing it to reuse one function seeds a demo season as a side effect of asking for the positions
+  table.
+- `db:bootstrap` needs `tsx --conditions=react-server`, like `db:seed`: `lib/auth/password.ts` is
+  `server-only`.
+- The last-coach guard was checked and is already there in both `updateMember` and `removeMember` —
+  a one-person team cannot remove its own coach. It returns silently, which is safe but says nothing;
+  left alone as pre-existing behaviour.
+- `CLAUDE.md` said development used Docker Postgres. It has been Homebrew since decision 016.
+
+**Debt, named.**
+
+- `removeMember` and `updateMember` refuse the last-coach case by returning `undefined`, so the button
+  appears to do nothing. It should say why.
+- No crest upload: `teams.crest_url` is read by the header and set by nothing.
+- `docs/DEPLOY.md` §4 and §6 are the only steps in this repo never executed. They need the owner's
+  Vercel account and the owner's phone.
+- The e2e suite covers the season loop, not the first run. The bootstrap path was verified by hand
+  against a scratch database; a regression in `/rejoindre`'s super-admin branch would not fail a test.
