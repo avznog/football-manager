@@ -371,6 +371,24 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(motm).toContainText(striker.displayName);
     await expect(motm).toContainText("9,0 de moyenne sur 2 notes");
   });
+
+  await test.step("a coach-only screen is a French dead end for a player, with a way out", async () => {
+    // Still the goalkeeper, so still a player: `match:amend` is coach-only, and the retro-entry
+    // screen answers `notFound()` rather than 403 precisely so that it does not confirm the match
+    // exists. What a player must therefore see is a 404 — in French, inside the shell.
+    await page.goto(`${matchUrl}/saisie`);
+    await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
+    // The sentence, not just the heading: Next keeps the layouts that matched, so removing
+    // `app/(app)/not-found.tsx` falls through to the root one — same heading, inside the same shell,
+    // and only the copy gives it away. « Réservée aux coachs » is the half that is true here.
+    await expect(page.getByText("réservée aux coachs")).toBeVisible();
+    // And what all of this replaced: Next's built-in page, « This page could not be found. », in
+    // English, in an app that is French everywhere else.
+    await expect(page.getByText("This page could not be found")).toHaveCount(0);
+
+    await page.getByRole("link", { name: "Retour au calendrier" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Calendrier" })).toBeVisible();
+  });
 });
 
 /* -------------------------------------------------------------------------- */
