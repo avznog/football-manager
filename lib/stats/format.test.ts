@@ -1,0 +1,108 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  NO_VALUE_FR,
+  formatAttendance,
+  formatDecimal,
+  formatMinutes,
+  formatPercent,
+  formatRating,
+  formatRecord,
+  formatScore,
+  formatSigned,
+  matchCount,
+  plural,
+  resultLabelOf,
+  resultLetterOf,
+} from "./format";
+
+describe("formatMinutes", () => {
+  it("writes a football minute with a prime", () => {
+    expect(formatMinutes(312)).toBe("312′");
+    expect(formatMinutes(0)).toBe("0′");
+  });
+});
+
+describe("formatDecimal", () => {
+  it("uses a comma, as French does", () => {
+    expect(formatDecimal(6.25, 2)).toBe("6,25");
+    expect(formatDecimal(7)).toBe("7,0");
+  });
+});
+
+describe("formatRating", () => {
+  it("shows one decimal", () => {
+    expect(formatRating(6.6666)).toBe("6,7");
+    expect(formatRating(0)).toBe("0,0");
+  });
+
+  it("shows a dash when nobody has rated — never 0,0", () => {
+    expect(formatRating(null)).toBe(NO_VALUE_FR);
+  });
+});
+
+describe("formatPercent", () => {
+  it("rounds and keeps a non-breaking space before the sign", () => {
+    expect(formatPercent(0.8)).toBe("80 %");
+    expect(formatPercent(2 / 3)).toBe("67 %");
+    expect(formatPercent(0)).toBe("0 %");
+  });
+
+  it("shows a dash rather than 0 % for an unknown rate", () => {
+    expect(formatPercent(null)).toBe(NO_VALUE_FR);
+  });
+});
+
+describe("formatAttendance", () => {
+  it("always carries its denominator (decision 020)", () => {
+    expect(formatAttendance(8, 10, 0.8)).toBe("8/10 · 80 %");
+    expect(formatAttendance(0, 2, 0)).toBe("0/2 · 0 %");
+  });
+
+  it("shows a dash for a player nobody marked — not 0/0, not 0 %", () => {
+    expect(formatAttendance(0, 0, null)).toBe(NO_VALUE_FR);
+  });
+});
+
+describe("formatSigned", () => {
+  it("signs a goal difference both ways", () => {
+    expect(formatSigned(3)).toBe("+3");
+    expect(formatSigned(-1)).toBe("-1");
+    expect(formatSigned(0)).toBe("0");
+  });
+});
+
+describe("formatScore and formatRecord", () => {
+  it("writes the score from our point of view", () => {
+    expect(formatScore(3, 2)).toBe("3 - 2");
+  });
+
+  it("fits a whole season's record on one line", () => {
+    expect(formatRecord(2, 1, 0)).toBe("2 V · 1 N · 0 D");
+  });
+});
+
+describe("results", () => {
+  it("has a letter and a label for each outcome", () => {
+    expect(resultLetterOf("win")).toBe("V");
+    expect(resultLetterOf("draw")).toBe("N");
+    expect(resultLetterOf("loss")).toBe("D");
+    expect(resultLabelOf("win")).toBe("Victoire");
+    expect(resultLabelOf("draw")).toBe("Match nul");
+    expect(resultLabelOf("loss")).toBe("Défaite");
+  });
+});
+
+describe("plural", () => {
+  it("adds an s only past one", () => {
+    expect(plural(0, "but")).toBe("0 but");
+    expect(plural(1, "but")).toBe("1 but");
+    expect(plural(2, "but")).toBe("2 buts");
+  });
+
+  it("takes an irregular plural", () => {
+    expect(plural(3, "match", "matchs")).toBe("3 matchs");
+    expect(matchCount(1)).toBe("1 match");
+    expect(matchCount(4)).toBe("4 matchs");
+  });
+});

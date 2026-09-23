@@ -24,6 +24,7 @@ import { getPlayerProfile } from "@/lib/player/queries";
 import { InjuriesCard } from "../_components/injuries-card";
 import { JerseyForm } from "../_components/jersey-form";
 import { PositionsEditor } from "../_components/positions-editor";
+import { PlayerStatsCard } from "../_components/stats-card";
 
 export async function generateMetadata({ params }: PageProps<"/joueur/[id]">) {
   const [{ team }, { id }] = await Promise.all([requireTeamContext(), params]);
@@ -150,11 +151,11 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
       )}
 
       {profile.isPlayer ? (
-        <Card title="Statistiques personnelles">
-          <p className="text-sm text-ink-muted">
-            Buts, passes décisives, minutes jouées et notes arrivent au jalon M5.
-          </p>
-        </Card>
+        <PlayerStatsCard
+          teamId={team.id}
+          viewerMemberId={team.membershipId}
+          memberId={profile.membershipId}
+        />
       ) : null}
     </div>
   );

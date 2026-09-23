@@ -324,3 +324,46 @@ row two meanings.
 **Consequences.** `training_attendance` has a row only for a judged player, so the whole squad
 travels in one submit and an unset value is a delete. A rate is only meaningful over marked
 sessions, which the stats screens must say out loud.
+
+---
+
+## 021 — The rating gate applies to season averages too
+**2026-09-23** · accepted
+
+Decision 007 hides a match's ratings from a player who has not yet submitted their own. That
+gate is enforced season-wide: a viewer who *could* have rated a match and did not sees nothing
+from it in any average, anywhere. A supporter, a non-playing coach or a later joiner — anybody
+who never had a card to fill — sees everything. The screens state how many matches are withheld
+and why.
+
+**Why.** A per-match gate that a season average leaks through is not a gate. Averaging six
+matches and showing the number would hand back most of the seventh, which is exactly the
+anchoring decision 007 exists to prevent. Saying nothing at all would be worse in the other
+direction: a masked average is indistinguishable from a missing one, and a player would read it
+as a bug.
+
+**Consequences.** `lib/stats/ratings.ts` owns the gate and `lib/rating/` must not re-derive it.
+**M6 must submit a player's whole set of ratings atomically** — if rating one teammate commits a
+row, that player has "submitted" and the averages unlock early. The masked count is displayed,
+not hidden.
+
+---
+
+## 022 — An appearance is a minute played, and live matches are out of the season totals
+**2026-09-23** · accepted
+
+A match counts as played for somebody when their recorded minutes are greater than zero, not
+when they were on a sheet. Selections (titulaire / remplaçant / supporter) come from
+`match_squad` and are counted separately; *gardien* is not a sheet role at all but
+`gk_minutes > 0`. A match with status `live` contributes to nothing.
+
+**Why.** `match_player_stats` stores whole minutes, so `minutes > 0` is the only definition that
+reads identically whether a figure came from the cache or from replaying the log — and the two
+paths agreeing is the property the whole cache design rests on. In 7-a-side the gloves move
+mid-match, so a keeper appearance has to be derived from time in goal. A live match's minutes are
+still moving, so including it would change a season total between two refreshes of the same page.
+
+**Consequences.** A thirty-second cameo is a selection, not an appearance, and the screens say
+which of the two they are showing. A player nobody ever selected gets dashes rather than zeros —
+never-selected is not the same fact as scored-none — while a named substitute who stayed on the
+bench gets honest zeros. The stats screen states that live matches are excluded.
