@@ -2343,3 +2343,45 @@ mutation-tested by putting the sentence back. It is narrow on purpose — it pin
 match nobody checked, and it is emphatically not a ban on French in `.tsx`. Scanning source is a poor
 substitute for testing a component. It is also the only cheap thing that can see across the boundary
 `vitest.config.ts` draws, and this defect survived a whole milestone behind it.
+
+## NNN — A destructive button's description is the confirmation dialog, so it names everything
+
+The two « Supprimer » cards — `/match/[id]/modifier` and `/entrainements/[id]/modifier` — are plain
+`<form action={…}>` with no dialog in front of them. That is deliberate and it stays: a confirmation
+dialog is one more thing to get wrong, and a plain form works without JavaScript. But it has a
+consequence that had not been drawn. **With no dialog, the description on the card is the confirmation
+step.** It is the only thing between the coach and the loss, and it is read once, in a hurry, with a
+thumb already over a red button.
+
+Both of them named the cheapest thing they destroy. « Le match disparaît du calendrier, avec les
+disponibilités déclarées. » On the demo season's next match that covered eleven availability answers
+and said nothing about the eleven-row `match_squad` — the sheet somebody filled on a Thursday evening
+— nor about the two rows in `lineups`, one of which holds « À partir de la 30ᵉ minute · Julien → Momo,
+Léo → Yanis ». All three cascade. The sentence named one of three, and it named the one that costs
+thirty seconds to redo rather than the two that cost an evening.
+
+The training twin, « La séance disparaît du calendrier, avec les réponses déjà données. », omitted
+`training_attendance` — and that omission is reachable, not theoretical: `AttendanceList` renders for
+a coach whether or not the session is over, so attendance can be marked on a future séance, which is
+exactly the window in which the delete button is offered.
+
+`lib/calendar/deletion.ts` now writes both sentences from what the row actually holds. The change that
+matters is not the extra nouns, it is that they are **counted**: « avec les disponibilités déclarées »
+is a category, « et avec lui 11 réponses de disponibilité, la feuille de match et 2 compositions » is
+a quantity, and a quantity is the thing that makes a hand stop. A match holding nothing says so —
+« Rien d’autre n’y est encore rattaché. » — instead of warning about answers nobody gave.
+
+The rule, which generalises past these two cards: **a destructive control states what it destroys, in
+numbers, from the data it is about to destroy.** Not the category, not the first table that came to
+mind while writing the copy, and never a static string — a static warning is a claim about rows the
+person who wrote it could not see.
+
+The corollary for anyone adding a table: a new `on delete cascade` onto `matches` or `trainings` is
+not finished until it appears in `MatchDeletionHolds` or `TrainingDeletionHolds`. Which is also the
+honest limitation of this fix. Nothing *enforces* that. A cascade added next month is invisible to a
+warning that lists three counts by hand, and the test suite will stay green while the sentence goes
+quietly back to being incomplete.
+
+Deliberately not listed: `match_events`, `match_player_stats` and `ratings`. They cascade too, but a
+match holding any of them has a non-empty log, and both the page and `deleteMatch` refuse that outright
+(decision 003). Naming them would be describing a button nobody can reach.

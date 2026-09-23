@@ -513,3 +513,36 @@ so a rebase of a Log line is a rebase of nothing.
   `entrainement-non-pointe`, `entrainement-nouveau`, `entrainement-modifier`, `composition-nouvelle`.
   **Next one I open: `match-nouveau`**, and the `joueur-` variant first — what a player is shown at a
   door he may not open is still where I expect the next one.
+- **14:05 CEST** — Thank you for #82, #84 and the numbers 096/097; I saw them on the rebase. PR
+  **#86**, `fix/delete-says-what-it-takes-with-it`, one `## NNN`, rebased on `81c480c`, 1022 tests.
+  `match-nouveau` read first as promised, coach and `joueur-` both: clean. The player gets an honest
+  404 at a door he may not open, and the coach's form already says what its two period numbers come
+  to (decision 066). `match-modifier` is where the defect was, and it is the first one I have found by
+  reading what a screen *omits* rather than what it states.
+  « Supprimer » on Étoile du Parc: « Le match disparaît du calendrier, avec les disponibilités
+  déclarées. » That match holds 11 answers, an 11-row `match_squad` and 2 `lineups` — « À partir de la
+  30ᵉ minute · Julien → Momo, Léo → Yanis » — and all three cascade. The page's own comment says « A
+  plain form: no confirmation dialog to get wrong », which is the right call and means **that sentence
+  is the confirmation dialog.** It named the loss a coach can absorb and skipped the two he cannot.
+  Same reading on the training twin, « avec les réponses déjà données », found the same hole and a
+  reachable one: `entrainements/[id]/page.tsx` guards `AvailabilityGrid` and `ReminderCard` on `over`
+  but renders `AttendanceList` for a coach unguarded, so attendance can be marked before the séance —
+  the one window in which the delete button is offered. `training_attendance` cascades too.
+  Both sentences now come from `lib/calendar/deletion.ts`, counted: « et avec lui 11 réponses de
+  disponibilité, la feuille de match et 2 compositions. C'est définitif. » A category does not stop a
+  hand; a quantity does. A row holding nothing says « Rien d'autre n'y est encore rattaché. »
+  **The honest weakness, so you can weigh it rather than discover it:** nothing enforces the list. A
+  new `on delete cascade` onto `matches` or `trainings` will not appear in `MatchDeletionHolds` by
+  itself and the suite will stay green while the sentence quietly goes back to being incomplete. It is
+  written in the decision entry and in the roadmap line. I could not think of a cheap guard that was
+  not worse than the problem.
+  Verified at 390 px in both themes on four rows picked for four shapes: Étoile du Parc, the
+  retro-entered FC des Deux-Ponts (**no event log at all**, so it is deletable, sheet and all), AS
+  Coteaux untouched, and the one future séance. Nothing touched in `vercel.json`, `.github/`,
+  `package.json` or the deployment.
+  **Remaining:** `entrainement`, `entrainement-pointe`, `entrainement-non-pointe`,
+  `entrainement-nouveau`, `entrainement-modifier`, `composition-nouvelle`.
+  **Next one I open: `entrainement`** — the page I had to read to prove this one, which means I have
+  already seen that a coach is offered a pointage on a session that has not happened. Whether that is
+  a defect or a feature is the next question, and it is a product one, so I will state it before I
+  touch it.
