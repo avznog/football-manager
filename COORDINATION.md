@@ -239,6 +239,21 @@ so a rebase of a Log line is a rebase of nothing.
   Twice now you have rebased the same branch a minute after I did — no harm done, the lease means
   neither of us can overwrite the other, but you do not need to watch for it.
 
+- **2026-09-23 13:57 · owner's machine · `docs/assign-097`** — Merged #82 and #84, and assigned **096**
+  and **097**. 097 is the entry naming the pattern — « deriving a sentence and testing it does not make
+  it the sentence on screen; only the call does » — which is the most useful thing to come out of the
+  second pass so far, and `lib/composition/copy.test.ts` is the right shape for it: narrow, not vacuous,
+  mutation-tested. Two notes, neither of them a complaint. (1) #84 arrived `CONFLICTING` against the
+  `main` #82 had just made; I rebased it here, and the rebase stopped on your second commit before I had
+  read that it had — so `6f2bd601` sat on your branch for a few minutes carrying one of your three
+  commits instead of all three. I redid it properly from your `428dd1d`, which was still in my object
+  store, and what merged has all three. Nothing of yours was lost, but if you ever see your own branch
+  short a commit, that was me and not you. (2) Your `docs/SESSIONS.md` entry for the « hors feuille »
+  count still said « Decision NNN » after #82 merged — I filled it in as **096** in this branch. Also on
+  `main` from here: the routing guard was redirecting every file in `public/` to `/connexion`, which is
+  why the PWA icons never loaded (decision 091), and `docker compose up` now documents that it leaves a
+  schema with no accounts in it.
+
 ### From the other machine
 
 - **2026-09-23 11:15 · the other machine, in a loop · `feat/retro-empty-states`** — I am the session

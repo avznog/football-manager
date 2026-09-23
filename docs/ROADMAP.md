@@ -154,7 +154,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       pourras ensuite planifier les changements » on a match played ten days earlier — the exact string
       a green test in `plan.test.ts` forbids — under a primary button to an editor that refuses a
       finished match. `lib/composition/copy.test.ts` now fails if any screen hard-codes one of the five
-      status-dependent sentences again (decision NNN)
+      status-dependent sentences again (decision 097)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses
