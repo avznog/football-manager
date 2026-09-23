@@ -29,6 +29,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Textarea } from "@/components/ui/textarea";
 import { submitRatings } from "@/lib/rating/actions";
+import { ratingLegendFr } from "@/lib/rating/labels";
 import { playedLabelFr, ratingCardPositionFr } from "@/lib/rating/progress";
 import { RATING_COMMENT_MAX } from "@/lib/rating/validation";
 
@@ -282,8 +283,10 @@ function RatingCard({
       ) : (
         <div className="space-y-3">
           <fieldset>
+            {/* « Sa note pour ce match (la tienne) » patched the pronoun instead of choosing it,
+                under a card already badged « toi » (decision 095). */}
             <legend className="mb-2 text-sm text-ink-muted">
-              Sa note pour ce match{target.isSelf ? " (la tienne)" : ""}
+              {ratingLegendFr(target.isSelf)}
             </legend>
             <div className="grid grid-cols-6 gap-1.5">
               {SCORES.map((score) => {
