@@ -15,12 +15,14 @@ import Link from "next/link";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { formatDateFr, injuryStatus, parisDate } from "@/lib/player/injury";
 import { positionsSignature } from "@/lib/player/positions";
 import { getPlayerProfile } from "@/lib/player/queries";
+import { removeMember, setMemberRole } from "@/lib/team/actions";
 import { InjuriesCard } from "../_components/injuries-card";
 import { JerseyForm } from "../_components/jersey-form";
 import { PositionsEditor } from "../_components/positions-editor";
@@ -46,6 +48,11 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
     can(actor, "profile:editPositions", context) || can(actor, "member:update", context);
   const canEditJersey = can(actor, "member:update", context);
   const canManageInjuries = can(actor, "injury:declare", context);
+  // The two squad-administration controls. They used to sit on every row of `/equipe`, where
+  // « Nommer coach » + « Retirer » took 200 px of a 390 px row and pushed the names to « Tho… ».
+  // They belong to one member, so they live on that member's page and the list is left to reading.
+  const canAppointCoach = can(actor, "team:appointCoach", context);
+  const canRemove = can(actor, "member:remove", context);
 
   const today = parisDate(new Date());
   const status = injuryStatus(profile.injuries, today);
@@ -122,15 +129,42 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
         )}
 
         <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-          <div className="flex justify-between gap-3 sm:justify-start sm:gap-2">
+          <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-2">
             <dt className="text-ink-muted">Rôle</dt>
-            <dd className="text-ink">{profile.role === "coach" ? "Coach" : "Joueur"}</dd>
+            <dd className="flex items-center gap-2 text-ink">
+              {/* Not simply « Coach » or « Joueur »: demoting a member of the encadrement would
+                  otherwise label them « Joueur » next to their own « encadrement » badge. */}
+              {profile.role === "coach" ? "Coach" : profile.isPlayer ? "Joueur" : "Encadrement"}
+              {canAppointCoach && !profile.isLastCoach ? (
+                /* A plain form, like the rest of this page: it works with no JavaScript, and there
+                   is no client state to hold — the button's own label is the whole question. */
+                <form action={setMemberRole}>
+                  <input type="hidden" name="teamId" value={team.id} />
+                  <input type="hidden" name="memberId" value={profile.membershipId} />
+                  <input
+                    type="hidden"
+                    name="role"
+                    value={profile.role === "coach" ? "player" : "coach"}
+                  />
+                  <Button type="submit" variant="ghost" size="sm">
+                    {profile.role === "coach" ? "Retirer coach" : "Nommer coach"}
+                  </Button>
+                </form>
+              ) : null}
+            </dd>
           </div>
           <div className="flex justify-between gap-3 sm:justify-start sm:gap-2">
             <dt className="text-ink-muted">Dans l’équipe depuis</dt>
             <dd className="text-ink">{formatDateFr(profile.joinedOn)}</dd>
           </div>
         </dl>
+
+        {canAppointCoach && profile.isLastCoach ? (
+          <p className="mt-2 text-xs text-ink-subtle">
+            Seul coach de l’équipe&nbsp;: nomme quelqu’un d’autre avant de changer son rôle ou de le
+            retirer de l’effectif.
+          </p>
+        ) : null}
       </Card>
 
       {profile.isPlayer ? (
@@ -156,6 +190,29 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
           viewerMemberId={team.membershipId}
           memberId={profile.membershipId}
         />
+      ) : null}
+
+      {canRemove && !isSelf && !profile.isLastCoach ? (
+        <Card
+          title="Retirer de l’effectif"
+          description="Le joueur ne pourra plus déclarer ses disponibilités ni être convoqué. Les matchs qu’il a joués gardent son nom : rien n’est effacé."
+        >
+          {/* A plain form, as with « Supprimer ce match »: no confirmation dialog to get wrong, and
+              it works without JavaScript. `removeMember` sets `left_at` and sends the coach back to
+              the squad list — this page would be a 404 on the next render. */}
+          <form action={removeMember}>
+            <input type="hidden" name="teamId" value={team.id} />
+            <input type="hidden" name="memberId" value={profile.membershipId} />
+            <Button
+              type="submit"
+              variant="danger"
+              fullWidth
+              aria-label={`Retirer ${profile.displayName} de l’effectif`}
+            >
+              Retirer {profile.displayName} de l’effectif
+            </Button>
+          </form>
+        </Card>
       ) : null}
     </div>
   );
