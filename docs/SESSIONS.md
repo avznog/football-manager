@@ -1081,3 +1081,16 @@ reading « 00:00 · Avant le coup d’envoi » — derived, not invented, and un
 the recap of the match nobody recorded, which a player reaches by the only button on the page, says
 « ? — ? · rien saisi · Ce match est terminé mais rien n’a été saisi : ni score, ni buteurs, ni temps
 de jeu. » Decision 013 is holding.
+
+## A demo session that told two stories
+
+One line of `db/seed.ts`. The second training session is the fixture for « everybody absent » — its
+own block comment says so: « the pitch was unplayable and the session was called off on the spot »,
+thirteen rows, all `present = false`. Its French note said « Terrain impraticable, séance écourtée »,
+which says the squad turned up and trained for twenty minutes. On the calendar that read « 0 présent
+sur 13 pointés » directly under a note claiming the session merely ran short.
+
+« Séance annulée sur place. » The comment and the rows already agreed with each other; only the
+sentence the app displays disagreed with both. Demo data is the first thing the owner and any reviewer
+read (`CLAUDE.md`: walking the season after `db:reset` is the cheapest review tool in the repo), so a
+fixture that contradicts itself is a screen stating something untrue like any other.
