@@ -1940,3 +1940,30 @@ happen to be identical and a different statement entirely. The « 7 changements 
 the list it counted, for the reason decision 061 gives: a count above a list nobody is shown is the
 same defect one line higher.
 
+## NNN — A heading is a claim about every row under it
+**2026-09-23** · accepted
+
+Game mode's last list was headed « Remplaçants ». On the demo season's Étoile du Parc, before the
+kick-off, that heading stood over thirteen rows:
+
+- the three named substitutes;
+- the seven titulaires — nobody is on the pitch until the coach confirms the composition
+  (invariant 3), so before the kick-off the whole group is off it;
+- two players the match sheet does not mention at all;
+- a supporter, who is injured.
+
+Ten of the thirteen were not substitutes, and each of them said so in grey two millimetres under its
+own name — which is how the heading got away with it for four milestones. The reader believes the
+heading; the subtitle is what they check afterwards, if they check.
+
+The list itself is right, and deliberately wide: `availableOptions` has said since M4 that a coach one
+man short at 20′ needs whoever turned up, not a validation error, and that the order is the
+recommendation. So the heading is what changes, and the rule is the general one: **a heading is a
+claim about every row under it, and it has to be true of the widest row, not the first three.**
+
+It now answers the question the list answers — « Qui peut entrer » — and the hint says the order out
+loud when the list is wider than the substitutes. For somebody who is only watching, the list answers
+a different question, because they cannot bring anyone on: they are told what it is,
+« En dehors du terrain », and given no instruction they cannot follow. The empty state stopped being
+« Personne sur le banc. » for the same reason the heading did — there is no bench in it.
+

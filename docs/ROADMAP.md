@@ -146,6 +146,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       player short, where the prompt used to list nothing at all while a man walked on
 - [x] Event timeline with per-event "annuler" (VOID)
 - [x] Final whistle → freeze `match_player_stats`
+- [x] Game mode's list of who can come on is no longer headed « Remplaçants ». Before the kick-off it
+      held the whole squad — three substitutes, seven titulaires, two players off the sheet and an
+      injured supporter — and the heading claimed all thirteen were substitutes (decision NNN)
 
 ## M5 — Stats
 - [x] Player stats: matches, minutes, goals, assists, own goals, fouls
