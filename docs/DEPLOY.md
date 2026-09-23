@@ -34,9 +34,14 @@ cannot be read back, so it has to be pasted here separately:
 gh secret set DATABASE_URL --repo avznog/football-manager   # paste the pooled string at the prompt
 ```
 
-The **first** migration, against a brand-new empty database, still comes from a shell: there is no
-schema for the application to serve against until it has run, so it happens before the first deploy
-rather than after a push, and it is worth watching.
+This is the *only* way migrations reach production now, including the first one. That was not the
+plan — this section used to say the first migration had to come from a shell, because there is no
+schema to serve against until it has run — but on the push that merged the `migrate` job itself, CI
+applied it: `migrations applied`, 41 seconds, against a database that had none. A brand-new Neon
+database needs nothing from a laptop.
+
+Running it by hand is still the way to migrate a database CI does not know about — a Neon branch for
+Preview, or a restored copy:
 
 ```bash
 DATABASE_URL='postgres://…-pooler…/neondb?sslmode=require' npm run db:migrate
@@ -130,6 +135,9 @@ lineup editor is writing to the real season — so give Preview its own Neon bra
 person is added to the scope.
 
 ### Turn Deployment Protection off
+
+**Done** for the live instance — production answers `200` and the French login form. Kept here
+because it is the first thing to check if the site ever goes silent for the squad.
 
 A new Vercel project has **Vercel Authentication** on. While it is on, every request is answered with
 a `302` to `vercel.com/sso-api` and only members of the Vercel team can open the app:

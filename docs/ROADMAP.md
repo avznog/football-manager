@@ -230,22 +230,26 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       for the migrations to have applied. Development is still `npm run dev` against the Homebrew
       Postgres: decision 077 adds compose, it does not supersede 016. `output: "standalone"` is
       gated on `NEXT_OUTPUT_STANDALONE` so Vercel builds unchanged
-- [ ] **Blocked on the owner, three things, all documented in `docs/DEPLOY.md`:**
-      1. **Deployment Protection is on**, so the site answers every request with a `302` to
-         `vercel.com/sso-api` — the squad joins with a code sent on WhatsApp and none of them has a
-         Vercel account, so nobody can open the app. Settings → Deployment Protection → Vercel
-         Authentication → Disabled.
-      2. **The migrations have not been run against Neon**, and `db:bootstrap` has not created the
-         super admin. Neither can be done from here: the marketplace integration stores its variables
-         sensitive, so `vercel env pull` returns `DATABASE_URL=""` and the string has to come from the
-         Neon dashboard. §2 and §3, one command each.
-      3. **The `DATABASE_URL` repository secret**, for the same reason and from the same string —
-         `gh secret set DATABASE_URL`. Without it the `migrate` job fails loudly on every push to
-         `main`, which is deliberate: a migration that silently did not happen is the worse failure.
+- [x] The owner set the `DATABASE_URL` repository secret and turned Deployment Protection off, and
+      the two unblocked everything that was waiting on them. `/connexion` answers `200` with the
+      French login form instead of a `302` to `vercel.com/sso-api`, so the squad can reach the app
+      with nothing but the link
+- [x] …and the `migrate` job has now run for real, which it never had: on the push that merged #49 it
+      applied the committed SQL to Neon in 41 seconds — `migrations applied`, exit 0 — after
+      typecheck · lint · Vitest · the browser run. Every previous observation of it was a *skip* on a
+      pull request, so the one branch that matters had been untested
+- [ ] `db:bootstrap` — the super admin. This is the last thing between a working deployment and a
+      usable one: the schema is there and every screen is reachable, but there is no account to log in
+      with, and an invite-only app cannot make one from the browser (decision 052). One command,
+      `docs/DEPLOY.md` §3, from the Neon dashboard's pooled string. **Whether it has been run cannot
+      be checked from a session**: the connection string is only in Vercel (sensitive, unreadable) and
+      in a GitHub secret (write-only), so the answer is a login attempt in a browser
 - [ ] Reset the super-admin password, which spent the first hour of the deployment sitting in the
-      Vercel environment where `docs/DEPLOY.md` says it must never be
-- [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6. Waits on the two above:
-      a phone in daylight currently sees the Vercel login page
+      Vercel environment where `docs/DEPLOY.md` says it must never be. Free, if the account is created
+      with a fresh password rather than the one that was in Vercel: the same `db:bootstrap` run does
+      both, because it is idempotent and re-hashes the password every time
+- [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6. No longer blocked by the
+      login page; it now waits only on an account to log in with
 - [ ] Give Preview its own Neon branch. `DATABASE_URL` is set for Preview too and points at
       production, so every pull request previews against the real season — behind Vercel
       Authentication, which is what makes it tolerable rather than fine
