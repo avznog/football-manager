@@ -1502,3 +1502,31 @@ already does, and the same sentence twice on one card is worse than none.
 
 In `lib/` rather than in the component for the reason decisions 060, 062 and 065–070 all give: Vitest
 collects `lib/**` and `db/**`, so a string built inline under `app/` is a string no test pins.
+
+## 074 — The French tutoies, everywhere
+**2026-09-23** · accepted
+
+The app addressed its reader both ways. Seventy-five strings say « tu » — « Ta réponse », « Tu peux
+changer d’avis jusqu’au coup d’envoi », « Tu n’es pas l’opérateur de ce match » — and eight said
+« vous »: the banner a player sees in game mode (« Vous suivez le match en direct »), the planned
+composition's « rien ne change avant votre confirmation », the TERRAIN sheet's « tant que vous ne
+validez pas », the install description « Gérez votre équipe ».
+
+It was not a split by role, which is the only thing that could have justified it: the operator — a
+coach — is told « Tu n’es pas l’opérateur de ce match » from `ingest.ts` and « rien ne change avant
+votre confirmation » from `presenter.ts`, two sentences about the same person on the same screen.
+Simple drift, and the kind a reader feels without being able to name.
+
+**« Tu », then.** This is one amateur team's own tool, used by a dozen people who play football
+together on a Sunday; the coach is « Benjamin », not « Monsieur ». And the tutoiement was already the
+majority by nine to one, so it is the cheaper direction of travel as well as the right one.
+
+Two of the eight were not about politeness at all and got a different fix. « Ce que vous travaillez »
+on the training form is the *plural* « vous » — the team, not the reader — so the pronoun goes
+altogether: « Le thème de la séance ». And the position picker's « appuyer pour en faire votre poste
+principal » is read out by a screen reader to a coach editing *somebody else's* preferences, where
+« votre » was simply wrong; it is « le poste principal » now, which is what its two sibling labels
+already did.
+
+Recorded in `CLAUDE.md` rather than only here, because it is a rule that applies to every string
+anybody adds afterwards.

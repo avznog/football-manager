@@ -747,7 +747,7 @@ export function emptyPitchFr(input: {
     return {
       title: "Personne n’est encore sur le terrain.",
       description: input.canOperate
-        ? "La composition ci-dessus attend votre confirmation : c’est elle qui fait entrer les joueurs."
+        ? "La composition ci-dessus attend ta confirmation : c’est elle qui fait entrer les joueurs."
         : "La composition ci-dessus attend la confirmation de l’opérateur : c’est elle qui fait entrer les joueurs.",
     };
   }

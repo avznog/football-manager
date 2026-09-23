@@ -78,7 +78,7 @@ export function TrainingForm({ teamId, trainingId, defaults }: TrainingFormProps
         htmlFor="note"
         label="Au programme"
         optional
-        hint="Ce que vous travaillez. Visible par tout le monde."
+        hint="Le thème de la séance. Visible par tout le monde."
         error={state?.fieldErrors?.note}
       >
         {({ id, describedBy, invalid }) => (

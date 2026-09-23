@@ -13,6 +13,12 @@ post-match player ratings, and training attendance.
 **The UI is in French. The code is in English.** User-facing strings are French; identifiers,
 comments, commit messages, docs and PR descriptions are English. Never mix the two.
 
+**The French tutoies, always.** « Ta réponse », « Appuie sur un poste », « Tu suis le match en
+direct » — never « votre », never « vous ». A dozen people who play football together on a Sunday, in
+one team's own tool (decision 074). When a sentence would need the plural « vous » for the team
+rather than for one reader, name the subject instead: « Le thème de la séance », not « Ce que vous
+travaillez ».
+
 ## Read these, in order
 
 1. `docs/PLAN.md` — the approved plan. The source of truth for scope and architecture.
@@ -63,6 +69,8 @@ comments, commit messages, docs and PR descriptions are English. Never mix the t
   reset clock.
 - Tailwind only, with the design tokens in `app/globals.css`. No inline hex colours.
 - Light and dark themes must both be checked for any new screen.
+- Nothing is explained on hover. A `title` is at most a duplicate of something already
+  visible or announced: there is no hover on a phone (decision 072).
 
 ## Commands
 

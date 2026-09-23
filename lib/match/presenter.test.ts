@@ -635,7 +635,7 @@ describe("the planned-composition prompt", () => {
 
     const proposed = emptyPitchFr({ hasLineups: true, isProposed: true, canOperate: true });
     expect(proposed.title).toBe("Personne n’est encore sur le terrain.");
-    expect(proposed.description).toContain("votre confirmation");
+    expect(proposed.description).toContain("ta confirmation");
 
     // A viewer who cannot operate is told whose confirmation it is waiting for, not asked for theirs.
     const watching = emptyPitchFr({ hasLineups: true, isProposed: true, canOperate: false });
