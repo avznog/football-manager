@@ -203,8 +203,17 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       route to collect its configuration, so a missing production secret killed the build itself.
       The connection opens on the first query now, and the message it throws names Vercel as well as
       `.env.local` (decision 075)
-- [ ] **Blocked:** needs a Neon `DATABASE_URL` from the owner (interactive signup).
-      Everything else is ready — the Vercel CLI is authenticated as `avznog` and
-      `docs/DEPLOY.md` is step by step from there
-- [ ] `vercel link`, env vars, production deploy — `docs/DEPLOY.md` §4
-- [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6
+- [x] `vercel link`, env vars, production deploy — `docs/DEPLOY.md` §4. The owner connected the
+      repository and attached Neon through the marketplace; `DATABASE_URL` is set for production and
+      preview, and production builds and deploys green since the fix above
+- [ ] **Blocked on the owner, two settings, both documented in `docs/DEPLOY.md` §4:**
+      1. **Deployment Protection is on**, so the site answers every request with a `302` to
+         `vercel.com/sso-api` — the squad joins with a code sent on WhatsApp and none of them has a
+         Vercel account, so nobody can open the app. Settings → Deployment Protection → Vercel
+         Authentication → Disabled.
+      2. **The migrations have not been run against Neon**, and `db:bootstrap` has not created the
+         super admin. Neither can be done from here: the marketplace integration stores its variables
+         sensitive, so `vercel env pull` returns `DATABASE_URL=""` and the string has to come from the
+         Neon dashboard. §2 and §3, one command each.
+- [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6. Waits on the two above:
+      a phone in daylight currently sees the Vercel login page

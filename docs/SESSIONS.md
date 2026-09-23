@@ -1128,3 +1128,32 @@ next: **a green build is no longer evidence that `DATABASE_URL` is set.** A depl
 compiles perfectly and then fails on every screen. Step 5 in a browser is the proof.
 
 Still blocked on the owner: the variable itself. Nothing in the repository can supply it.
+
+## What is actually left on Vercel
+
+With the build fixed, production went green — so the next question was whether the app *works*, and
+the answer is not yet, for two reasons that are both settings rather than code.
+
+**The site is behind Vercel Authentication.** `curl -sI …/connexion` answers `302` to
+`vercel.com/sso-api`. A new Vercel project has this on by default, and it is fine for a company's
+staging environment; it is the wrong setting for an app whose entire user base is a dozen amateur
+footballers who join with a code sent on WhatsApp. None of them has a Vercel account. Nothing in
+`docs/DEPLOY.md` mentioned it, so §4 now has the `curl` output and the three-click path to turn it
+off, and §6 — the phone in daylight — says it waits on this, because a phone in daylight currently
+sees a Vercel login form.
+
+**The database has no tables.** The owner attached Neon through Vercel's marketplace, which set
+`DATABASE_URL` for production and preview (plus fifteen `FOOTBALL_MANAGER_*` variables the app reads
+none of). But §2's migrations and §3's `db:bootstrap` have not been run, and they cannot be run from
+here: marketplace variables are stored sensitive, and `vercel env pull` writes them back as
+`DATABASE_URL=""` — Vercel will not hand a sensitive value back out even to the account that owns it.
+So the connection string has to be copied from the Neon dashboard. Documented in both places, since
+§2 is where a reader gets stuck and §4 is where the explanation belongs.
+
+Deliberately not done here: turning the protection off myself. The CLI on this machine could, and
+making somebody's deployment publicly reachable on the internet is their decision, not a chore to
+absorb.
+
+`docs/ROADMAP.md`'s deployment section is honest about it now — `vercel link`, the variables and the
+production deploy are done; what is left is two owner-side steps, each one command or three clicks,
+each written down.

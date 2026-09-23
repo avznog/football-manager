@@ -35,6 +35,9 @@ Migrations are committed SQL (`db/migrations/`), so this applies exactly what CI
 `db:push` at a production database, and never `db:reset` — it refuses unless `ALLOW_REMOTE_RESET=yes`,
 and there is no reason to set it.
 
+If the Neon project was attached through Vercel's marketplace rather than created by hand, take the
+string from the **Neon** dashboard: `vercel env pull` hands back an empty value for it, see §4.
+
 ## 3. Reference data and the first account — `db:bootstrap`
 
 ```bash
@@ -81,6 +84,38 @@ variable — the server log will say so in as many words.
 `SUPER_ADMIN_USERNAME` and `SUPER_ADMIN_PASSWORD` are **not** needed in Vercel. They are read by
 `db/bootstrap.ts` and `db/seed.ts`, both of which run from a command line, never from the
 application. Leaving a password in the deployment environment for no reason is how it leaks.
+
+### Turn Deployment Protection off
+
+A new Vercel project has **Vercel Authentication** on. While it is on, every request is answered with
+a `302` to `vercel.com/sso-api` and only members of the Vercel team can open the app:
+
+```
+$ curl -sI https://football-manager-avznog-team.vercel.app/connexion
+HTTP/2 302
+location: https://vercel.com/sso-api?url=…
+```
+
+This project's whole point is that a dozen amateur footballers join it with a code sent on WhatsApp.
+None of them has a Vercel account, and inviting them to one to look at a match sheet is absurd — so
+**Settings → Deployment Protection → Vercel Authentication → Disabled**, for production at least.
+Steps 5 and 6 below are impossible until it is off: the phone in daylight sees the Vercel login page.
+
+Leaving it on for *preview* deployments is reasonable and costs nothing, since previews are only ever
+opened from this machine.
+
+### If the database came from the Neon integration
+
+Attaching Neon through Vercel's marketplace, rather than `vercel env add` by hand, writes about
+fifteen variables prefixed `FOOTBALL_MANAGER_` (`…_DATABASE_URL`, `…_PGHOST`, `…_POSTGRES_URL`, …).
+**The application reads none of them.** It reads `DATABASE_URL` and nothing else, so that one still
+has to exist on its own — the integration creates it too, but check it is there and that it holds the
+*pooled* string.
+
+Their values are stored sensitive, which has one consequence worth knowing before you go looking for
+it: `vercel env pull` writes them back as `DATABASE_URL=""`. Vercel will not hand a sensitive value
+back out, not even to the account that owns it. So the connection string for step 2's migrations has
+to be copied from the **Neon** dashboard, not pulled from Vercel.
 
 ## 5. First run, in the browser
 
