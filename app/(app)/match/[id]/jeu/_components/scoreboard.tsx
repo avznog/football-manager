@@ -12,16 +12,24 @@ export type ScoreboardProps = {
   isHome: boolean;
   /** « 3 actions en attente », or null when everything has reached the server. */
   pendingLabel: string | null;
+  /** « saisi après le match », or null — `entryModeBadgeFr`. */
+  entryBadge: string | null;
 };
 
 /**
- * The clock, the score, and nothing else.
+ * The clock, the score, and what they are worth.
  *
  * Read at arm's length, in daylight, by someone who is also watching the match: the minute is the
  * biggest thing on the screen, in tabular figures so the digits do not jump as the seconds tick.
  * The clock is **continuous** (decision 009) — the second half of a 2 × 30 reads 30′ → 60′, and a
  * half that runs long reads « 30’+2 » rather than resetting, because the log stores match time and
  * this is what it says.
+ *
+ * The one other thing it says is how the log came to exist. This screen prints the largest minute
+ * in the app, and decision 048 stamps the minutes of a match typed up afterwards — so on a `retro`
+ * log the caption under the clock carries « saisi après le match », for the same reason the match
+ * page and the recap do (decision 013). Without it the biggest number on the screen is the one
+ * number a reader has no way to qualify.
  */
 export function Scoreboard({
   reading,
@@ -31,6 +39,7 @@ export function Scoreboard({
   opponentName,
   isHome,
   pendingLabel,
+  entryBadge,
 }: ScoreboardProps) {
   const home = isHome ? "Nous" : opponentName;
   const away = isHome ? opponentName : "Nous";
@@ -61,6 +70,7 @@ export function Scoreboard({
                 en cours
               </span>
             ) : null}
+            {entryBadge !== null ? <Badge variant="neutral">{entryBadge}</Badge> : null}
           </span>
         </p>
 

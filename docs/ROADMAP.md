@@ -101,6 +101,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       page and the recap, and a note under « Temps de jeu » explaining that the minutes are the
       app's best placement and the score is exact (decisions 013 and 048). `matches.entry_mode` was
       written by the entry action and read by nothing but the entry screen itself
+- [x] …including game mode, the last screen that printed a minute without saying where it came from.
+      `LiveMatchRow` did not *declare* `entry_mode` and `competition`, though `getLiveMatch` had
+      always passed them through, so the scoreboard could not ask and `getRetroView` re-queried
+      `matches` for values it was already holding. The type now says what the row carries: the badge
+      sits under the clock, and that query is gone
 
 ## Deployment
 - [x] First-run bootstrap — `npm run db:bootstrap` writes the reference data and the one

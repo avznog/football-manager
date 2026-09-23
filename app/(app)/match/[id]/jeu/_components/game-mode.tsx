@@ -18,6 +18,7 @@ import {
 import { PitchLayout } from "@/components/pitch/PitchLayout";
 import { Badge, Button, ButtonLink, Card, EmptyState } from "@/components/ui";
 import { positionLabelFr } from "@/db/reference";
+import { entryModeBadgeFr } from "@/lib/calendar/labels";
 import type { MatchEventType } from "@/lib/match/events";
 import { createOutbox, toWireEvent, type OutboxRecord, type OutboxState } from "@/lib/match/outbox";
 import {
@@ -371,6 +372,9 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         opponentName={live.match.opponentName}
         isHome={live.match.isHome}
         pendingLabel={queue.pending.length > 0 ? pendingCountLabelFr(queue.pending.length) : null}
+        // `recorded` is the same test the match page and the recap make: an empty log was not
+        // « saisi après le match », whatever `entry_mode` happens to say (decision 013).
+        entryBadge={entryModeBadgeFr(live.match.entryMode, { recorded: live.events.length > 0 })}
       />
 
       {!canOperate ? (

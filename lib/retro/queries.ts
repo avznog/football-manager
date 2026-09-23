@@ -7,19 +7,15 @@ import "server-only";
  * one is *corrected*. Both need the same things — the roster, a formation to place the seven in, the
  * period configuration — so they are loaded together and the page picks its mode from `hasLog`.
  *
- * Almost all of it comes from `getLiveMatch`, deliberately: retro entry writes the same log game
- * mode writes, so it reads the same inputs and derives its preview through the same `reduceLive`.
- * The only thing added is `matches.entry_mode` and the competition, which `LiveMatchRow` drops at the
- * client boundary — game mode has no use for either. The screens that only need to *say* how the log
- * came to exist read `MatchRow.entryMode` instead (`entryModeBadgeFr`).
+ * All of it comes from `getLiveMatch`, deliberately: retro entry writes the same log game mode
+ * writes, so it reads the same inputs and derives its preview through the same `reduceLive`. It used
+ * to re-query `matches` for `entry_mode` and the competition because `LiveMatchRow` did not declare
+ * them; it always carried them, and now says so.
  *
  * Everything returned is plain and serialisable — the timeline crosses into a client component.
  */
 
-import { eq } from "drizzle-orm";
-
-import { db } from "@/db/client";
-import { matches, type EntryMode } from "@/db/schema";
+import { type EntryMode } from "@/db/schema";
 import { getLiveMatch, type LiveMatch } from "@/lib/match/live";
 import { reduceLive } from "@/lib/match/presenter";
 import type { TimelineEntry } from "@/lib/match/reducer";
@@ -67,7 +63,7 @@ export type RetroTimelineLine = {
 };
 
 export type RetroView = {
-  match: LiveMatch["match"] & { entryMode: EntryMode; competition: string };
+  match: LiveMatch["match"];
   /** False when `match_events` is empty: the screen is an entry form rather than a corrections list. */
   hasLog: boolean;
   /** Milliseconds of the final whistle in the existing log, 0 when there is none. */
@@ -109,12 +105,6 @@ export async function getRetroView(teamId: string, matchId: string): Promise<Ret
   const live = await getLiveMatch(teamId, matchId);
   if (!live) return null;
 
-  const [row] = await db
-    .select({ entryMode: matches.entryMode, competition: matches.competition })
-    .from(matches)
-    .where(eq(matches.id, matchId))
-    .limit(1);
-
   // As of the last event, never as of now: this screen is about a match that is over (`finalize.ts`).
   const state = reduceLive(live, [], null);
 
@@ -130,11 +120,7 @@ export async function getRetroView(teamId: string, matchId: string): Promise<Ret
   const planned = initial && formation && initial.formationId === formation.id ? initial : null;
 
   return {
-    match: {
-      ...live.match,
-      entryMode: row?.entryMode ?? "live",
-      competition: row?.competition ?? "friendly",
-    },
+    match: live.match,
     hasLog: live.events.length > 0,
     // The whistle as the log stamped it, not as regulation would have it: a match that ran three
     // minutes over ended at 63′, and a correction may not be stamped after that.
