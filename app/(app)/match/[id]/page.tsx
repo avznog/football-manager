@@ -253,23 +253,32 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
       ) : null}
 
       {/* Open to every member, not just the operator: following the score from the touchline is
-          legitimate, and game mode itself decides who may record an action (`can()`). */}
-      <Card title="Mode match" as="h2">
-        <div className="space-y-3">
-          <p className="text-sm text-ink-muted">
-            {match.status === "finished"
-              ? "Le match est terminé : le déroulé reste consultable."
-              : "Chronomètre, buts, remplacements et minutes jouées, en direct."}
-          </p>
-          <ButtonLink href={`/match/${match.id}/jeu`} fullWidth>
-            {match.status === "live"
-              ? "Reprendre le mode match"
-              : match.status === "finished"
-                ? "Voir le déroulé"
-                : "Ouvrir le mode match"}
-          </ButtonLink>
-        </div>
-      </Card>
+          legitimate, and game mode itself decides who may record an action (`can()`).
+
+          Not offered at all for a match that is over with nothing recorded — `score === null`, the
+          same signal the « Saisir le match » card above uses. « Le déroulé reste consultable » is
+          untrue there: opening it shows « Rien pour l’instant », and a full-width primary button is
+          a poor way to say that nothing happened. The card above is the real next action, and
+          decision 013's whole point is that the app does not pretend to hold a record of an
+          afternoon nobody recorded. */}
+      {match.status === "finished" && score === null ? null : (
+        <Card title="Mode match" as="h2">
+          <div className="space-y-3">
+            <p className="text-sm text-ink-muted">
+              {match.status === "finished"
+                ? "Le match est terminé : le déroulé reste consultable."
+                : "Chronomètre, buts, remplacements et minutes jouées, en direct."}
+            </p>
+            <ButtonLink href={`/match/${match.id}/jeu`} fullWidth>
+              {match.status === "live"
+                ? "Reprendre le mode match"
+                : match.status === "finished"
+                  ? "Voir le déroulé"
+                  : "Ouvrir le mode match"}
+            </ButtonLink>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

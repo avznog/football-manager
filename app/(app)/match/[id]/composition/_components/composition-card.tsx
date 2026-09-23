@@ -63,8 +63,11 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
       as="h2"
       description={squadSummaryFr(counts)}
       action={
+        /* « titulaires », the word `SquadSheet` already uses, because this badge counts the *sheet*
+           while the card is titled « Composition ». Bare, it read as the composition's own progress
+           — and on a match with none it sat directly above « Aucune composition », saying « 7 / 7 ». */
         <Badge variant={counts.starters === 7 ? "success" : "warning"}>
-          {counts.starters} / 7
+          {counts.starters} / 7 titulaires
         </Badge>
       }
     >

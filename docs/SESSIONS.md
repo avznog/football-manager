@@ -829,3 +829,27 @@ Vitest runs in `node`, cannot render a client component, and copy this easy to g
 live where a test can read it.
 
 848 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.
+
+## Two more from the same screenshot
+
+Kept reading. `audit/light-coach-match-saisi-apres.png` is the demo season's match against FC des
+Deux-Ponts: finished, nine men on the sheet, not one event in the log — the fixture decision 038 put
+there precisely so that this state gets looked at. It held two more defects of the family that keeps
+turning up, a screen stating something untrue, and neither would ever fail a test.
+
+« Mode match » promised « Le match est terminé : le déroulé reste consultable » under a full-width
+primary « Voir le déroulé », for a match with nothing to consult. The destination is honest — it says
+« Rien pour l’instant » — but the button is not, and it was competing for attention with the « Saisir le
+match » card two above, which is the actual next action. The card is now suppressed for
+`status === "finished" && score === null`, reusing the page's existing test for "not one event was ever
+recorded" rather than inventing a second one. Game mode stays reachable by URL, and stays readable by
+the whole squad; what stops is the app advertising a story it does not have.
+
+And the « Composition » card's badge read « 7 / 7 », in green, directly above the « Aucune composition »
+panel. No bug: it counts the players marked `starter` on the sheet, which is the number a coach wants
+when picking a squad. But on a card titled « Composition » the bare figure reads as the composition
+being complete. `SquadSheet` has written « titulaires » next to the same number since M3 — the
+unlabelled one was the odd one out, and now it is not.
+
+Neither fix is a line of logic, and that is the point of the screenshot half of the audit: the
+mechanical checks came back clean on all 92 visits both before and after. 848 unit tests, 3 e2e specs.

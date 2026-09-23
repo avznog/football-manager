@@ -25,6 +25,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       timeline writing the same goals « 2 – 0 » (decision 061)
 - [x] « Aucune composition enregistrée » no longer printed twenty pixels under the composition it
       denied: an empty pitch before kick-off is what invariant 3 *produces* (decision 062)
+- [x] A finished match with an empty log is no longer offered « Voir le déroulé » in a full-width
+      primary button promising « le déroulé reste consultable », and the « Composition » card's badge
+      says which seven it is counting — it read « 7 / 7 » directly above « Aucune composition »
+      (decision 063)
 - [x] Local Postgres via Homebrew (`npm run db:start`), Drizzle config, `DATABASE_URL` only
       — Docker was abandoned, see decision 016
 - [x] Full schema in `db/schema.ts` + first migration committed

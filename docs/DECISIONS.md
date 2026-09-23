@@ -1226,3 +1226,30 @@ saved and proposed — a test encoding the lie rather than catching it. It now a
 that the false one is absent. And like `pendingLineupChangesFr` (decision 060) the function lives in
 `lib/` rather than as a condition in JSX, because Vitest runs in `node` and cannot render a client
 component: copy this easy to get backwards has to live where a test can read it.
+
+## 063 — A match nobody recorded is offered nothing to read
+**2026-09-23** · accepted
+
+For a finished match whose log is empty, the match page does not render the « Mode match » card at
+all. And the « Composition » card's badge reads « 4 / 7 titulaires » rather than « 4 / 7 »: it counts
+the *sheet*, not the composition it sits on.
+
+**Why.** Both were found by reading `audit/light-coach-match-saisi-apres.png` — the demo season's
+finished match with nine men on the sheet and not one event (decision 038's fixture). On that one
+screen the app said three things about the same match. « Saisir le match » said, correctly, that it had
+been played without the phone. Below it, « Mode match » said « Le match est terminé : le déroulé reste
+consultable » under a full-width primary « Voir le déroulé » — offering a record that does not exist,
+and prominently. Following the link shows « Rien pour l’instant », which is honest, but a primary
+button is a poor way to say nothing happened, and it competes with the card that *is* the next action.
+Third, above the « Aucune composition » panel, a green badge read « 7 / 7 ».
+
+The badge was the subtler of the two. It has always counted the players marked `starter` on the match
+sheet, which is the useful number when picking a squad — but on a card titled « Composition », above a
+panel saying there is none, « 7 / 7 » reads as the composition being complete. `SquadSheet` had
+written « titulaires » next to the same figure since M3; the bare one was the odd one out.
+
+**Consequences.** The suppression reuses `score === null`, the same signal the « Saisir le match » card
+two cards above already uses, so there is one definition of "not one event was ever recorded" on this
+page. Nothing is lost for a live or scheduled match, nor for a finished match that *does* have a log:
+`/match/[id]/jeu` stays reachable by URL in every case, and game mode remains readable by the whole
+squad (decision 059). What changes is only that the app stops advertising a story it does not have.
