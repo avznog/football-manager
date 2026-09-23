@@ -81,6 +81,7 @@ export default async function TeamPage() {
           <TeamSettings
             teamId={team.id}
             name={team.name}
+            crestUrl={team.crestUrl}
             primaryColor={team.primaryColor}
             secondaryColor={team.secondaryColor}
           />

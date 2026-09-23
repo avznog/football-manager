@@ -6,23 +6,28 @@ import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { updateTeam } from "@/lib/team/actions";
+import { CrestField } from "./crest-field";
 
 /**
- * Renaming the team and setting its two kit colours. Coach only; `updateTeam` re-checks that
- * (invariant 4) and takes the `teamId` from this form rather than from the active-team cookie.
+ * Renaming the team, setting its two kit colours, and choosing its crest. Coach only; `updateTeam`
+ * re-checks that (invariant 4) and takes the `teamId` from this form rather than from the active-team
+ * cookie.
  *
- * The colours are not decoration: the discs on the pitch are drawn in them, and the team header
- * carries the primary (decision 011). Until this card existed they could only be set at the moment
- * the team was created, which meant in practice never.
+ * None of the three is decoration: the discs on the pitch are drawn in the colours, the team header
+ * carries the primary one (decision 011), and it shows the crest in place of the coloured disc as soon
+ * as there is one. Until this card existed the colours could only be set at the moment the team was
+ * created — which meant in practice never — and the crest could not be set at all.
  */
 export function TeamSettings({
   teamId,
   name,
+  crestUrl,
   primaryColor,
   secondaryColor,
 }: {
   teamId: string;
   name: string;
+  crestUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
 }) {
@@ -31,7 +36,7 @@ export function TeamSettings({
   return (
     <Card
       title="Réglages de l’équipe"
-      description="Le nom et les couleurs du maillot, celles des joueurs sur le terrain."
+      description="Le nom, le blason, et les couleurs du maillot — celles des joueurs sur le terrain."
     >
       <form action={action} className="space-y-4">
         <input type="hidden" name="teamId" value={teamId} />
@@ -59,6 +64,11 @@ export function TeamSettings({
             <span className="text-sm font-normal text-danger">{state.fieldErrors.name[0]}</span>
           ) : null}
         </label>
+
+        <CrestField name={name} crestUrl={crestUrl} primaryColor={primaryColor} />
+        {state?.fieldErrors?.crest ? (
+          <p className="text-sm text-danger">{state.fieldErrors.crest[0]}</p>
+        ) : null}
 
         <div className="flex flex-wrap gap-4">
           <ColorField
