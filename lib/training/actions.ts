@@ -16,7 +16,7 @@ import { teamMembers, trainingAttendance, trainingAvailability, trainings } from
 import { assertCan, membershipIn } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
-import { trainingWindowMinutes } from "@/lib/calendar/timeline";
+import { attendanceIsOpen, trainingWindowMinutes } from "@/lib/calendar/timeline";
 import {
   createTrainingSchema,
   markAttendanceSchema,
@@ -197,9 +197,13 @@ export async function markTrainingAttendance(formData: FormData): Promise<void> 
 
   const training = await db.query.trainings.findFirst({
     where: and(eq(trainings.id, parsed.data.trainingId), eq(trainings.teamId, parsed.data.teamId)),
-    columns: { id: true },
+    columns: { id: true, startsAt: true },
   });
   if (!training) return;
+  // A présence is an observation, so it cannot be recorded about an evening nobody has lived
+  // (decision 090, enforced by decision NNN). The page hides the list, and this is the rule: the
+  // page is a courtesy, the action is the guard.
+  if (!attendanceIsOpen(training.startsAt, new Date())) return;
 
   // Only members of this team, so a crafted form cannot mark a stranger present.
   const allowed = await activePlayerIds(parsed.data.teamId);
@@ -279,9 +283,12 @@ export async function markEveryonePresent(formData: FormData): Promise<void> {
 
   const training = await db.query.trainings.findFirst({
     where: and(eq(trainings.id, parsed.data.trainingId), eq(trainings.teamId, parsed.data.teamId)),
-    columns: { id: true },
+    columns: { id: true, startsAt: true },
   });
   if (!training) return;
+  // « Tout le monde est là » is the sentence this whole rule exists for: it was one tap, on a séance
+  // four days away, and it wrote thirteen rows (decision NNN).
+  if (!attendanceIsOpen(training.startsAt, new Date())) return;
 
   const players = [...(await activePlayerIds(parsed.data.teamId))];
   if (players.length === 0) return;

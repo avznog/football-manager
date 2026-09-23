@@ -129,6 +129,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       match holding eleven answers, an eleven-row sheet and two compositions. The training twin never
       mentioned `training_attendance`, markable before the séance because `AttendanceList` is not
       gated on `over`. `lib/calendar/deletion.ts`, eleven tests (decision 098)
+- [x] A présence cannot be recorded about an evening nobody has lived. `AttendanceList` rendered for
+      a coach with no reference to `over`, so « Tout le monde est là » was one tap on a séance four
+      days away — and `getAttendanceMarks` has no date filter, so `/stats` then read « 3 séances
+      pointées » in a season of two, with Brice credited 1/3 where the truth is 0/2. `attendanceIsOpen`
+      opens the pointage 30 minutes before kick-off and never closes it; both Server Actions refuse
+      outside the window, and the card says what to use meanwhile (decision NNN)
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)

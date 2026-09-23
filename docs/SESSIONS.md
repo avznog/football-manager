@@ -2020,3 +2020,36 @@ Verified at 390 px in both themes against the demo season, four rows chosen for 
 Étoile du Parc (three parts), the retro-entered FC des Deux-Ponts — no event log at all, so it *is*
 deletable, sheet and all (two parts) — AS Coteaux untouched (« Rien d'autre n'y est encore rattaché. »),
 and the one future séance, 9 réponses, 0 pointés.
+
+### 2026-09-23 — « Tout le monde est là », four days early, and « 3 séances pointées » out of two
+
+`entrainement` was the screen I opened to prove the previous one, and it turned out to hold a worse
+defect than the one it was helping prove.
+
+`dark-coach-entrainement.png` is the 26 September training seen on the 22nd. The top of it is correct
+and careful: « 9 réponses sur 13 joueurs », « Karim (toi) », and the tally adds up — 7 dispo, 1
+peut-être, 1 pas dispo, 4 sans réponse, thirteen players. Then, at 1 800 px, « Présences · Personne
+n'est encore pointé » over a « Tout le monde est là » button and thirteen Présent/Absent rows.
+
+Decision 090 fixed exactly this confusion in *words* three screens over. `AttendanceList` is rendered
+with no reference to `over`; `PresenceSummary`, the other half of the same ternary, reasons about it
+explicitly and returns `null` before the session. Somebody thought hard about what a player should be
+told, in that expression, and never turned the question around.
+
+The part that made it worth a branch rather than a copy fix: `getAttendanceMarks` filters by team and
+not by date. I inserted the thirteen rows one tap would have written and read `/stats`: « **3 séances
+pointées** » in a season of two, Brice 1/3 where the truth is 0/2, Fabien with him. Then deleted them;
+the two real sessions still hold 14 and 13 marks, checked.
+
+`attendanceIsOpen` opens the pointage 30 minutes before kick-off and never closes it — decision 076's
+« Présences pas encore pointées » depends on late marking staying possible. Both Server Actions refuse
+outside the window, and I proved that rather than asserting it: forced `canMark` to `true`, clicked
+« Tout le monde est là », then checked a Présent radio and submitted « Enregistrer les présences ».
+`training_attendance` empty after both. The scratch edit is reverted.
+
+Decision NNN. Seven new tests, 1018. Verified at 390 px in both themes on the future séance, the
+pointed 12 September one and the unpointed 19 September one.
+
+What I did **not** do, stated because it is a judgement and not an oversight: no date filter on
+`getAttendanceMarks`. With the write shut the table holds facts, and two definitions of « which
+sessions count » is how two screens come to disagree.

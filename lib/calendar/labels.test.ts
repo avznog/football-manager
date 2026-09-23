@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   attendanceCountFr,
   attendanceLineFr,
+  attendanceNotOpenFr,
   availabilityCountFr,
   availabilitySubtitleFr,
   departedMarksNoteFr,
@@ -121,6 +122,30 @@ describe("unmarkedSessionNoteFr", () => {
    */
   it("says the session counts in no attendance rate", () => {
     expect(unmarkedSessionNoteFr).toContain("aucun taux de présence");
+  });
+});
+
+describe("attendanceNotOpenFr", () => {
+  it("says when the pointage opens, with the number the rule actually uses", () => {
+    expect(attendanceNotOpenFr(30)).toContain("ouvre 30 minutes avant la séance");
+    expect(attendanceNotOpenFr(45)).toContain("ouvre 45 minutes avant la séance");
+  });
+
+  /**
+   * The refusal is the easy half. The sentence has to send the coach to the tool that answers the
+   * question he came with — decision 090's distinction, said to the one person who can blur it.
+   */
+  it("points at the availability answers instead of just refusing", () => {
+    const note = attendanceNotOpenFr(30);
+    expect(note).toContain("disponibilités");
+    expect(note).toContain("intention");
+    expect(note).toContain("un fait");
+  });
+
+  it("does not borrow the présences vocabulary for what the players declared", () => {
+    // « absent » is an observation about an evening that happened (decision 090). This sentence is
+    // printed on one that has not.
+    expect(attendanceNotOpenFr(30)).not.toContain("absent");
   });
 });
 

@@ -176,6 +176,27 @@ export const unmarkedSessionNoteFr =
   "Aucune présence n’a été pointée pour cette séance. Elle ne compte donc dans aucun taux de présence.";
 
 /**
+ * What the coach reads where the pointage list will be, on a séance that has not started.
+ *
+ * The list used to be there, in the present indicative: « Présences », « Tout le monde est là »,
+ * « Enregistrer les présences », on a session four days away. One tap put thirteen observations in
+ * `training_attendance` about an evening nobody had lived, and `/stats` then said « 3 séances
+ * pointées » in a season of two, with Brice at 1/3 instead of 0/2 (decision NNN).
+ *
+ * Hiding the card would leave a coach looking for it, so the card stays and says when it opens and
+ * what to use instead. The second sentence is the one doing the work: it does not just refuse, it
+ * points at the tool for the question he is actually asking, which is decision 090's distinction
+ * said out loud to the one person who can blur it.
+ */
+export function attendanceNotOpenFr(minutesBefore: number): string {
+  return (
+    `Le pointage ouvre ${minutesBefore} minutes avant la séance. ` +
+    "D’ici là, ce sont les disponibilités au-dessus qui disent qui vient : " +
+    "ce que les joueurs annoncent est une intention, une présence est un fait."
+  );
+}
+
+/**
  * Why « sur 14 pointés » can sit above a list of thirteen names.
  *
  * The attendance of a session is a fact about that evening and does not change when somebody leaves

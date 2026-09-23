@@ -2385,3 +2385,52 @@ quietly back to being incomplete.
 Deliberately not listed: `match_events`, `match_player_stats` and `ratings`. They cascade too, but a
 match holding any of them has a non-empty log, and both the page and `deleteMatch` refuse that outright
 (decision 003). Naming them would be describing a button nobody can reach.
+
+## NNN — A présence may not be recorded about an evening nobody has lived
+
+Decision 090 drew the line: `training_availability` holds what a player says he intends to do,
+`training_attendance` holds what the coach saw, and « pas dispo » is a declaration about a Saturday
+that has not happened while « absent » is an observation about one that has. It then fixed the
+*words* on the three screens that had blurred them.
+
+It did not close the door the words came through. `app/(app)/entrainements/[id]/page.tsx` rendered
+`AttendanceList` for a coach with no reference to `over` at all. On the 26 September training, read
+four days early, « Présences » sat over thirteen Présent/Absent rows, a « Tout le monde est là »
+button and « Enregistrer les présences », every one of them in the present indicative about an
+evening nobody had lived. The player's half of the very same ternary had reasoned about this from the
+start — « before the session there is genuinely nothing to report; the coach has not failed to do
+anything yet » — and the coach's half never did. The asymmetry is the whole finding: somebody thought
+carefully about what a player should be told before a séance, in the same expression, and the
+question never turned around.
+
+It is not only a screen in the wrong tense. `getAttendanceMarks` in `lib/stats/queries.ts` filters by
+team and not by date, so a pre-marked session enters the season statistics the moment it is written.
+Proved against the demo season by inserting the thirteen rows one tap would have created: `/stats`
+then reads « **3 séances pointées** » in a season of two, Brice's rate goes from 0/2 to 1/3 and
+Fabien's with him — a player credited with attending a session that will not happen for four days.
+That is the defect this repository exists to hunt, a screen stating something untrue, except that the
+untruth outlives the screen and settles in the statistics.
+
+So: **`attendanceIsOpen(startsAt, now)`**, in `lib/calendar/timeline.ts` beside the other durations.
+It opens the pointage `ATTENDANCE_OPENS_MINUTES_BEFORE` = 30 minutes before kick-off, because a coach
+arrives before his players and marks the first arrivals while they change, and it **never closes
+again**, because a coach who forgot last Thursday must still be able to — which is the entire premise
+of decision 076's « Présences pas encore pointées ». Both Server Actions check it. The page is a
+courtesy; the action is the guard, and the guard was verified by forcing the list to render and using
+it, with the table still empty afterwards.
+
+The card stays rather than disappearing — a coach hunting for a control he has used before is a worse
+screen than one that explains itself — and it says what to use meanwhile: « D'ici là, ce sont les
+disponibilités au-dessus qui disent qui vient : ce que les joueurs annoncent est une intention, une
+présence est un fait. » A refusal that does not name the right tool is half a sentence.
+
+**`getAttendanceMarks` deliberately keeps no date filter.** With the write shut, the table holds
+facts, and a second definition of « which sessions count » living in the stats query is exactly how
+two screens come to disagree. The cost of that choice is that a row written before this change would
+still be counted; there is none anywhere, because no production team exists yet (`docs/DEPLOY.md`),
+and if one ever did the cleanup is a migration deleting marks on sessions that had not started, not a
+`where` clause hiding them.
+
+The general rule, which is 090's rule pointed at a write instead of a sentence: **a table that holds
+observations may not be written before the thing it observes.** Getting the vocabulary right on the
+screens that read it is half the job; the other half is the one place that writes it.
