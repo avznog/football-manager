@@ -124,15 +124,21 @@ export function planMinuteBadgeFr(lineup: { fromMinute: number }): string {
   return `${lineup.fromMinute}'`;
 }
 
-/** What the match sheet calls each role. `null` is a real answer: « non retenu ». */
+/** What the match sheet calls each role. `null` is a real answer: « hors feuille ». */
 export const SQUAD_ROLE_LABELS: Record<SquadRole, string> = {
   starter: "Titulaire",
   substitute: "Remplaçant",
   supporter: "Supporter",
 };
 
+/**
+ * « Hors feuille » and not « Non retenu », because `null` in this column means two different things
+ * and the app cannot tell them apart: a coach who decided to leave the player out, and a sheet nobody
+ * has touched. On a match created a minute ago every one of the thirteen rows is `null` — « Non
+ * retenu » states a decision that has not been taken, thirteen times over.
+ */
 export function squadRoleLabelFr(role: SquadRole | null): string {
-  return role === null ? "Non retenu" : SQUAD_ROLE_LABELS[role];
+  return role === null ? "Hors feuille" : SQUAD_ROLE_LABELS[role];
 }
 
 export type SquadCounts = {
@@ -152,10 +158,15 @@ export function countSquadRoles(members: readonly { squadRole: SquadRole | null 
 }
 
 /**
- * The one-line state of the match sheet: « 7 titulaires · 4 remplaçants · 1 supporter ».
+ * The one-line state of the match sheet: « 7 titulaires · 3 remplaçants · 1 supporter · 2 hors
+ * feuille ».
  *
  * Roles with nobody in them are left out rather than printed as a zero — the line is read at a
  * glance on a phone, and « 0 supporter » is noise.
+ *
+ * The last part is what makes the line add up. Without it a thirteen-player squad summarised as
+ * « 7 titulaires · 3 remplaçants · 1 supporter » leaves two players unaccounted for, and a coach
+ * counting on his fingers cannot tell whether he forgot somebody or the app did.
  */
 export function squadSummaryFr(counts: SquadCounts): string {
   const parts: string[] = [];
@@ -167,6 +178,12 @@ export function squadSummaryFr(counts: SquadCounts): string {
   }
   if (counts.supporters > 0) {
     parts.push(counts.supporters === 1 ? "1 supporter" : `${counts.supporters} supporters`);
+  }
+  // Only once somebody is on the sheet: on an untouched one this would be the whole squad, and the
+  // line already says « Feuille de match vide », which is both shorter and truer — nobody has been
+  // left out of a sheet that does not exist yet.
+  if (parts.length > 0 && counts.unselected > 0) {
+    parts.push(`${counts.unselected} hors feuille`);
   }
   return parts.length > 0 ? parts.join(" · ") : "Feuille de match vide";
 }

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "./cn";
 
-export type SegmentTone = "accent" | "success" | "danger" | "warning";
+export type SegmentTone = "accent" | "success" | "danger" | "warning" | "neutral";
 
 export type SegmentOption<T extends string> = {
   value: T;
@@ -13,12 +13,23 @@ export type SegmentOption<T extends string> = {
   disabled?: boolean;
 };
 
-/** `accent-ink` clears 6.4:1 on every one of these fills, in both themes. */
+/**
+ * `accent-ink` clears 6.4:1 on every one of these fills, in both themes.
+ *
+ * `neutral` is the one that is not a fill: a quiet pill in `surface` on the `surface-2` track, with
+ * `ink` where the others have `accent-ink`. It exists for an option that is *chosen* without being
+ * *good, bad or pending* — « hors feuille » on the match sheet, which used to be painted `danger` and
+ * turned a brand-new match into thirteen red bars. The inset ring is what makes it read as selected
+ * in dark mode, where `surface` is darker than the track it sits on rather than lighter.
+ */
 const CHECKED: Record<SegmentTone, string> = {
   accent: "peer-checked:bg-accent peer-checked:text-accent-ink",
   success: "peer-checked:bg-success peer-checked:text-accent-ink",
   danger: "peer-checked:bg-danger peer-checked:text-accent-ink",
   warning: "peer-checked:bg-warning peer-checked:text-accent-ink",
+  neutral:
+    "peer-checked:bg-surface peer-checked:text-ink peer-checked:ring-1 " +
+    "peer-checked:ring-inset peer-checked:ring-border",
 };
 
 export type SegmentedControlProps<T extends string> = {

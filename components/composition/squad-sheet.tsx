@@ -62,7 +62,11 @@ const MARK_OPTIONS: readonly { value: SquadMark; short: string; full: string; to
   { value: "starter", short: "Titu.", full: "Titulaire", tone: "success" },
   { value: "substitute", short: "Rempl.", full: "Remplaçant", tone: "accent" },
   { value: "supporter", short: "Supp.", full: "Supporter", tone: "warning" },
-  { value: "none", short: "—", full: "Non retenu", tone: "danger" },
+  // « Hors », not « — ». The other three segments abbreviate a word; a bare dash abbreviates nothing,
+  // and it was the option selected on every row of a match created a minute ago. `neutral`, not
+  // `danger`, for the same reason: leaving a player out is the coach's routine choice, and on an
+  // untouched sheet it is not even a choice yet — thirteen red bars announced thirteen problems.
+  { value: "none", short: "Hors", full: "Hors feuille", tone: "neutral" },
 ];
 
 export function SquadSheet({

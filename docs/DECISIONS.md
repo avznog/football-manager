@@ -1341,3 +1341,30 @@ announced with it.
 
 The fields stay uncontrolled (`defaultValue`): the mirrored state exists only to write the sentence,
 and the form still posts what was typed with JavaScript off.
+
+## 067 — A new match sheet is empty, not thirteen rejections
+**2026-09-23** · accepted
+
+Creating a match and opening its « Feuille de match » gave thirteen rows, each with the fourth segment
+— labelled « — » and painted `danger` — selected. Thirteen red bars, under a summary line that
+correctly said « Feuille de match vide ». The screen contradicted itself: nobody had been left out of
+anything, and red is the colour this app uses for « Pas dispo » and « Blessé ».
+
+Three changes, one idea — the sheet stops asserting a decision nobody took.
+
+**« Hors feuille », not « Non retenu ».** `null` in `match_squad` means two things the app cannot tell
+apart: a coach who decided to leave the player out, and a sheet nobody has touched. « Non retenu »
+claims the first. « Hors feuille » is true of both, and is what `squadRoleLabelFr` returns now.
+
+**A `neutral` segment tone.** `SegmentedControl` had four tones, all of them fills that mean something
+— accent, success, warning, danger. There was no way to say *chosen, and unremarkable*. `neutral` is a
+quiet pill in `surface` with an inset `border` ring, which is what makes it legible as the selected
+segment in dark mode too, where `surface` is darker than the `surface-2` track rather than lighter.
+The visible label is « Hors » rather than « — »: the other three segments abbreviate a word, and a
+bare dash abbreviates nothing.
+
+**The summary accounts for everybody.** `squadSummaryFr` printed « 7 titulaires · 3 remplaçants ·
+1 supporter » for a thirteen-player squad, leaving two players unexplained — a coach counting on his
+fingers cannot tell whether he forgot somebody or the app did. It ends « · 2 hors feuille » now, and
+the line adds up. Not on an untouched sheet, though: « 13 hors feuille » would be the same lie in
+another font, and « Feuille de match vide » is already both shorter and true.

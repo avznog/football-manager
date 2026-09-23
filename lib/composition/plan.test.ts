@@ -325,26 +325,42 @@ describe("the match sheet in words", () => {
     });
   });
 
-  it("summarises the sheet the way a coach reads it", () => {
+  /**
+   * The last part is what makes the line add up: five players are marked here, and a coach reading
+   * « 2 titulaires · 1 remplaçant · 1 supporter » would be missing one with no way to know whether he
+   * forgot him or the app did.
+   */
+  it("summarises the sheet the way a coach reads it, and accounts for everybody", () => {
     expect(squadSummaryFr(countSquadRoles(sheet))).toBe(
-      "2 titulaires · 1 remplaçant · 1 supporter",
+      "2 titulaires · 1 remplaçant · 1 supporter · 1 hors feuille",
     );
   });
 
   it("leaves out the roles nobody has", () => {
-    expect(squadSummaryFr({ starters: 1, substitutes: 0, supporters: 0, unselected: 9 })).toBe(
+    expect(squadSummaryFr({ starters: 1, substitutes: 0, supporters: 0, unselected: 0 })).toBe(
       "1 titulaire",
+    );
+    expect(squadSummaryFr({ starters: 1, substitutes: 0, supporters: 0, unselected: 9 })).toBe(
+      "1 titulaire · 9 hors feuille",
     );
   });
 
+  /**
+   * An untouched sheet is not thirteen players left out — it is a sheet nobody has filled. « Feuille
+   * de match vide » is shorter and truer than « 13 hors feuille », so the tally is dropped entirely
+   * when there is nothing else on the line.
+   */
   it("says so when nothing has been decided", () => {
     expect(squadSummaryFr(countSquadRoles([{ squadRole: null }]))).toBe("Feuille de match vide");
+    expect(squadSummaryFr({ starters: 0, substitutes: 0, supporters: 0, unselected: 13 })).toBe(
+      "Feuille de match vide",
+    );
   });
 
   it("names every role, and the absence of one", () => {
     expect(squadRoleLabelFr("starter")).toBe("Titulaire");
     expect(squadRoleLabelFr("substitute")).toBe("Remplaçant");
     expect(squadRoleLabelFr("supporter")).toBe("Supporter");
-    expect(squadRoleLabelFr(null)).toBe("Non retenu");
+    expect(squadRoleLabelFr(null)).toBe("Hors feuille");
   });
 });

@@ -924,3 +924,29 @@ jeu » on the way to every value a coach types. Decision 066.
 Checked at 390 px in both themes with the fields at 2×30, at 3×20, and mid-edit with the minutes
 cleared: the label fits on one line, the two inputs stay aligned, and the sentence disappears rather
 than lying. 852 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.
+
+## Thirteen red bars for a decision nobody had taken
+
+The remaining screenshots had one real defect left in them, and it only shows on a screen the audit
+does not visit: `feuille` is walked for a match whose sheet is already filled. So I created a match
+through the UI, opened its match sheet, and there it was — thirteen rows, each with a red « — »
+selected, under a line that said « Feuille de match vide ». The screen disagreed with itself, and red
+is what this app uses for « Pas dispo » and « Blessé ».
+
+Fixed as decision 067: « Hors feuille » instead of « Non retenu » (because `null` means both « the
+coach left him out » and « nobody has touched this », and only one of those is a decision), a new
+`neutral` segment tone for an option that is chosen without being good, bad or pending, « Hors »
+instead of a dash that abbreviates nothing, and a summary line that ends « · 2 hors feuille » so the
+thirteen add up.
+
+Looked at at 390 px in both themes, on a match created for the purpose and deleted afterwards: the
+quiet pill reads as selected in light and in dark, and the demo season's sheet now says « 7 titulaires
+· 3 remplaçants · 1 supporter · 2 hors feuille ». 852 unit tests, 3 e2e specs, `audit:screens` clean
+on 92 visits.
+
+**Where the next session should pick up.** `docs/ROADMAP.md` has exactly two unchecked lines left, both
+blocked on the owner: the Vercel production deploy (needs a Neon `DATABASE_URL`; `SUPER_ADMIN_PASSWORD`
+must never be stored in Vercel, `ALLOW_REMOTE_RESET` must never be set in production) and the daylight
+check on a real iPhone and Android. Everything else in the backlog is merged. The audit screenshots
+still worth a fresh pair of eyes are the `joueur`-role variants of `notation`, `recap` and
+`entrainement` — they have been walked mechanically but not read line by line.
