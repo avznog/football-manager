@@ -29,6 +29,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       timeline, game mode's timeline and `lib/stats/format.ts` each built their own with a hyphen, so
       a recap showed « 2 – 0 » and « 2 - 0 » three cards apart. `formatScore` deleted, decision 061
       amended by 064 rather than left standing as a claim that was not true
+- [x] The audit browser speaks French to its *form controls* too — `--lang=fr-FR`, because
+      `context.locale` does not reach the native date picker, so every date field had been
+      screenshotted `mm/dd/yyyy` in a French app (decision 065)
+- [x] « 11 présents sur 14 pointés » on a calendar row: the denominator was always who the coach
+      marked, and without the word a coach with thirteen players reads « sur 14 » as a bug
+- [x] « Je me suis blessé » on `/moi` looks tappable — a `<summary>` with `list-none` and no marker
+      is a grey panel of text on a phone
 - [x] A finished match with an empty log is no longer offered « Voir le déroulé » in a full-width
       primary button promising « le déroulé reste consultable », and the « Composition » card's badge
       says which seven it is counting — it read « 7 / 7 » directly above « Aucune composition »

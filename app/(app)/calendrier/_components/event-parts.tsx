@@ -9,6 +9,7 @@
 import { Badge } from "@/components/ui/badge";
 import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
 import {
+  attendanceCountFr,
   AVAILABILITY_LABELS,
   COMPETITION_LABELS,
   pluralize,
@@ -129,8 +130,8 @@ export function trainingSubtitle(training: CalendarTraining): string {
   return [training.venue, training.note].filter((part): part is string => Boolean(part)).join(" · ");
 }
 
-/** « 10 présents sur 13 » once the coach has ticked the list. */
+/** « 10 présents sur 13 pointés » once the coach has ticked the list — `attendanceCountFr`. */
 export function attendanceSummary(training: CalendarTraining): string | null {
   if (training.attendance.marked === 0) return null;
-  return `${pluralize(training.attendance.present, "présent")} sur ${training.attendance.marked}`;
+  return attendanceCountFr(training.attendance.present, training.attendance.marked);
 }
