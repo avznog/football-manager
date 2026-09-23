@@ -129,6 +129,22 @@ export function attendanceCountFr(present: number, marked: number): string {
 }
 
 /**
+ * Why « sur 14 pointés » can sit above a list of thirteen names.
+ *
+ * The attendance of a session is a fact about that evening and does not change when somebody leaves
+ * the club, so the count is taken over the marks (the calendar row counts the same way). The list
+ * underneath can only show players who are still in the squad — there is no présent/absent to set
+ * for a man who has gone — and a coach counting the rows would otherwise be one short with no way to
+ * find out why. That is the whole job of this sentence, and it is only printed when the two differ.
+ */
+export function departedMarksNoteFr(departed: number): string | null {
+  if (departed <= 0) return null;
+  return departed === 1
+    ? "1 joueur pointé ce soir-là a quitté l’équipe depuis."
+    : `${departed} joueurs pointés ce soir-là ont quitté l’équipe depuis.`;
+}
+
+/**
  * « 13 réponses sur 13 joueurs » — how far round the squad the question has got.
  *
  * The denominator is named for the same reason it is on `attendanceCountFr`: « 11 sur 13 » alone
@@ -137,6 +153,28 @@ export function attendanceCountFr(present: number, marked: number): string {
  */
 export function availabilityCountFr(answered: number, total: number): string {
   return `${pluralize(answered, "réponse")} sur ${pluralize(total, "joueur")}`;
+}
+
+/**
+ * The same line once the event has happened: « Avant le match · 11 réponses sur 13 joueurs ».
+ *
+ * A list of who *said* they would come outlives the question it answered, and on a past event it is
+ * the only thing on the screen that is no longer actionable — « Sans réponse : 2 » about a session
+ * that finished on Tuesday is not a list to chase, it is a record. Naming the moment is what keeps a
+ * reader from taking it for the present tense, and the pages that show it put the card *below* what
+ * actually happened (decision 068).
+ *
+ * « la séance » rather than « l’entraînement » because the card is already inside a training page:
+ * the shorter word is the one a coach says, and it does not repeat the page title.
+ */
+export function availabilitySubtitleFr(
+  answered: number,
+  total: number,
+  past: "match" | "training" | null,
+): string {
+  const count = availabilityCountFr(answered, total);
+  if (past === null) return count;
+  return `${past === "match" ? "Avant le match" : "Avant la séance"} · ${count}`;
 }
 
 /** A plural `s` only when it is needed: `pluralize(1, "joueur")` → « 1 joueur ». */

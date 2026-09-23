@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
 import {
   addMinutes,
+  availabilityIsWorthShowing,
   buildReminderMessage,
   byStartAscending,
   countsOf,
@@ -317,5 +318,25 @@ describe("buildReminderMessage", () => {
     });
     expect(message).toContain("Tout le monde a répondu.");
     expect(message).not.toContain("Il manque");
+  });
+});
+
+describe("availabilityIsWorthShowing", () => {
+  /** The coach's reason for opening the screen at all: the thirteen names he has to chase. */
+  it("shows the list before the event even when nobody has answered", () => {
+    expect(availabilityIsWorthShowing({ answered: 0 }, false)).toBe(true);
+  });
+
+  /**
+   * The demo season's 29 August session: nobody answered, and the card was still the largest thing
+   * on the player's page a month later — thirteen names under « Sans réponse » about a session whose
+   * présences are recorded right above. A record of nothing is not a record.
+   */
+  it("drops it afterwards when there was nothing to record", () => {
+    expect(availabilityIsWorthShowing({ answered: 0 }, true)).toBe(false);
+  });
+
+  it("keeps it afterwards as soon as one person answered", () => {
+    expect(availabilityIsWorthShowing({ answered: 1 }, true)).toBe(true);
   });
 });

@@ -290,7 +290,12 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
           déplacement ce week-end » is why he is not in the log — but it is history, and `past` is
           what stops the card asking a question that closed at the kick-off. */}
       {match.status === "scheduled" ? null : (
-        <AvailabilityGrid tally={tally} notes={notes} selfMembershipId={team.membershipId} past />
+        <AvailabilityGrid
+          tally={tally}
+          notes={notes}
+          selfMembershipId={team.membershipId}
+          past="match"
+        />
       )}
     </div>
   );

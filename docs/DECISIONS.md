@@ -1392,3 +1392,47 @@ list of a played match harder to read, not easier.
 for the same reason: the denominator is named — « sur 13 joueurs », the squad the question went to —
 and the plurals are pinned by a test instead of living in a template inside a component vitest cannot
 reach.
+
+## 069 — A session's présences are counted over the evening, not over today's squad
+**2026-09-23** · accepted
+
+The player's « Présences » card on a training page printed « 11 présents sur 13 joueurs » for the demo
+season's 29 August session. The calendar row for the same session says « 11 présents sur 14 pointés ».
+One evening, two denominators, and the smaller one wrong twice over: an unmarked player is not an absent
+one (decision 020), and the numerator was read off every attendance row while the denominator was the
+squad *as it stands today*, so a player marked présent who had left the club in September counted
+towards a total he was no longer part of. With one more departure the card could have claimed more
+présents than there were players.
+
+**Attendance is a fact about that evening.** It does not change when somebody leaves the club, so both
+cards — the coach's marking list and the player's summary — now count the marks themselves, which is
+what the calendar row already counted. The consequence is that the denominator can exceed the number of
+rows in the list underneath, because the list can only offer a présent/absent control to a player who
+is still here. That gap is stated rather than left as arithmetic: `departedMarksNoteFr` adds « 1 joueur
+pointé ce soir-là a quitté l’équipe depuis. », and only when the two actually differ.
+
+**The ordering of decision 068 applies to trainings too.** Before the session, « Disponibilités » leads:
+who is coming is the question of the day. Once it is over, who *came* is the answer and who *said they
+would* is history, so the card moves below the présences and says « Avant la séance ». `past` on
+`AvailabilityGrid` therefore carries which kind of event it is rather than a bare boolean that only
+knew the word « match ».
+
+**And a past event nobody answered gets no card at all.** For 29 August the card was thirteen names
+under « Sans réponse » — the largest thing on the player's page, a month after the fact, about a
+question the présences above it have already answered. `availabilityIsWorthShowing` drops it when the
+event is past and `answered` is zero. Before the event it is always shown: « 0 réponse sur 13 joueurs »
+with thirteen names to chase is exactly what the coach came for.
+
+## 070 — « joueur 3 sur 11 », because an unlabelled ratio reads as a rating
+**2026-09-23** · accepted
+
+The rating card's subtitle was built from two bare figures joined by a dot: « n° 8 · 3 / 11 ». The first
+is a fact about the man being rated, so the second read as one too — and on a screen where every other
+number is a mark out of something, the likeliest reading of « 3 / 11 » is *three of his eleven
+team-mates have already rated him*, which is precisely what decision 007 hides until the reader has
+finished his own set. It was neither: it was which card of the stack is open.
+
+Labelled « joueur 3 sur 11 », and moved into `lib/rating/progress.ts` beside `playedLabelFr`, because
+Vitest only collects `lib/**` — a sentence built inline in a client component is a sentence no test
+pins. It returns `null` for a single card, where « joueur 1 sur 1 » would say nothing the screen does
+not already show.

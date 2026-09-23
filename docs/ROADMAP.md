@@ -89,6 +89,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Availability declaration for matches and trainings
 - [x] Coach view of non-responders, copyable list
 - [x] Training attendance marking
+- [x] A session's présences are counted over that evening and not over today's squad, so the training
+      page and the calendar row agree about it — and the page says why the denominator can be larger
+      than the list under it. The availability list moves below the présences once the session is over,
+      and disappears when nobody had answered at all (decision 069)
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)
@@ -142,6 +146,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       « non entré », read from the log, and nothing at all for a match nobody recorded. It used to
       read « entré en jeu » off `match_squad.role`, so a named substitute who spent the whole hour
       on the bench was announced as having come on, to the team, as they rated him (decision 053)
+- [x] …and says which card of the stack is open in words: « joueur 3 sur 11 ». An unlabelled « 3 / 11 »
+      beside a shirt number read as a fact about the man being rated, most plausibly as a tally of who
+      had already rated him — which decision 007 exists to hide (decision 070)
 
 ## M7 — Retro-entry & amendments
 - [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet

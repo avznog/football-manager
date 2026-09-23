@@ -157,3 +157,20 @@ export function playedLabelFr(minutes: number | null): string | null {
   if (minutes === null) return null;
   return minutes > 0 ? `${minutes}’` : "non entré";
 }
+
+/**
+ * Where you are in the pile: « joueur 3 sur 11 ».
+ *
+ * The word is the whole point. The card used to print « n° 8 · 3 / 11 » under the name, two bare
+ * figures joined by a dot, so the second read as another fact about the man being rated — and the
+ * likeliest reading of « 3 / 11 » on a screen whose every other number is a score out of something
+ * is that three of his eleven team-mates have rated him, which decision 007 exists to stop anybody
+ * knowing. It is neither: it is which card of the stack is open.
+ *
+ * `null` for a single card, because one card is not a sequence and « joueur 1 sur 1 » says nothing
+ * the screen does not already show. `position` is zero-based, the way the list index is.
+ */
+export function ratingCardPositionFr(position: number, total: number): string | null {
+  if (total <= 1) return null;
+  return `joueur ${position + 1} sur ${total}`;
+}

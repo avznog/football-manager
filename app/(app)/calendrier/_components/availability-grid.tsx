@@ -11,8 +11,12 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { AvailabilityStatus } from "@/db/schema";
-import { availabilityCountFr } from "@/lib/calendar/labels";
-import type { AvailabilityTally, Responder } from "@/lib/calendar/timeline";
+import { availabilitySubtitleFr } from "@/lib/calendar/labels";
+import {
+  availabilityIsWorthShowing,
+  type AvailabilityTally,
+  type Responder,
+} from "@/lib/calendar/timeline";
 
 type GroupKey = AvailabilityStatus | "pending";
 
@@ -34,24 +38,26 @@ export type AvailabilityGridProps = {
   /** Highlights the viewer's own line, so they can see their answer landed. */
   selfMembershipId?: string | null;
   /**
-   * The event has kicked off. The list is then a record of what people answered beforehand and not a
-   * question anybody can still act on, so it says so — and the match page moves the card below the
-   * things that can still be done.
+   * The event has kicked off — and which kind of event it was, because the card names the moment it
+   * describes. The list is then a record of what people answered beforehand and not a question
+   * anybody can still act on, so it says so, and the page moves the card below the things that can
+   * still be done. Leave it out for an event that has yet to happen.
    */
-  past?: boolean;
+  past?: "match" | "training";
 };
 
 export function AvailabilityGrid({
   tally,
   notes,
   selfMembershipId,
-  past = false,
+  past,
 }: AvailabilityGridProps) {
-  const count = availabilityCountFr(tally.answered, tally.total);
+  if (!availabilityIsWorthShowing(tally, past !== undefined)) return null;
+
   return (
     <Card
       title="Disponibilités"
-      description={past ? `Avant le match · ${count}` : count}
+      description={availabilitySubtitleFr(tally.answered, tally.total, past ?? null)}
       flush
     >
       <div className="divide-y divide-border/60">

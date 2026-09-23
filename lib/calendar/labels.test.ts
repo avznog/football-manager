@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   attendanceCountFr,
   availabilityCountFr,
+  availabilitySubtitleFr,
+  departedMarksNoteFr,
   entryModeBadgeFr,
   matchLengthHintFr,
   periodsLabel,
@@ -81,6 +83,25 @@ describe("attendanceCountFr", () => {
   });
 });
 
+describe("departedMarksNoteFr", () => {
+  /**
+   * 29 August again: fourteen pointed, thirteen rows in the list, because the fourteenth had left by
+   * September. Without this line a coach counting the rows is one short and cannot find out why.
+   */
+  it("accounts for the gap between the denominator and the list", () => {
+    expect(departedMarksNoteFr(1)).toBe("1 joueur pointé ce soir-là a quitté l’équipe depuis.");
+    expect(departedMarksNoteFr(3)).toBe(
+      "3 joueurs pointés ce soir-là ont quitté l’équipe depuis.",
+    );
+  });
+
+  /** The usual case: everybody pointed is still here, and there is nothing to explain. */
+  it("says nothing when the two agree", () => {
+    expect(departedMarksNoteFr(0)).toBeNull();
+    expect(departedMarksNoteFr(-2)).toBeNull();
+  });
+});
+
 describe("matchLengthHintFr", () => {
   /**
    * The default, and the one a coach actually needs told: the second period of a 2×30 runs 30′→60′,
@@ -126,5 +147,24 @@ describe("availabilityCountFr", () => {
     expect(availabilityCountFr(1, 13)).toBe("1 réponse sur 13 joueurs");
     expect(availabilityCountFr(0, 13)).toBe("0 réponse sur 13 joueurs");
     expect(availabilityCountFr(1, 1)).toBe("1 réponse sur 1 joueur");
+  });
+});
+
+describe("availabilitySubtitleFr", () => {
+  it("says nothing about the moment while the event is still to come", () => {
+    expect(availabilitySubtitleFr(11, 13, null)).toBe("11 réponses sur 13 joueurs");
+  });
+
+  /**
+   * The point of the prefix: without it the card reads as a live question about an event that
+   * finished days ago, and « Sans réponse : 2 » looks like two people to chase tonight.
+   */
+  it("dates the list once the event has happened, in the words of that event", () => {
+    expect(availabilitySubtitleFr(11, 13, "match")).toBe(
+      "Avant le match · 11 réponses sur 13 joueurs",
+    );
+    expect(availabilitySubtitleFr(9, 13, "training")).toBe(
+      "Avant la séance · 9 réponses sur 13 joueurs",
+    );
   });
 });
