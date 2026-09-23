@@ -29,7 +29,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Textarea } from "@/components/ui/textarea";
 import { submitRatings } from "@/lib/rating/actions";
-import { playedLabelFr } from "@/lib/rating/progress";
+import { playedLabelFr, ratingCardPositionFr } from "@/lib/rating/progress";
 import { RATING_COMMENT_MAX } from "@/lib/rating/validation";
 
 export type RatingFlowTarget = {
@@ -250,7 +250,7 @@ function RatingCard({
       title={target.displayName}
       description={[
         target.jerseyNumber !== null ? `n° ${target.jerseyNumber}` : null,
-        showPosition ? `${position + 1} / ${total}` : null,
+        showPosition ? ratingCardPositionFr(position, total) : null,
       ]
         .filter(Boolean)
         .join(" · ")}

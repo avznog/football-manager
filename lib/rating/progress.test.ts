@@ -6,6 +6,7 @@ import {
   isRateableRole,
   playedLabelFr,
   rateableMemberIds,
+  ratingCardPositionFr,
   ratingProgress,
   ratingVisibility,
   type SheetEntry,
@@ -148,5 +149,19 @@ describe("playedLabelFr", () => {
     // The reducer hands over whole minutes; a 40-second appearance arrives here as 0 and reads
     // « non entré », which is the same rule the season stats use (`lib/stats/aggregate.ts` rule 3).
     expect(playedLabelFr(1)).toBe("1’");
+  });
+});
+
+describe("ratingCardPositionFr", () => {
+  it("says what the figure counts, so it cannot be read as a score or a tally of raters", () => {
+    // « 3 / 11 » under a name, next to « n° 8 », read as a fact about the player — and on this
+    // screen most plausibly as "three of eleven have rated him", which decision 007 hides.
+    expect(ratingCardPositionFr(2, 11)).toBe("joueur 3 sur 11");
+    expect(ratingCardPositionFr(0, 11)).toBe("joueur 1 sur 11");
+  });
+
+  it("stays quiet when there is only one card", () => {
+    expect(ratingCardPositionFr(0, 1)).toBeNull();
+    expect(ratingCardPositionFr(0, 0)).toBeNull();
   });
 });
