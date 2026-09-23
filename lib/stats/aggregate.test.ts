@@ -1,0 +1,659 @@
+import { describe, expect, it } from "vitest";
+
+import type { MatchStatLine } from "./match-lines";
+import {
+  FORM_LENGTH,
+  LEADERBOARD_SIZE,
+  MIN_RATINGS,
+  type PlayerSeasonStats,
+  type SeasonInput,
+  type StatsMatch,
+  type StatsMember,
+  aggregateSeason,
+  attendanceRate,
+  average,
+  comparePlayers,
+  resultOf,
+  sortPlayers,
+} from "./aggregate";
+
+/* -------------------------------------------------------------------------- */
+/* Fixtures — all hand-written, nothing read from a database                   */
+/* -------------------------------------------------------------------------- */
+
+function member(id: string, name: string, extra: Partial<StatsMember> = {}): StatsMember {
+  return {
+    teamMemberId: id,
+    displayName: name,
+    jerseyNumber: null,
+    isPlayer: true,
+    hasLeft: false,
+    ...extra,
+  };
+}
+
+function match(id: string, extra: Partial<StatsMatch> = {}): StatsMatch {
+  return {
+    id,
+    kickoffAt: "2026-09-06T08:30:00.000Z",
+    opponentName: "AS Cormeilles",
+    isHome: true,
+    competition: "league",
+    score: { goalsFor: 1, goalsAgainst: 0 },
+    ...extra,
+  };
+}
+
+/** A zeroed line, so each test only states the fields it is actually about. */
+function line(matchId: string, teamMemberId: string, extra: Partial<MatchStatLine> = {}) {
+  return {
+    matchId,
+    teamMemberId,
+    minutes: 0,
+    goals: 0,
+    assists: 0,
+    ownGoals: 0,
+    penaltiesScored: 0,
+    penaltiesMissed: 0,
+    fouls: 0,
+    gkMinutes: 0,
+    cleanMinutes: 0,
+    concededWhileOn: 0,
+    gkCleanMinutes: 0,
+    concededWhileGk: 0,
+    squadRole: null,
+    ...extra,
+  } satisfies MatchStatLine;
+}
+
+function season(input: Partial<SeasonInput> = {}) {
+  return aggregateSeason({
+    members: [],
+    matches: [],
+    lines: [],
+    squad: [],
+    attendance: [],
+    ratings: [],
+    ...input,
+  });
+}
+
+const playerNamed = (players: PlayerSeasonStats[], id: string) =>
+  players.find((player) => player.teamMemberId === id)!;
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+describe("attendanceRate", () => {
+  it("is présent / marqué", () => {
+    expect(attendanceRate(8, 10)).toBe(0.8);
+    expect(attendanceRate(0, 3)).toBe(0);
+  });
+
+  it("is null rather than NaN when nothing was marked (decision 020)", () => {
+    expect(attendanceRate(0, 0)).toBeNull();
+    // Defensive: a negative denominator can only be a bug, and must not become an Infinity.
+    expect(attendanceRate(1, -1)).toBeNull();
+  });
+});
+
+describe("average", () => {
+  it("is null for an empty set, not zero", () => {
+    expect(average([])).toBeNull();
+  });
+
+  it("does not round", () => {
+    expect(average([6, 7])).toBe(6.5);
+    expect(average([0, 0, 0])).toBe(0);
+  });
+});
+
+describe("resultOf", () => {
+  it("reads the score from our point of view", () => {
+    expect(resultOf({ goalsFor: 3, goalsAgainst: 2 })).toBe("win");
+    expect(resultOf({ goalsFor: 1, goalsAgainst: 1 })).toBe("draw");
+    expect(resultOf({ goalsFor: 0, goalsAgainst: 4 })).toBe("loss");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The empty season                                                           */
+/* -------------------------------------------------------------------------- */
+
+describe("an empty season", () => {
+  it("says so instead of publishing zeros as facts", () => {
+    const stats = season({ members: [member("hugo", "Hugo")] });
+
+    expect(stats.isEmpty).toBe(true);
+    expect(stats.team.played).toBe(0);
+    expect(stats.topScorers).toEqual([]);
+    expect(stats.topRated).toEqual([]);
+    expect(stats.keepers).toEqual([]);
+
+    // The active player is still listed — a squad that loses its unselected players reads as a bug —
+    // but every derived number is null, not zero.
+    const hugo = playerNamed(stats.players, "hugo");
+    expect(hugo.hasData).toBe(false);
+    expect(hugo.rating).toEqual({ average: null, count: 0 });
+    expect(hugo.attendance).toEqual({ present: 0, marked: 0, rate: null });
+  });
+
+  it("leaves out a non-playing coach with nothing recorded", () => {
+    const stats = season({
+      members: [member("admin", "Admin", { isPlayer: false }), member("hugo", "Hugo")],
+    });
+    expect(stats.players.map((player) => player.teamMemberId)).toEqual(["hugo"]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Selections versus appearances                                              */
+/* -------------------------------------------------------------------------- */
+
+describe("a player who was a supporter twice and a starter once", () => {
+  const members = [member("gerard", "Gérard")];
+  const matches = [match("m1"), match("m2"), match("m3")];
+  const squad = [
+    { matchId: "m1", teamMemberId: "gerard", role: "supporter" as const },
+    { matchId: "m2", teamMemberId: "gerard", role: "supporter" as const },
+    { matchId: "m3", teamMemberId: "gerard", role: "starter" as const },
+  ];
+  const lines = [
+    line("m1", "gerard", { squadRole: "supporter" }),
+    line("m2", "gerard", { squadRole: "supporter" }),
+    line("m3", "gerard", { squadRole: "starter", minutes: 60, goals: 1 }),
+  ];
+
+  const gerard = playerNamed(season({ members, matches, squad, lines }).players, "gerard");
+
+  it("counts three selections split by role", () => {
+    expect(gerard.appearances).toEqual({
+      selected: 3,
+      starter: 1,
+      substitute: 0,
+      supporter: 2,
+      goalkeeper: 0,
+    });
+  });
+
+  it("counts one match played, because the two touchline afternoons were not appearances", () => {
+    expect(gerard.matchesPlayed).toBe(1);
+    expect(gerard.minutes).toBe(60);
+    expect(gerard.goals).toBe(1);
+  });
+});
+
+describe("a substitute who never came on", () => {
+  it("is a selection but not an appearance (rule 3)", () => {
+    const stats = season({
+      members: [member("momo", "Momo")],
+      matches: [match("m1")],
+      squad: [{ matchId: "m1", teamMemberId: "momo", role: "substitute" }],
+      lines: [line("m1", "momo", { squadRole: "substitute", minutes: 0 })],
+    });
+
+    const momo = playerNamed(stats.players, "momo");
+    expect(momo.appearances.selected).toBe(1);
+    expect(momo.appearances.substitute).toBe(1);
+    expect(momo.matchesPlayed).toBe(0);
+    expect(momo.hasData).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Goalkeepers                                                                */
+/* -------------------------------------------------------------------------- */
+
+describe("goalkeepers", () => {
+  // One match, one keeper each half, conceded in the second (decision 018's example).
+  const stats = season({
+    members: [member("hugo", "Hugo"), member("momo", "Momo")],
+    matches: [match("m1", { score: { goalsFor: 2, goalsAgainst: 1 } })],
+    squad: [
+      { matchId: "m1", teamMemberId: "hugo", role: "starter" },
+      { matchId: "m1", teamMemberId: "momo", role: "substitute" },
+    ],
+    lines: [
+      line("m1", "hugo", {
+        squadRole: "starter",
+        minutes: 30,
+        gkMinutes: 30,
+        gkCleanMinutes: 30,
+        concededWhileGk: 0,
+        cleanMinutes: 30,
+      }),
+      line("m1", "momo", {
+        squadRole: "substitute",
+        minutes: 30,
+        gkMinutes: 30,
+        gkCleanMinutes: 10,
+        concededWhileGk: 1,
+        cleanMinutes: 10,
+        concededWhileOn: 1,
+      }),
+    ],
+  });
+
+  it("counts a gardien appearance from the minutes in goal, not from a sheet role (rule 4)", () => {
+    expect(playerNamed(stats.players, "hugo").appearances.goalkeeper).toBe(1);
+    expect(playerNamed(stats.players, "hugo").appearances.starter).toBe(1);
+    expect(playerNamed(stats.players, "momo").appearances.goalkeeper).toBe(1);
+  });
+
+  it("gives the clean sheet to the keeper who did not concede, in a match we did", () => {
+    expect(playerNamed(stats.players, "hugo").gkCleanSheets).toBe(1);
+    expect(playerNamed(stats.players, "momo").gkCleanSheets).toBe(0);
+    // The team's own clean-sheet count is a different fact and stays at zero: we conceded.
+    expect(stats.team.cleanSheets).toBe(0);
+  });
+
+  it("still credits the replaced keeper's clean minutes", () => {
+    expect(playerNamed(stats.players, "momo").gkCleanMinutes).toBe(10);
+  });
+
+  it("ranks keepers by clean sheets, then clean minutes", () => {
+    expect(stats.keepers.map((keeper) => keeper.teamMemberId)).toEqual(["hugo", "momo"]);
+  });
+
+  it("leaves outfield players out of the keepers list", () => {
+    const outfield = season({
+      members: [member("julien", "Julien")],
+      matches: [match("m1")],
+      lines: [line("m1", "julien", { minutes: 60 })],
+    });
+    expect(outfield.keepers).toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Attendance                                                                 */
+/* -------------------------------------------------------------------------- */
+
+describe("attendance with unmarked sessions", () => {
+  // Three sessions happened. Hugo was judged at all three, Momo at two, Yanis at none — the coach
+  // simply never pointed him. Decision 020: that is not three absences.
+  const stats = season({
+    members: [member("hugo", "Hugo"), member("momo", "Momo"), member("yanis", "Yanis")],
+    attendance: [
+      { teamMemberId: "hugo", present: true },
+      { teamMemberId: "hugo", present: true },
+      { teamMemberId: "hugo", present: false },
+      { teamMemberId: "momo", present: true },
+      { teamMemberId: "momo", present: false },
+    ],
+  });
+
+  it("divides by what was marked, not by the number of sessions", () => {
+    const hugo = playerNamed(stats.players, "hugo");
+    expect(hugo.attendance).toEqual({ present: 2, marked: 3, rate: 2 / 3 });
+
+    const momo = playerNamed(stats.players, "momo");
+    expect(momo.attendance).toEqual({ present: 1, marked: 2, rate: 0.5 });
+  });
+
+  it("gives an unmarked player a null rate, never 0 %", () => {
+    const yanis = playerNamed(stats.players, "yanis");
+    expect(yanis.attendance).toEqual({ present: 0, marked: 0, rate: null });
+  });
+
+  it("is not an empty season: marks are data even with no match played", () => {
+    expect(stats.isEmpty).toBe(false);
+    expect(playerNamed(stats.players, "hugo").hasData).toBe(true);
+    expect(playerNamed(stats.players, "yanis").hasData).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Ratings                                                                    */
+/* -------------------------------------------------------------------------- */
+
+describe("ratings", () => {
+  const members = [member("julien", "Julien"), member("karim", "Karim")];
+  const matches = [match("m1"), match("m2", { kickoffAt: "2026-09-13T08:30:00.000Z" })];
+
+  it("averages over matches without rounding, and counts what it averaged", () => {
+    const stats = season({
+      members,
+      matches,
+      ratings: [
+        { matchId: "m1", ratedMemberId: "julien", score: 7 },
+        { matchId: "m1", ratedMemberId: "julien", score: 8 },
+        { matchId: "m2", ratedMemberId: "julien", score: 6 },
+      ],
+    });
+    expect(playerNamed(stats.players, "julien").rating).toEqual({ average: 7, count: 3 });
+    expect(playerNamed(stats.players, "karim").rating).toEqual({ average: null, count: 0 });
+  });
+
+  it("ignores a rating attached to a match outside the filter", () => {
+    const stats = season({
+      members,
+      matches: [match("m1")],
+      ratings: [{ matchId: "m2", ratedMemberId: "julien", score: 9 }],
+    });
+    expect(playerNamed(stats.players, "julien").rating.count).toBe(0);
+  });
+
+  it(`keeps a thin average out of the leaderboard but not out of the table (${MIN_RATINGS} minimum)`, () => {
+    const stats = season({
+      members,
+      matches,
+      ratings: [
+        // Karim: one glowing rating. Real, shown on his row, not a ranking.
+        { matchId: "m1", ratedMemberId: "karim", score: 10 },
+        { matchId: "m1", ratedMemberId: "julien", score: 6 },
+        { matchId: "m1", ratedMemberId: "julien", score: 6 },
+        { matchId: "m2", ratedMemberId: "julien", score: 6 },
+      ],
+    });
+
+    expect(playerNamed(stats.players, "karim").rating).toEqual({ average: 10, count: 1 });
+    expect(stats.topRated.map((entry) => entry.teamMemberId)).toEqual(["julien"]);
+    expect(stats.topRated[0]).toMatchObject({ value: 6, count: 3 });
+  });
+
+  it("ranks an honest 0.0 average rather than dropping it as a falsy value", () => {
+    const stats = season({
+      members,
+      matches,
+      ratings: [
+        { matchId: "m1", ratedMemberId: "julien", score: 0 },
+        { matchId: "m1", ratedMemberId: "julien", score: 0 },
+        { matchId: "m2", ratedMemberId: "julien", score: 0 },
+      ],
+    });
+    expect(stats.topRated).toHaveLength(1);
+    expect(stats.topRated[0]).toMatchObject({ teamMemberId: "julien", value: 0, count: 3 });
+  });
+
+  it("passes the count of matches whose ratings are hidden from the viewer", () => {
+    expect(season({ hiddenRatingMatches: 2 }).hiddenRatingMatches).toBe(2);
+    expect(season().hiddenRatingMatches).toBe(0);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The team                                                                   */
+/* -------------------------------------------------------------------------- */
+
+describe("the team's tally", () => {
+  const stats = season({
+    matches: [
+      match("m1", { kickoffAt: "2026-09-06T08:30:00.000Z", score: { goalsFor: 3, goalsAgainst: 2 } }),
+      match("m2", { kickoffAt: "2026-09-13T08:30:00.000Z", score: { goalsFor: 1, goalsAgainst: 1 } }),
+      match("m3", { kickoffAt: "2026-09-20T08:30:00.000Z", score: { goalsFor: 0, goalsAgainst: 4 } }),
+      match("m4", { kickoffAt: "2026-09-27T08:30:00.000Z", score: { goalsFor: 2, goalsAgainst: 0 } }),
+    ],
+  });
+
+  it("counts wins, draws and losses", () => {
+    expect(stats.team).toMatchObject({
+      played: 4,
+      wins: 2,
+      draws: 1,
+      losses: 1,
+      goalsFor: 6,
+      goalsAgainst: 7,
+      goalDifference: -1,
+      cleanSheets: 1,
+      points: 7,
+    });
+  });
+
+  it("puts the most recent match first in the form guide", () => {
+    expect(stats.team.form.map((entry) => entry.matchId)).toEqual(["m4", "m3", "m2", "m1"]);
+    expect(stats.team.form.map((entry) => entry.result)).toEqual(["win", "loss", "draw", "win"]);
+  });
+
+  it(`shows at most ${FORM_LENGTH} matches`, () => {
+    const many = season({
+      matches: Array.from({ length: 9 }, (_, index) =>
+        match(`m${index}`, { kickoffAt: `2026-09-0${index + 1}T08:30:00.000Z` }),
+      ),
+    });
+    expect(many.team.form).toHaveLength(FORM_LENGTH);
+    expect(many.team.form[0]?.matchId).toBe("m8");
+  });
+
+  it("counts a finished match with nothing logged nowhere, and says how many (rule 7)", () => {
+    const withGap = season({
+      matches: [match("m1", { score: { goalsFor: 2, goalsAgainst: 0 } }), match("m2", { score: null })],
+    });
+
+    expect(withGap.team.played).toBe(1);
+    expect(withGap.team.unrecordedMatches).toBe(1);
+    // Not a draw, not a defeat, not a clean sheet: no score at all.
+    expect(withGap.team.draws).toBe(0);
+    expect(withGap.team.cleanSheets).toBe(1);
+    expect(withGap.team.form.map((entry) => entry.matchId)).toEqual(["m1"]);
+  });
+});
+
+describe("goals with no scorer (decision 017)", () => {
+  it("reports the gap instead of forcing the scorers to add up to the score", () => {
+    const stats = season({
+      members: [member("julien", "Julien")],
+      matches: [match("m1", { score: { goalsFor: 3, goalsAgainst: 1 } })],
+      lines: [line("m1", "julien", { minutes: 60, goals: 1 })],
+    });
+
+    expect(stats.team.goalsFor).toBe(3);
+    expect(playerNamed(stats.players, "julien").goals).toBe(1);
+    expect(stats.team.unattributedGoals).toBe(2);
+  });
+
+  it("never reports a negative number of unattributed goals", () => {
+    const stats = season({
+      members: [member("julien", "Julien")],
+      matches: [match("m1", { score: { goalsFor: 1, goalsAgainst: 0 } })],
+      lines: [line("m1", "julien", { minutes: 60, goals: 2 })],
+    });
+    expect(stats.team.unattributedGoals).toBe(0);
+  });
+
+  it("does not add a scored penalty to the goal it already is (reducer rule 5)", () => {
+    const stats = season({
+      members: [member("julien", "Julien")],
+      matches: [match("m1", { score: { goalsFor: 2, goalsAgainst: 0 } })],
+      lines: [line("m1", "julien", { minutes: 60, goals: 2, penaltiesScored: 1 })],
+    });
+
+    const julien = playerNamed(stats.players, "julien");
+    expect(julien.goals).toBe(2);
+    expect(julien.penaltiesScored).toBe(1);
+    expect(stats.team.unattributedGoals).toBe(0);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The competition filter                                                     */
+/* -------------------------------------------------------------------------- */
+
+describe("a competition filter that excludes somebody's only match", () => {
+  const members = [member("julien", "Julien"), member("yanis", "Yanis")];
+  // Two matches happened; the filter keeps only the league one. Yanis played only the cup match.
+  const allLines = [
+    line("m1", "julien", { squadRole: "starter", minutes: 60, goals: 1 }),
+    line("m2", "yanis", { squadRole: "starter", minutes: 60, goals: 3, gkMinutes: 60 }),
+  ];
+  const allSquad = [
+    { matchId: "m1", teamMemberId: "julien", role: "starter" as const },
+    { matchId: "m2", teamMemberId: "yanis", role: "starter" as const },
+  ];
+  const allRatings = [
+    { matchId: "m2", ratedMemberId: "yanis", score: 9 },
+    { matchId: "m2", ratedMemberId: "yanis", score: 9 },
+    { matchId: "m2", ratedMemberId: "yanis", score: 9 },
+  ];
+
+  // The query layer filters the *matches*; the lines, sheets and ratings it hands over may still
+  // mention others, and the aggregate must ignore them rather than trust its caller.
+  const stats = season({
+    members,
+    matches: [match("m1", { competition: "league" })],
+    lines: allLines,
+    squad: allSquad,
+    ratings: allRatings,
+  });
+
+  it("drops every number attached to the excluded match", () => {
+    const yanis = playerNamed(stats.players, "yanis");
+    expect(yanis.minutes).toBe(0);
+    expect(yanis.goals).toBe(0);
+    expect(yanis.gkMinutes).toBe(0);
+    expect(yanis.appearances.selected).toBe(0);
+    expect(yanis.rating).toEqual({ average: null, count: 0 });
+    expect(yanis.hasData).toBe(false);
+  });
+
+  it("still lists him, so the filter reads as a filter and not as a disappearance", () => {
+    expect(stats.players.map((player) => player.teamMemberId).sort()).toEqual(["julien", "yanis"]);
+  });
+
+  it("keeps him out of every leaderboard", () => {
+    expect(stats.topScorers.map((entry) => entry.teamMemberId)).toEqual(["julien"]);
+    expect(stats.topRated).toEqual([]);
+    expect(stats.keepers).toEqual([]);
+  });
+
+  it("gives him everything back when the filter is lifted", () => {
+    const unfiltered = season({
+      members,
+      matches: [match("m1", { competition: "league" }), match("m2", { competition: "cup" })],
+      lines: allLines,
+      squad: allSquad,
+      ratings: allRatings,
+    });
+
+    const yanis = playerNamed(unfiltered.players, "yanis");
+    expect(yanis.goals).toBe(3);
+    expect(yanis.matchesPlayed).toBe(1);
+    expect(unfiltered.topScorers.map((entry) => entry.teamMemberId)).toEqual(["yanis", "julien"]);
+    expect(unfiltered.keepers.map((keeper) => keeper.teamMemberId)).toEqual(["yanis"]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Members who have left                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe("a member who has left", () => {
+  it("keeps the goals he scored in September (rule 8)", () => {
+    const stats = season({
+      members: [member("old", "Ancien", { hasLeft: true })],
+      matches: [match("m1", { score: { goalsFor: 2, goalsAgainst: 0 } })],
+      lines: [line("m1", "old", { squadRole: "starter", minutes: 60, goals: 2 })],
+    });
+
+    const old = playerNamed(stats.players, "old");
+    expect(old.goals).toBe(2);
+    expect(old.hasLeft).toBe(true);
+    expect(stats.topScorers[0]).toMatchObject({ teamMemberId: "old", hasLeft: true });
+  });
+
+  it("disappears once the filter leaves him with nothing to show", () => {
+    const stats = season({
+      members: [member("old", "Ancien", { hasLeft: true })],
+      matches: [match("m1")],
+      lines: [],
+    });
+    expect(stats.players).toEqual([]);
+  });
+});
+
+describe("a line naming somebody the member list does not", () => {
+  it("keeps the numbers under a placeholder rather than losing them", () => {
+    const stats = season({
+      members: [],
+      matches: [match("m1", { score: { goalsFor: 1, goalsAgainst: 0 } })],
+      lines: [line("m1", "ghost", { minutes: 60, goals: 1 })],
+    });
+
+    expect(stats.players).toHaveLength(1);
+    expect(stats.players[0]).toMatchObject({ teamMemberId: "ghost", goals: 1 });
+    expect(stats.team.unattributedGoals).toBe(0);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Sorting                                                                    */
+/* -------------------------------------------------------------------------- */
+
+describe("sorting the table", () => {
+  const stats = season({
+    members: [member("a", "Alice"), member("b", "Bruno"), member("c", "Chloé")],
+    matches: [match("m1")],
+    lines: [
+      line("m1", "a", { minutes: 60, goals: 1, assists: 3 }),
+      line("m1", "b", { minutes: 30, goals: 4 }),
+      line("m1", "c", { minutes: 45, goals: 1 }),
+    ],
+    ratings: [{ matchId: "m1", ratedMemberId: "b", score: 8 }],
+    attendance: [{ teamMemberId: "c", present: true }],
+  });
+
+  it("defaults to minutes, descending", () => {
+    expect(stats.players.map((player) => player.teamMemberId)).toEqual(["a", "c", "b"]);
+  });
+
+  it("sorts by goals, then by minutes", () => {
+    expect(sortPlayers(stats.players, "goals").map((player) => player.teamMemberId)).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
+  });
+
+  it("puts players with no value for the key last, not first", () => {
+    // Only Bruno has a rating and only Chloé has a marked session: the others sort behind them.
+    expect(sortPlayers(stats.players, "rating")[0]?.teamMemberId).toBe("b");
+    expect(sortPlayers(stats.players, "attendance")[0]?.teamMemberId).toBe("c");
+  });
+
+  it("breaks a full tie on the name, so two renders never disagree", () => {
+    const tied = season({
+      members: [member("z", "Zoé"), member("a", "Alice")],
+      matches: [match("m1")],
+      lines: [line("m1", "z", { minutes: 60 }), line("m1", "a", { minutes: 60 })],
+    });
+    expect(tied.players.map((player) => player.displayName)).toEqual(["Alice", "Zoé"]);
+  });
+
+  it("is a total order for every key", () => {
+    for (const key of ["minutes", "goals", "assists", "rating", "attendance"] as const) {
+      const sorted = sortPlayers(stats.players, key);
+      expect(sorted).toHaveLength(stats.players.length);
+      expect(comparePlayers(key)(sorted[0]!, sorted[0]!)).toBe(0);
+    }
+  });
+});
+
+describe("leaderboards", () => {
+  it(`show at most ${LEADERBOARD_SIZE} rows and nobody on zero`, () => {
+    const stats = season({
+      members: Array.from({ length: 8 }, (_, index) => member(`p${index}`, `Joueur ${index}`)),
+      matches: [match("m1")],
+      lines: Array.from({ length: 8 }, (_, index) =>
+        line("m1", `p${index}`, { minutes: 60, goals: index }),
+      ),
+    });
+
+    expect(stats.topScorers).toHaveLength(LEADERBOARD_SIZE);
+    // p0 scored none and is therefore not in a scorers' chart at all.
+    expect(stats.topScorers.map((entry) => entry.teamMemberId)).not.toContain("p0");
+    expect(stats.topScorers[0]).toMatchObject({ teamMemberId: "p7", value: 7 });
+  });
+
+  it("breaks a tie between scorers on assists", () => {
+    const stats = season({
+      members: [member("a", "Alice"), member("b", "Bruno")],
+      matches: [match("m1")],
+      lines: [
+        line("m1", "a", { minutes: 60, goals: 2, assists: 0 }),
+        line("m1", "b", { minutes: 60, goals: 2, assists: 1 }),
+      ],
+    });
+    expect(stats.topScorers.map((entry) => entry.teamMemberId)).toEqual(["b", "a"]);
+  });
+});

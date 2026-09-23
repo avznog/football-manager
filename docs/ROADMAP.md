@@ -54,12 +54,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Final whistle → freeze `match_player_stats`
 
 ## M5 — Stats
-- [ ] Player stats: matches, minutes, goals, assists, own goals, fouls
-- [ ] GK clean sheets + clean minutes for every player
-- [ ] Appearance counts by role (starter / substitute / GK / supporter)
-- [ ] Training attendance rate
-- [ ] Team stats: results, form, top scorers, top rated
-- [ ] Competition filter across all stats
+- [x] Player stats: matches, minutes, goals, assists, own goals, fouls
+- [x] GK clean sheets + clean minutes for every player
+- [x] Appearance counts by role (starter / substitute / GK / supporter)
+- [x] Training attendance rate
+- [x] Team stats: results, form, top scorers, top rated
+- [x] Competition filter across all stats
 
 ## M6 — Ratings & recap
 - [ ] Rating flow: one teammate per card, 0–10, optional comment
