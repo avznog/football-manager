@@ -78,8 +78,9 @@ test("le premier lancement : un compte sans équipe en crée une et entre dans l
     await expect(page.getByRole("heading", { level: 1, name: teamName })).toBeVisible();
     await expect(page.getByText("0 joueur", { exact: true })).toBeVisible();
     await expect(page.getByText(/Personne encore\./)).toBeVisible();
-    // He is the team's coach, so the tool for fixing that is on the same screen.
-    await expect(page.getByRole("heading", { name: "Inviter des joueurs" })).toBeVisible();
+    // He is the team's coach, so the tool for fixing that is on the same screen. The heading names
+    // both roles because the select inside the card mints a coach code too — `inviteCardFr`.
+    await expect(page.getByRole("heading", { name: "Inviter un joueur ou un coach" })).toBeVisible();
   });
 
   await test.step("the club colours and the name can still be changed afterwards", async () => {

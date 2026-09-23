@@ -1750,7 +1750,13 @@ secondary colour, which is the ring `PlayerDisc` draws. Two claims did not.
   because Karim is coach *and* player and is therefore in « Effectif ». The card now says « 1 coach
   joue aussi, et apparaît dans l'effectif. », derived from the squad.
 
-`lib/team/labels.ts` with six tests — `inviteCardFr`, `staffCardFr`, `invitesReadOnlyFr`. 931 tests on this branch, 936 with #73's five.
+`lib/team/labels.ts` with six tests — `inviteCardFr`, `staffCardFr`, `invitesReadOnlyFr`. 958 tests
+on this branch, rebased on the `main` that has #73 in it.
+
+CI caught what I had not: `e2e/first-run.spec.ts` asserts the heading of that card by its exact
+words, so renaming it turned the first-run spec red. My fault for not running `npm run test:e2e`
+on this branch before opening the pull request — `/equipe` is on the happy path and `CLAUDE.md`
+says so. The assertion now names both roles too, with the reason beside it.
 Looked at at 390 px in both themes as `karim` and as `hugo`: both titles still fit one line, and a
 player sees the Encadrement note but no invite card.
 
