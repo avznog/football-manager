@@ -85,6 +85,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       over a select whose second option is « Coach »; and « Encadrement », true of every row under it,
       did not mention the coach who is in the effectif instead. `lib/team/labels.ts`, six tests
       (decision NNN)
+- [x] …and the profile speaks about the member whose profile it is. The demo team's own non-playing
+      coach was told he would « ne plus pouvoir déclarer ses disponibilités ni être convoqué », under
+      a card headed « Fiche joueur » saying he is not one, beside a jersey hint about « le joueur ».
+      `lib/player/labels.ts` decides all three now, and Vitest can read them (decision NNN)
 
 ## M2 — Calendar
 - [x] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)
@@ -205,6 +209,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       27 septembre à 10:30 ». `closesAtMs` had been computed since M6 and read by nobody, so three
       screens promised « tu verras les notes des autres quand tu auras fini » without mentioning that
       finishing has a closing time — and `progress.ts` makes missing it permanent (decision 079)
+- [x] …and a player's average is explained with the matches that hold a note about **him**. The
+      profile printed the reader's own season-wide count of unfinished matches — « Les notes de
+      2 matchs sont exclus de cette moyenne » where one of the two held no note about that player at
+      all, and under a « — » where nothing was excluded from anything (decision NNN)
 
 ## M7 — Retro-entry & amendments
 - [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet

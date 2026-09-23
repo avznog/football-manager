@@ -1763,3 +1763,44 @@ player sees the Encadrement note but no invite card.
 The decision this earned is the general form of it: a heading is answerable for the rows a reader
 would expect under it, not only the ones that are there. Splitting a list is a choice the app made and
 the reader cannot see.
+
+### « 2 matchs sont exclus de cette moyenne », under a moyenne that was a dash
+
+Tenth screen from the captures, `/joueur/[id]`. Two unrelated defects, one rule, which is why they
+ship together.
+
+The stats card carried « Les notes de 2 matchs sont exclus de cette moyenne : tu étais sur la feuille
+mais tu n'as pas noté tes coéquipiers. » `season.hiddenRatingMatches` is
+`hiddenMatchIds.length` — the reader's count, correct on `/stats` where the note sits over the whole
+table, and not a fact about the player being looked at. psql settled it: the demo season has ratings in
+three matches (23, 11 and 44 notes) and four of the 78 are about Ali, so Karim's second hidden match
+holds nothing about him. And Ali's own average is « — », so on his own profile the sentence explained
+an exclusion from a number that is not there, while saying nothing about the dash he was looking at.
+
+`ratingVisibility` already loops the author rows to decide what to hide, and those rows carry
+`ratedMemberId`, so a `matchId → Set<ratedMemberId>` map in that same loop gives one count per player
+for no extra query and no extra leak — the existence of a note, never its score. `hiddenRatingsNoteFr`
+then has two forms because there are two states: beside an average, « La moyenne ne porte que sur les
+matchs que tu as notés »; instead of one, « c'est pourquoi il n'y a pas de moyenne ». Verified as Ali
+and as Karim at 390 px: Karim now reads **1 match** where the screen used to say two.
+
+Then the other half, found while checking the rest of the page. `admin` / « Coach » is a member of the
+demo team with `is_player = false`, and there is a second coach, so `canRemove && !isSelf &&
+!isLastCoach` holds and the profile renders all of its cards about them. « Le joueur ne pourra plus
+déclarer ses disponibilités ni être convoqué » was untrue twice over — `can()` refuses every
+`SELF_ACTIONS` entry to `isPlayer = false`, and `/match/[id]` filters `isPlayer` before drawing the
+selection list — so removing them takes the team away, not a place in it. « Fiche joueur » headed a
+card whose one sentence says the member is not one. The jersey hint said « si le joueur n'a pas de
+numéro fixe » to a coach editing a man with no maillot. And « convoqué » is a word the data model has
+no concept for: no convocation fields, by a decision taken before the first line of code, and eleven
+other places say « feuille de match ».
+
+What I deliberately did **not** change, having read them: `/stats`'s two season-wide notes
+(« Les notes de 2 matchs ne sont pas comptées ici », « ces moyennes ») — they are true at table level,
+and that is exactly the distinction this slice is about. The jersey *form* also stays on an
+encadrement profile: `/equipe` prints the number next to whoever has one, so the field is reachable on
+purpose; only its hint was wrong.
+
+969 tests, seventeen new across `lib/stats/ratings.test.ts`, `lib/stats/format.test.ts` and the new
+`lib/player/labels.test.ts`. Both themes at 390 px, as `karim` looking at Ali and at the non-playing
+coach, and as `ali` looking at himself. `npm run test:e2e` green in 27 s.

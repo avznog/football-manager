@@ -2112,3 +2112,48 @@ when there is nothing to explain.
 The general rule: **a heading is answerable not only for the rows under it, but for the rows a reader
 would expect under it.** Splitting a list is a choice the app made; the reader did not make it and
 cannot see it.
+
+## NNN — A profile may only state facts about the member whose profile it is
+**2026-09-23** · accepted
+
+`/joueur/[id]` is one page rendered for twenty-four different members and read by any of them. Three
+sentences on it were true of somebody — just not of the member whose name was at the top.
+
+**The reader's fact, printed as the player's.** Under Ali's average, the card said « Les notes de
+2 matchs sont exclus de cette moyenne : tu étais sur la feuille mais tu n'as pas noté tes
+coéquipiers. » That two is `RatingVisibility.hiddenMatchIds.length`, which is a fact about **the
+reader**: how many matches they have not finished rating. It is the right number on `/stats`, where
+the note sits over a whole table, and it was the wrong number here in two independent ways. Karim's
+second hidden match holds no rating about Ali at all — proved against the demo database, which has
+notes in three matches only and four of them about Ali — so one of the two « exclus » matches had
+nothing to exclude. And for Ali reading his own profile the average is « — »: nothing is excluded
+*from* a number that does not exist, and the sentence explained an omission the reader could not see
+while failing to explain the dash they could.
+
+`ratingVisibility` now also returns `hiddenRatedCounts`, one count per rated member, built from the
+author rows it already holds — so this costs no query and leaks no judgement, only the existence of
+one. `hiddenRatingsNoteFr` says « Ses notes sur 1 match restent cachées tant que tu n'as pas noté tes
+coéquipiers » beside an average, and « … : c'est pourquoi il n'y a pas de moyenne » when there is
+none. The season-wide notes on `/stats` are left exactly as they were: they are true at table level,
+which is the whole point of this entry.
+
+**The squad's fact, printed as the member's.** The demo team's own `admin` is a member with
+`is_player = false` and there is a second coach, so the profile renders every one of its cards about
+them — and three spoke as though they were a player. « Le joueur ne pourra plus déclarer ses
+disponibilités ni être convoqué » was untrue twice: `can()` refuses every entry in `SELF_ACTIONS` to
+a member with `isPlayer = false` (« Only players act as players. A non-playing coach has nothing to
+declare. ») and `/match/[id]` filters `isPlayer` before it draws the selection list. Removing them
+takes away the team, not a place in it, so the card is now « Retirer de l'équipe » for them and
+« Retirer de l'effectif » for a player. « Fiche joueur » headed a card whose only sentence says the
+member is not one. And the jersey hint told a coach what to do « si le joueur n'a pas de numéro
+fixe » about somebody who has no maillot at all.
+
+« convoqué » went for a second reason, decision 085's: there are no convocation fields in this app by
+design, and the eleven other places naming the same thing say « feuille de match ». A verb the data
+model has no concept for reads as a feature the reader cannot find.
+
+The general rule, which is decision 087's heading rule turned on the page instead of the list: **the
+subject of a screen is the subject of every sentence on it.** A number that is true of the reader, or
+of the typical member, has to be either recomputed for this member or moved to a screen whose subject
+it is. All four sentences above were inlined in Server Components, where `vitest.config.ts` collects
+nothing, which is why none of them failed a test for four milestones.
