@@ -2053,3 +2053,24 @@ pointed 12 September one and the unpointed 19 September one.
 What I did **not** do, stated because it is a judgement and not an oversight: no date filter on
 `getAttendanceMarks`. With the write shut the table holds facts, and two definitions of « which
 sessions count » is how two screens come to disagree.
+
+### 2026-09-23 — The sort tab that moved the page out from under the reader
+
+First of eight remarks the owner wrote up after using the deployed app himself, and the cheapest of
+them: on `/stats`, scrolled down to « Joueurs », tapping « Buts » instead of « Minutes » sorted the list
+and sent the viewport back to the title.
+
+Nothing was wrong with the sort. Every control on that screen is a `<Link>` writing a search param —
+deliberately, so `?tri=goals` is shareable, survives a reload and works with no JavaScript — and the
+App Router scrolls to the top of the document on every navigation unless told otherwise. Both link
+groups in `filters.tsx` now pass `scroll={false}`: the sort tabs the owner reported, and the
+competition chips, which had exactly the same defect and only looked innocent because they sit near the
+top of the page where the jump is invisible.
+
+`/stats` turned out to be entirely server-rendered — no `"use client"`, no `useState`, no
+`router.push` anywhere under `app/(app)/stats/` — so `filters.tsx` was the whole surface: two link
+groups, not the three I expected to find. `leaderboard.tsx`, `keepers.tsx`, `attendance.tsx`,
+`player-list.tsx` and `team-summary.tsx` have no interactive controls at all.
+
+Decision 100. No test: this is a prop on a `<Link>` in `app/`, which Vitest does not collect, and the
+behaviour is the framework's. Outstanding, and it is the only honest check — scroll and tap on a phone.

@@ -213,6 +213,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       five « rien dans cette sélection ». The hint now reads « séances pointées, toute la saison »
       whenever a filter is on, and the reason is one sentence shared with the présence card
       (decision 082)
+- [x] …and a sort tab no longer throws the reader back to the title. Every control on `/stats` is a
+      `<Link>` writing a search param, which is what makes the selection shareable and no-JS-proof —
+      and the App Router scrolls to the top on every navigation, so sorting the player list from
+      halfway down the page moved the one thing the reader was looking at. `scroll={false}` on both
+      the chips and the tabs (decision 100)
 
 - [x] One register in the French: the app tutoies everywhere. Eight strings vouvoied, including the
       banner a player reads in game mode, with the same coach addressed both ways on one screen

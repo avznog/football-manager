@@ -2434,3 +2434,30 @@ and if one ever did the cleanup is a migration deleting marks on sessions that h
 The general rule, which is 090's rule pointed at a write instead of a sentence: **a table that holds
 observations may not be written before the thing it observes.** Getting the vocabulary right on the
 screens that read it is half the job; the other half is the one place that writes it.
+
+## 100 — A control that only replaces numbers may not move the page
+
+**2026-09-23.** From the owner, on a phone: scroll down `/stats` to « Joueurs », tap « Buts » instead
+of « Minutes », and the page jumps back to the title. The list sorted correctly — and the reader was no
+longer looking at it.
+
+The cause is a deliberate design meeting a framework default. Every control on `/stats` is a `<Link>`
+writing a search param, and that is on purpose: `?competition=cup` and `?tri=goals` are shareable,
+survive a reload, and work with no JavaScript, which `SegmentedControl` and an `onChange` handler would
+all have cost. But the App Router scrolls to the top of the document on every navigation unless told
+not to, and a sort tab *is* a navigation here.
+
+Both link groups in `app/(app)/stats/_components/filters.tsx` now carry `scroll={false}` — the
+competition chips as well as the sort tabs, because the chips had the same defect and only looked
+innocent for sitting near the top of the page.
+
+The rule, and it is the one worth keeping: **when a control's whole effect is to replace content that is
+already under the reader's thumb, the viewport must not move.** In this codebase that means
+`scroll={false}` on the `<Link>`, not demoting the control to client state — trading a shareable URL for
+a scroll position would be the wrong way round.
+
+One accepted limit: with JavaScript off, the tap is a full document load and the browser lands at the
+top regardless. `scroll={false}` is an instruction to the client router. Fixing the no-JS case would
+mean appending a `#joueurs` fragment to every sort href, which would then follow every shared URL
+around; the no-JS fallback is a fallback, and landing at the top of a page whose numbers are correct is
+not a defect worth that.
