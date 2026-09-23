@@ -11,7 +11,8 @@
  * *which two teams* to compare, and which of the resulting changes are worth showing.
  */
 
-import type { SquadRole } from "@/db/schema";
+import { FORMATION_SLOT_COUNT } from "@/db/reference";
+import type { MatchStatus, SquadRole } from "@/db/schema";
 import {
   type LineupDiff,
   type PositionChange,
@@ -186,6 +187,71 @@ export function squadSummaryFr(counts: SquadCounts): string {
     parts.push(`${counts.unselected} hors feuille`);
   }
   return parts.length > 0 ? parts.join(" · ") : "Feuille de match vide";
+}
+
+/**
+ * What the « Et maintenant ? » card on the match sheet should say, and where it should point.
+ *
+ * It used to say « Le groupe est fait : place les sept sur le terrain. » on every sheet, in every
+ * state. On a match created a minute ago that is a completed selection nobody has made; on a match
+ * played a fortnight ago it is an instruction for a match that is over; and with nine names ticked it
+ * names a seven that does not exist. Decision 084, which is decision 083's rule applied to a
+ * next-step card: **it describes the form in front of the coach, not a match.**
+ *
+ * The four cases are the four different pieces of advice, in the order a coach meets them:
+ *
+ *   - **finished** — nothing to place. The sheet is frozen (`SquadSheet` already says so), so the
+ *     card stops giving instructions and offers the recap instead.
+ *   - **nobody ticked** — the composition editor would open with an empty bench, so there is no link
+ *     at all: the next step is on this screen, above.
+ *   - **fewer than seven** — worth saying how many are missing, and worth keeping the link: placing
+ *     four while thinking about the fifth is a normal way to work.
+ *   - **more than seven** — there are only seven places (`FORMATION_SLOT_COUNT`), and nothing stops a
+ *     coach ticking eight. The badge turns amber; this says by how much.
+ *
+ * `live` is deliberately not a case of its own. A composition prepared during a match is the normal
+ * way to plan a change, and invariant 3 means it is still only a proposal.
+ */
+export function sheetNextStepFr(
+  counts: SquadCounts,
+  status: MatchStatus,
+): { description: string; cta: "composition" | "recap" | null } {
+  if (status === "finished") {
+    return {
+      description:
+        "Le match est joué : la feuille reste ici pour mémoire. Le résumé dit ce qui s’est passé.",
+      cta: "recap",
+    };
+  }
+  if (counts.starters === 0) {
+    return {
+      description:
+        "Personne n’est encore titulaire. Coche d’abord le groupe ci-dessus : sans titulaire, il " +
+        "n’y a personne à placer sur le terrain.",
+      cta: null,
+    };
+  }
+  if (counts.starters < FORMATION_SLOT_COUNT) {
+    const missing = FORMATION_SLOT_COUNT - counts.starters;
+    return {
+      description:
+        `${counts.starters} titulaire${counts.starters > 1 ? "s" : ""} sur ${FORMATION_SLOT_COUNT} : ` +
+        `il en manque ${missing}. Tu peux déjà placer ${counts.starters > 1 ? "ceux-là" : "celui-là"} ` +
+        "sur le terrain et finir la feuille après.",
+      cta: "composition",
+    };
+  }
+  if (counts.starters > FORMATION_SLOT_COUNT) {
+    const extra = counts.starters - FORMATION_SLOT_COUNT;
+    return {
+      description:
+        `${counts.starters} titulaires cochés pour ${FORMATION_SLOT_COUNT} places : il y en a ` +
+        `${extra} de trop. Repasse${extra > 1 ? "-les en remplaçants" : "-le en remplaçant"} ` +
+        "avant de composer.",
+      cta: "composition",
+    };
+  }
+  return { description: "Le groupe est fait : place les sept sur le terrain.", cta: "composition" };
 }
 
 /* -------------------------------------------------------------------------- */

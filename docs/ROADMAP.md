@@ -109,6 +109,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Match sheet selection: titulaire / remplaçant / supporter
 - [x] Planned compositions from minute X, with the deduced-changes diff
 - [x] `lib/match/lineup.ts` + unit tests (including chained position changes)
+- [x] « Et maintenant ? » at the bottom of the match sheet is derived, not written once. It said
+      « Le groupe est fait : place les sept sur le terrain. » on an untouched sheet, on a match played
+      a fortnight ago, and on a sheet with nine titulaires ticked. `sheetNextStepFr` returns the
+      sentence and the call to action together, so the button can disappear when there is nowhere
+      useful to go (decision 084)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses
