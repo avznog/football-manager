@@ -135,6 +135,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Training attendance rate
 - [x] Team stats: results, form, top scorers, top rated
 - [x] Competition filter across all stats
+- [x] Nothing on the stats screens is explained on hover: `Figure`'s hints used to live in a `title`
+      attribute, which on a phone is nowhere, so « 7 matchs sur la feuille » — the figure that
+      reconciles « Matchs 6 » with « 7 fois titulaire » — had never been read by anyone (decision 072)
+- [x] One wording for a player's appearances, shared by `/stats` and the profile card, and French:
+      « 7 fois titulaire », not « 7 titulaire » (decision 073)
 
 ## M6 — Ratings & recap
 - [x] Rating flow: one teammate per card, 0–10, optional comment

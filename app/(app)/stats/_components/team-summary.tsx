@@ -69,7 +69,7 @@ export function TeamSummary({
         <Figure
           label="Clean sheets"
           value={team.cleanSheets}
-          hint="Matchs terminés sans encaisser"
+          hint="sans encaisser"
           tone="strong"
         />
         <Figure label="Victoires" value={team.wins} tone="muted" />

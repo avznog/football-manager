@@ -82,3 +82,44 @@ export function plural(count: number, singular: string, many = `${singular}s`): 
 export function matchCount(count: number): string {
   return plural(count, "match", "matchs");
 }
+
+/**
+ * « 6 matchs sur la feuille · 1 fois titulaire · 5 fois remplaçant · 2 fois gardien ».
+ *
+ * The line under a player's figures, and the place where two numbers that look like the same number
+ * are told apart. « Matchs » counts the matches he has minutes in (`aggregate.ts`, rule 3), while a
+ * selection is a name on a sheet (rule 4) — an unused substitute is selected and has no appearance,
+ * and a finished match nobody recorded gives nobody a minute at all (rule 7). So the sheet total is
+ * routinely the larger of the two: the demo season's Karim reads « MATCHS 6 » above « 7 fois
+ * titulaire », and the figure that reconciles them used to live in a `title` attribute, which on the
+ * phone this app is built for is nowhere at all.
+ *
+ * « N fois titulaire », not « N titulaire »: seven of them is « 7 titulaires » in French, and the
+ * shape with « fois » needs no agreement, reads the way a coach says it, and is what the profile
+ * card already printed while `/stats` printed the ungrammatical short form.
+ *
+ * `withSheetTotal` is off for the profile card, whose header already says « 7 matchs sur la feuille »
+ * in full width — the same sentence twice on one card is worse than none.
+ */
+export function appearancesLineFr(
+  appearances: {
+    selected: number;
+    starter: number;
+    substitute: number;
+    supporter: number;
+    goalkeeper: number;
+  },
+  options: { withSheetTotal?: boolean } = {},
+): string | null {
+  const parts: string[] = [];
+
+  if (options.withSheetTotal === true && appearances.selected > 0) {
+    parts.push(`${matchCount(appearances.selected)} sur la feuille`);
+  }
+  if (appearances.starter > 0) parts.push(`${appearances.starter} fois titulaire`);
+  if (appearances.substitute > 0) parts.push(`${appearances.substitute} fois remplaçant`);
+  if (appearances.supporter > 0) parts.push(`${appearances.supporter} fois supporter`);
+  if (appearances.goalkeeper > 0) parts.push(`${appearances.goalkeeper} fois gardien`);
+
+  return parts.length > 0 ? parts.join(" · ") : null;
+}

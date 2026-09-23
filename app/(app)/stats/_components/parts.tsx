@@ -7,9 +7,13 @@
  *    scrolls sideways or shrinks to four-point type. So a player is a *row with a caption*: an
  *    identity line, then a wrapped list of `label: value` pairs. The pairs stay a real `<dl>`, so a
  *    screen reader still hears "Buts, 4" rather than a bare number.
- * 2. **A missing number says so.** `null` renders as an em dash with a `title`, never as `0`
- *    (`lib/stats/aggregate.ts`, rule 1). `Figure` is the only place that decision is applied, which
- *    is why no card formats a value itself.
+ * 2. **A missing number says so.** `null` renders as an em dash, explained to assistive tech and on
+ *    hover, never as `0` (`lib/stats/aggregate.ts`, rule 1). `Figure` is the only place that
+ *    decision is applied, which is why no card formats a value itself.
+ * 3. **Nothing is explained on hover alone.** There is no hover on a phone, and this screen is read
+ *    on a phone: a `title` is a sentence nobody will ever see. So `hint` is *printed*, under the
+ *    value — and because a column is about 110 px wide at 390 px, a hint that will not fit in two or
+ *    three words belongs in a `Note` under the card instead (decision 072).
  */
 
 import type { ReactNode } from "react";
@@ -21,6 +25,9 @@ import { NO_DATA_FR, NO_VALUE_FR } from "@/lib/stats/format";
 /**
  * One `label / value` pair. `value` of `null` is "nobody has this number yet" and is rendered as a
  * dash explained on hover and to assistive tech — the one rule the screen must never break.
+ *
+ * `hint` is printed under the value, not hidden in a `title` (idea 3 above). Keep it to two or three
+ * words: the grid gives it about 110 px.
  */
 export function Figure({
   label,
@@ -31,7 +38,7 @@ export function Figure({
 }: {
   label: ReactNode;
   value: string | number | null;
-  /** Extra clarification, e.g. the denominator behind a rate. */
+  /** The denominator behind the value, printed under it. Two or three words. */
   hint?: string;
   tone?: "default" | "strong" | "muted";
   className?: string;
@@ -49,7 +56,7 @@ export function Figure({
           tone === "strong" ? "text-base font-semibold" : "text-sm font-medium",
           missing ? "text-ink-subtle" : tone === "muted" ? "text-ink-muted" : "text-ink",
         )}
-        title={missing ? NO_DATA_FR : hint}
+        title={missing ? NO_DATA_FR : undefined}
       >
         {missing ? (
           <>
@@ -59,6 +66,14 @@ export function Figure({
         ) : (
           value
         )}
+        {/* Inside the `<dd>`, so a screen reader hears « Note, 7,5, sur 4 notes » as one value
+            rather than as a stray fragment between two pairs. Nothing is printed when the value is
+            a dash: a denominator under a number nobody has is noise. */}
+        {!missing && hint !== undefined ? (
+          <span className="mt-0.5 block text-[0.625rem] leading-tight font-normal text-ink-subtle">
+            {hint}
+          </span>
+        ) : null}
       </dd>
     </div>
   );

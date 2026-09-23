@@ -38,15 +38,13 @@ export function Keepers({ keepers }: { keepers: readonly PlayerSeasonStats[] }) 
               <Figure
                 label="Clean sheets"
                 value={keeper.gkCleanSheets}
-                hint={`sur ${matchCount(keeper.appearances.goalkeeper)} dans les buts`}
+                hint={`sur ${matchCount(keeper.appearances.goalkeeper)}`}
                 tone="strong"
               />
               <Figure label="Minutes" value={formatMinutes(keeper.gkMinutes)} />
-              <Figure
-                label="Sans encaisser"
-                value={formatMinutes(keeper.gkCleanMinutes)}
-                hint="Minutes passées dans les buts avec la cage inviolée"
-              />
+              {/* No hint: « minutes dans les buts avec la cage inviolée » is the Note under the
+                  card, in the width a sentence needs (decision 072). */}
+              <Figure label="Sans encaisser" value={formatMinutes(keeper.gkCleanMinutes)} />
               <Figure label="Encaissés" value={keeper.concededWhileGk} />
             </FigureGrid>
           </li>

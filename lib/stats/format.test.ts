@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   NO_VALUE_FR,
+  appearancesLineFr,
   formatAttendance,
   formatDecimal,
   formatMinutes,
@@ -99,5 +100,38 @@ describe("plural", () => {
     expect(plural(3, "match", "matchs")).toBe("3 matchs");
     expect(matchCount(1)).toBe("1 match");
     expect(matchCount(4)).toBe("4 matchs");
+  });
+});
+
+describe("appearancesLineFr", () => {
+  /** Karim's demo season: seven sheets, six matches with minutes. */
+  const karim = { selected: 7, starter: 7, substitute: 0, supporter: 0, goalkeeper: 0 };
+
+  it("leads with the sheet total, which is what explains « Matchs 6 » above it", () => {
+    expect(appearancesLineFr(karim, { withSheetTotal: true })).toBe(
+      "7 matchs sur la feuille · 7 fois titulaire",
+    );
+  });
+
+  it("omits the sheet total for the profile card, whose header already prints it", () => {
+    expect(appearancesLineFr(karim)).toBe("7 fois titulaire");
+  });
+
+  it("says « fois » rather than agreeing the noun, so a plural is never wrong", () => {
+    expect(
+      appearancesLineFr({ selected: 6, starter: 1, substitute: 5, supporter: 0, goalkeeper: 2 }),
+    ).toBe("1 fois titulaire · 5 fois remplaçant · 2 fois gardien");
+  });
+
+  it("drops the roles nobody has, and the singular reads as French", () => {
+    expect(
+      appearancesLineFr({ selected: 1, starter: 0, substitute: 0, supporter: 1, goalkeeper: 0 }),
+    ).toBe("1 fois supporter");
+  });
+
+  it("is null for a player who has never been on a sheet, so the card prints nothing", () => {
+    const none = { selected: 0, starter: 0, substitute: 0, supporter: 0, goalkeeper: 0 };
+    expect(appearancesLineFr(none)).toBeNull();
+    expect(appearancesLineFr(none, { withSheetTotal: true })).toBeNull();
   });
 });

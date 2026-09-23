@@ -1454,3 +1454,51 @@ width either way, and the table still fits without horizontal scroll at 360 px.
 a scoreboard actually uses (`GB`, `V`/`N`/`D`, `csc`). Screen width is never a good enough reason — the
 numbers under these headers are single digits, so the header is what sets the column width, and a
 shorter header buys no space at all.
+
+## 072 — There is no hover on a phone, so nothing is explained in a `title`
+**2026-09-23** · accepted
+
+`Figure`, the label/value pair every card on `/stats` and the profile's « Statistiques personnelles »
+are built from, took a `hint` and rendered it as a `title` attribute. A `title` is a desktop tooltip:
+it needs a mouse to rest on an element, which is a gesture no touch screen has. This app is
+mobile-first by its first decision, so seven written explanations were reaching nobody —
+« 7 matchs sur la feuille », « moyenne sur 4 notes », « présences / séances pointées », « Minutes
+passées dans les buts avec la cage inviolée », « Matchs terminés sans encaisser ».
+
+The cost was not merely a missing footnote. A player card reads « MATCHS 6 » above « 7 fois
+titulaire », which looks like one of the two being wrong; it is rules 3 and 4 of `aggregate.ts`
+meeting — a match counts when he has minutes in it, a selection is a name on a sheet, and the demo
+season's one unrecorded match (rule 7) gives nobody a minute. « 7 matchs sur la feuille » is what
+reconciles them, and it was the hidden sentence.
+
+**So a `hint` is printed, under its value.** And because the grid gives a column about 110 px at
+390 px, every hint was re-judged rather than simply revealed:
+
+- a hint that is really a sentence goes into the `Note` under its card, which has the full width —
+  the keepers' card already explained clean minutes there, so its hint was pure duplication;
+- what stays is two or three words: « sur 4 notes », « séances pointées », « sur 2 matchs »,
+  « sans encaisser »;
+- the sheet total has no short form, so it leads the full-width appearances line instead.
+
+It is printed inside the `<dd>`, so a screen reader hears « Note, 8,0, sur 4 notes » as one value,
+and it is suppressed when the value is a dash: a denominator under a number nobody has is noise.
+`title` survives only on that dash, where it duplicates an `sr-only` sentence.
+
+**The general rule:** nothing an app of ours says may depend on hovering. A `title` is at most a
+duplicate of something already visible or announced.
+
+## 073 — One wording for a player's appearances, shared by the two screens that print them
+**2026-09-23** · accepted
+
+`/stats` printed « 7 titulaire · 5 remplaçant », the profile card printed « 7 fois titulaire · 5 fois
+remplaçant ». The first is not French — seven of them is « 7 titulaires » — and the two were separate
+hand-built lists that had already drifted once.
+
+`appearancesLineFr` in `lib/stats/format.ts` is now the only place either is written. It keeps the
+« N fois titulaire » shape: it needs no agreement, so it cannot be got wrong, and it is how a coach
+says it. `withSheetTotal` is what distinguishes the two callers — `/stats` prepends « 7 matchs sur la
+feuille » because nothing else on that card carries it, the profile does not because its header
+already does, and the same sentence twice on one card is worse than none.
+
+In `lib/` rather than in the component for the reason decisions 060, 062 and 065–070 all give: Vitest
+collects `lib/**` and `db/**`, so a string built inline under `app/` is a string no test pins.
