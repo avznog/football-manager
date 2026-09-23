@@ -14,7 +14,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { attendanceCountFr } from "@/lib/calendar/labels";
+import { attendanceCountFr, departedMarksNoteFr } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
 import {
   buildReminderMessage,
@@ -139,7 +139,7 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
           marks={marks}
         />
       ) : (
-        <PresenceSummary marks={marks} />
+        <PresenceSummary marks={marks} squadSize={players.length} />
       )}
 
       {over ? (
@@ -159,13 +159,25 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
  * was read off every attendance row while the denominator was today's squad, so a player marked
  * présent who has since left the club counted towards a total he was no longer part of.
  */
-function PresenceSummary({ marks }: { marks: ReadonlyMap<string, boolean> }) {
+function PresenceSummary({
+  marks,
+  squadSize,
+}: {
+  marks: ReadonlyMap<string, boolean>;
+  squadSize: number;
+}) {
   if (marks.size === 0) return null;
   const present = [...marks.values()].filter(Boolean).length;
+  // A player knows how many they are, so « sur 14 pointés » in a squad of thirteen needs the same
+  // explanation the coach's card gives. There is no list here to compare against, so the count is
+  // the arithmetic floor — it can only under-report, never claim a departure that did not happen.
+  const departed = departedMarksNoteFr(marks.size - squadSize);
 
   return (
     <Card title="Présences">
-      <p className="text-sm text-ink-muted">{attendanceCountFr(present, marks.size)}.</p>
+      <p className="text-sm text-ink-muted">
+        {attendanceCountFr(present, marks.size)}.{departed ? ` ${departed}` : ""}
+      </p>
     </Card>
   );
 }

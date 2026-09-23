@@ -129,6 +129,22 @@ export function attendanceCountFr(present: number, marked: number): string {
 }
 
 /**
+ * Why « sur 14 pointés » can sit above a list of thirteen names.
+ *
+ * The attendance of a session is a fact about that evening and does not change when somebody leaves
+ * the club, so the count is taken over the marks (the calendar row counts the same way). The list
+ * underneath can only show players who are still in the squad — there is no présent/absent to set
+ * for a man who has gone — and a coach counting the rows would otherwise be one short with no way to
+ * find out why. That is the whole job of this sentence, and it is only printed when the two differ.
+ */
+export function departedMarksNoteFr(departed: number): string | null {
+  if (departed <= 0) return null;
+  return departed === 1
+    ? "1 joueur pointé ce soir-là a quitté l’équipe depuis."
+    : `${departed} joueurs pointés ce soir-là ont quitté l’équipe depuis.`;
+}
+
+/**
  * « 13 réponses sur 13 joueurs » — how far round the squad the question has got.
  *
  * The denominator is named for the same reason it is on `attendanceCountFr`: « 11 sur 13 » alone

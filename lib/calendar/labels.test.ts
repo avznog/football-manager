@@ -4,6 +4,7 @@ import {
   attendanceCountFr,
   availabilityCountFr,
   availabilitySubtitleFr,
+  departedMarksNoteFr,
   entryModeBadgeFr,
   matchLengthHintFr,
   periodsLabel,
@@ -79,6 +80,25 @@ describe("attendanceCountFr", () => {
   it("keeps both halves singular when both are one", () => {
     expect(attendanceCountFr(1, 1)).toBe("1 présent sur 1 pointé");
     expect(attendanceCountFr(0, 13)).toBe("0 présent sur 13 pointés");
+  });
+});
+
+describe("departedMarksNoteFr", () => {
+  /**
+   * 29 August again: fourteen pointed, thirteen rows in the list, because the fourteenth had left by
+   * September. Without this line a coach counting the rows is one short and cannot find out why.
+   */
+  it("accounts for the gap between the denominator and the list", () => {
+    expect(departedMarksNoteFr(1)).toBe("1 joueur pointé ce soir-là a quitté l’équipe depuis.");
+    expect(departedMarksNoteFr(3)).toBe(
+      "3 joueurs pointés ce soir-là ont quitté l’équipe depuis.",
+    );
+  });
+
+  /** The usual case: everybody pointed is still here, and there is nothing to explain. */
+  it("says nothing when the two agree", () => {
+    expect(departedMarksNoteFr(0)).toBeNull();
+    expect(departedMarksNoteFr(-2)).toBeNull();
   });
 });
 

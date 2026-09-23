@@ -966,3 +966,41 @@ reads as a record rather than a question (decision 068). `availabilityCountFr` j
 in a template a component test cannot reach.
 
 854 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits, both themes at 390 px.
+
+## The player's side of a training, and one ratio that read as a rating
+
+Still reading the `joueur`-role screenshots rather than the coach's. Three defects, all of the one
+family the audit exists to catch — a screen stating something untrue.
+
+**« 11 présents sur 13 joueurs. »** That was the player's « Présences » card for the demo season's
+29 August session. The calendar row for the same evening says « 11 présents sur 14 pointés »: fourteen
+men were pointed and one of them left the club in September. The card's denominator was the squad as it
+stands today, which is wrong twice — an unmarked player is not an absent one (decision 020), and the
+numerator came from every attendance row, so a departed player counted towards a total he was no longer
+part of. Both cards now count the marks, which is the evening itself and what the calendar already
+counted, and `departedMarksNoteFr` explains the gap between « sur 14 pointés » and a list of thirteen
+rows instead of leaving it as arithmetic (decision 069).
+
+**The availability list outlived its question.** Decision 068 fixed the ordering for matches last
+session; the training page still led with « Disponibilités » for a session that finished a month ago,
+above the présences that answer it. It moves last once the session is over and says « Avant la séance ».
+And on 29 August nobody had answered at all, so the card was thirteen names under « Sans réponse » — the
+largest thing on the page, recording nothing. `availabilityIsWorthShowing` drops it in that case, and
+only in that case: before the event those thirteen names are the list the coach came to chase.
+
+**« n° 8 · 3 / 11 ».** Two bare figures joined by a dot on the rating card, the first a fact about the
+player, so the second read as one too — and on that screen the natural reading of « 3 / 11 » is *three
+of his eleven team-mates have rated him*, which is what decision 007 hides until you have finished your
+own set. It is which card of the stack is open. Now « joueur 3 sur 11 », from
+`ratingCardPositionFr` in `lib/rating/progress.ts`, where a test can reach it (decision 070).
+
+Verified by looking: the 29 August session in both roles and both themes at 390 px, and the notation
+card in the fresh `audit:screens` captures. 863 unit tests, 3 e2e specs, `audit:screens` clean on
+92 visits.
+
+**Where the next session should pick up.** `docs/ROADMAP.md` still has exactly one item unchecked, in
+three lines, all blocked on the owner: the Vercel production deploy (needs a Neon `DATABASE_URL` —
+`SUPER_ADMIN_PASSWORD` must never be stored in Vercel, `ALLOW_REMOTE_RESET` must never be set in
+production) and the daylight check on a real iPhone and Android. Everything else is merged. The audit
+captures not yet read line by line in the `joueur` role are `recap`, `joueur`, `stats`,
+`stats-coupe-buts`, `jeu`, `calendrier` and `match-saisi-apres`.

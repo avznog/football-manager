@@ -12,7 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { AvailabilityStatus } from "@/db/schema";
 import { availabilitySubtitleFr } from "@/lib/calendar/labels";
-import type { AvailabilityTally, Responder } from "@/lib/calendar/timeline";
+import {
+  availabilityIsWorthShowing,
+  type AvailabilityTally,
+  type Responder,
+} from "@/lib/calendar/timeline";
 
 type GroupKey = AvailabilityStatus | "pending";
 
@@ -48,6 +52,8 @@ export function AvailabilityGrid({
   selfMembershipId,
   past,
 }: AvailabilityGridProps) {
+  if (!availabilityIsWorthShowing(tally, past !== undefined)) return null;
+
   return (
     <Card
       title="Disponibilités"

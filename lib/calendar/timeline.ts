@@ -223,6 +223,24 @@ export function tallyAvailability(
   return tally;
 }
 
+/**
+ * Whether the availability list earns its place on the screen.
+ *
+ * Before the event, always: « 0 réponse sur 13 joueurs » with thirteen names under « Sans réponse »
+ * is the list of people to chase, which is the coach's whole reason for looking.
+ *
+ * Afterwards, only if somebody answered. A past event nobody replied to has no record to keep, and
+ * the card was the largest thing on the player's page for the demo season's 29 August session:
+ * thirteen names, a month old, under a question that has already been answered by what happened.
+ * The présences are the answer by then.
+ */
+export function availabilityIsWorthShowing(
+  tally: Pick<AvailabilityTally, "answered">,
+  past: boolean,
+): boolean {
+  return past ? tally.answered > 0 : true;
+}
+
 /** Counts from a tally, for the compact badges on a list row. */
 export function countsOf(tally: AvailabilityTally): AvailabilityCounts {
   return { yes: tally.yes.length, no: tally.no.length, maybe: tally.maybe.length };

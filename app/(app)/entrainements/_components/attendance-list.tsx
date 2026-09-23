@@ -19,7 +19,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
-import { attendanceCountFr, AVAILABILITY_LABELS } from "@/lib/calendar/labels";
+import {
+  attendanceCountFr,
+  AVAILABILITY_LABELS,
+  departedMarksNoteFr,
+} from "@/lib/calendar/labels";
 import type { AvailabilityStatus } from "@/db/schema";
 import { markEveryonePresent, markTrainingAttendance } from "@/lib/training/actions";
 
@@ -73,6 +77,11 @@ export function AttendanceList({ teamId, trainingId, players, marks }: Attendanc
   // It is also why the denominator can be larger than the number of rows below it.
   const present = [...marks.values()].filter(Boolean).length;
   const judged = marks.size;
+  // The list below can only offer a radio to a player who is still here, so it can be shorter than
+  // the number pointed. Said out loud rather than left as an arithmetic puzzle.
+  const departed = departedMarksNoteFr(
+    judged - players.filter((player) => marks.has(player.membershipId)).length,
+  );
 
   return (
     <Card
@@ -80,7 +89,7 @@ export function AttendanceList({ teamId, trainingId, players, marks }: Attendanc
       description={
         judged === 0
           ? "Personne n’est encore pointé."
-          : `${attendanceCountFr(present, judged)}.`
+          : [`${attendanceCountFr(present, judged)}.`, departed].filter(Boolean).join(" ")
       }
       flush
     >
