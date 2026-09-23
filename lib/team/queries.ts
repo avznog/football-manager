@@ -22,6 +22,8 @@ export type SquadMember = {
   role: TeamRole;
   isPlayer: boolean;
   jerseyNumber: number | null;
+  /** The flocage, `null` unless somebody set one — most rows have none (`lib/player/shirt.ts`). */
+  shirtName: string | null;
   /** True while an injury row exists with no `resolvedOn` (decision 011 — flagged, not blocked). */
   isInjured: boolean;
   /** Preferred positions, primary first — shown on the squad row and set on the profile. */
@@ -44,6 +46,7 @@ export async function getSquad(teamId: string): Promise<SquadMember[]> {
       role: teamMembers.role,
       isPlayer: teamMembers.isPlayer,
       jerseyNumber: teamMembers.jerseyNumber,
+      shirtName: teamMembers.shirtName,
       // One aggregate beats a second query per player.
       openInjuries: sql<number>`count(${injuries.id}) filter (where ${injuries.resolvedOn} is null)`,
     })
@@ -59,6 +62,7 @@ export async function getSquad(teamId: string): Promise<SquadMember[]> {
       teamMembers.role,
       teamMembers.isPlayer,
       teamMembers.jerseyNumber,
+      teamMembers.shirtName,
     )
     .orderBy(
       // Coaches at the top, then numbered shirts, then whoever has no number yet.
@@ -97,6 +101,7 @@ export async function getSquad(teamId: string): Promise<SquadMember[]> {
     role: row.role,
     isPlayer: row.isPlayer,
     jerseyNumber: row.jerseyNumber,
+    shirtName: row.shirtName,
     isInjured: Number(row.openInjuries) > 0,
     positions: sortPreferredPositions(positionsByMember.get(row.membershipId) ?? []),
   }));

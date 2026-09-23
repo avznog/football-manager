@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { positionsSummaryFr, primaryCodeOf, secondaryCodesOf } from "@/lib/player/positions";
+import { shirtNameRowFr } from "@/lib/player/shirt";
 import type { SquadMember } from "@/lib/team/queries";
 
 /**
@@ -26,6 +27,7 @@ import type { SquadMember } from "@/lib/team/queries";
 export function MemberRow({ member }: { member: SquadMember }) {
   const primary = primaryCodeOf(member.positions);
   const secondary = secondaryCodesOf(member.positions);
+  const shirtNameRow = shirtNameRowFr(member.shirtName);
 
   return (
     <li>
@@ -46,6 +48,12 @@ export function MemberRow({ member }: { member: SquadMember }) {
           </p>
           <p className="truncate text-xs text-ink-subtle">
             @{member.username}
+            {/* The flocage, when there is one — a coach ordering a set of shirts reads this list and
+                nothing else. `shirtNameRowFr` returns null rather than "" for the members who have
+                none, which is almost all of them, so there is no stray « · » to render. The word
+                « floqué » travels with the value: « MOMO » alone between two separators reads as
+                another position code. */}
+            {shirtNameRow !== null ? <> · {shirtNameRow}</> : null}
             {member.positions.length > 0 ? (
               <>
                 {" · "}

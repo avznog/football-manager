@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { POSITION_CODES } from "@/db/reference";
 import { isIsoDate } from "./injury";
+import { SHIRT_NAME_MAX_CHARS } from "./shirt";
 
 export const positionCodeSchema = z.enum(POSITION_CODES);
 export const positionPreferenceSchema = z.enum(["primary", "secondary"]);
@@ -45,6 +46,32 @@ export const updatePositionsSchema = z.object({
     .union([z.literal(""), positionCodeSchema])
     .transform((value) => (value === "" ? null : value)),
   secondary: z.array(positionCodeSchema).max(POSITION_CODES.length),
+});
+
+/**
+ * The flocage, as typed. Trimmed and length-checked against the shirt back, and **not** uppercased:
+ * that happens in `shirtNameDisplay` so the player's own « El Professor » survives in the column
+ * (`lib/player/shirt.ts`).
+ */
+export const shirtNameSchema = z
+  .string()
+  .trim()
+  .max(
+    SHIRT_NAME_MAX_CHARS,
+    `Ce flocage est trop long (${SHIRT_NAME_MAX_CHARS} caractères maximum).`,
+  );
+
+/**
+ * The « Nom sur le maillot » form: one field, and an empty one means « enlève-le ».
+ *
+ * A blank field and a field holding two spaces both become `null` rather than a one-character
+ * flocage, so « no flocage » has a single representation everywhere — the same thing the
+ * `team_members_shirt_name_length` check enforces from the other side.
+ */
+export const updateShirtNameSchema = z.object({
+  teamId: z.uuid(),
+  memberId: z.uuid(),
+  shirtName: shirtNameSchema.transform((value) => (value === "" ? null : value)),
 });
 
 /** Long enough for « Entorse de la cheville, 3 semaines d’arrêt », short enough to stay a note. */

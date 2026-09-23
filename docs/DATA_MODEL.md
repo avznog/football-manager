@@ -24,7 +24,7 @@ Colours are used for kit discs and the team header only — never as the app's a
 (decision 014).
 
 ### `team_members`
-`id`, `team_id`, `user_id`, `role` (`coach` | `player`), `is_player`, `jersey_number`,
+`id`, `team_id`, `user_id`, `role` (`coach` | `player`), `is_player`, `jersey_number`, `shirt_name`,
 `joined_at`, `left_at`.
 
 > **This is the central table.** Almost everything else references a `team_member`, not a `user` —
@@ -33,6 +33,11 @@ Colours are used for kit discs and the team header only — never as the app's a
 Invariants:
 - unique `(team_id, user_id)` where `left_at is null`
 - unique `(team_id, jersey_number)` among active members, when the number is set
+- `shirt_name` is the flocage — what is printed on the back of the shirt, often a nickname rather
+  than a name. Nullable and null for most members; `char_length between 1 and 12`, so « no flocage »
+  has exactly one representation and no screen has to tell `''` from `null`. Deliberately **not**
+  unique: two players may both be floqués « JUNIOR ». Stored as typed and uppercased at display time
+  only (`lib/player/shirt.ts`), so a player's own capitalisation survives
 - `role = 'coach'` with `is_player = true` means a player-coach: they get both permission sets
 - a member with `left_at` set keeps all their historical stats but disappears from selection lists
 

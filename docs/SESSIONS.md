@@ -2102,3 +2102,35 @@ loop over twenty-four hours against `/^([01]\d|2[0-3]):[0-5]\d$/`. 1032 unit tes
 Not done, and it matters here: **no 390 px pass.** The calendar row gained a third line and grew from
 about 56 px to about 65 px, in the list on the busiest screen in the app and on the e2e happy path.
 It wants a look in both themes before anybody calls this finished.
+
+### 2026-09-23 — A name on the shirt, and the permission question hiding inside it
+
+Fifth of the owner's eight remarks, and the only one that needed a migration: « fiche d'un joueur,
+possibilité de mettre son nom sur le maillot en plus du numéro ».
+
+The five-minute version is a second field in `JerseyForm`. That form posts to `updateMember`, which
+is gated on `member:update`, which is a coach — so the five-minute version ships a screen where Momo
+cannot change the word printed on Momo's own back, on the page whose subject is Momo. Decision 093 is
+about that page and about exactly this kind of slip.
+
+A number and a flocage look like one thing. A number has to agree with the twelve other numbers in
+the squad, and `updateMember` has refused a number already worn since M0: it is inventory, and the
+profile has always said so (« les numéros sont attribués par le coach »). A flocage agrees with
+nothing; two players may both be floqués « JUNIOR » and neither is wrong. So `profile:editShirtName`
+is a `SELF_ACTIONS` entry and `updateShirtName` is its own action, with the `assertCanActFor` shape
+the preferred positions already use — self first, the coach's `member:update` as the fallback. Not a
+wrapper around `updateMember`, which would have re-imposed the very check being avoided.
+
+`shirt_name text`, `check (… is null or char_length(…) between 1 and 12)`, migration
+`0002_daily_sharon_carter.sql`. The `1` rejects `''`, so « no flocage » has one representation and no
+screen has to tell two empties apart. Uppercased at display time with `toLocaleUpperCase("fr-FR")`,
+never on the way in. Three of fourteen demo players got one — Léo for the accent, « El Professor » at
+exactly twelve characters — because a seed where everybody has one cannot show whether the empty case
+reads correctly.
+
+Decision 104. `lib/player/shirt.ts`, 21 tests, one of which greps `db/schema.ts` so the 12 in the
+Zod schema cannot drift from the 12 in the column. 1054 unit tests.
+
+Not done: **no 390 px pass**, and the migration has not been applied anywhere but a test database.
+The flocage is deliberately absent from the pitch discs — a 44 px target already carrying a number
+and a short name — which is a judgement rather than an omission.

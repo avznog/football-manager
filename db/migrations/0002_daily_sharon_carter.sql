@@ -1,0 +1,2 @@
+ALTER TABLE "team_members" ADD COLUMN "shirt_name" text;--> statement-breakpoint
+ALTER TABLE "team_members" ADD CONSTRAINT "team_members_shirt_name_length" CHECK ("team_members"."shirt_name" is null or char_length("team_members"."shirt_name") between 1 and 12);

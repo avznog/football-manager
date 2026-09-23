@@ -96,6 +96,12 @@ type PlayerFixture = {
   /** A player-coach: both permission sets (decision 002). */
   isCoach?: boolean;
   /**
+   * The flocage, when the player has one. Deliberately set on only three of the fourteen: the
+   * *normal* case is `null`, and a demo where everybody has one is a demo that cannot show whether
+   * the empty case reads correctly. Stored as typed — the uppercasing is `shirtNameDisplay`'s.
+   */
+  shirtName?: string;
+  /**
    * Days ago this member left the team. They keep every goal and every minute they played
    * (`docs/DATA_MODEL.md`) but disappear from selection lists — the case `lib/stats/queries.ts`
    * deliberately keeps and `lib/team/queries.ts` deliberately hides.
@@ -112,13 +118,15 @@ const PLAYERS: PlayerFixture[] = [
   { username: "hugo", displayName: "Hugo", jerseyNumber: 1, primary: "GB", secondary: [] },
   { username: "mehdi", displayName: "Mehdi", jerseyNumber: 12, primary: "GB", secondary: ["DC"] },
   { username: "julien", displayName: "Julien", jerseyNumber: 9, primary: "AT", secondary: ["MOC"] },
-  { username: "momo", displayName: "Momo", jerseyNumber: 11, primary: "AG", secondary: ["AT"] },
+  { username: "momo", displayName: "Momo", jerseyNumber: 11, primary: "AG", secondary: ["AT"], shirtName: "Momo" },
   { username: "ali", displayName: "Ali", jerseyNumber: 7, primary: "AD", secondary: ["MD"] },
   { username: "thomas", displayName: "Thomas", jerseyNumber: 4, primary: "DC", secondary: ["MC"] },
   { username: "nico", displayName: "Nico", jerseyNumber: 2, primary: "DD", secondary: ["MD"] },
   { username: "samir", displayName: "Samir", jerseyNumber: 3, primary: "DG", secondary: ["MG"] },
-  { username: "leo", displayName: "Léo", jerseyNumber: 6, primary: "MG", secondary: ["AG", "DG"] },
-  { username: "yanis", displayName: "Yanis", jerseyNumber: 10, primary: "MOC", secondary: ["AT"] },
+  { username: "leo", displayName: "Léo", jerseyNumber: 6, primary: "MG", secondary: ["AG", "DG"], shirtName: "Léo" },
+  // Twelve characters exactly: the longest flocage a shirt back holds, so the squad row and the
+  // fiche are both reviewed at the limit rather than at four characters.
+  { username: "yanis", displayName: "Yanis", jerseyNumber: 10, primary: "MOC", secondary: ["AT"], shirtName: "El Professor" },
   { username: "brice", displayName: "Brice", jerseyNumber: 5, primary: "DC", secondary: ["DD"] },
   { username: "fabien", displayName: "Fabien", jerseyNumber: 14, primary: "MD", secondary: ["AD"] },
   // Left the club in the autumn — after scoring on J2. His goal must survive in every season table.
@@ -248,6 +256,7 @@ async function seedDemo(): Promise<void> {
         role: p.isCoach ? ("coach" as const) : ("player" as const),
         isPlayer: true,
         jerseyNumber: p.jerseyNumber,
+        shirtName: p.shirtName ?? null,
         // Backdated to before the first match of the fixture: a profile claiming that a player
         // who scored in August joined the club today is the sort of small lie that makes a demo
         // useless for reading a screen.

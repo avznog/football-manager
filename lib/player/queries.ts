@@ -33,6 +33,11 @@ export type PlayerProfile = {
   /** A coach with `isPlayer = false` has no player profile: no positions, no injuries. */
   isPlayer: boolean;
   jerseyNumber: number | null;
+  /**
+   * The flocage — what is printed on the back of the shirt. `null` for most members, which is the
+   * normal case and not a missing value: see `lib/player/shirt.ts` for how it is displayed.
+   */
+  shirtName: string | null;
   /** `YYYY-MM-DD` in Paris. */
   joinedOn: string;
   positions: PreferredPosition[];
@@ -67,6 +72,7 @@ export const getPlayerProfile = cache(
         role: teamMembers.role,
         isPlayer: teamMembers.isPlayer,
         jerseyNumber: teamMembers.jerseyNumber,
+        shirtName: teamMembers.shirtName,
         joinedAt: teamMembers.joinedAt,
       })
       .from(teamMembers)
@@ -97,6 +103,7 @@ export const getPlayerProfile = cache(
       role: row.role,
       isPlayer: row.isPlayer,
       jerseyNumber: row.jerseyNumber,
+      shirtName: row.shirtName,
       joinedOn: parisDate(row.joinedAt),
       positions,
       injuries: history,

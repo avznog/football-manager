@@ -94,6 +94,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       coach was told he would « ne plus pouvoir déclarer ses disponibilités ni être convoqué », under
       a card headed « Fiche joueur » saying he is not one, beside a jersey hint about « le joueur ».
       `lib/player/labels.ts` decides all three now, and Vitest can read them (decision 093)
+- [x] A player can put a name on his shirt as well as a number — and the two answer to two different
+      people. The flocage is his own (`profile:editShirtName`, self-scoped, like his preferred
+      positions); the number stays the coach's, because a squad's numbers have to agree with each
+      other and `updateMember` already refuses one already worn. `shirt_name`, 12 characters checked
+      in the column, uppercased at display time and never stored uppercased, shown on the fiche and on
+      the `/equipe` row a coach reads when he orders the shirts (decision 104)
 
 ## M2 — Calendar
 - [x] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)

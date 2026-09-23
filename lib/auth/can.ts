@@ -54,6 +54,12 @@ export type Action =
   // Self-scoped
   | "availability:declare"
   | "profile:editPositions"
+  /**
+   * The flocage — the name printed on the shirt. Self-scoped, unlike the **number**, which stays a
+   * coach's `member:update`: a squad's numbers have to agree with each other (`updateMember` refuses
+   * one already worn) while « MOMO » is nobody's business but Momo's.
+   */
+  | "profile:editShirtName"
   | "injury:declare"
   | "rating:submit"
   // Read
@@ -103,6 +109,7 @@ const COACH_ACTIONS = new Set<Action>([
 const SELF_ACTIONS = new Set<Action>([
   "availability:declare",
   "profile:editPositions",
+  "profile:editShirtName",
   "injury:declare",
   "rating:submit",
 ]);

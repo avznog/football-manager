@@ -13,6 +13,9 @@
  *  - `profile:editPositions` is self-only. A coach editing a teammate's wishes therefore falls
  *    back to `member:update`, their permission over the squad record that `player_positions`
  *    belongs to. Both branches are `can()` decisions; neither is an ad-hoc role check.
+ *  - `profile:editShirtName` is self-only in the same way, with the same `member:update` fallback.
+ *    The **number** on the maillot is deliberately not: it is `member:update` alone, because it has
+ *    to be unique in the squad. Same garment, two permissions — see `updateShirtName`.
  */
 
 import { and, eq, isNull } from "drizzle-orm";
@@ -26,7 +29,12 @@ import { type FormState, toFormState } from "@/lib/auth/validation";
 import { updateMember } from "@/lib/team/actions";
 import { isFutureDate, parisDate } from "./injury";
 import { toPositionRows } from "./positions";
-import { declareInjurySchema, resolveInjurySchema, updatePositionsSchema } from "./validation";
+import {
+  declareInjurySchema,
+  resolveInjurySchema,
+  updatePositionsSchema,
+  updateShirtNameSchema,
+} from "./validation";
 
 /**
  * A self-scoped action, or a coach doing it on somebody's behalf. Tries the self action first,
@@ -146,6 +154,57 @@ export async function updateJerseyNumber(
   if (!result && typeof memberId === "string") revalidateMember(memberId);
 
   return result;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Flocage — the name on the shirt                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The flocage, from the profile page. **Not** a wrapper around `updateMember`, and that is the
+ * point of it existing.
+ *
+ * The number and the name printed on a shirt are one object and two permissions. A number has to
+ * agree with the twelve other numbers in the squad — `updateMember` refuses one already worn — so it
+ * is the coach's to hand out, and the profile has told a player « les numéros sont attribués par le
+ * coach » since M0. A flocage agrees with nothing: « MOMO » is a decision about one man's own back,
+ * two players may perfectly well both be floqués « JUNIOR », and a coach typing a nickname for
+ * somebody is doing them a favour rather than administering a squad.
+ *
+ * So this is a self action first (`profile:editShirtName`, in `SELF_ACTIONS`) with the coach's
+ * `member:update` as the fallback — the same `assertCanActFor` shape as the preferred positions,
+ * which are the other field of the squad record that belongs to the player. One consequence worth
+ * stating: a member with `isPlayer = false` fails the self branch, because `can()` refuses every
+ * `SELF_ACTIONS` entry to a non-player, so a member of the encadrement cannot invent a flocage for a
+ * maillot they do not have — only a coach can, which is the same asymmetry the jersey number has.
+ */
+export async function updateShirtName(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const actor = await requireActor();
+
+  const parsed = updateShirtNameSchema.safeParse({
+    teamId: formData.get("teamId"),
+    memberId: formData.get("memberId"),
+    shirtName: formData.get("shirtName") ?? "",
+  });
+  if (!parsed.success) return toFormState(parsed.error);
+  const { teamId, memberId, shirtName } = parsed.data;
+
+  assertCanActFor(actor, "profile:editShirtName", teamId, memberId);
+
+  // As everywhere else here: a forged `memberId` from another team must not widen anybody's reach.
+  const member = await findActiveMember(teamId, memberId);
+  if (!member) return { error: UNKNOWN_MEMBER };
+
+  await db
+    .update(teamMembers)
+    .set({ shirtName })
+    .where(and(eq(teamMembers.id, memberId), eq(teamMembers.teamId, teamId)));
+
+  revalidateMember(memberId);
+  return undefined;
 }
 
 /* -------------------------------------------------------------------------- */
