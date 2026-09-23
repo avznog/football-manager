@@ -19,6 +19,16 @@ export const COMPETITION_LABELS: Record<Competition, string> = {
 /** In the order a coach picks them: the league is the common case. */
 export const COMPETITION_ORDER: readonly Competition[] = ["league", "cup", "friendly", "tournament"];
 
+/**
+ * What stands where the score would be, on a past match with an empty log.
+ *
+ * Not an empty space: the row the coach most needs to act on was the quietest one in the list. Not
+ * « 0 – 0 » either, which is the invention decisions 013 and 061 exist to have removed — nobody has
+ * said what the score was, and a match ending 0 – 0 is a different statement from a match nobody
+ * wrote down.
+ */
+export const SCORE_NOT_RECORDED_FR = "Non saisi";
+
 export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   scheduled: "À venir",
   live: "En cours",

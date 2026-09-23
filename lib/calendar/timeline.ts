@@ -165,6 +165,30 @@ export function splitTimeline<T extends TimelineItem>(items: readonly T[], now: 
   return { next: active[0] ?? null, upcoming: active.slice(1), past };
 }
 
+/**
+ * The heading of the history section, which used to be « Déjà joué » on every list.
+ *
+ * Two kinds of row have never been joué. A **training** is not played, and the demo season's history
+ * has five of them interleaved with the matches — the single merged agenda is the point of the screen
+ * (`docs/PROJECT.md`), so the heading has to be true of both kinds. And a **match nobody recorded**:
+ * the window closes, the row drops into the history with no score, and saying it was played is the
+ * calendar's version of the invention decision 013 refused — the demo season keeps exactly that row,
+ * FC des Deux-Ponts, nine men named on the sheet and not one event.
+ *
+ * So « Déjà joué » is kept for the list where every row really was a match that was played, and the
+ * wider list gets the wider word. Same rule as decision 085's heading: it has to hold for the widest
+ * row, not the first three.
+ */
+export function pastSectionTitleFr(past: readonly PastSectionItem[]): string {
+  const allPlayed = past.every((event) => event.kind === "match" && event.score !== null);
+  return allPlayed ? "Déjà joué" : "Déjà passé";
+}
+
+/** Declared structurally, like `TimelineItem`, so the heading is testable against literals. */
+export type PastSectionItem =
+  | { kind: "match"; score: { goalsFor: number; goalsAgainst: number } | null }
+  | { kind: "training" };
+
 /* -------------------------------------------------------------------------- */
 /* Who has answered, and who has not                                          */
 /* -------------------------------------------------------------------------- */

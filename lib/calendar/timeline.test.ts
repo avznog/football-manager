@@ -11,10 +11,12 @@ import {
   isOngoing,
   isPast,
   matchWindowMinutes,
+  pastSectionTitleFr,
   pendingCount,
   splitTimeline,
   tallyAvailability,
   trainingWindowMinutes,
+  type PastSectionItem,
   type Responder,
   type TimelineItem,
 } from "./timeline";
@@ -338,5 +340,36 @@ describe("availabilityIsWorthShowing", () => {
 
   it("keeps it afterwards as soon as one person answered", () => {
     expect(availabilityIsWorthShowing({ answered: 1 }, true)).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The heading of the history                                                 */
+/* -------------------------------------------------------------------------- */
+
+describe("pastSectionTitleFr", () => {
+  const played: PastSectionItem = { kind: "match", score: { goalsFor: 2, goalsAgainst: 1 } };
+  const unrecorded: PastSectionItem = { kind: "match", score: null };
+  const session: PastSectionItem = { kind: "training" };
+
+  it("says « Déjà joué » when every row is a match that was played", () => {
+    expect(pastSectionTitleFr([played, played])).toBe("Déjà joué");
+  });
+
+  /** The demo season interleaves five sessions with the matches: an entraînement is not « joué ». */
+  it("widens the word as soon as a training is in the list", () => {
+    expect(pastSectionTitleFr([played, session])).toBe("Déjà passé");
+  });
+
+  /**
+   * FC des Deux-Ponts: finished, nine men on the sheet, not one event. The heading claimed it had
+   * been played, which is the invention decision 013 refused, one level up.
+   */
+  it("widens it for a match whose window closed with nothing recorded", () => {
+    expect(pastSectionTitleFr([played, unrecorded])).toBe("Déjà passé");
+  });
+
+  it("is only ever rendered over a non-empty list", () => {
+    expect(pastSectionTitleFr([])).toBe("Déjà joué");
   });
 });
