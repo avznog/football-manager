@@ -25,6 +25,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       timeline writing the same goals « 2 – 0 » (decision 061)
 - [x] « Aucune composition enregistrée » no longer printed twenty pixels under the composition it
       denied: an empty pitch before kick-off is what invariant 3 *produces* (decision 062)
+- [x] …and `scoreLineFr` really is the only function that writes one now: the reducer, the recap
+      timeline, game mode's timeline and `lib/stats/format.ts` each built their own with a hyphen, so
+      a recap showed « 2 – 0 » and « 2 - 0 » three cards apart. `formatScore` deleted, decision 061
+      amended by 064 rather than left standing as a claim that was not true
 - [x] A finished match with an empty log is no longer offered « Voir le déroulé » in a full-width
       primary button promising « le déroulé reste consultable », and the « Composition » card's badge
       says which seven it is counting — it read « 7 / 7 » directly above « Aucune composition »

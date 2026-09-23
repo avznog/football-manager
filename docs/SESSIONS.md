@@ -853,3 +853,30 @@ unlabelled one was the odd one out, and now it is not.
 
 Neither fix is a line of logic, and that is the point of the screenshot half of the audit: the
 mechanical checks came back clean on all 92 visits both before and after. 848 unit tests, 3 e2e specs.
+
+## The decision that was not true yet
+
+Reading the stats screenshots turned up nothing untrue on screen, but grepping for how the form guide
+wrote « 2-0 » turned up something worse in the repository: decision 061, written yesterday, states that
+`scoreLineFr` is the only way the app writes a score, and four other places were writing one by hand
+— the reducer's `scoreLabel`, the recap timeline's `scoreAfter`, game mode's timeline, and a
+`formatScore` of the statistics module's own. All four with a hyphen instead of an en dash, and the
+form guide with no spaces at all, which is how the recap ended up showing « 2 – 0 » in its scoreboard
+and « 2 - 0 » three cards below for the same two goals.
+
+The typography is the trivial half. The real defect is a written decision that is false: the next
+session reads it, believes there is one place to change, and changes one of five. Fixed in the
+direction the decision already pointed — `formatScore` deleted with a comment in its place saying
+where it went, the other three routed through `scoreLineFr`, and 064 recording that 061's claim is now
+accurate rather than aspirational.
+
+Two e2e assertions had to be scoped, which is the fix proving itself: once the scoreboard and the
+timeline agree on the character, `getByText("1 – 1")` matches both of them and Playwright refuses. The
+recap's scoreboard got `aria-label="Score du match"` in the process — the largest number in the product
+had no accessible name, while game mode's « Chrono et score » has been a named region since M4.
+
+Also, one line in the same neighbourhood: the « Bilan de l'équipe » badge announced itself to a screen
+reader as « +3 » and nothing else. It now carries an invisible « de différence de buts ».
+
+847 unit tests (one fewer: `formatScore`'s went with it), 3 e2e specs, `audit:screens` clean on 92
+visits.

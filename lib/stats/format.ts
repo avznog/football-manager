@@ -52,10 +52,11 @@ export function formatSigned(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
-/** `3 - 2`, from our point of view, as the reducer writes it. */
-export function formatScore(goalsFor: number, goalsAgainst: number): string {
-  return `${goalsFor} - ${goalsAgainst}`;
-}
+/*
+ * There is deliberately no `formatScore` here. A scoreline is written by `scoreLineFr` in
+ * `lib/calendar/labels.ts` and nowhere else (decision 061); this module used to have its own, with
+ * a hyphen where that one has an en dash, so the stats page and the recap disagreed by a character.
+ */
 
 /** « 2 V · 1 N · 0 D » — a whole season's record in one line on a 320 px screen. */
 export function formatRecord(wins: number, draws: number, losses: number): string {

@@ -320,8 +320,14 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(page.getByText("Actions refusées")).toHaveCount(0);
 
     await page.getByRole("link", { name: "Revenir au match" }).click();
-    await expect(page.getByText("1 – 1")).toBeVisible();
-    await expect(page.getByText("Match nul")).toBeVisible();
+    // Wait for the navigation before asking for the score: game mode's own scoreboard and its
+    // timeline both read « 1 – 1 » now that the two agree on the character (decision 061), so an
+    // unscoped `getByText` matches two elements on the page we are leaving. The match page states
+    // the score and the result on one line in its header — that line is the assertion.
+    await expect(page).toHaveURL(new RegExp(`${matchUrl}$`));
+    const headline = page.locator("header p").filter({ hasText: /^\d+ – \d+/ });
+    await expect(headline).toContainText("1 – 1");
+    await expect(headline).toContainText("Match nul");
   });
 
   /* ---------------------------------------------------------------------- */
@@ -342,8 +348,12 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await page.getByRole("button", { name: "Terminer et voir le résumé" }).click();
     await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap$`));
 
-    await expect(page.getByText("1 – 1")).toBeVisible();
-    await expect(page.getByText("Match nul")).toBeVisible();
+    // Scoped to the scoreboard, because the equaliser's « 1 – 1 » is *also* on the timeline three
+    // cards below — since the two agree on the character, which is decision 061's point, an
+    // unscoped `getByText` would match both and Playwright's strict mode would refuse.
+    const finalScore = page.getByRole("region", { name: "Score du match" });
+    await expect(finalScore).toContainText("1 – 1");
+    await expect(finalScore).toContainText("Match nul");
 
     // Decision 025: one teammate's opinion does not make a man of the match.
     await expect(page.getByText("Pas encore assez de notes")).toBeVisible();

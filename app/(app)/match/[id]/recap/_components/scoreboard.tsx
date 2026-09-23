@@ -42,7 +42,10 @@ export function Scoreboard({
   const unrecorded = status === "finished" && !recap.recorded;
 
   return (
-    <Card>
+    /* A named `<section>` is a `region` landmark, which is what game mode's « Chrono et score »
+       already is: the largest number in the product is worth being able to jump to, and worth
+       being announced as something other than a bare paragraph of digits. */
+    <Card aria-label="Score du match">
       <div className="flex flex-col items-center gap-2 py-2 text-center">
         {/* Our side first, to match the figures below — `scoreLineFr` says why. The venue is on its
             own badge on the match header, in words. */}

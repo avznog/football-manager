@@ -151,7 +151,7 @@ describe("an empty log", () => {
   it("is a 0-0 that has not started, with no result", () => {
     expect(state.goalsFor).toBe(0);
     expect(state.goalsAgainst).toBe(0);
-    expect(state.scoreLabel).toBe("0 - 0");
+    expect(state.scoreLabel).toBe("0 – 0");
     expect(state.phase).toBe("before-kickoff");
     expect(state.started).toBe(false);
     expect(state.finished).toBe(false);
@@ -196,7 +196,7 @@ describe("the seeded match, reduced", () => {
     expect(state.goalsFor).toBe(3);
     // 24′ conceded, 51′ own goal by Nico.
     expect(state.goalsAgainst).toBe(2);
-    expect(state.scoreLabel).toBe("3 - 2");
+    expect(state.scoreLabel).toBe("3 – 2");
     expect(state.result).toBe("win");
     expect(state.finished).toBe(true);
     expect(state.phase).toBe("finished");

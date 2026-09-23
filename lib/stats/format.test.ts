@@ -8,7 +8,6 @@ import {
   formatPercent,
   formatRating,
   formatRecord,
-  formatScore,
   formatSigned,
   matchCount,
   plural,
@@ -72,11 +71,7 @@ describe("formatSigned", () => {
   });
 });
 
-describe("formatScore and formatRecord", () => {
-  it("writes the score from our point of view", () => {
-    expect(formatScore(3, 2)).toBe("3 - 2");
-  });
-
+describe("formatRecord", () => {
   it("fits a whole season's record on one line", () => {
     expect(formatRecord(2, 1, 0)).toBe("2 V · 1 N · 0 D");
   });

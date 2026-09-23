@@ -114,7 +114,7 @@ describe("buildRecap — the scoreline", () => {
     expect(recap).toMatchObject({
       goalsFor: 2,
       goalsAgainst: 2,
-      scoreLabel: "2 - 2",
+      scoreLabel: "2 – 2",
       result: "draw",
       resultLabel: "Match nul",
       finished: true,
@@ -139,7 +139,7 @@ describe("buildRecap — the scoreline", () => {
       { type: "FINAL_WHISTLE", min: 60, period: 2 },
     ]);
 
-    expect(recapOf(events)).toMatchObject({ cleanSheet: true, result: "win", scoreLabel: "1 - 0" });
+    expect(recapOf(events)).toMatchObject({ cleanSheet: true, result: "win", scoreLabel: "1 – 0" });
   });
 
   it("counts the players who actually came on", () => {
@@ -210,7 +210,7 @@ describe("buildRecap — timeline", () => {
     expect(at("11’")[0]).toMatchObject({
       label: "But",
       detail: "Julien Marchal, passe de Karim Benali",
-      scoreAfter: "1 - 0",
+      scoreAfter: "1 – 0",
       tone: "for",
     });
   });
@@ -219,7 +219,7 @@ describe("buildRecap — timeline", () => {
     expect(at("24’")[0]).toMatchObject({
       label: "But encaissé",
       detail: null,
-      scoreAfter: "1 - 1",
+      scoreAfter: "1 – 1",
       tone: "against",
     });
   });
@@ -362,7 +362,7 @@ describe("buildRecap — a goal nobody could attribute", () => {
     expect(recap.timeline.find((entry) => entry.minuteLabel === "14’")).toMatchObject({
       label: "But",
       detail: "buteur non renseigné",
-      scoreAfter: "1 - 0",
+      scoreAfter: "1 – 0",
       tone: "for",
     });
   });

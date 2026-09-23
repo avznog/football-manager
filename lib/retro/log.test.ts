@@ -145,7 +145,7 @@ describe("buildRetroLog", () => {
 
     // Two from open play, one penalty; conceded one, plus our own defender's.
     expect(state.finished).toBe(true);
-    expect(state.scoreLabel).toBe("3 - 2");
+    expect(state.scoreLabel).toBe("3 – 2");
     expect(state.result).toBe("win");
     expect(state.anomalies).toEqual([]);
 
