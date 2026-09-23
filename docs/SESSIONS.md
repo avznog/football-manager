@@ -1554,7 +1554,7 @@ on a pelouse for a match played on 13 September.
 So the guard went into `saveLineup` and `deleteLineup`, a sixth dead end into the editor route — it
 would have taken a full composition and lost it on submit — and every sentence on the page into
 `compositionsScreenFr`, which reads `status` and `entryMode`. `LINEUPS_FROZEN_FR` is shared between the
-list's notice and the editor's dead end so the two cannot drift. Decision NNN writes the rule down for
+list's notice and the editor's dead end so the two cannot drift. Decision 085 writes the rule down for
 the whole match rather than for this screen.
 
 Two things only the captures found, at 390 px, which is why they get looked at: the header still said
