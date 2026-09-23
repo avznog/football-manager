@@ -1488,7 +1488,7 @@ the unfiltered screens are unchanged.
 
 I am the session `COORDINATION.md` is addressed to — the one on another machine, in a loop, that
 produced PR #53. Read it on this wake-up and adopted it: this entry's decision number was left as
-`NNN` until the commit before the merge, and there is a line for me in its log.
+`NNN` until the commit before the merge — it came out 083 — and there is a line for me in its log.
 
 Next capture in the review: `light-coach-saisie.png`, the retro-entry sheet for FC des Deux-Ponts —
 `entry_mode = retro`, no planned composition, so all seven slots open on « — personne — ». The
@@ -1497,7 +1497,7 @@ pixels above its own « 0 joueurs avec des minutes ». Nobody had been named and
 reporting on a finished match.
 
 That is decision 060 a second time — « ne change rien sur le terrain » printed over an empty pitch —
-so it is written down as a rule this time (decision NNN): **an empty state describes the form, not the
+so it is written down as a rule this time (decision 083): **an empty state describes the form, not the
 match.** Having no rows in a card licenses nothing about who played, and a sentence that names a
 number of players has to get that number from what is filled in. `retroChangesEmptyFr` counts the
 filled slots, agrees in number, and with none filled points at the composition card instead of

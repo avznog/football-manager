@@ -1809,7 +1809,7 @@ would have been wrong in the new place and vague in the old one.
 Both strings are pure functions in `lib/stats/format.ts` with tests, for the reason that keeps
 recurring: Vitest does not look under `app/`, so copy that matters has to leave the component.
 
-## NNN — An empty state describes the form, never a match
+## 083 — An empty state describes the form, never a match
 **2026-09-23** · accepted
 
 The retro-entry sheet for a match with no planned composition opens with seven `— personne —`

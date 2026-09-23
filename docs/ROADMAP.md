@@ -197,7 +197,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] The sheet's empty states no longer describe a match nobody has entered. « Changements » said
       « les sept titulaires ont fini le match » over seven `— personne —` selects, and « Actions du
       match » wrote « 0-0 » with a hyphen under the derived « 0 – 0 ». Both now come from
-      `lib/retro/labels.ts`, count what is filled in, and are tested (decision NNN)
+      `lib/retro/labels.ts`, count what is filled in, and are tested (decision 083)
 
 ## Deployment
 - [x] First-run bootstrap — `npm run db:bootstrap` writes the reference data and the one
