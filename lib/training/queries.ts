@@ -14,6 +14,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { trainingAttendance, trainingAvailability, trainings } from "@/db/schema";
 import type { AvailabilityStatus } from "@/db/schema";
+import type { TrainingDeletionHolds } from "@/lib/calendar/deletion";
 
 export type TrainingRow = {
   id: string;
@@ -144,4 +145,28 @@ export async function getTeamAttendanceCounts(
       { present: Number(row.present), marked: Number(row.marked) },
     ]),
   );
+}
+
+/**
+ * What would go with this séance, for the sentence on the « supprimer » card.
+ *
+ * Attendance is counted even though the button only appears before the session: `AttendanceList`
+ * renders for a coach whether or not the session is over, so marks on a future séance exist, and a
+ * warning that only mentioned the answers would be describing the easier half of the loss.
+ */
+export async function getTrainingDeletionHolds(
+  trainingId: string,
+): Promise<TrainingDeletionHolds> {
+  const [row] = await db
+    .select({
+      answers: sql<string>`(select count(*) from training_availability
+        where training_id = ${trainingId})`,
+      attendance: sql<string>`(select count(*) from training_attendance
+        where training_id = ${trainingId})`,
+    })
+    .from(trainings)
+    .where(eq(trainings.id, trainingId));
+
+  // `count(*)` is a bigint, which postgres.js hands over as a string.
+  return { answers: Number(row?.answers ?? 0), attendance: Number(row?.attendance ?? 0) };
 }

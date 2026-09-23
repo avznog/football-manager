@@ -1989,3 +1989,34 @@ Verified at 390 px in light and dark as `karim`, on all three states the card ha
 button, « Saisi sans composition »), CS Morvan (pitch and « Composition de départ · Classique 1-3-2-1 »
 unchanged), and AS Coteaux, still to be played and untouched, which still says « Choisis d'abord tes
 titulaires et tes remplaçants » over a primary « Feuille de match ». 1008 tests, six new.
+
+### 2026-09-23 — « avec les disponibilités déclarées », over a sheet and two compositions
+
+Third screen of the audit read-through this afternoon, and the first one where what the screen omits is
+worth more than what it says.
+
+`dark-coach-match-modifier.png`, Étoile du Parc. « Supprimer » — « Le match disparaît du calendrier,
+avec les disponibilités déclarées. » — over a red « Supprimer ce match ». That match holds eleven
+availability answers, an eleven-row `match_squad`, and two `lineups`, the second being « À partir de la
+30ᵉ minute · Julien → Momo, Léo → Yanis ». `db/migrations/0000_*.sql` confirms all three cascade.
+
+The point is not the missing nouns, it is where the sentence sits. The page's own comment says « A plain
+form: no confirmation dialog to get wrong » — which is the right call, and it means **that sentence is
+the confirmation dialog**. It described the loss a coach can absorb and skipped the two he cannot.
+
+The same reading applied to the training twin, « avec les réponses déjà données », found the same hole
+and a reachable one: `app/(app)/entrainements/[id]/page.tsx` guards `AvailabilityGrid` and
+`ReminderCard` on `over` but renders `{isCoach ? <AttendanceList/> : <PresenceSummary/>}` unguarded, so
+a coach can mark attendance before the séance — the one window where the button exists.
+`training_attendance`
+cascades. Not hypothetical, just unwritten.
+
+`lib/calendar/deletion.ts` writes both from counted holds, fed by two scalar-subquery queries. Eleven
+tests; 1022 with the suite. Decision NNN, whose rule is that a destructive control states what it
+destroys in numbers, and whose stated limitation is that nothing enforces it: a `cascade` added next
+month will not appear in the two `…Holds` types by itself, and the suite will stay green.
+
+Verified at 390 px in both themes against the demo season, four rows chosen for their four shapes:
+Étoile du Parc (three parts), the retro-entered FC des Deux-Ponts — no event log at all, so it *is*
+deletable, sheet and all (two parts) — AS Coteaux untouched (« Rien d'autre n'y est encore rattaché. »),
+and the one future séance, 9 réponses, 0 pointés.

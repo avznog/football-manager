@@ -13,6 +13,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { matchAvailability, matchEvents, matches } from "@/db/schema";
 import type { AvailabilityStatus, Competition, EntryMode, MatchStatus } from "@/db/schema";
+import type { MatchDeletionHolds } from "@/lib/calendar/deletion";
 
 export type MatchRow = {
   id: string;
@@ -204,6 +205,31 @@ export async function hasMatchEvents(matchId: string): Promise<boolean> {
     .limit(1);
 
   return rows.length > 0;
+}
+
+/**
+ * What would go with this match, for the sentence on the « supprimer » card.
+ *
+ * Three counts in one round trip, from a match row that is not joined to anything: scalar
+ * subqueries, so a match with no answers and no sheet still comes back with zeros rather than no
+ * row at all.
+ */
+export async function getMatchDeletionHolds(matchId: string): Promise<MatchDeletionHolds> {
+  const [row] = await db
+    .select({
+      answers: sql<string>`(select count(*) from match_availability where match_id = ${matchId})`,
+      squad: sql<string>`(select count(*) from match_squad where match_id = ${matchId})`,
+      lineups: sql<string>`(select count(*) from lineups where match_id = ${matchId})`,
+    })
+    .from(matches)
+    .where(eq(matches.id, matchId));
+
+  // `count(*)` is a bigint, which postgres.js hands over as a string.
+  return {
+    answers: Number(row?.answers ?? 0),
+    squad: Number(row?.squad ?? 0),
+    lineups: Number(row?.lineups ?? 0),
+  };
 }
 
 /** Convenience for the match page, which needs exactly one score. */

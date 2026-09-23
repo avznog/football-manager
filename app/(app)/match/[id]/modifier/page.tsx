@@ -16,9 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { matchDeletionWarningFr } from "@/lib/calendar/deletion";
 import { toLocalInput } from "@/lib/calendar/time";
 import { deleteMatch } from "@/lib/match/actions";
-import { getMatch, hasMatchEvents } from "@/lib/match/queries";
+import { getMatch, getMatchDeletionHolds, hasMatchEvents } from "@/lib/match/queries";
 import { MatchForm } from "../../_components/match-form";
 
 export const metadata = { title: "Modifier le match" };
@@ -30,7 +31,10 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
   const match = await getMatch(team.id, id);
   if (!match) notFound();
 
-  const logged = await hasMatchEvents(match.id);
+  const [logged, holds] = await Promise.all([
+    hasMatchEvents(match.id),
+    getMatchDeletionHolds(match.id),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -61,11 +65,10 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
       </Card>
 
       {!logged && can(actor, "match:delete", { teamId: team.id }) ? (
-        <Card
-          title="Supprimer"
-          description="Le match disparaît du calendrier, avec les disponibilités déclarées."
-        >
-          {/* A plain form: no confirmation dialog to get wrong, and it works without JavaScript. */}
+        <Card title="Supprimer" description={matchDeletionWarningFr(holds)}>
+          {/* A plain form: no confirmation dialog to get wrong, and it works without JavaScript.
+              Which is exactly why the description above counts the sheet and the compositions the
+              cascade takes too, instead of naming only the availability answers (decision NNN). */}
           <form action={deleteMatch}>
             <input type="hidden" name="teamId" value={team.id} />
             <input type="hidden" name="matchId" value={match.id} />

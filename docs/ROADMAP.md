@@ -123,6 +123,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       was titled « Relancer les absents » above its own « 4 joueurs n'ont pas répondu ». Both
       sentences are `answersLineFr` / `reminderCardFr` in `lib/calendar/timeline.ts` now, where a test
       can read them (decision 090)
+- [x] The « Supprimer » cards say what they take with them, counted. Both are plain forms with no
+      confirmation dialog — on purpose — which makes their description the confirmation step, and it
+      named the cheapest thing the cascade destroys: « avec les disponibilités déclarées » over a
+      match holding eleven answers, an eleven-row sheet and two compositions. The training twin never
+      mentioned `training_attendance`, markable before the séance because `AttendanceList` is not
+      gated on `over`. `lib/calendar/deletion.ts`, eleven tests (decision NNN)
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)
