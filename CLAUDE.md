@@ -75,7 +75,7 @@ npm run db:seed        # reference data + the demo season (idempotent)
 npm run db:reset       # drop everything, remigrate, reseed — local only
 npm run db:bootstrap   # an empty database: reference data + the one super admin (docs/DEPLOY.md)
 npm test               # Vitest — unit only, and it stays that way
-npm run test:e2e       # Playwright, the whole season loop in a browser (~25s)
+npm run test:e2e       # Playwright: the season loop, the first run, and the offline queue (~25s)
 npm run test:e2e:install   # Chromium, once per machine
 npm run lint           # eslint
 npm run typecheck      # next typegen && tsc --noEmit
