@@ -95,6 +95,7 @@ npm run test:e2e:install   # Chromium, once per machine
 npm run lint           # eslint
 npm run typecheck      # next typegen && tsc --noEmit
 npm run build          # production build
+npm run peer           # what the other sessions changed on origin since last run (COORDINATION.md)
 ```
 
 `npm run test:e2e` reuses a dev server if one is already up, so it is cheap. It drives
