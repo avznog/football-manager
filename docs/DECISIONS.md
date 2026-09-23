@@ -367,3 +367,59 @@ still moving, so including it would change a season total between two refreshes 
 which of the two they are showing. A player nobody ever selected gets dashes rather than zeros —
 never-selected is not the same fact as scored-none — while a named substitute who stayed on the
 bench gets honest zeros. The stats screen states that live matches are excluded.
+
+---
+
+## 023 — A rating, once submitted, is final; a partial set is kept
+**2026-09-23** · accepted
+
+`submitRatings` inserts with `on conflict do nothing`. There is no update path: a score and its
+comment cannot be changed once they are in. You may, however, submit your set in pieces — four
+teammates in the car, the rest at home — and only a **complete** set unlocks the results.
+
+**Why.** Editable notes would reopen the hole that decision 007 exists to close: rate everybody 5,
+read the averages, then go back and adjust. Finality also makes a retried POST free, which matters
+on the coach journey home with one bar of signal. Refusing partial sets instead would cost more
+than it buys — a player interrupted at teammate four would have to start again, and would not.
+
+**Consequences.** The flow says plainly that a note cannot be changed, so finality is a stated rule
+and not a surprise. Inserts are idempotent per `(match, rater, rated)`, which the unique constraint
+already guaranteed. M5's season averages depend on the *whole* set arriving before anything
+unlocks, which is why the write is atomic (decision 021).
+
+---
+
+## 024 — The rating gate has two edges: no set to fill means no gate, and never filling it means never seeing
+**2026-09-23** · accepted
+
+Somebody who could not rate at all — a player who was not on the match sheet, a coach who did not
+play — sees the results immediately. Somebody who could rate and never did never sees that match's
+ratings, and the window closing does not release them.
+
+**Why.** The gate exists to stop copying and anchoring, and neither is possible for a person with
+no card to fill; gating them would be a permanent lock-out for no benefit, since they have nothing
+to submit. At the other edge, unlocking at the window's close would turn the whole thing into a
+waiting game: say nothing for a week and read everyone's notes on Sunday, which is precisely the
+free ride the gate is for.
+
+**Consequences.** The refusal text states which of the two cases the reader is in, because
+« tu ne peux pas voir » without a reason reads as a bug. The visibility rule lives in
+`lib/rating/progress.ts`; nothing else may re-derive it.
+
+---
+
+## 025 — Man of the match needs two ratings, and a tie is shared
+**2026-09-23** · accepted
+
+The derived man of the match requires at least two ratings; ties name every winner. The ranked
+ratings list applies **no** minimum and shows each player's rating count alongside their average.
+
+**Why.** One teammate's 9 is an opinion, not a verdict, and a single-rating winner would discredit
+the award the first time it happened. Breaking a tie would mean inventing a tiebreaker the players
+never agreed to. The list is a different object from the award: hiding a 9,0 on one note would be
+dishonest, and printing the count is enough for a reader to judge it — which is also why M5's
+top-rated chart uses its own, higher threshold for a season-long claim.
+
+**Consequences.** A match with fewer than two ratings shows « pas encore assez de notes » rather
+than a winner. Averages are compared by exact integer cross-multiplication, so a tie is a real tie
+and not a floating-point artefact.

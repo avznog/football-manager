@@ -62,11 +62,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Competition filter across all stats
 
 ## M6 — Ratings & recap
-- [ ] Rating flow: one teammate per card, 0–10, optional comment
-- [ ] Results hidden until you have submitted your own
-- [ ] Window closes at the next kick-off
-- [ ] Derived man of the match
-- [ ] Celebratory post-match recap screen
+- [x] Rating flow: one teammate per card, 0–10, optional comment
+- [x] Results hidden until you have submitted your own
+- [x] Window closes at the next kick-off
+- [x] Derived man of the match
+- [x] Celebratory post-match recap screen
 
 ## M7 — Retro-entry & amendments
 - [ ] "Saisie rétroactive" screen synthesising events
