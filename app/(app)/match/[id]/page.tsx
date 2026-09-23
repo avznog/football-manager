@@ -39,6 +39,7 @@ import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calend
 import { buildReminderMessage, tallyAvailability, type Responder } from "@/lib/calendar/timeline";
 import { getMatch, getMatchAnswers, getMatchScore } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
+import { ratingDeadlineFr } from "@/lib/rating/window";
 import { getSquad } from "@/lib/team/queries";
 import { CompositionCard } from "./composition/_components/composition-card";
 import { AvailabilityControl } from "../../calendrier/_components/availability-control";
@@ -105,6 +106,11 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
     notation.window.state === "open" &&
     can(actor, "rating:submit", { teamId: team.id })
       ? notation.progress
+      : null;
+  /** Only meaningful next to `ratingDuty`: it is the deadline on notes this viewer still owes. */
+  const ratingDeadline =
+    ratingDuty !== null && notation !== null
+      ? ratingDeadlineFr(notation.window.closesAtMs, now.getTime())
       : null;
   const declarable = team.isPlayer && match.status === "scheduled";
   const myAnswer =
@@ -213,6 +219,11 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
                     ? `Il te reste ${ratingDuty.missingIds.length} note${ratingDuty.missingIds.length > 1 ? "s" : ""} à donner. Tu verras celles des autres quand tu auras fini.`
                     : "Tu n’as pas encore noté tes coéquipiers. Les notes des autres restent cachées jusque-là."}
                 </p>
+                {/* The comment above calls this « the one that expires at the next kick-off », and
+                    the card never said when that was (decision 077). */}
+                {ratingDeadline ? (
+                  <p className="text-sm font-medium text-ink">{ratingDeadline}</p>
+                ) : null}
                 <ButtonLink href={`/match/${match.id}/notation`} fullWidth>
                   Noter mes coéquipiers
                 </ButtonLink>

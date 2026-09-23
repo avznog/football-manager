@@ -29,6 +29,7 @@ import type { MatchRow } from "@/lib/match/queries";
 import { MOTM_MIN_RATINGS } from "@/lib/rating/aggregate";
 import { isOnRateableSheet } from "@/lib/rating/progress";
 import { getMatchRecap, getRatingResults, getRatingWindow } from "@/lib/rating/queries";
+import { ratingDeadlineFr } from "@/lib/rating/window";
 import { ManOfTheMatchCard } from "./_components/man-of-the-match";
 import { MinutesTable } from "./_components/minutes-table";
 import { RatingsPanel } from "./_components/ratings-panel";
@@ -84,6 +85,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
   const mayRate = canSubmit && isOnRateableSheet(sheet, team.membershipId);
   const canStillRate = mayRate && window.isOpen;
   const gated = results !== null && !results.visible;
+  const deadline = ratingDeadlineFr(window.closesAtMs, now.getTime());
 
   return (
     <div className="space-y-6">
@@ -122,6 +124,9 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
               Mets une note à chaque joueur de la feuille de match, toi compris. Tu verras les notes
               de tout le monde dès que tu auras fini.
             </p>
+            {/* « dès que tu auras fini » has a closing time, and this card never said it
+                (decision 077). */}
+            {deadline ? <p className="text-sm font-medium text-ink">{deadline}</p> : null}
             <ButtonLink href={`/match/${match.id}/notation`}>
               {results !== null && !results.visible && results.progress.submittedCount > 0
                 ? "Finir mes notes"
