@@ -38,8 +38,12 @@ export function MinutesTable({
               <th scope="col" className="px-2 py-2 text-right font-medium">
                 Buts
               </th>
+              {/* « Passes », never the two-letter abbreviation for « passes décisives »: in French
+                  those two letters are a slur, and this table is read by the whole squad on a
+                  celebration screen. The word is what the scoreboard directly above it already uses,
+                  and the column holds single digits, so the header sets its width either way. */}
               <th scope="col" className="py-2 pr-4 text-right font-medium">
-                PD
+                Passes
               </th>
             </tr>
           </thead>

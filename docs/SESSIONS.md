@@ -1004,3 +1004,23 @@ three lines, all blocked on the owner: the Vercel production deploy (needs a Neo
 production) and the daylight check on a real iPhone and Android. Everything else is merged. The audit
 captures not yet read line by line in the `joueur` role are `recap`, `joueur`, `stats`,
 `stats-coupe-buts`, `jeu`, `calendrier` and `match-saisi-apres`.
+
+## Two letters on the celebration screen
+
+One defect, found by reading `audit/light-joueur-recap-0.png` line by line rather than by any test.
+
+**« PD ».** The assists column of the recap's « Temps de jeu » table, abbreviating « passes décisives ».
+In French those two letters are a homophobic slur, and this is the table the whole squad scrolls through
+on the one screen the plan calls « le moment de fête », two columns from each player's own name. Now
+« Passes », which is what the scoreboard directly above it already says — it was the only abbreviation
+of its kind left in the app (decision 071). Checked in the browser at both widths the table has to
+survive: 356 px wide inside a 390 px viewport, 326 px inside 360 px, no horizontal scroll either way.
+
+**One thing looked at and left alone.** On `/stats`, a player card can read « MATCHS 6 » above
+« 7 titulaire ». That is `lib/stats/aggregate.ts` rules 3 and 4 meeting: « titulaire » is what the coach
+wrote on the sheet and counts all seven, while « matchs » counts the matches he has minutes in — and the
+demo season has one finished match nobody recorded, which gives nobody a minute. The team card at the
+top of the same page already
+names it — « 1 match terminé sans aucun évènement saisi : ils ne sont comptés nulle part » — so the
+figure is explained on the screen it appears on, and the two numbers are answers to different questions
+rather than one number that is wrong. Recorded here so the next session does not re-open it.

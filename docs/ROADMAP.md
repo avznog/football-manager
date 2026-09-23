@@ -149,6 +149,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] …and says which card of the stack is open in words: « joueur 3 sur 11 ». An unlabelled « 3 / 11 »
       beside a shirt number read as a fact about the man being rated, most plausibly as a tally of who
       had already rated him — which decision 007 exists to hide (decision 070)
+- [x] The recap's minutes table spells out « Passes ». Its header was « PD », two letters that are a
+      slur in French, on the one screen the whole squad reads (decision 071)
 
 ## M7 — Retro-entry & amendments
 - [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet

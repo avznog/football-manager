@@ -1436,3 +1436,21 @@ Labelled « joueur 3 sur 11 », and moved into `lib/rating/progress.ts` beside `
 Vitest only collects `lib/**` — a sentence built inline in a client component is a sentence no test
 pins. It returns `null` for a single card, where « joueur 1 sur 1 » would say nothing the screen does
 not already show.
+
+## 071 — « Passes » spelled out, because the abbreviation is a slur
+**2026-09-23** · accepted
+
+The assists column of the recap's « Temps de jeu » table was headed « PD », for « passes décisives ».
+In French those two letters are a homophobic slur, and this is the table every player scrolls to on the
+one screen `docs/PLAN.md` calls « le moment de fête » — the abbreviation sat two columns from his own
+name, at 390 px, read by the whole squad.
+
+It was also the only one in the app: the scoreboard immediately above says « Passes », and the player
+card and the stats filters say « Passes » or « Passes déc. ». So the fix is the word the surrounding
+screens already use, and it costs nothing — the column holds single digits, so its header sets its
+width either way, and the table still fits without horizontal scroll at 360 px.
+
+**The general rule this settles:** no two- or three-letter abbreviation of a stat name unless it is one
+a scoreboard actually uses (`GB`, `V`/`N`/`D`, `csc`). Screen width is never a good enough reason — the
+numbers under these headers are single digits, so the header is what sets the column width, and a
+shorter header buys no space at all.
