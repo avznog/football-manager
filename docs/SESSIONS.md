@@ -1732,3 +1732,28 @@ image target, command and dependency. **The seed itself was not run**: this sess
 
 937 tests, typecheck and lint clean. Nothing here touches the match flow, so the browser suite was
 not run.
+
+### A card that promised less than its own select offered
+
+Screen nine: `equipe`, from `light-coach-equipe.png` and `dark-joueur-equipe.png`. Most of it holds up
+under the question — « 13 joueurs » counts `isPlayer` and nothing else, rows carry a real « coach » and
+« blessé » badge, « Aucun code actif. » is true because `getActiveInvites` excludes both expired and
+exhausted codes, « L'image est réduite à 96 px » prints `CREST_MAX_SIDE` rather than a number somebody
+typed once, and « les couleurs du maillot — celles des joueurs sur le terrain » is true down to the
+secondary colour, which is the ring `PlayerDisc` draws. Two claims did not.
+
+- The invite card: « Inviter des joueurs », « Le joueur choisit lui-même son mot de passe », and a
+  `<select>` offering « Coach » directly underneath. Now « Inviter un joueur ou un coach » and « la
+  personne ». The player-side sentence had the same narrowing and is now « Seul un coach peut envoyer
+  une invitation. »
+- « Encadrement »: true of every row under it, and the reader asking who runs the team counted one,
+  because Karim is coach *and* player and is therefore in « Effectif ». The card now says « 1 coach
+  joue aussi, et apparaît dans l'effectif. », derived from the squad.
+
+`lib/team/labels.ts` with six tests — `inviteCardFr`, `staffCardFr`, `invitesReadOnlyFr`. 931 tests on this branch, 936 with #73's five.
+Looked at at 390 px in both themes as `karim` and as `hugo`: both titles still fit one line, and a
+player sees the Encadrement note but no invite card.
+
+The decision this earned is the general form of it: a heading is answerable for the rows a reader
+would expect under it, not only the ones that are there. Splitting a list is a choice the app made and
+the reader cannot see.

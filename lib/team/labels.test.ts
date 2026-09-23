@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inviteCardFr, staffCardFr } from "./labels";
+import { inviteCardFr, invitesReadOnlyFr, staffCardFr } from "./labels";
 
 describe("inviteCardFr", () => {
   /** The card's own `<select>` offers « Coach », so its title may not promise « des joueurs ». */
@@ -40,3 +40,12 @@ describe("staffCardFr", () => {
     expect(staffCardFr(0).descriptionFr).toBeUndefined();
   });
 });
+
+describe("invitesReadOnlyFr", () => {
+  /** The same narrowing as the title, in the sentence a player reads instead of it. */
+  it("does not claim a coach only invites players", () => {
+    expect(invitesReadOnlyFr()).toBe("Seul un coach peut envoyer une invitation.");
+    expect(invitesReadOnlyFr()).not.toContain("joueurs");
+  });
+});
+

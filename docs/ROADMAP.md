@@ -81,6 +81,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       everyone else's, for two buttons he presses twice a season. The row is one line again and the
       whole of it is the link. « A team keeps one coach » is now one tested function,
       `wouldLeaveNoCoach` in `lib/team/coaches.ts`, instead of three copies that had to agree
+- [x] The invite card stops promising less than its own form offers. It was « Inviter des joueurs »
+      over a select whose second option is « Coach »; and « Encadrement », true of every row under it,
+      did not mention the coach who is in the effectif instead. `lib/team/labels.ts`, six tests
+      (decision NNN)
 
 ## M2 — Calendar
 - [x] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)

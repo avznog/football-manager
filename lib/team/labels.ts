@@ -55,3 +55,14 @@ export function staffCardFr(playingCoachCount: number): {
         : `${playingCoachCount} coachs jouent aussi, et apparaissent dans l’effectif.`,
   };
 }
+
+/**
+ * What a player is told in the invite card's place.
+ *
+ * It read « Seul un coach peut inviter de nouveaux joueurs », which is the same narrowing as the
+ * title it replaces — a coach invites coaches too. It says nothing about roles now, because the fact
+ * a player needs is about who may do it, not whom it is done to.
+ */
+export function invitesReadOnlyFr(): string {
+  return "Seul un coach peut envoyer une invitation.";
+}

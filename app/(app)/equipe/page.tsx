@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { staffCardFr } from "@/lib/team/labels";
+import { invitesReadOnlyFr, staffCardFr } from "@/lib/team/labels";
 import { getActiveInvites, getSquad } from "@/lib/team/queries";
 import { InviteManager } from "./invite-manager";
 import { MemberRow } from "./member-row";
@@ -83,8 +83,7 @@ export default async function TeamPage() {
         </>
       ) : (
         <p className="text-sm text-ink-subtle">
-          Seul un coach peut inviter de nouveaux joueurs.{" "}
-          <Badge variant="neutral">lecture seule</Badge>
+          {invitesReadOnlyFr()} <Badge variant="neutral">lecture seule</Badge>
         </p>
       )}
     </div>

@@ -2085,3 +2085,30 @@ And it has a test, which is the part that makes the claim checkable rather than 
 the same stale list one layer down. The same suite asserts `/calendrier` and `/match/1/jeu` still
 are matched, so an exclusion can never quietly swallow the guard, and drives `proxy()` itself with
 real `NextRequest`s for the redirect behaviour that had no test at all.
+
+## NNN — A card may not promise less than the controls inside it
+
+`/equipe`'s invite card was titled « Inviter des joueurs » and described as « Génère un code et
+envoie-le sur WhatsApp. Le joueur choisit lui-même son mot de passe. » The first control inside it is
+a `<select>` whose second option is « Coach », and `createInvite` has taken a role since M0. So the
+card's own form refuted its title, two centimetres below it — the same shape as « Relancer les
+absents » over « 4 joueurs n'ont pas répondu », and the third time today that a screen carried its own
+correction and nobody read it.
+
+It is now « Inviter un joueur ou un coach », and the sentence says « la personne », which is true of
+either. The title is deliberately **not** derived from the selected role: the select is a client
+control, and a heading that changed under the reader's thumb would trade one defect for a worse one.
+What matters is that nothing is false before anybody has touched it. The sentence a player reads in
+the card's place lost the same narrowing: « Seul un coach peut envoyer une invitation. »
+
+The second claim on the screen is subtler and is the reason this is a decision rather than a typo
+fix. « Encadrement » is true of every row under it — decision 087's test — and is still not the whole
+staff, because a coach who plays is listed in « Effectif » above with a « coach » badge. A heading can
+mislead by being *complete about the wrong set*: the reader asking who runs this team counted one. So
+the card explains its own boundary, the way the training page explains a denominator larger than the
+list under it (decision 076): « 1 coach joue aussi, et apparaît dans l'effectif. » Nothing is said
+when there is nothing to explain.
+
+The general rule: **a heading is answerable not only for the rows under it, but for the rows a reader
+would expect under it.** Splitting a list is a choice the app made; the reader did not make it and
+cannot see it.
