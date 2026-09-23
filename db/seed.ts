@@ -1,9 +1,10 @@
 /**
  * Seeding, in two halves.
  *
- *  1. **Reference data** — the seven-a-side positions and the built-in formation templates from
- *     `db/reference.ts`. The application is useless without them, so this half runs in every
- *     environment, including production, and is idempotent.
+ *  1. **Reference data** — the seven-a-side positions and the built-in formation templates. The
+ *     application is useless without them, so this half runs in every environment, including
+ *     production, and is idempotent. It lives in `db/seed-reference.ts` because `db/bootstrap.ts`
+ *     needs it too and must never pull in the half below.
  *  2. **A demo season** — a fake team of fourteen, seven played matches with real event logs,
  *     four trainings, an injury and some ratings. Development only.
  *
@@ -39,18 +40,13 @@ import "./load-env";
 
 import { randomUUID } from "node:crypto";
 
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db } from "./client";
-import {
-  BUILTIN_FORMATIONS,
-  DEFAULT_FORMATION_LABEL,
-  POSITIONS,
-  type PositionCode,
-} from "./reference";
+import { DEFAULT_FORMATION_LABEL, type PositionCode } from "./reference";
+import { seedReference } from "./seed-reference";
 import {
   formationSlots,
-  formations,
   injuries,
   lineupSlots,
   lineups,
@@ -59,7 +55,6 @@ import {
   matchSquad,
   matches,
   playerPositions,
-  positions,
   ratings,
   teamMembers,
   teams,
@@ -74,82 +69,8 @@ import { hashPassword } from "../lib/auth/password";
 import { finalizeMatchById } from "../lib/match/finalize";
 
 /* -------------------------------------------------------------------------- */
-/* 1. Reference data                                                          */
-/* -------------------------------------------------------------------------- */
-
-async function seedReference(): Promise<void> {
-  await db
-    .insert(positions)
-    .values(
-      POSITIONS.map((p) => ({
-        code: p.code,
-        labelFr: p.labelFr,
-        line: p.line,
-        defaultX: p.defaultX,
-        defaultY: p.defaultY,
-        sort: p.sort,
-      })),
-    )
-    .onConflictDoUpdate({
-      target: positions.code,
-      set: {
-        labelFr: sql`excluded.label_fr`,
-        line: sql`excluded.line`,
-        defaultX: sql`excluded.default_x`,
-        defaultY: sql`excluded.default_y`,
-        sort: sql`excluded.sort`,
-      },
-    });
-
-  for (const template of BUILTIN_FORMATIONS) {
-    // Built-ins are identified by their label among the rows with no team.
-    const existing = await db.query.formations.findFirst({
-      where: (f, { and, eq: equals, isNull: nul }) =>
-        and(nul(f.teamId), equals(f.label, template.label)),
-      columns: { id: true },
-    });
-
-    const formationId =
-      existing?.id ??
-      (
-        await db
-          .insert(formations)
-          .values({ teamId: null, name: template.name, label: template.label })
-          .returning({ id: formations.id })
-      )[0].id;
-
-    // Slots are replaced wholesale: a template's geometry is ours to change, and no user data
-    // points at a built-in slot except through a lineup, which cascades.
-    if (existing) {
-      const used = await db
-        .select({ id: lineupSlots.lineupId })
-        .from(lineupSlots)
-        .innerJoin(formationSlots, eq(formationSlots.id, lineupSlots.formationSlotId))
-        .where(eq(formationSlots.formationId, formationId))
-        .limit(1);
-      // Somebody's composition depends on these slots — leave them alone.
-      if (used.length > 0) continue;
-      await db.delete(formationSlots).where(eq(formationSlots.formationId, formationId));
-    }
-
-    await db.insert(formationSlots).values(
-      template.slots.map((slot) => ({
-        formationId,
-        positionCode: slot.positionCode,
-        x: slot.x,
-        y: slot.y,
-        sort: slot.sort,
-      })),
-    );
-  }
-
-  console.log(
-    `  positions: ${POSITIONS.length} · formations intégrées: ${BUILTIN_FORMATIONS.length}`,
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* 2. The demo season                                                         */
+/* The demo season. Reference data is in `db/seed-reference.ts`, which this     */
+/* script and `db/bootstrap.ts` both call.                                     */
 /* -------------------------------------------------------------------------- */
 
 /**

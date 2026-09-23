@@ -23,12 +23,14 @@ comments, commit messages, docs and PR descriptions are English. Never mix the t
 4. `docs/ROADMAP.md` — what is done, what is in progress, what is next.
 5. `docs/SESSIONS.md` — append-only log of what each session changed. Read the last entries
    to understand where the previous session stopped.
-6. `instructions.md` — the owner's original notes, in French. Historical; `docs/` supersedes it.
+6. `docs/DEPLOY.md` — the deployment runbook: Neon, migrations, `db:bootstrap`, Vercel, and the
+   first run in the browser. Read it before touching anything about deployment or the first account.
+7. `instructions.md` — the owner's original notes, in French. Historical; `docs/` supersedes it.
 
 ## Stack
 
 - Next.js (App Router) + TypeScript, React Server Components, Server Actions for mutations
-- Neon Postgres in production; a local Docker Postgres in development
+- Neon Postgres in production; a local Homebrew Postgres in development (decision 016)
 - Drizzle ORM — schema in `db/schema.ts`, generated SQL in `db/migrations/` (**always committed**)
 - Tailwind CSS, hand-rolled components (no heavy UI kit)
 - Self-written auth: username + password (argon2id), opaque session cookie, `sessions` table
@@ -71,6 +73,7 @@ npm run db:generate    # generate a migration from schema.ts changes
 npm run db:migrate     # apply migrations
 npm run db:seed        # reference data + the demo season (idempotent)
 npm run db:reset       # drop everything, remigrate, reseed — local only
+npm run db:bootstrap   # an empty database: reference data + the one super admin (docs/DEPLOY.md)
 npm test               # Vitest — unit only, and it stays that way
 npm run test:e2e       # Playwright, the whole season loop in a browser (~25s)
 npm run test:e2e:install   # Chromium, once per machine
