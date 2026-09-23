@@ -16,6 +16,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { reminderCardFr } from "@/lib/calendar/timeline";
 
 export type ReminderCardProps = {
   /** Already formatted, French, multi-line. */
@@ -26,6 +27,9 @@ export type ReminderCardProps = {
 
 export function ReminderCard({ message, pending }: ReminderCardProps) {
   const [copied, setCopied] = useState(false);
+  // Not « Relancer les absents »: nobody in this list has said they are not coming — they have said
+  // nothing at all, which is why the card exists (decision NNN).
+  const heading = reminderCardFr(pending);
 
   async function copy() {
     try {
@@ -39,14 +43,7 @@ export function ReminderCard({ message, pending }: ReminderCardProps) {
   }
 
   return (
-    <Card
-      title="Relancer les absents"
-      description={
-        pending === 0
-          ? "Tout le monde a répondu. Rien à faire."
-          : `${pending} joueur${pending > 1 ? "s" : ""} n’${pending > 1 ? "ont" : "a"} pas répondu.`
-      }
-    >
+    <Card title={heading.titleFr} description={heading.descriptionFr}>
       <div className="space-y-3">
         <textarea
           readOnly

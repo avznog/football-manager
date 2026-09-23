@@ -271,6 +271,55 @@ export function countsOf(tally: AvailabilityTally): AvailabilityCounts {
 }
 
 /**
+ * The tally under a pinned event: « 7 dispo · 1 pas dispo · 1 peut-être · 4 sans réponse ».
+ *
+ * It used to count « 1 absent », three days before a session nobody had attended yet. Availability is
+ * an intention and a présence is a fact, and this app keeps them in two different tables on purpose:
+ * `training_attendance` is the one that may call somebody absent, and it only ever does so about an
+ * evening that has happened (decision 076 — an unmarked player is not an absent one). Saying
+ * « 1 absent » about an answer borrowed the word from the fact, on the one screen where both can be on
+ * the same card.
+ *
+ * « pas dispo » is what the player tapped, what his badge says, and what the relance message asks for.
+ * Nothing is pluralised: « 2 pas dispo » is the same words as « 1 pas dispo », which is what makes the
+ * line scannable.
+ */
+export function answersLineFr(answers: AvailabilityCounts, squadSize: number): string {
+  const pending = pendingCount(squadSize, answers);
+  const parts = [
+    answers.yes > 0 ? `${answers.yes} dispo` : null,
+    answers.no > 0 ? `${answers.no} pas dispo` : null,
+    answers.maybe > 0 ? `${answers.maybe} peut-être` : null,
+    pending > 0 ? `${pending} sans réponse` : null,
+  ].filter((part): part is string => part !== null);
+
+  return parts.length === 0 ? "Personne n’a encore répondu." : parts.join(" · ");
+}
+
+/**
+ * The relance card's own heading, which said « Relancer les absents » over « 4 joueurs n'ont pas
+ * répondu ».
+ *
+ * Nobody in that list is absent: they have not answered, which is the opposite of having said they
+ * would not come, and the card's own description said so one line below its title. Decision 087's rule
+ * — a heading is a claim about every row under it — and `answersLineFr`'s, in the same card.
+ */
+export function reminderCardFr(pending: number): { titleFr: string; descriptionFr: string } {
+  if (pending === 0) {
+    return {
+      titleFr: "Personne à relancer",
+      descriptionFr: "Tout le monde a répondu. Rien à faire.",
+    };
+  }
+
+  return {
+    titleFr: "Relancer ceux qui n’ont pas répondu",
+    descriptionFr:
+      pending === 1 ? "1 joueur n’a pas répondu." : `${pending} joueurs n’ont pas répondu.`,
+  };
+}
+
+/**
  * The message a coach pastes into the team's WhatsApp group.
  *
  * There are no notifications and no e-mails by design (decision 015): the app's job is to tell
