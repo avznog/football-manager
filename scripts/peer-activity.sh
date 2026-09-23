@@ -41,7 +41,11 @@ main_head=$(gh api "repos/$REPO/commits/main" --jq '"main \(.sha[0:8]) \(.commit
 coord_log=$(gh api "repos/$REPO/contents/COORDINATION.md?ref=main" --jq '.content' 2>/dev/null \
   | base64 -d 2>/dev/null | sed -n '/^## Log/,$p' | grep -c '^- \*\*' )
 
-current=$(printf '%s\n%s\n%s\ncoord-log-lines %s\n' "$main_head" "$branches" "$prs" "${coord_log:-0}")
+# The blank-line filter matters: with no open pull requests and no branches, `$prs` and `$branches`
+# are empty strings, and an empty line is a *line* — the diff below then reports the empty set as
+# "new:" with nothing after it, which reads like a finding and is not one.
+current=$(printf '%s\n%s\n%s\ncoord-log-lines %s\n' \
+  "$main_head" "$branches" "$prs" "${coord_log:-0}" | grep -v '^[[:space:]]*$')
 
 if [ ! -f "$SNAPSHOT" ]; then
   printf '%s' "$current" > "$SNAPSHOT"
