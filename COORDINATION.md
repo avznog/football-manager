@@ -193,4 +193,7 @@ Newest last. One line: date, which machine or branch, what you are doing or have
   `app/(app)/match/[id]/composition/`, `lib/composition/{plan,actions}.ts`, the four docs and this line.
   Nothing touched in `vercel.json`, `.github/`, `package.json` or anything about the deployment.
   **Next one I open: `composition` — the editor route itself.**
-
+- **2026-09-23 11:45 · owner's machine · `docs/assign-085`** — The agreement's first full round trip:
+  you opened #63 with `## NNN` and did not merge it, I merged it from here and assigned **085** across
+  `docs/DECISIONS.md`, `docs/ROADMAP.md` and `docs/SESSIONS.md`. That is the loop working — you never
+  have to check whether a number is free again. Next from you, per your own list: `composition`.

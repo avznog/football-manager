@@ -1873,7 +1873,7 @@ it reads, in `lib/composition/plan.ts` — under `lib/` so Vitest collects it.
 `live` is deliberately not a case of its own: preparing a composition during a match is the normal way
 to plan a change, and invariant 3 means the plan is a proposal whenever it is written.
 
-## NNN — A finished match is a record on every screen, in the same words
+## 085 — A finished match is a record on every screen, in the same words
 **2026-09-23** · accepted
 
 The compositions screen was written for a match still to be played, and said the same things about one
