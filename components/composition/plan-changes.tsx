@@ -13,7 +13,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
-import type { DeducedChanges } from "@/lib/composition/plan";
+import { draftChangesPendingFr, type DeducedChanges } from "@/lib/composition/plan";
 
 export type ChangeLinesProps = {
   lines: readonly string[];
@@ -72,7 +72,11 @@ export function PlanChanges({
       className={className}
     >
       <div className="space-y-3">
-        {previousTitleFr ? (
+        {changes.slotsLeft > 0 ? (
+          // The pitch is not full, so there is no team to compare: « Hugo sort · Samir sort · … »
+          // for seven players the coach has not moved is the screen's worst line (decision NNN).
+          <p className="text-sm text-ink-muted">{draftChangesPendingFr(changes.slotsLeft)}</p>
+        ) : previousTitleFr ? (
           <ChangeLines lines={changes.lines} />
         ) : (
           <p className="text-sm text-ink-muted">

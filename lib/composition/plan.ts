@@ -356,6 +356,13 @@ export type DeducedChanges = {
   isEmpty: boolean;
   /** False when there is no earlier composition to compare against — nothing can be deduced. */
   hasPrevious: boolean;
+  /**
+   * Slots nobody is standing in. A saved composition always has none — an incomplete one is
+   * blocking (`findPlanIssues`) — so this is only ever non-zero for the draft in the editor, which
+   * is the point: until the last post is filled, the difference against the previous team is not a
+   * change list but the state of an unfinished form.
+   */
+  slotsLeft: number;
 };
 
 /**
@@ -365,6 +372,10 @@ export type DeducedChanges = {
  * `MC` slots of a double pivot, or keeping a centre-back a centre-back through a change of
  * formation, is not a change a coach needs to be told about — and printing « Karim passe MC → MC »
  * would make the genuinely useful lines harder to spot.
+ *
+ * Nothing is deduced in either direction while one of the two teams is not a team: no earlier
+ * composition, or a target with empty slots. Both are the same lie in mirror image, and both
+ * used to be printed — see `slotsLeft` (decision NNN).
  */
 export function deduceChanges(
   previous: { assignments: readonly SlotAssignment[]; slots: readonly PlanSlot[] } | null,
@@ -390,16 +401,50 @@ export function deduceChanges(
    * `describeLineupDiffFr` omitting unpaired arrivals altogether, which was a bug everywhere else.
    */
   const hasPrevious = (previous?.assignments.length ?? 0) > 0;
-  const lines = hasPrevious ? describeLineupDiffFr(meaningful, nameOf, options) : [];
+
+  /*
+   * And the mirror of it, which the editor showed for as long as the editor existed. « Nouvelle
+   * composition » opens on an empty pitch, so the diff against the seven in force was seven
+   * departures: « Hugo sort · Samir sort · Thomas sort · Nico sort · Léo sort · Karim sort · Julien
+   * sort », under a card headed « Changements déduits », for a coach who had not yet touched a
+   * player. It counts the slots of the target because an empty *pitch* is legitimate in the other
+   * caller — a plan may field six after an injury (`describeLineupDiffFr`) — whereas a slot with
+   * nobody in it is only ever a form the coach has not finished.
+   */
+  const placed = new Set(
+    target.assignments
+      .filter((assignment) => target.slots.some((slot) => slot.id === assignment.slotId))
+      .map((assignment) => assignment.slotId),
+  );
+  const slotsLeft = Math.max(0, target.slots.length - placed.size);
+
+  const deducible = hasPrevious && slotsLeft === 0;
+  const lines = deducible ? describeLineupDiffFr(meaningful, nameOf, options) : [];
 
   return {
-    substitutions: meaningful.substitutions,
-    positionChanges: meaningful.positionChanges,
+    // Emptied with the lines, and for the same reason: they only feed the « 2 changements · 1
+    // repositionnement » badge, and a count above a list that is deliberately not shown is the
+    // « 0 – 0 » of decision 061 all over again.
+    substitutions: deducible ? meaningful.substitutions : [],
+    positionChanges: deducible ? meaningful.positionChanges : [],
     lines,
-    summary: hasPrevious ? summariseLineupDiffFr(meaningful, nameOf, options) : "Aucun changement",
+    summary: deducible ? summariseLineupDiffFr(meaningful, nameOf, options) : "Aucun changement",
     isEmpty: lines.length === 0,
     hasPrevious,
+    slotsLeft,
   };
+}
+
+/**
+ * « Il reste 4 postes à pourvoir : les changements apparaîtront quand l’équipe sera complète. »
+ *
+ * What « Changements déduits » says while `slotsLeft` is not zero. Not « Aucun changement », which is
+ * the answer for two complete teams that happen to be identical — a different thing from a form whose
+ * question has not been answered yet (decisions 083 and NNN).
+ */
+export function draftChangesPendingFr(slotsLeft: number): string {
+  const posts = slotsLeft === 1 ? "un poste" : `${slotsLeft} postes`;
+  return `Il reste ${posts} à pourvoir : les changements apparaîtront quand l’équipe sera complète.`;
 }
 
 /** The slots of both compositions in one catalogue, so the diff can name every position. */
