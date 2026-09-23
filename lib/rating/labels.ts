@@ -60,3 +60,14 @@ export function ratingCountNoteFr(input: {
     ? `${notes} · tu t’es mis ${input.selfScore}`
     : `${notes} · il s’est mis ${input.selfScore}`;
 }
+
+/**
+ * The legend above the 0–10 pad on one card of the rating flow.
+ *
+ * Decision 007 has the reader rate himself, so one card of the eleven is his own — and that card asked
+ * for « Sa note pour ce match **(la tienne)** », a parenthesis patching a pronoun instead of choosing
+ * the right one. The card already wears a « toi » badge; the legend under it said « Sa ».
+ */
+export function ratingLegendFr(isSelf: boolean): string {
+  return isSelf ? "Ta note pour ce match" : "Sa note pour ce match";
+}

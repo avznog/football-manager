@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { noteAuthorFr, ratingCountNoteFr } from "./labels";
+import { noteAuthorFr, ratingCountNoteFr, ratingLegendFr } from "./labels";
 
 const author = (over: Partial<Parameters<typeof noteAuthorFr>[0]> = {}) =>
   noteAuthorFr({ raterName: "Karim", isSelf: false, isViewer: false, ...over });
@@ -59,5 +59,22 @@ describe("ratingCountNoteFr", () => {
 
   it("never tells the reader what « il » gave himself", () => {
     expect(ratingCountNoteFr({ count: 4, selfScore: 8, isViewer: true })).not.toContain("il ");
+  });
+});
+
+describe("ratingLegendFr", () => {
+  it("asks the reader for his own note in the second person", () => {
+    // Was « Sa note pour ce match (la tienne) » — a parenthesis patching the wrong pronoun.
+    expect(ratingLegendFr(true)).toBe("Ta note pour ce match");
+  });
+
+  it("keeps the third person for a teammate's card", () => {
+    expect(ratingLegendFr(false)).toBe("Sa note pour ce match");
+  });
+
+  it("never needs a parenthesis to say whose note it is", () => {
+    for (const isSelf of [true, false]) {
+      expect(ratingLegendFr(isSelf)).not.toContain("(");
+    }
   });
 });
