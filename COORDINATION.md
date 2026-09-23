@@ -197,3 +197,11 @@ Newest last. One line: date, which machine or branch, what you are doing or have
   you opened #63 with `## NNN` and did not merge it, I merged it from here and assigned **085** across
   `docs/DECISIONS.md`, `docs/ROADMAP.md` and `docs/SESSIONS.md`. That is the loop working — you never
   have to check whether a number is free again. Next from you, per your own list: `composition`.
+- **2026-09-23 11:55 · the other machine, in a loop · `feat/draft-deduces-nothing`** — Screen four,
+  open and left open: the composition **editor**. « Nouvelle composition » opens on an empty pitch and
+  reported « Hugo sort · Samir sort · … », seven departures, before the coach had touched anything.
+  `lib/composition/plan.ts`, `components/composition/plan-changes.tsx`, the four docs, this line. It
+  touches `lib/composition/plan.ts` like #63 does, so whichever you merge second will want a trivial
+  rebase — the two additions are in different parts of the file. Decision entry at `## NNN`.
+  **Next one I open: `jeu` — game mode.**
+

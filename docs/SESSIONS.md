@@ -1563,3 +1563,22 @@ and the card around it both read « Aucune composition », stacked. 911 tests be
 assertions, and the live case was checked by flipping Étoile du Parc to `live` in psql and putting it
 back.
 
+### Seven players walking off a pitch none of them was on
+
+Fourth screen from the captures, the composition editor. `audit/dark-coach-composition-nouvelle.png`
+is « Nouvelle composition » for Étoile du Parc on an empty pitch, and the last card on it listed seven
+players going off. The diff was being computed between the seven in force and a draft nobody had
+filled in.
+
+The interesting part is that the guard for the mirror case was already there, with a comment
+explaining it — an empty *previous* composition yields seven arrivals, which are a team sheet and not
+seven changes. The other direction had never been considered, which is worth remembering: a rule
+written for one direction of a comparison is half written.
+
+`deduceChanges` now counts empty slots on the target. Slots, not players: a plan fielding six after an
+injury is a real composition, and a session before this one fixed a defect caused by suppressing that
+diff. One existing test had to change — it built a six-player target to exercise the `long` option, and
+that target is now a draft — which is the sort of fixture that should have been seven all along.
+
+911 tests. Checked at 390 px in both themes on the empty draft and with one player placed.
+

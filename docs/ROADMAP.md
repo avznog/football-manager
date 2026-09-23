@@ -118,6 +118,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       `saveLineup` and `deleteLineup` now refuse a finished match like `setMatchSquad` always has, the
       editor gained a sixth dead end, and the header, the notice and both empty states are derived from
       the match's status and entry mode (decision 085)
+- [x] The composition editor deduces nothing while the pitch is unfinished. It opened on an empty one
+      and reported seven departures under « Changements déduits »; `deduceChanges` now counts the slots
+      nobody is standing in and the card says what is still missing (decision NNN)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses

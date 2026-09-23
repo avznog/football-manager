@@ -1908,3 +1908,35 @@ Three smaller untruths on the same page came from the same root, and each is now
 `live` stays editable on purpose, in all of it: planning the 40th minute during the 20th is the whole
 point of the screen, and invariant 3 means what is written is still only a proposal.
 
+## NNN — A diff needs two teams, and a draft is not one
+**2026-09-23** · accepted
+
+« Nouvelle composition » opens on an empty pitch — that is what it is for. At the bottom of it, under
+a heading saying the words were deduced:
+
+> **Changements déduits**
+> Par rapport à : composition de départ
+> · Hugo sort · Samir sort · Thomas sort · Nico sort · Léo sort · Karim sort · Julien sort
+
+Seven departures, for a coach who had not yet touched a player, and the list shrank by one every time
+he placed somebody — the screen reading a form as if it were a decision.
+
+`deduceChanges` already refused the other direction, and for exactly this reason: with no earlier
+composition the diff is seven arrivals, and « Hugo entre, Nico entre, … » under the starting sheet is
+the « 7 changements » lie in another form. That guard was written, commented, and only half of the
+problem. **A difference between two compositions is only meaningful when both are complete teams**,
+and the editor's draft is the one place in the app where one is not.
+
+It counts empty **slots**, not missing players, because the distinction matters to the other caller: a
+team playing on with six after an injury is a real composition and the diff against it is real
+(`describeLineupDiffFr` says so, and a session before this one fixed a defect that came from ignoring
+it). Six players in seven slots is not that; it is a form with a question still open. A saved
+composition can never be in that state — an incomplete one is blocking in `findPlanIssues` — so this
+only ever changes what the editor shows.
+
+The card says « Il reste 4 postes à pourvoir : les changements apparaîtront quand l'équipe sera
+complète. » rather than « Aucun changement », which is the true answer for two complete teams that
+happen to be identical and a different statement entirely. The « 7 changements » badge is emptied with
+the list it counted, for the reason decision 061 gives: a count above a list nobody is shown is the
+same defect one line higher.
+
