@@ -1617,7 +1617,7 @@ The words for it already existed. The recap of that same match says « ? – ? �
 said one screen earlier, and `NOT_RECORDED_FR` is now imported by both. I wrote « Non saisi » first and
 deleted it: two screens inventing their own wording for one state is the defect 085 is about.
 
-921 tests, four of them new on `pastSectionTitleFr`. Checked at 390 px in both themes, as `karim` and
+925 tests, four of them new on `pastSectionTitleFr`. Checked at 390 px in both themes, as `karim` and
 as `hugo`, and the recap of the unrecorded match re-read to make sure the two screens now agree. The
 e2e suite passes — `/calendrier` is on the happy path, and its fixture history is all played matches,
 so it still reads « Déjà joué ».
