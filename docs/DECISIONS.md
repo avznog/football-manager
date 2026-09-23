@@ -423,3 +423,53 @@ top-rated chart uses its own, higher threshold for a season-long claim.
 **Consequences.** A match with fewer than two ratings shows « pas encore assez de notes » rather
 than a winner. Averages are compared by exact integer cross-multiplication, so a tie is a real tie
 and not a floating-point artefact.
+
+## 026 — Compositions and the match sheet are coach-only screens
+**2026-09-23** · accepted
+
+`/match/[id]/feuille` and every `/match/[id]/composition*` route return 404 for a non-coach, and a
+player's match page renders no composition card at all.
+
+**Why.** `docs/PLAN.md` screen 3 makes selection and compositions the coach's job, and the squad
+already sees what concerns it: the availability grid. A half-made Thursday lineup visible to twelve
+players is an argument the coach has to answer before he has finished thinking, and a benched player
+reading « remplaçant » from a draft he was never meant to see is worse than reading it from a coach.
+A 404 rather than a 403 also means the routes do not advertise their own existence.
+
+**Consequences.** There is no read-only composition view for players yet. The natural place for one
+is the finished-match recap, where the lineup is a fact rather than a plan, and the ghost-disc
+`LineupPitch` already renders it with no JavaScript.
+
+## 027 — A dragged slot is retyped to the nearest canonical position
+**2026-09-23** · accepted
+
+When the coach drags a slot in « Postes » mode, the slot's `position_code` is reassigned to the
+nearest canonical outfield position for its new coordinates. The goalkeeper slot cannot be moved.
+
+**Why.** The reference `positions` set exists so that « Julien prefers AT » means something in every
+formation (`docs/DATA_MODEL.md`). A slot dragged from midfield into attack while still carrying `MC`
+would silently break that: the editor would highlight the wrong players, and the reducer would count
+a striker's minutes as a midfielder's. Retyping keeps the code and the coordinates telling the same
+story. The keeper is pinned because a goal that moves is not a 7-a-side formation, and because
+`gk_minutes` is derived from which slot is the goal.
+
+**Consequences.** A custom shape is named from its own geometry (`shapeLabel` → « Perso 1-3-2-1 »),
+and a hand-drawn shape that matches one of the team's existing formations reuses it instead of
+forking a duplicate. Two identical formations under different names would make the season's
+formation statistics meaningless.
+
+## 028 — Only an unfinished lineup blocks a save; everything else is a warning
+**2026-09-23** · accepted
+
+`saveLineup` refuses exactly two problems: fewer than seven players placed, and nobody in goal.
+Off-sheet, supporter, injured and unknown-member are shown as warnings and saved anyway.
+
+**Why.** A coach plans Thursday for Sunday, when half the answers are still missing. A tool that
+refuses the plan because Momo has not yet tapped « dispo » is a tool he abandons for a screenshot of
+a notes app — which is the situation this project exists to replace. The two hard rules are the ones
+that make the lineup meaningless rather than merely provisional, and both are things the reducer
+would otherwise have to guess at.
+
+**Consequences.** Dropping a player from the sheet clears him from **planned** lineups only; a
+player already fielded in a confirmed composition cannot be removed from the sheet, since that would
+rewrite a fact. The sheet itself is frozen once the match is `finished`.
