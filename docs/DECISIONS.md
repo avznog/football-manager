@@ -1018,3 +1018,33 @@ in each screen's code rather than hidden behind a flag in a shared hook.
   formation label recomputes live (`1-3-2-1` → `1-3-1-2` while the finger is still down). TERRAIN does
   not pass it, because a match never changes shape by gesture.
 - Both callers lost ~80 lines each and the next drag surface gets the rules for free.
+
+## 056 — A list row reads; administration lives on the thing's own page
+**2026-09-23** · accepted
+
+Removing a member from the squad and appointing a coach are per-member actions, and they sit on that
+member's page (`/joueur/[id]`), not on their row in `/equipe`. The row is one line for everybody, coach
+or not, and the whole of it is a link to the page.
+
+**Why.** They were on the row, and at 390 px « Nommer coach » + « Retirer » took 200 px of a 326 px
+line. The only thing left that could shrink was the name, and it did: first names read « Tho… », « Ya… »,
+« Fa… », and the injured player's row showed a shirt number, a « blessé » badge and no name at all.
+Letting the row wrap fixed the truncation and cost a second line **per player**, so a coach with fourteen
+players scrolled twice the list a player scrolls — to reach two buttons he presses about twice a season.
+A phone row cannot hold a name, a number, three position codes, two badges and two buttons; something
+had to go, and the two rare controls are worth less there than the name is.
+
+**Consequences.**
+
+- Any action on a single member goes on that member's page. If a future control genuinely belongs in the
+  list — something applied to *many* members at once, like marking training attendance — that is a
+  different shape (a toggle list), not a button per row.
+- A Server Action invoked from the page of the thing it deletes must `redirect` somewhere that still
+  exists: `removeMember` ends on `/equipe`, because the page that called it is a 404 afterwards.
+- A coach needs telling where the controls went, since the row no longer shows them. The « Effectif »
+  card carries a coach-only line saying a player's row is the way to their number, posts, role and
+  injuries. A player is shown no such line: for them nothing moved.
+- « A team keeps one coach » had to become shared, not duplicated: the page decides whether to render
+  the controls and both actions still refuse the case, so all three ask `wouldLeaveNoCoach`
+  (`lib/team/coaches.ts`, pure, tested). The last coach gets the sentence instead of the buttons, which
+  is what the previous slice established and this one keeps.

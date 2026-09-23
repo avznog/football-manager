@@ -617,3 +617,46 @@ after losing its query. No console errors.
 **Debt after this:** the two-line squad row, and `docs/DEPLOY.md` §4 and §6.
 
 **Next:** deployment. It needs a Neon `DATABASE_URL` from the owner; that is all that is left.
+
+## 2026-09-23 — two buttons twice a season, on every row all season
+
+**PR #32** — the squad list goes back to one line, and the controls move to the member's page.
+
+The previous session made the last coach's row honest: instead of « Nommer coach » and « Retirer »
+that the server refuses in silence, he gets a sentence saying why. The name no longer truncated
+either, because the row was allowed to wrap. The bill arrived on the next screen-width check: a coach
+with fourteen players scrolled a list **twice as long** as any player's, and the two controls that
+cost him that are ones he uses about twice a season.
+
+« Nommer coach » + « Retirer » took 200 px of a 326 px row. Both act on exactly one member, and that
+member has a page — so they moved there, and the list went back to what it is for: reading who is in
+the squad. The whole row is now a single `<Link>` to the profile, and `/equipe` tells a coach so
+(« Touche un joueur pour son numéro, ses postes, son rôle et ses blessures. ») rather than leaving him
+to guess where the buttons went.
+
+The rule they enforce was in three places that had to agree: `setMemberRole` and `removeMember` each
+carried their own `coaches[0]?.id === memberId`, and `/equipe` counted coaches a third way so it could
+avoid rendering a dead button. It is now `wouldLeaveNoCoach(coachMemberIds, memberId)` in
+`lib/team/coaches.ts` — pure, six tests, fed by one narrow `getActiveCoachIds` query. The empty-team
+answer (`false`, nothing left to protect) is pinned by a test, because `db:bootstrap` leaves an
+instance looking exactly like that until the first team exists. `lastCoachId` was written alongside it
+for the list to label rows with, and deleted in the same slice once the list stopped labelling
+anything — it had no caller but its own test.
+
+Two things the move required. `removeMember` now ends in `redirect("/equipe")`: it is invoked *from*
+the page of the member it removes, which would be a 404 on the next render. And `setMemberRole` gained
+`revalidatePath("/joueur/<id>")` for the same reason — the role it changes is printed there.
+
+**Looked at, at 390 px, both themes.** Rows measure 56–57 px, one line each, no name clipped. On a
+player's profile: « Nommer coach » beside the Rôle cell, « Retirer Hugo de l'effectif » in a danger
+card at the very bottom, and removal lands back on `/equipe` with thirteen rows instead of fourteen.
+Demoting the staff coach to make Karim the only one swaps both controls for the sentence, as designed.
+A player sees neither the signpost nor any control. Found one unrelated untruth on the way: a demoted
+member of the encadrement was labelled « Joueur » next to their own « encadrement » badge, so the cell
+now reads « Encadrement ». `db:reset` after, since the walk removed a player.
+
+845 unit tests in 43 files, 2 e2e specs in 18 s.
+
+**Debt after this:** none outside deployment.
+
+**Next:** deployment, and nothing else. It needs a Neon `DATABASE_URL` from the owner.
