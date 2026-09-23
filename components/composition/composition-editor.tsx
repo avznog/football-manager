@@ -37,9 +37,16 @@
 
 import { useActionState, useMemo, useRef, useState } from "react";
 
-import { POSITION_CODES, positionLabelFr } from "@/db/reference";
+import { POSITION_CODES, atPositionFr, positionLabelFr } from "@/db/reference";
 import type { SquadRole } from "@/db/schema";
-import { PitchLayout, PitchPoint, PlayerDisc, type KitColors, type PitchSlot } from "@/components/pitch";
+import {
+  PitchLayout,
+  PitchPoint,
+  PlayerDisc,
+  usePitchDrag,
+  type KitColors,
+  type PitchSlot,
+} from "@/components/pitch";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -80,7 +87,6 @@ import {
   shapeProblemsFr,
   type ShapeSlot,
 } from "@/lib/formation/shape";
-import { fromClientPoint, type Box, type PitchPoint as PitchCoordinates } from "@/lib/pitch/geometry";
 
 import { PlanChanges } from "./plan-changes";
 
@@ -139,30 +145,16 @@ export type CompositionEditorProps = {
 /* Gesture state                                                              */
 /* -------------------------------------------------------------------------- */
 
-type Drag = {
-  pointerId: number;
-  /** A player being carried, or a slot being repositioned. */
-  kind: "player" | "slot";
-  /** `team_members.id` for a player drag, the shape key for a slot drag. */
-  subject: string;
-  /** Where the finger went down, in screen coordinates — used to tell a tap from a drag. */
-  origin: { x: number; y: number };
-  /** Where the finger is now, in pitch coordinates. `null` once it has left the pitch. */
-  point: PitchCoordinates | null;
-  /** True once the finger has travelled further than `TAP_SLOP`. */
-  moved: boolean;
-};
+/**
+ * What a gesture is carrying: a player being placed, or — in `postes` mode — one of the seven slots
+ * being moved around the pitch. `id` is a `team_members.id` for a player and a shape key for a slot.
+ */
+type Carried = { kind: "player" | "slot"; id: string };
 
 type Selection =
   | { kind: "member"; id: string }
   | { kind: "slot"; key: string }
   | null;
-
-/** Pixels of travel below which a pointer sequence is a tap, not a drag. */
-const TAP_SLOP = 8;
-
-/** How far outside the pitch box a drop still counts as a drop on the pitch. */
-const PITCH_MARGIN_PX = 12;
 
 /** Pitch units one arrow key moves a slot. Shift multiplies it. */
 const NUDGE = 20;
@@ -183,7 +175,6 @@ export function CompositionEditor(props: CompositionEditorProps) {
   const [fromMinute, setFromMinute] = useState(props.fromMinute);
   const [mode, setMode] = useState<"players" | "shape">("players");
   const [selection, setSelection] = useState<Selection>(null);
-  const [drag, setDrag] = useState<Drag | null>(null);
   const [announcement, setAnnouncement] = useState("");
 
   const pitchRef = useRef<HTMLDivElement | null>(null);
@@ -242,91 +233,42 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
   /* --- the gesture --------------------------------------------------------- */
 
-  function boxOfPitch(): Box | null {
-    const element = pitchRef.current;
-    if (!element) return null;
-    const rect = element.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return null;
-    return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
-  }
-
-  /** Screen point → pitch point, plus whether the finger is still over the turf. */
-  function locate(clientX: number, clientY: number): { point: PitchCoordinates; inside: boolean } | null {
-    const box = boxOfPitch();
-    if (!box) return null;
-    const inside =
-      clientX >= box.left - PITCH_MARGIN_PX &&
-      clientX <= box.left + box.width + PITCH_MARGIN_PX &&
-      clientY >= box.top - PITCH_MARGIN_PX &&
-      clientY <= box.top + box.height + PITCH_MARGIN_PX;
-    return { point: fromClientPoint({ x: clientX, y: clientY }, box), inside };
-  }
-
-  function beginDrag(event: React.PointerEvent<HTMLElement>, kind: Drag["kind"], subject: string) {
-    // Mouse: left button only. Touch and pen have no buttons to speak of.
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const located = locate(event.clientX, event.clientY);
-    setDrag({
-      pointerId: event.pointerId,
-      kind,
-      subject,
-      origin: { x: event.clientX, y: event.clientY },
-      point: located?.inside ? located.point : null,
-      moved: false,
-    });
-  }
-
-  function continueDrag(event: React.PointerEvent<HTMLElement>) {
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    const travelled =
-      Math.abs(event.clientX - drag.origin.x) + Math.abs(event.clientY - drag.origin.y);
-    const moved = drag.moved || travelled > TAP_SLOP;
-    const located = locate(event.clientX, event.clientY);
-    const point = located?.inside ? located.point : null;
-
+  const gesture = usePitchDrag<Carried>({
+    pitchRef,
     // A slot follows the finger as it goes, so the label and the position code update live: the
     // coach sees « 1-2-3-1 » appear the moment the defender he is dragging crosses the halfway line.
-    if (moved && drag.kind === "slot" && mode === "shape" && point) {
-      setShape((current) => moveShapeSlot(current, drag.subject, point));
-    }
-
-    setDrag({ ...drag, moved, point });
-  }
-
-  function endDrag(event: React.PointerEvent<HTMLElement>) {
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    const located = locate(event.clientX, event.clientY);
-
-    if (!drag.moved) {
-      // A pointer sequence that went nowhere is a tap.
-      if (drag.kind === "player") tapPlayer(drag.subject);
-      else tapSlot(drag.subject);
-    } else if (drag.kind === "player") {
-      const target = located?.inside ? nearestSlot(shape, located.point) : null;
-      if (target) {
-        place(target.key, drag.subject);
-      } else {
-        // Dropped on the bench, or off the screen: the player comes off.
-        setAssignments((current) => removeMember(current, drag.subject));
-        setAnnouncement(`${nameOf(drag.subject)} retourne sur le banc.`);
+    onMove: (carried, point) => {
+      if (carried.kind === "slot" && mode === "shape") {
+        setShape((current) => moveShapeSlot(current, carried.id, point));
       }
-      setSelection(null);
-    } else if (mode === "shape") {
-      const moved = shape.find((slot) => slot.key === drag.subject);
+    },
+    // A pointer sequence that went nowhere is a tap.
+    onTap: (carried) => (carried.kind === "player" ? tapPlayer(carried.id) : tapSlot(carried.id)),
+    onDrop: (carried, point) => {
+      if (carried.kind === "player") {
+        const target = point ? nearestSlot(shape, point) : null;
+        if (target) {
+          place(target.key, carried.id);
+        } else {
+          // Dropped on the bench, or off the screen: the player comes off. TERRAIN deliberately does
+          // the opposite (decision 045) — here there is no match in progress to lose a player from.
+          setAssignments((current) => removeMember(current, carried.id));
+          setAnnouncement(`${nameOf(carried.id)} retourne sur le banc.`);
+        }
+        setSelection(null);
+        return;
+      }
+      if (mode !== "shape") return;
+      // The slot has already followed the finger; this only says where it ended up.
+      const moved = shape.find((slot) => slot.key === carried.id);
       if (moved) {
         setAnnouncement(
           `Poste déplacé : ${positionNameFr(moved.positionCode)}. Formation ${shapeLabel(shape)}.`,
         );
       }
-    }
-
-    setDrag(null);
-  }
-
-  function cancelDrag() {
-    setDrag(null);
-  }
+    },
+  });
+  const drag = gesture.drag;
 
   /* --- what a gesture does ------------------------------------------------- */
 
@@ -338,7 +280,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
     setAnnouncement(
       occupant && occupant !== memberId
         ? `${nameOf(memberId)} et ${nameOf(occupant)} échangent leurs postes.`
-        : `${nameOf(memberId)} est placé ${slot ? `au poste de ${positionNameFr(slot.positionCode)}` : "sur le terrain"}.`,
+        : `${nameOf(memberId)} est placé ${slot ? atPositionFr(slot.positionCode) : "sur le terrain"}.`,
     );
   }
 
@@ -445,10 +387,10 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
   /* --- rendering ----------------------------------------------------------- */
 
-  const lifted = drag?.kind === "player" && drag.moved ? drag.subject : null;
+  const lifted = drag?.subject.kind === "player" && drag.moved ? drag.subject.id : null;
   const visible = lifted ? removeMember(assignments, lifted) : assignments;
   const hoveredSlot =
-    drag?.kind === "player" && drag.moved && drag.point
+    drag?.subject.kind === "player" && drag.moved && drag.point
       ? (nearestSlot(shape, drag.point)?.key ?? null)
       : null;
 
@@ -479,7 +421,8 @@ export function CompositionEditor(props: CompositionEditorProps) {
     };
   });
 
-  const draggedMember = drag?.kind === "player" && drag.moved ? byId.get(drag.subject) : undefined;
+  const draggedMember =
+    drag?.subject.kind === "player" && drag.moved ? byId.get(drag.subject.id) : undefined;
 
   return (
     <form action={action} className="space-y-4">
@@ -623,15 +566,17 @@ export function CompositionEditor(props: CompositionEditorProps) {
                   className="touch-none rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   aria-label={slotButtonLabelFr(slot, mode)}
                   onPointerDown={(event) =>
-                    beginDrag(
+                    gesture.begin(
                       event,
-                      mode === "shape" ? "slot" : slot.player ? "player" : "slot",
-                      mode === "shape" || !slot.player ? slot.id : slot.player.id,
+                      // In `postes` mode the slot itself is what moves. Otherwise the gesture carries
+                      // whoever is standing in it, and an empty slot carries the slot so that a tap
+                      // on it still goes through `tapSlot`.
+                      mode === "shape" || !slot.player
+                        ? { kind: "slot", id: slot.id }
+                        : { kind: "player", id: slot.player.id },
                     )
                   }
-                  onPointerMove={continueDrag}
-                  onPointerUp={endDrag}
-                  onPointerCancel={cancelDrag}
+                  {...gesture.handlers}
                   onKeyDown={(event) => onSlotKeyDown(event, slot.id)}
                   disabled={pending}
                 >
@@ -682,10 +627,10 @@ export function CompositionEditor(props: CompositionEditorProps) {
             kit={kit}
             selection={selection}
             disabled={pending || mode === "shape"}
-            onPointerDown={(event, memberId) => beginDrag(event, "player", memberId)}
-            onPointerMove={continueDrag}
-            onPointerUp={endDrag}
-            onPointerCancel={cancelDrag}
+            onPointerDown={(event, memberId) => gesture.begin(event, { kind: "player", id: memberId })}
+            onPointerMove={gesture.handlers.onPointerMove}
+            onPointerUp={gesture.handlers.onPointerUp}
+            onPointerCancel={gesture.handlers.onPointerCancel}
             onKeyDown={onPlayerKeyDown}
           />
           <BenchGroup
@@ -695,10 +640,10 @@ export function CompositionEditor(props: CompositionEditorProps) {
             kit={kit}
             selection={selection}
             disabled={pending || mode === "shape"}
-            onPointerDown={(event, memberId) => beginDrag(event, "player", memberId)}
-            onPointerMove={continueDrag}
-            onPointerUp={endDrag}
-            onPointerCancel={cancelDrag}
+            onPointerDown={(event, memberId) => gesture.begin(event, { kind: "player", id: memberId })}
+            onPointerMove={gesture.handlers.onPointerMove}
+            onPointerUp={gesture.handlers.onPointerUp}
+            onPointerCancel={gesture.handlers.onPointerCancel}
             onKeyDown={onPlayerKeyDown}
           />
         </div>
