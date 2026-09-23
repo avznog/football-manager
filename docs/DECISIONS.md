@@ -2247,7 +2247,7 @@ that does, and inventing « iel » or a genderless rewrite of six screens on the
 card would be a decision taken sideways. Written down here so the next session finds it stated rather
 than missed.
 
-## NNN — « Hors feuille » counts players, and the app knows which members are players
+## 096 — « Hors feuille » counts players, and the app knows which members are players
 
 **2026-09-23.** Decision 094 found `/moi` deciding what a member *is* from `role` alone and ignoring
 `is_player`. This is the same column being ignored one screen over, except that here it does not
