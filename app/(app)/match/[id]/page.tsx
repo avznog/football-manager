@@ -9,8 +9,8 @@
  * (`docs/NEXTJS16.md`). A match id from another team is a 404: `getMatch` scopes its query by
  * team, so nothing leaks.
  *
- * The composition editor (M3) and game mode (M4) belong on this page and are not built yet; the
- * two placeholder cards at the bottom name the milestone they are waiting for.
+ * The composition card (M3) is coach-only and loads its own data, so a player's match page pays
+ * nothing for it. Game mode (M4) is not built yet; its placeholder card names the milestone.
  */
 
 import { notFound } from "next/navigation";
@@ -33,6 +33,7 @@ import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calend
 import { buildReminderMessage, tallyAvailability, type Responder } from "@/lib/calendar/timeline";
 import { getMatch, getMatchAnswers, getMatchScore } from "@/lib/match/queries";
 import { getSquad } from "@/lib/team/queries";
+import { CompositionCard } from "./composition/_components/composition-card";
 import { AvailabilityControl } from "../../calendrier/_components/availability-control";
 import { AvailabilityGrid } from "../../calendrier/_components/availability-grid";
 import { ReminderCard } from "../../calendrier/_components/reminder-card";
@@ -147,12 +148,9 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         <ReminderCard message={reminder} pending={tally.pending.length} />
       ) : null}
 
-      <Card title="Composition" as="h2">
-        <EmptyState
-          title="L’éditeur de composition arrive"
-          description="Placer les 7 sur le terrain, garder plusieurs compositions par match (jalon M3)."
-        />
-      </Card>
+      {/* The match sheet and the compositions are the coach's job (`docs/PLAN.md`, screen 3): a
+          player sees the availability grid above and nothing else. */}
+      {isCoach ? <CompositionCard team={team} match={match} /> : null}
 
       <Card title="Mode match" as="h2">
         <EmptyState
