@@ -2488,13 +2488,13 @@ not line up, and `tabular-nums` can align digits it has but cannot supply one it
 locale string was the only thing standing between a kick-off and « 7:00 PM », and a locale is the
 kind of argument someone eventually parameterises.
 
-Digits do not win everywhere, and the split is by what the reader is doing rather than by taste.
+~~Digits do not win everywhere, and the split is by what the reader is doing rather than by taste.
 Where a date is **a fact to read off** — a list column, an expiry, a record of a day — it is digits,
 because the eye compares them without reading. Where it is **a sentence** — « Blessé depuis le 13
 septembre », « Dimanche 14 septembre à 10:30 » — the month stays a word, so `formatDayMonthFr` and
-`formatDay` are untouched. The calendar row keeps the weekday above the numeric date for the same
-reason: « dim. » is the fact a coach actually scans for, and the year underneath it is what makes the
-row unambiguous in February.
+`formatDay` are untouched.~~ **Superseded by decision 109: the sentence gets digits too.** The
+calendar row keeps the weekday above the numeric date: « dim. » is the fact a coach actually scans
+for, and the year underneath it is what makes the row unambiguous in February.
 
 `toLocalInput` and `fromLocalInput` are deliberately left in ISO. They are the wire format of
 `<input type="datetime-local">`, not something anybody reads, and the browser renders that control
@@ -2797,3 +2797,44 @@ convention that survives two sessions. And a release created by hand is a claim 
 nothing verified — exactly what `CLAUDE.md` forbids about tags, for exactly the same reason.
 
 The first release this cuts is `v0.2.0`, the wave of eight remarks the owner made on 2026-09-23.
+
+## 109 — The sentence gets digits too
+
+**2026-09-23** · accepted · supersedes the prose carve-out in decision 101
+
+Decision 101 split dates in two: digits where a date is a fact to read off, the month spelled out
+where it sits inside a sentence. That split survived exactly as long as it took to look at eleven
+screens at 390 px in both themes, which is the review `CLAUDE.md` asks for and which decision 101 had
+not had.
+
+**What the screenshots showed.** The prose date is never alone. `/match/[id]` printed « Dimanche 27
+septembre à 10:30 » in its header, three centimetres above the calendar list where the same fixture
+is « dim. 27/09/2026 ». The player fiche puts « Blessé depuis le 13 septembre » under « Arrivé le
+01/08/2026 ». So the reader is not reading a sentence, he is comparing two shapes of the same fact —
+and removing that work is the entire reason the numeric shape exists. 101's own rationale defeats
+101's exception, once you can see both halves at once.
+
+**Decision.** One shape, everywhere: `DD/MM/YYYY`, zero-padded, year always. In prose the **weekday
+stays**, because it is what a coach actually scans for, and the date behind it is digits:
+
+- « dimanche 27/09/2026 à 10:30 » — `formatWhen`, the match and séance headers
+- « dim. 27/09/2026 » — `formatShortDay`, the calendar row
+- « demain, 28/09/2026 » — `formatDayLabel`, for the three neighbouring days only
+- « Blessé depuis le 13/09/2026 » — `injurySummaryFr`, via the `formatDateFr` it already imported
+
+`MONTHS_FR` and `formatDayMonthFr` in `lib/player/injury.ts` are deleted with their last caller, and
+so are `DAY_FORMAT`, `DAY_WITH_YEAR_FORMAT` and `SHORT_DAY_FORMAT` in `lib/calendar/time.ts`. That is
+the load-bearing part: a hand-rolled month array that no longer has a caller is a trap for the next
+session, which will find it and assume the app wants a month somewhere.
+
+**The year is unconditional now, and that is a change from 101 as well.** `formatDay` used to take a
+`now` and drop the year inside the current one. A season crosses 1 January, so « 27 septembre » in a
+February archive is a row that cannot say which 27 September it means — and the saving was four
+characters. Dropping the parameter also makes the function pure in the only sense that matters here:
+its output no longer depends on when it is called, so the tests say what they mean.
+
+**What is still not ours.** `<input type="date">` and `<input type="datetime-local">` render in the
+*browser's* locale, so a French kick-off can still be typed into a field showing `MM/DD/YYYY` on a
+phone set to English. `toLocalInput` / `fromLocalInput` stay ISO because that is the control's wire
+format (101 was right about that). Replacing the native control with our own is a real change with a
+real cost — offered to the owner, not taken.

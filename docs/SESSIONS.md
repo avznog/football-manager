@@ -2304,3 +2304,23 @@ Housekeeping: `docs/DECISIONS.md` entries 101–108 are back in ascending order.
 it because the eight remarks were merged in the order their CI went green rather than the order they
 were numbered — 104 landed before 102 — and the file is read top to bottom by every session that
 opens it. Whole blocks moved, nothing edited: `git diff --numstat` is 64 lines each way.
+
+The 390 px pass the eight-remark wave was missing finally happened: eleven screens, light and dark,
+22 screenshots, in a throwaway Playwright spec that was deleted afterwards. Two real defects, both
+fixed here. Dates were still spelled out in every prose header — « Dimanche 27 septembre à 10:30 » in
+the match header, above a calendar row reading « dim. 27/09/2026 », and « Blessé depuis le 13
+septembre » under « Arrivé le 01/08/2026 ». Decision 101 had allowed that on purpose; decision 109
+supersedes it, because the two shapes are never far enough apart for the argument to hold. Everything
+is digits now, weekday kept, year always: `formatDay`, `formatShortDay`, `formatDayLabel`,
+`formatWhen`, `injurySummaryFr`. `MONTHS_FR`, `formatDayMonthFr` and three `Intl` format constants are
+deleted with their last callers. And the pre-fill notice stuttered — « Équipe reprise de la
+composition « composition de départ » », because it interpolated `planTitleFr` into a sentence that
+had already said the word; `planSourcePhraseFr` is that slot's phrase now, and the test that missed it
+asserts exactly rather than with `toContain`.
+
+Two things looked at and reported rather than changed, both waiting on the owner: on the composition
+editor the goalkeeper's post sits under the sticky bench dock at the opening scroll position, and
+`<input type="date">` renders in the browser's locale, so a phone set to English still offers
+`MM/DD/YYYY` — no formatter of ours reaches it, and replacing the native control is a real change.
+
+Version 0.2.1, so CI cuts `v0.2.1` and, since decision 108, publishes its release.

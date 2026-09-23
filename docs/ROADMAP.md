@@ -260,6 +260,15 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       injury history spelled the month out where a record wants digits; the calendar row said
       « dim. 27 sept. » in a list that crosses 1 January. `formatDate` beside `formatTime` in
       `lib/calendar/time.ts` is now the only place that knows the shape (decision 101)
+- [x] …and the sentences too: « dimanche 27/09/2026 à 10:30 », « dim. 27/09/2026 », « demain,
+      28/09/2026 », « Blessé depuis le 13/09/2026 ». Decision 101 had kept the month as a word inside
+      prose; the 390 px pass showed the prose date sitting three centimetres above the numeric one, so
+      the reader was comparing two shapes of the same fact. The year is unconditional now — a season
+      crosses 1 January — and `MONTHS_FR`, `formatDayMonthFr` and three format constants go with their
+      last callers (decision 109)
+- [x] The pre-fill notice names its source without stuttering: « Équipe reprise de la composition de
+      départ », not « de la composition « composition de départ » ». `planSourcePhraseFr`, and the
+      test asserts the whole line (decision 106)
 
 ## M6 — Ratings & recap
 - [x] Rating flow: one teammate per card, 0–10, optional comment
