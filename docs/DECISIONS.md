@@ -1530,3 +1530,39 @@ already did.
 
 Recorded in `CLAUDE.md` rather than only here, because it is a rule that applies to every string
 anybody adds afterwards.
+
+## 075 — A build must not need a database
+**2026-09-23** · accepted
+
+The first three deploys of this app to Vercel all failed, in 36 to 43 seconds, at the same line:
+
+```
+Error: Failed to collect configuration for /api/match-events
+  [cause]: Error: DATABASE_URL is not set. Copy .env.example to .env.local.
+    at module evaluation (db/client.ts:21:9)
+```
+
+`db/client.ts` read `DATABASE_URL` at module scope and threw if it was absent. That reads as a
+sensible fail-fast, and locally it is one — `npm run dev` on a machine with no `.env.local` should
+say so immediately. But `next build` imports every route module to collect its configuration, so a
+module-scope throw is a *build-time* dependency on a production secret. TypeScript had already
+passed, every page had compiled; the build died on page-data collection, before rendering anything.
+
+Two things were wrong and both are fixed.
+
+**The connection now opens on first use.** `db` and `sql` are proxies over a lazily created
+connection: importing the module does nothing, and the check throws at the moment somebody actually
+asks for data. The proxy is invisible — `db` is still typed as `drizzle()` returns it, `` sql`…` ``
+still works as a tagged template (that is what the `apply` trap is for), and the twenty-eight
+modules that import either were not touched. The e2e suite, which drives real queries, `sql.unsafe`
+and `sql.end()` through a real Postgres, passes unchanged.
+
+**The message names both environments.** « Copy .env.example to .env.local » is advice that cannot be
+followed on a serverless host: there is no file to copy and no machine to copy it on. It now says
+what to do locally *and* what to do on Vercel, and points at `docs/DEPLOY.md` §4.
+
+The cost is that a deploy with no `DATABASE_URL` builds green and fails at runtime instead of
+failing loudly at build. That is the right trade — a build is not a run, previews of a branch that
+touches no data should not need a database, and the runtime error is explicit rather than silent —
+but it is a real change in where the mistake surfaces, so `docs/DEPLOY.md` §4 now says a green build
+is not evidence the variable is set, and what the symptom looks like when it is not.

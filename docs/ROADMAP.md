@@ -198,6 +198,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       been looked at; `/equipe` was an empty bordered box and now says what to do next
 - [x] `docs/DEPLOY.md` — the runbook: Neon, migrations, bootstrap, Vercel, first run, upgrades,
       and every environment variable with where it belongs
+- [x] The app builds without a database. The first three Vercel deploys failed in 40 seconds at
+      `db/client.ts:21` — `DATABASE_URL` was read at module scope, and `next build` imports every
+      route to collect its configuration, so a missing production secret killed the build itself.
+      The connection opens on the first query now, and the message it throws names Vercel as well as
+      `.env.local` (decision 075)
 - [ ] **Blocked:** needs a Neon `DATABASE_URL` from the owner (interactive signup).
       Everything else is ready — the Vercel CLI is authenticated as `avznog` and
       `docs/DEPLOY.md` is step by step from there

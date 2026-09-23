@@ -25,7 +25,7 @@
  *   account can read and rewrite every team on the instance.
  */
 
-// Must come first: `db/client.ts` reads DATABASE_URL as it loads.
+// Must come first: nothing below may read `process.env` before `.env.local` is loaded.
 import "./load-env";
 
 import { eq } from "drizzle-orm";
