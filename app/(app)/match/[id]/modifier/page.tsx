@@ -68,7 +68,7 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
         <Card title="Supprimer" description={matchDeletionWarningFr(holds)}>
           {/* A plain form: no confirmation dialog to get wrong, and it works without JavaScript.
               Which is exactly why the description above counts the sheet and the compositions the
-              cascade takes too, instead of naming only the availability answers (decision NNN). */}
+              cascade takes too, instead of naming only the availability answers (decision 098). */}
           <form action={deleteMatch}>
             <input type="hidden" name="teamId" value={team.id} />
             <input type="hidden" name="matchId" value={match.id} />

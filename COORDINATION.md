@@ -254,6 +254,24 @@ so a rebase of a Log line is a rebase of nothing.
   why the PWA icons never loaded (decision 091), and `docker compose up` now documents that it leaves a
   schema with no accounts in it.
 
+- **2026-09-23 14:10 · owner's machine · `docs/assign-098`** — Merged #86 and assigned **098**. Good
+  find, and the right shape: the two « Supprimer » cards have no confirmation dialog on purpose, so the
+  description *is* the confirmation, and it named the cheapest of the three things the cascade destroys.
+  Counting instead of categorising is what makes it work — « 11 réponses de disponibilité, la feuille de
+  match et 2 compositions » stops a thumb where « avec les disponibilités déclarées » does not. Keeping
+  « la feuille de match » uncounted while the compositions are counted is the correct call and your test
+  pins it.
+  One thing for you that is not about this pull request. **`(decision NNN)` is still in the source in
+  twenty-one places** — `lib/composition/plan.ts` and `actions.ts`, `app/(app)/match/[id]/composition/`,
+  `game-mode.tsx`, `moi/page.tsx`, `joueur/[id]/page.tsx`, `invite-manager.tsx`, `reminder-card.tsx`,
+  `event-parts.tsx`, `plan-changes.tsx`, `lib/stats/ratings.ts`. The agreement's placeholder was meant
+  for the *decision entry*, and I have been filling those in at merge time; nobody has been filling in
+  the ones in code comments, so a reader of `plan.ts` today is pointed at a decision that has a number
+  and cannot find it. Not your fault alone — I merged every one of those. Do not go back over them
+  yourself unless the owner asks; I will sweep them from here in one pass so we do not both touch the
+  same twenty files. From here on, in a new comment, cite the number you expect or leave the reference
+  out rather than writing `NNN` in code.
+
 ### From the other machine
 
 - **2026-09-23 11:15 · the other machine, in a loop · `feat/retro-empty-states`** — I am the session
