@@ -2292,3 +2292,54 @@ The rule, which is decision 094's applied to arithmetic rather than to a label: 
 can count has to be counted over the same set the reader is counting.** « Hors feuille » is not the
 complement of the sheet within the membership, it is the complement within the players — and when a
 sentence and a subtraction disagree about who is in the set, it is the subtraction that is lying.
+
+## NNN — A test on a pure function proves nothing about a screen that never calls it
+
+**2026-09-23.** Decision 085 stopped the compositions screen offering to plan the 30ᵉ minute of a match
+played a fortnight ago. It derived `compositionsScreenFr` from the match's status and entry mode, wrote
+the four honest sentences a played match needs, and `plan.test.ts` has asserted this ever since:
+
+```
+it("never tells a coach to place seven players in a match that is over", () => {
+  expect(screen.noPlansFr.description).not.toContain("Place tes sept joueurs");
+  expect(screen.noPlansFr.description).not.toContain("planifier");
+```
+
+That test has been green for as long as it has existed, and for all of it the « Composition » card on
+`/match/[id]` printed, on a match played ten days earlier:
+
+> **Aucune composition** — Place tes sept joueurs sur la pelouse : tu pourras ensuite planifier les
+> changements. · **[ Composition de départ ]**
+
+Word for word the sentence the test forbids, under a **primary** button pointing at an editor decision
+085 taught to refuse a finished match — so the one call to action on the card was a door that answers
+« non », on a screen whose real next action (« Saisir le match ») is the card directly below it.
+
+085 derived the screen and never came back to the card that links to it. The card had its own pair of
+empty states, hard-coded, written when the only match anybody pictured was one still to be played. So
+the function was right, the test was right, the fix was right, and the screen was wrong — and nothing
+in the repository could say so, because **Vitest collects `lib/**` and `db/**` and nothing under
+`app/` or `components/`** (`vitest.config.ts`). That configuration is why French copy migrates into
+pure `…Fr()` functions in this project; it is also why a component that declines to call one is
+invisible. Decisions 093, 094, 095 and the « hors feuille » count each found the same shape. This is
+the entry that names it, because the pattern is now the more useful finding than any of its instances:
+
+**Deriving a sentence and testing it does not make it the sentence on screen. Only the call does.**
+
+Two things follow, and the second is the new one.
+
+The card now calls `compositionsScreenFr(match)` for both empty states, and drops the call to action
+when `withCta` is false. One consequence is deliberate and worth stating rather than hiding: on a
+scheduled match with an empty sheet the card's wording *changes*, from « Le groupe n'est pas encore
+fait » to the screen's « Personne n'est encore retenu ». One function means one wording. The card's
+version mentioned supporters and the screen's explains why only two of the three roles matter to a
+pitch, which is the more useful half of the sentence on a card titled « Composition ».
+
+And `lib/composition/copy.test.ts`, which is not a unit test: it reads the source of `app/`,
+`components/` and `lib/` and asserts that the five status-dependent sentences appear in
+`lib/composition/plan.ts` and nowhere else. It fails if a screen hard-codes one again, and it was
+mutation-tested by putting the sentence back. It is narrow on purpose — it pins the sentences that are
+*already* derived from a match's status, where a hard-coded copy is by construction a claim about a
+match nobody checked, and it is emphatically not a ban on French in `.tsx`. Scanning source is a poor
+substitute for testing a component. It is also the only cheap thing that can see across the boundary
+`vitest.config.ts` draws, and this defect survived a whole milestone behind it.

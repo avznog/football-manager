@@ -466,3 +466,35 @@ so a rebase of a Log line is a rebase of nothing.
   `composition-nouvelle`. The `joueur-` variants of the four coach-only forms are on that list on
   purpose — what a player is shown at a door he may not open is where I would expect the next one.
   **Next one I open: `match-joue`.**
+- **14:35 — `match-joue` and `match-saisi-apres` read. PR #84 open, alongside #82.** `match-joue` gave
+  up only the « hors feuille » line #82 already fixes; everything else on it reconciles — Karim really
+  did give all 11 notes, so « Tu as noté tout le monde » is true, and CS Morvan really has just the one
+  applied lineup, so the card is right to list no planned change.
+  `match-saisi-apres` is the one worth your time, and not for the defect. FC des Deux-Ponts was played
+  on 13 September and its « Composition » card said « Place tes sept joueurs sur la pelouse : tu pourras
+  ensuite planifier les changements », in a **primary** button pointing at the editor 085 taught to
+  refuse a finished match — with the real next action, « Saisir le match », in the card directly below.
+  **`plan.test.ts` already forbade that sentence, by name, and was green.** « never tells a coach to
+  place seven players in a match that is over », `not.toContain("Place tes sept joueurs")`. 085 derived
+  the screen, tested it, and never came back to the card that links to it; the card kept its own
+  hard-coded pair. The function was right, the test was right, the screen was wrong, and nothing here
+  could say so, because Vitest collects `lib/**` and nothing under `app/`.
+  That is twice today. #82 shipped a wrong count under a doc comment describing the correct one. A doc
+  comment is not a test — and a test on a pure function is not a test of the screen. **Only the call
+  is.** So #84 carries `lib/composition/copy.test.ts`, which is not a unit test: it reads the source of
+  `app/`, `components/` and `lib/`, and fails if a status-dependent sentence is hard-coded outside
+  `plan.ts`. One case proves the scan is not walking an empty list; mutation-tested by putting the
+  sentence back. I kept it narrow on purpose and I would rather you pushed back on it than found it
+  later: scanning source is a poor substitute for testing a component, and it is the only cheap thing
+  that sees across that boundary. If you would rather it did not exist, drop the second commit — the
+  first one stands alone.
+  One deliberate copy change, said out loud rather than buried in a diff: a **scheduled** match with an
+  empty sheet now reads « Personne n'est encore retenu » instead of « Le groupe n'est pas encore fait ».
+  One function means one wording.
+  Two `## NNN` waiting for you now, in #82 and #84. #82 is green on both jobs. 1008 tests, e2e green in
+  28 s, all three card states checked at 390 px in both themes. Nothing touched in `vercel.json`,
+  `.github/`, `package.json` or anything about the deployment.
+  **Remaining:** `match-nouveau`, `match-modifier`, `entrainement`, `entrainement-pointe`,
+  `entrainement-non-pointe`, `entrainement-nouveau`, `entrainement-modifier`, `composition-nouvelle`.
+  **Next one I open: `match-nouveau`**, and the `joueur-` variant first — what a player is shown at a
+  door he may not open is still where I expect the next one.

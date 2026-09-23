@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { ActiveTeam } from "@/lib/auth/dal";
 import {
+  compositionsScreenFr,
   countSquadRoles,
   deduceChanges,
   nameOfMembers,
@@ -39,6 +40,13 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
   const selected = counts.starters + counts.substitutes + counts.supporters;
   const plans = sortPlans(lineups.map(toPlannedLineup));
   const nameOf = nameOfMembers(members);
+  /**
+   * The same function the compositions screen uses for its own two empty states (decision 085). This
+   * card had its own pair, written for a match still to be played, and kept handing them to a coach
+   * looking at a match played ten days earlier — under a primary button leading to an editor that
+   * refuses a finished match. 085 derived the screen and never came back to the card linking to it.
+   */
+  const screen = compositionsScreenFr(match);
 
   const sheetHref = `/match/${match.id}/feuille`;
   const compositionsHref = `/match/${match.id}/composition`;
@@ -47,9 +55,15 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
     return (
       <Card title="Composition" as="h2">
         <EmptyState
-          title="Le groupe n’est pas encore fait"
-          description="Choisis tes titulaires, tes remplaçants et tes supporters, puis place les sept sur le terrain."
-          action={<ButtonLink href={sheetHref}>Feuille de match</ButtonLink>}
+          title={screen.emptySheetFr.title}
+          description={screen.emptySheetFr.description}
+          /* The link stays either way — an empty sheet is worth seeing — but it stops being the
+             primary thing to do on a match whose sheet can no longer be filled. */
+          action={
+            <ButtonLink href={sheetHref} variant={screen.editable ? "primary" : "secondary"}>
+              Feuille de match
+            </ButtonLink>
+          }
         />
       </Card>
     );
@@ -106,12 +120,16 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
           </>
         ) : (
           <EmptyState
-            title="Aucune composition"
-            description="Place tes sept joueurs sur la pelouse : tu pourras ensuite planifier les changements."
+            title={screen.noPlansFr.title}
+            description={screen.noPlansFr.description}
+            /* No button at all on a played match: the editor refuses it (decision 085), and the real
+               next action on this screen is the « Saisir le match » card below. */
             action={
-              <ButtonLink href={`${compositionsHref}/nouvelle?minute=0`}>
-                Composition de départ
-              </ButtonLink>
+              screen.noPlansFr.withCta ? (
+                <ButtonLink href={`${compositionsHref}/nouvelle?minute=0`}>
+                  Composition de départ
+                </ButtonLink>
+              ) : undefined
             }
           />
         )}

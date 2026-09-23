@@ -1949,3 +1949,43 @@ Verified at 390 px in light and dark, on all three screens, as `karim`: 7 + 3 + 
 page and the sheet, and 7 + 4 + 1 + 1 = 13 on the CS Morvan compositions header, whose « 1 hors
 feuille » is Mehdi — the one name SQL says is missing from that sheet. 1005 tests, three new, one of
 which asserts the four counts sum to the number of *players* and not to the size of the membership.
+
+### The sentence a green test forbade, printed on screen for a milestone
+
+`light-coach-match-saisi-apres.png`, the « Composition » card on FC des Deux-Ponts — `finished`,
+`entry_mode = 'retro'`, no events, no lineups, played on 13 September:
+
+> **Aucune composition** — Place tes sept joueurs sur la pelouse : tu pourras ensuite planifier les
+> changements. · **[ Composition de départ ]**
+
+Instructions for a match that was played ten days ago, in a primary button leading to an editor that
+decision 085 taught to refuse a finished match, on a screen whose actual next action is the « Saisir le
+match » card immediately below it.
+
+What makes this worth an entry rather than a line is that `plan.test.ts` already contained
+`expect(screen.noPlansFr.description).not.toContain("Place tes sept joueurs")`, under the name « never
+tells a coach to place seven players in a match that is over ». Green throughout. Decision 085 derived
+`compositionsScreenFr`, wrote the four sentences a played match needs — « Saisi sans composition · Ce
+match a été saisi après coup, sans composition : les temps de jeu viennent de la saisie et non d'un
+placement sur le terrain. » — tested them, and never came back to the card that links to the screen it
+had fixed. The card kept its own hard-coded pair. **The function was right, the test was right, and the
+screen was wrong, and nothing in the repository could say so**, because Vitest collects `lib/**` and
+`db/**` and nothing under `app/`.
+
+That is the second time in one afternoon: the « hors feuille » count shipped wrong under a doc comment
+that described the correct behaviour. A doc comment is not a test, and now: a test on a pure function is
+not a test of the screen. Only the call is. Decision NNN.
+
+So besides the card calling `compositionsScreenFr`, there is `lib/composition/copy.test.ts` — not a unit
+test. It reads the source of `app/`, `components/` and `lib/` and asserts the five status-dependent
+sentences live in `plan.ts` and nowhere else, with one test proving the scan is not reading an empty
+list. Mutation-tested by putting the sentence back into the card: it fails. Narrow on purpose.
+
+One deliberate copy change, stated rather than buried: a *scheduled* match with an empty sheet now reads
+« Personne n'est encore retenu », the compositions screen's wording, instead of the card's « Le groupe
+n'est pas encore fait ». One function means one wording.
+
+Verified at 390 px in light and dark as `karim`, on all three states the card has: the retro match (no
+button, « Saisi sans composition »), CS Morvan (pitch and « Composition de départ · Classique 1-3-2-1 »
+unchanged), and AS Coteaux, still to be played and untouched, which still says « Choisis d'abord tes
+titulaires et tes remplaçants » over a primary « Feuille de match ». 1008 tests, six new.

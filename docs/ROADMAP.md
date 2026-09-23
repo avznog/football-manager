@@ -149,6 +149,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       sheet screen that said « 2 » — because they counted the non-playing coach `createTeam` inserts on
       every new team. `isSheetCandidate` is the filter that existed inline in one page, named, and
       `countSquadRoles` applies it to its own input (decision 096)
+- [x] …and the « Composition » card on the match page calls the function decision 085 wrote, instead of
+      keeping its own copy of the sentences. It printed « Place tes sept joueurs sur la pelouse : tu
+      pourras ensuite planifier les changements » on a match played ten days earlier — the exact string
+      a green test in `plan.test.ts` forbids — under a primary button to an editor that refuses a
+      finished match. `lib/composition/copy.test.ts` now fails if any screen hard-codes one of the five
+      status-dependent sentences again (decision NNN)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses
