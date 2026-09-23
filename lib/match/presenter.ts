@@ -12,7 +12,7 @@
  * Nothing here touches the database, `Date.now()` or React — `presenter.test.ts` covers it.
  */
 
-import type { MatchStatus, SquadRole } from "@/db/schema";
+import type { Competition, EntryMode, MatchStatus, SquadRole } from "@/db/schema";
 import {
   MS_PER_MINUTE,
   clockMsToMinute,
@@ -52,10 +52,21 @@ export type LiveMatchRow = {
   opponentName: string;
   isHome: boolean;
   venue: string | null;
+  competition: Competition;
   periodsCount: number;
   periodMinutes: number;
   status: MatchStatus;
   operatorUserId: string | null;
+  /**
+   * How the log came to exist. Game mode prints the biggest minute in the app, and decision 048
+   * stamps the minutes a coach could not remember, so the screen owes the reader the sentence
+   * « saisi après le match » when that is what happened — `entryModeBadgeFr`.
+   *
+   * `getMatch` has always returned this and `getLiveMatch` has always passed the row straight
+   * through; only the type left it out, which is why `getRetroView` used to re-query for a value it
+   * was already holding.
+   */
+  entryMode: EntryMode;
 };
 
 /** One row of `match_events`. */

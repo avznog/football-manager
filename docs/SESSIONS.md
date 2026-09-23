@@ -586,3 +586,34 @@ sentences out loud.
 (it is built on `LiveMatchRow`, which drops `entryMode`), and `docs/DEPLOY.md` §4 and §6.
 
 **Next:** deployment. It needs a Neon `DATABASE_URL` from the owner; that is all that is left.
+
+## 2026-09-23 — the biggest number on the screen, unqualified
+
+**PR #31** — game mode says « saisi après le match » too.
+
+Decision 013 put `matches.entry_mode` in the database so a reader is told when a minute was typed up
+rather than watched, and `lib/match/queries.ts` states the rule plainly: *every screen that prints a
+minute a human did not type owes him that sentence.* The match page and the recap kept it. Game mode —
+which prints a 48 px clock, the largest number anywhere in the app — did not.
+
+The cause was a type, not a query. `getLiveMatch` calls `getMatch` and returns the row it gets
+**unchanged**, so `entry_mode` and `competition` have always crossed the RSC boundary; `LiveMatchRow`
+simply never declared them. Two consequences fell out of that one omission: the scoreboard could not
+ask the question, and `getRetroView` opened a second `select` on `matches` for two columns it was
+already holding — with a `?? "live"` fallback for a row that cannot be missing, since `getLiveMatch`
+just found it. Declaring the two fields fixes both; the extra query and its comment about values being
+« dropped at the client boundary » are gone, because nothing was ever dropping them.
+
+The badge goes in the caption under the clock rather than in the page header, next to « 2ᵉ période » —
+it qualifies the clock, and that is what it should sit beside. `recorded: live.events.length > 0` is
+the same test the other two screens make: an empty log was never *saisi*, whatever `entry_mode` says,
+which is exactly the FC des Deux-Ponts case `lib/calendar/labels.test.ts` was written around.
+
+**Looked at, at 390 px, both themes.** FC Rivière (`retro`, 18 events) reads « 60:00 · Match terminé ·
+saisi après le match · 3 – 2 ». FC des Deux-Ponts (`retro`, empty log) and Union des Lavandières
+(`live`, 13 events) carry no badge. The retro-entry screen still labels the first and not the second
+after losing its query. No console errors.
+
+**Debt after this:** the two-line squad row, and `docs/DEPLOY.md` §4 and §6.
+
+**Next:** deployment. It needs a Neon `DATABASE_URL` from the owner; that is all that is left.
