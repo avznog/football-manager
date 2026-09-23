@@ -14,6 +14,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { pluralize } from "@/lib/calendar/labels";
+import { noteAuthorFr, ratingCountNoteFr } from "@/lib/rating/labels";
 import type { RatingResultsView } from "@/lib/rating/queries";
 
 export function RatingsPanel({
@@ -91,12 +92,14 @@ export function RatingsPanel({
                     <Badge variant="neutral">entré en jeu</Badge>
                   ) : null}
                 </span>
+                {/* Not « il s’est mis 8 » unconditionally: on the reader's own row this list already
+                    calls him « toi » in every other author's chips (decision NNN). */}
                 <span className="mt-0.5 block text-xs text-ink-subtle">
-                  {player.count === 0
-                    ? "pas encore noté"
-                    : `${pluralize(player.count, "note")}${
-                        player.selfScore !== null ? ` · il s’est mis ${player.selfScore}` : ""
-                      }`}
+                  {ratingCountNoteFr({
+                    count: player.count,
+                    selfScore: player.selfScore,
+                    isViewer: player.isViewer,
+                  })}
                 </span>
               </span>
 
@@ -118,10 +121,7 @@ export function RatingsPanel({
                     <span className="font-mono font-semibold text-ink tabular-nums">
                       {note.score}
                     </span>
-                    <span className="truncate">
-                      {note.isSelf ? "lui-même" : note.raterName}
-                      {note.isViewer && !note.isSelf ? " (toi)" : ""}
-                    </span>
+                    <span className="truncate">{noteAuthorFr(note)}</span>
                   </li>
                 ))}
               </ul>
@@ -134,9 +134,9 @@ export function RatingsPanel({
                   .map((note) => (
                     <li key={`${note.raterMemberId}-comment`} className="text-sm text-ink-muted">
                       <span className="italic">« {note.comment} »</span>{" "}
-                      <span className="text-ink-subtle">
-                        — {note.isSelf ? "lui-même" : note.raterName}
-                      </span>
+                      {/* Same function as the chip above it: the attribution used to drop the
+                          « (toi) » the chip carried, so one note was signed two ways. */}
+                      <span className="text-ink-subtle">— {noteAuthorFr(note)}</span>
                     </li>
                   ))}
               </ul>
