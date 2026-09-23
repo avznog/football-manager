@@ -9,6 +9,15 @@
 #   docker compose up --build app  # the production image on http://localhost:3000
 #
 # The credentials are the ones CI and `.env.example` already use, so nothing else has to change.
+#
+# **`up` leaves a schema with no accounts.** `db`, `migrate` and `app` are all it starts; the two
+# services that create users are in the `setup` profile and are never started for you, so
+# `select username from users` returns nothing and there is no password that logs you in. Neither
+# `admin`/`admin` nor `admin`/`change-me` works — see the two services below. Pick one way out:
+#
+#   docker compose run --rm seed       # the demo season: `admin`/`change-me`, players on `motdepasse`
+#   SUPER_ADMIN_USERNAME=admin SUPER_ADMIN_PASSWORD='…' docker compose run --rm bootstrap
+#                                      # reference data and one real super admin, no demo data
 
 name: football-manager
 
@@ -49,7 +58,10 @@ services:
     command: ["npm", "run", "db:migrate"]
 
   # Reference data and the one super admin, for an empty database — docs/DEPLOY.md §3.
-  # Not started by `up`: `docker compose run --rm bootstrap`.
+  # Not started by `up`, and that is why a freshly `up`ped stack has no account at all:
+  # `docker compose run --rm bootstrap`, with a password you choose. `change-me` is *refused* by
+  # `db/bootstrap.ts` — it blacklists the demo password and enforces a minimum length, so `admin`
+  # is refused too (decision 052). This service creates no team and no demo data.
   bootstrap:
     profiles: ["setup"]
     build:
@@ -67,6 +79,27 @@ services:
         condition: service_healthy
     restart: "no"
     command: ["npm", "run", "db:bootstrap"]
+
+  # The demo season — the other way out of a stack you cannot log into. It creates `admin` /
+  # `change-me` and a squad on `motdepasse`, plus a season of matches, trainings and events, so a
+  # local stack can be clicked through end to end instead of merely being reachable.
+  #
+  # Built from `tools`, which sets no `NODE_ENV`: `db/seed.ts` refuses to run under
+  # `NODE_ENV=production`, and that guard is what keeps demo passwords off a real database. It is
+  # not weakened here and must not be — this service is for the compose database and nothing else.
+  # Pointing it at Neon, or at any database anyone else uses, would hand out known passwords.
+  seed:
+    profiles: ["setup"]
+    build:
+      context: .
+      target: tools
+    environment:
+      DATABASE_URL: postgres://football:football@db:5432/football_manager
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    command: ["npm", "run", "db:seed"]
 
   app:
     build:
