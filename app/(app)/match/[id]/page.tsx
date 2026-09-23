@@ -12,6 +12,10 @@
  * The composition card (M3) is coach-only and loads its own data, so a player's match page pays
  * nothing for it. Game mode is open to everybody — it is read-only for anyone who is not the
  * operator, and following the score from the touchline is a legitimate use of it.
+ *
+ * Once the match is played this page becomes the hub for the two screens that read it: the recap,
+ * and the rating flow for whoever still owes notes. Whether he owes any is asked of
+ * `getNotationView`, which owns decision 007's rule — this page restates none of it.
  */
 
 import { notFound } from "next/navigation";
@@ -32,6 +36,7 @@ import {
 import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
 import { buildReminderMessage, tallyAvailability, type Responder } from "@/lib/calendar/timeline";
 import { getMatch, getMatchAnswers, getMatchScore } from "@/lib/match/queries";
+import { getNotationView } from "@/lib/rating/queries";
 import { getSquad } from "@/lib/team/queries";
 import { CompositionCard } from "./composition/_components/composition-card";
 import { AvailabilityControl } from "../../calendrier/_components/availability-control";
@@ -57,6 +62,21 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
     match.status === "scheduled" ? Promise.resolve(null) : getMatchScore(match.id),
   ]);
 
+  /**
+   * The state of *this* viewer's rating duty, asked of the module that owns the rule rather than
+   * re-derived here from the sheet and the next kick-off — two implementations of that rule is
+   * exactly how the season averages once leaked (decision 021). Only a finished match has a duty,
+   * so a scheduled one pays nothing.
+   */
+  const notation =
+    match.status === "finished"
+      ? await getNotationView({
+          teamId: team.id,
+          matchId: match.id,
+          membershipId: team.membershipId,
+        })
+      : null;
+
   const kickoff = new Date(match.kickoffAt);
   const now = new Date();
 
@@ -67,6 +87,17 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   const notes = new Map(answers.map((answer) => [answer.teamMemberId, answer.note]));
 
   const isCoach = can(actor, "match:update", { teamId: team.id });
+  /**
+   * This viewer's rating duty, or null when he has none: not on the sheet, window shut, or not
+   * allowed to rate at all. Invariant 4 — the permission is `can()`'s answer, not a role read here.
+   */
+  const ratingDuty =
+    notation !== null &&
+    notation.onSheet &&
+    notation.window.state === "open" &&
+    can(actor, "rating:submit", { teamId: team.id })
+      ? notation.progress
+      : null;
   const declarable = team.isPlayer && match.status === "scheduled";
   const myAnswer =
     answers.find((answer) => answer.teamMemberId === team.membershipId)?.status ?? null;
@@ -151,6 +182,42 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
       {/* The match sheet and the compositions are the coach's job (`docs/PLAN.md`, screen 3): a
           player sees the availability grid above and nothing else. */}
       {isCoach ? <CompositionCard team={team} match={match} /> : null}
+
+      {/* The reading half of the match, once it has been played: the recap for everybody, and the
+          rating flow for whoever still owes notes. A player who has finished is told so, because a
+          link that silently disappears reads as a bug. */}
+      {match.status !== "scheduled" ? (
+        <Card title="Après le match" as="h2">
+          <div className="space-y-3">
+            {ratingDuty && !ratingDuty.complete ? (
+              <>
+                <p className="text-sm text-ink-muted">
+                  {ratingDuty.partial
+                    ? `Il te reste ${ratingDuty.missingIds.length} note${ratingDuty.missingIds.length > 1 ? "s" : ""} à donner. Tu verras celles des autres quand tu auras fini.`
+                    : "Tu n’as pas encore noté tes coéquipiers. Les notes des autres restent cachées jusque-là."}
+                </p>
+                <ButtonLink href={`/match/${match.id}/notation`} fullWidth>
+                  Noter mes coéquipiers
+                </ButtonLink>
+              </>
+            ) : null}
+
+            {ratingDuty?.complete ? (
+              <p className="text-sm text-ink-muted">
+                Tu as noté tout le monde&nbsp;: les notes de l’équipe sont visibles dans le résumé.
+              </p>
+            ) : null}
+
+            <ButtonLink
+              href={`/match/${match.id}/recap`}
+              variant={ratingDuty && !ratingDuty.complete ? "secondary" : "primary"}
+              fullWidth
+            >
+              Voir le résumé
+            </ButtonLink>
+          </div>
+        </Card>
+      ) : null}
 
       {/* Open to every member, not just the operator: following the score from the touchline is
           legitimate, and game mode itself decides who may record an action (`can()`). */}
