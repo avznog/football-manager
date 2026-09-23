@@ -109,7 +109,7 @@ describe("buildAmendment", () => {
     ]);
 
     // The score is unchanged — one goal, still one goal — but the credit has moved.
-    expect(state.scoreLabel).toBe("1 - 0");
+    expect(state.scoreLabel).toBe("1 – 0");
     expect(playerState(state, P.at)?.goals).toBe(0);
     expect(playerState(state, P.mcl)?.goals).toBe(1);
     expect(state.anomalies).toEqual([]);
@@ -193,7 +193,7 @@ describe("buildAmendment", () => {
       { ...amendment.events[0], id: uuid("eee", 1), seq: stored.length + 1 },
     ]);
 
-    expect(state.scoreLabel).toBe("0 - 0");
+    expect(state.scoreLabel).toBe("0 – 0");
     expect(state.result).toBe("draw");
     expect(playerState(state, P.at)?.goals).toBe(0);
     expect(state.anomalies).toEqual([]);
@@ -219,7 +219,7 @@ describe("buildAmendment", () => {
       { ...amendment.events[0], id: uuid("eee", 1), seq: stored.length + 1 },
     ]);
 
-    expect(state.scoreLabel).toBe("1 - 1");
+    expect(state.scoreLabel).toBe("1 – 1");
     // The keeper's clean sheet is recomputed, not patched: that is invariant 2 doing its job.
     expect(playerState(state, P.gk)?.gkCleanMinutes).toBe(41);
     expect(state.anomalies).toEqual([]);

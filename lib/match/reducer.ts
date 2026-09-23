@@ -77,6 +77,7 @@
 
 import { FORMATION_SLOT_COUNT } from "@/db/reference";
 import type { SquadRole } from "@/db/schema";
+import { scoreLineFr } from "@/lib/calendar/labels";
 
 import {
   type ClockAnchor,
@@ -347,7 +348,7 @@ export type MatchState = {
   periodsStarted: number;
   goalsFor: number;
   goalsAgainst: number;
-  /** `3 - 2`, from our point of view. */
+  /** « 3 – 2 », ours first — `scoreLineFr`, the app's one scoreline (decision 061). */
   scoreLabel: string;
   /** Null until the final whistle: a match in progress has no result. */
   result: "win" | "draw" | "loss" | null;
@@ -1098,7 +1099,7 @@ export function reduceMatch(
     periodsStarted,
     goalsFor,
     goalsAgainst,
-    scoreLabel: `${goalsFor} - ${goalsAgainst}`,
+    scoreLabel: scoreLineFr(goalsFor, goalsAgainst),
     result: finished ? (goalsFor > goalsAgainst ? "win" : goalsFor < goalsAgainst ? "loss" : "draw") : null,
     onPitch,
     goalkeeperId,

@@ -1253,3 +1253,34 @@ two cards above already uses, so there is one definition of "not one event was e
 page. Nothing is lost for a live or scheduled match, nor for a finished match that *does* have a log:
 `/match/[id]/jeu` stays reachable by URL in every case, and game mode remains readable by the whole
 squad (decision 059). What changes is only that the app stops advertising a story it does not have.
+
+## 064 — `scoreLineFr` is the only function that writes a score, and now that is true
+**2026-09-23** · accepted · amends 061
+
+Decision 061 said `scoreLineFr` was « the only way the app writes a score ». It was not: four other
+places built one by hand. They have been removed, and every scoreline on every screen now comes from
+that one function.
+
+**What was actually there.** `reduceMatch` built `scoreLabel` as `` `${goalsFor} - ${goalsAgainst}` ``;
+`buildRecap` built the timeline's `scoreAfter` the same way; `buildLiveTimeline` built game mode's the
+same way again; and `lib/stats/format.ts` had its own `formatScore`. All four used a **hyphen** where
+`scoreLineFr` uses an en dash, and the stats form guide printed a third form, « 2-0 », with no spaces
+at all. So the recap's scoreboard read « 2 – 0 » and the timeline three cards below it « 2 - 0 », for
+the same two goals, on the same screen.
+
+**Why bother, since nobody would notice a hyphen.** Because the decision claiming a single writer was
+already written down, and a decision that is false is worse than no decision: the next session reads
+061, believes there is one place to change, and changes one of five. Typography is the trivial half of
+this; the drift is the real defect, and it had already happened once — 061 exists because two
+scoreline *orientations* grew up side by side for the same reason.
+
+**Consequences.** `formatScore` is gone, with a comment in its place saying where the function went
+and why there is not one here. The reducer imports `scoreLineFr`, which is a French display string
+inside a pure function — it already imports `EVENT_LABELS_FR` and `formatMinuteLabelFr`, and
+`lib/calendar/labels.ts` is pure, so invariant 2 is untouched.
+
+The e2e suite needed two assertions scoped: with the timeline and the scoreboard finally agreeing on
+the character, `getByText("1 – 1")` matches both and Playwright's strict mode refuses. That is the
+fix working. The recap's scoreboard gained `aria-label="Score du match"`, making it a `region` the way
+game mode's « Chrono et score » already is — the largest number in the product had no accessible name,
+and now the spec has a stable handle on it for the same reason a screen reader user does.

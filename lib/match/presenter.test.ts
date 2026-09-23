@@ -191,7 +191,7 @@ describe("merging the outbox into the log", () => {
     const state = reduceLive(live(log(KICKED_OFF)), [pending], T0 + 13 * MIN);
 
     expect(state.goalsFor).toBe(1);
-    expect(state.scoreLabel).toBe("1 - 0");
+    expect(state.scoreLabel).toBe("1 – 0");
   });
 
   it("does not count it twice once the server has confirmed it", () => {
@@ -420,8 +420,8 @@ describe("the timeline", () => {
     const lines = timelineLines(state, index);
 
     expect(lines[0]).toMatchObject({ title: "Changement", detail: "Léo → Yanis", minuteLabel: "25’" });
-    expect(lines[1]).toMatchObject({ title: "But encaissé", scoreLabel: "1 - 1" });
-    expect(lines[2]).toMatchObject({ title: "But", detail: "Julien (passe de Karim)", scoreLabel: "1 - 0" });
+    expect(lines[1]).toMatchObject({ title: "But encaissé", scoreLabel: "1 – 1" });
+    expect(lines[2]).toMatchObject({ title: "But", detail: "Julien (passe de Karim)", scoreLabel: "1 – 0" });
   });
 
   it("offers « annuler » only on an event that can be annulled and has reached the server", () => {

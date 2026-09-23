@@ -8,11 +8,11 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { scoreLineFr } from "@/lib/calendar/labels";
 import { formatShortDay } from "@/lib/calendar/time";
 import type { FormEntry, TeamSeasonStats } from "@/lib/stats/aggregate";
 import {
   formatRecord,
-  formatScore,
   formatSigned,
   matchCount,
   plural,
@@ -54,8 +54,12 @@ export function TeamSummary({
       title="Bilan de l’équipe"
       description={`${matchCount(team.played)} ${team.played > 1 ? "comptés" : "compté"} · ${formatRecord(team.wins, team.draws, team.losses)}`}
       action={
+        /* The sign carries the meaning to anybody reading « Buts pour » and « Buts contre » just
+           below it, but « +3 » alone is what a screen reader announces, and a lone signed number
+           could be anything — points, a form trend. The word is invisible and free. */
         <Badge variant={team.goalDifference >= 0 ? "success" : "danger"}>
           {formatSigned(team.goalDifference)}
+          <span className="sr-only"> de différence de buts</span>
         </Badge>
       }
     >
@@ -115,7 +119,7 @@ function Form({ entries }: { entries: FormEntry[] }) {
           <li key={entry.matchId}>
             <span
               className="inline-flex flex-col items-center gap-0.5"
-              title={`${resultLabelOf(entry.result)} ${formatScore(entry.goalsFor, entry.goalsAgainst)} — ${entry.isHome ? "domicile" : "extérieur"} contre ${entry.opponentName}, ${formatShortDay(new Date(entry.kickoffAt))}`}
+              title={`${resultLabelOf(entry.result)} ${scoreLineFr(entry.goalsFor, entry.goalsAgainst)} — ${entry.isHome ? "domicile" : "extérieur"} contre ${entry.opponentName}, ${formatShortDay(new Date(entry.kickoffAt))}`}
             >
               <Badge variant={RESULT_VARIANT[entry.result]} solid className="justify-center px-2">
                 <span aria-hidden="true">{resultLetterOf(entry.result)}</span>
@@ -124,7 +128,7 @@ function Form({ entries }: { entries: FormEntry[] }) {
                 </span>
               </Badge>
               <span className="font-mono text-[0.625rem] text-ink-subtle tabular-nums">
-                {entry.goalsFor}-{entry.goalsAgainst}
+                {scoreLineFr(entry.goalsFor, entry.goalsAgainst)}
               </span>
             </span>
           </li>

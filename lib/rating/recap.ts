@@ -35,7 +35,7 @@
  */
 
 import type { SquadRole } from "@/db/schema";
-import { pluralize, resultLabel } from "@/lib/calendar/labels";
+import { pluralize, resultLabel, scoreLineFr } from "@/lib/calendar/labels";
 import { VOIDED_SUFFIX_FR } from "@/lib/match/events";
 import type { MatchState, PlayerMatchState, TimelineEntry } from "@/lib/match/reducer";
 
@@ -67,7 +67,7 @@ export type RecapTimelineEntry = {
   /** « Julien Marchal, passe de Karim Benali » — null when there is nobody to name. */
   detail: string | null;
   voided: boolean;
-  /** « 2 - 1 » after a goal, null otherwise. */
+  /** « 2 – 1 » after a goal, null otherwise — `scoreLineFr`, like every other score. */
   scoreAfter: string | null;
   tone: RecapTimelineTone;
 };
@@ -118,7 +118,7 @@ export type RecapPlayerLine = {
 export type MatchRecap = {
   goalsFor: number;
   goalsAgainst: number;
-  /** « 3 - 2 », from our point of view. */
+  /** « 3 – 2 », ours first, as `scoreLineFr` writes every score in the app. */
   scoreLabel: string;
   /**
    * At least one event was logged. A match can be over with an empty log — nobody opened game mode,
@@ -264,7 +264,7 @@ export function buildTimeline(
       detail: describeActors(entry, nameOf) ?? missingScorerNote(entry),
       voided: entry.voided,
       scoreAfter: entry.scoreAfter
-        ? `${entry.scoreAfter.goalsFor} - ${entry.scoreAfter.goalsAgainst}`
+        ? scoreLineFr(entry.scoreAfter.goalsFor, entry.scoreAfter.goalsAgainst)
         : null,
       tone: toneOf(entry),
     }));

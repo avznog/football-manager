@@ -13,6 +13,7 @@
  */
 
 import type { Competition, EntryMode, MatchStatus, SquadRole } from "@/db/schema";
+import { scoreLineFr } from "@/lib/calendar/labels";
 import {
   MS_PER_MINUTE,
   clockMsToMinute,
@@ -582,7 +583,7 @@ export function timelineLines(
         title: entry.labelFr,
         detail: describeActorsFr(entry.type, entry.actors, players),
         scoreLabel: entry.scoreAfter
-          ? `${entry.scoreAfter.goalsFor} - ${entry.scoreAfter.goalsAgainst}`
+          ? scoreLineFr(entry.scoreAfter.goalsFor, entry.scoreAfter.goalsAgainst)
           : null,
         voided: entry.voided,
         pending: isPending,
