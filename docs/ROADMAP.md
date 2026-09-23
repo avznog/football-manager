@@ -148,7 +148,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Final whistle → freeze `match_player_stats`
 - [x] Game mode's list of who can come on is no longer headed « Remplaçants ». Before the kick-off it
       held the whole squad — three substitutes, seven titulaires, two players off the sheet and an
-      injured supporter — and the heading claimed all thirteen were substitutes (decision NNN)
+      injured supporter — and the heading claimed all thirteen were substitutes (decision 087)
 
 ## M5 — Stats
 - [x] Player stats: matches, minutes, goals, assists, own goals, fouls
