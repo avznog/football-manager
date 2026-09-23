@@ -1,0 +1,584 @@
+/**
+ * Retro-entry: turning what a coach remembers into a normal match event log.
+ *
+ * Screen 8 of `docs/PLAN.md` — « saisie rétroactive » — exists for two situations: a match played
+ * before anybody opened the app, and a match whose operator's phone died at 12′. Decision 013
+ * settles how it works: **the screen synthesises the same events game mode would have written**, so
+ * the reducer, `match_player_stats`, `/stats`, the recap and the ratings all read one kind of log
+ * and none of them has a branch for "this one was typed in afterwards".
+ *
+ * Pure: no database, no clock, no randomness — the caller supplies the kick-off instant and the
+ * idempotency seed. That is what lets `log.test.ts` assert, from hand-written fixtures, that a log
+ * built here reduces to exactly the score and the minutes the coach entered.
+ *
+ * ## What the coach is asked for, and what is derived
+ *
+ * He is asked for the starting seven, the substitutions (« X sort, Y entre, à la M′ ») and the
+ * facts of the match (goals, penalties, own goals, fouls, injuries). He is **not** asked how many
+ * minutes anybody played: minutes, the score, who was in goal and the clean sheets are all derived
+ * by `reduceMatch` from the log this module writes (invariant 2). A coach remembers "Momo came on
+ * for Ali at half-time" far better than "Momo played 22 minutes", and only one of those two is
+ * something the app can check.
+ *
+ * ## The minute nobody remembers
+ *
+ * Two weeks later, most minutes are gone. Every stamp here is therefore optional, and an absent one
+ * is resolved to **the midpoint of the window in which the event could have happened**: the middle
+ * of regulation for something with no player attached, the middle of the scorer's longest stint on
+ * the pitch when there is one (and of the overlap with the assister's, when they overlap). See
+ * `resolveFactClockMs`. Several guessed events legitimately land on the same minute; `seq` then
+ * preserves the order the coach typed them in, so the score progression stays monotone.
+ *
+ * The alternatives were worse. Stamping at 0′ zeroes the clean minutes of every backfilled match
+ * and risks the `goal-before-kickoff` anomaly; stamping at the final whistle makes a 0-5 defeat
+ * look entirely clean; spreading the events evenly across the match invents an ordering and a
+ * precision nobody has. The midpoint of the plausible window invents the least, and — crucially —
+ * it cannot put a goal at a minute its scorer was not on the pitch, which would be a reducer
+ * anomaly on a log the app wrote itself.
+ */
+
+import {
+  MS_PER_MINUTE,
+  type PeriodsConfig,
+  clockMsToMinute,
+  minuteToClockMs,
+  periodEndMs,
+  periodOfClockMs,
+  periodStartMs,
+  periodsConfig,
+  regulationMs,
+} from "@/lib/match/clock";
+import type { MatchEventInput, MatchEventType } from "@/lib/match/events";
+import type { MatchEventRecord } from "@/lib/match/reducer";
+
+/* -------------------------------------------------------------------------- */
+/* What the screen collects                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The event types the retro screen can produce as "facts of the match". Deliberately excludes the
+ * clock events — those are the synthesiser's own job — and `SUBSTITUTION`, `POSITION_CHANGE` and
+ * `LINEUP_APPLIED`, which are deduced from the starting seven and the substitution rows.
+ */
+export const RETRO_FACT_TYPES = [
+  "GOAL_FOR",
+  "PENALTY_SCORED",
+  "PENALTY_MISSED",
+  "OWN_GOAL",
+  "GOAL_AGAINST",
+  "FOUL",
+  "INJURY",
+] as const satisfies readonly MatchEventType[];
+
+export type RetroFactType = (typeof RETRO_FACT_TYPES)[number];
+
+export function isRetroFactType(value: string): value is RetroFactType {
+  return (RETRO_FACT_TYPES as readonly string[]).includes(value);
+}
+
+/** Types whose payload requires a player: the reducer refuses them without one. */
+export function retroFactNeedsMember(type: RetroFactType): boolean {
+  return type !== "GOAL_FOR" && type !== "GOAL_AGAINST";
+}
+
+/** Only a goal can carry an assist. */
+export function retroFactTakesAssist(type: RetroFactType): boolean {
+  return type === "GOAL_FOR";
+}
+
+/** Types that credit nobody, ever: we track no opponent players (decision 010). */
+export function retroFactTakesMember(type: RetroFactType): boolean {
+  return type !== "GOAL_AGAINST";
+}
+
+/** One slot of the starting seven. `slotId` is a `formation_slots.id`. */
+export type RetroStarter = {
+  slotId: string;
+  memberId: string;
+};
+
+/**
+ * One substitution as the coach types it. `minute` is null for « je ne sais plus », which resolves
+ * to the period break — the moment an amateur seven-a-side side actually makes its changes.
+ */
+export type RetroChange = {
+  /** Row identity, stable for the lifetime of the form. Never stored. */
+  key: string;
+  outId: string;
+  inId: string;
+  minute: number | null;
+};
+
+/** One fact of the match. Every field but `type` may be absent. */
+export type RetroFact = {
+  key: string;
+  type: RetroFactType;
+  /** Scorer, fouler, injured player. Null when unknown or when the type takes nobody. */
+  memberId: string | null;
+  assistId: string | null;
+  minute: number | null;
+};
+
+export type RetroEntry = {
+  /**
+   * One uuid per attempt at the form, generated once by the browser. Every synthesised event's
+   * `client_event_id` is derived from it, which makes a double tap on « Enregistrer » land exactly
+   * one log (invariant 6) instead of two.
+   */
+  submissionId: string;
+  periods: { periodsCount?: number | null; periodMinutes?: number | null };
+  /** Epoch milliseconds of the kick-off, from `matches.kickoff_at`. Only feeds `occurred_at`. */
+  kickoffAtMs: number;
+  /** The planned initial composition this seven came from, when it is unchanged. */
+  lineupId: string | null;
+  starters: readonly RetroStarter[];
+  changes: readonly RetroChange[];
+  facts: readonly RetroFact[];
+};
+
+/* -------------------------------------------------------------------------- */
+/* Who was on the pitch, and when                                             */
+/* -------------------------------------------------------------------------- */
+
+/** A stint on the pitch, in match-time milliseconds. Closed: retro entry knows the whistle. */
+export type RetroSpell = { fromMs: number; toMs: number };
+
+export type RetroResolvedChange = {
+  key: string;
+  outId: string;
+  inId: string;
+  /** The slot the outgoing player vacates, which is the one the incoming player takes. */
+  slotId: string | null;
+  clockMs: number;
+  /** True when the coach did not give a minute and the break was used instead. */
+  guessed: boolean;
+  /** False when the outgoing player was not on the pitch at that moment — a contradiction. */
+  outWasOn: boolean;
+  /** True when the incoming player was already on the pitch — the other contradiction. */
+  inAlreadyOn: boolean;
+};
+
+export type RetroPitch = {
+  periods: PeriodsConfig;
+  /** Every stint each player had, in order. A player may come back on (reducer rule 7). */
+  spells: ReadonlyMap<string, readonly RetroSpell[]>;
+  changes: readonly RetroResolvedChange[];
+};
+
+/**
+ * The substitution the coach cannot date happened at the break.
+ *
+ * With 2×30 that is 30′, with 4×15 it is also 30′, and with a single period there is no break at
+ * all so the middle of the match is the only honest answer. Both come out at "half-way through",
+ * which is what « je ne sais plus » means in practice.
+ */
+export function breakClockMs(periods: PeriodsConfig): number {
+  const endMs = regulationMs(periods);
+  if (periods.periodsCount <= 1) return snapToMinute(endMs / 2, 0, endMs);
+  return periodStartMs(Math.floor(periods.periodsCount / 2) + 1, periods);
+}
+
+/**
+ * Replay the starting seven and the substitutions into stints on the pitch.
+ *
+ * Exported because the form needs it to validate a substitution before it is submitted — "you
+ * cannot take off somebody who is not on" is a question about this structure, not about the log.
+ */
+export function retroPitch(entry: RetroEntry): RetroPitch {
+  const periods = periodsConfig(entry.periods);
+  const endMs = regulationMs(periods);
+
+  const spells = new Map<string, RetroSpell[]>();
+  const bank = (memberId: string, fromMs: number, toMs: number) => {
+    const list = spells.get(memberId);
+    const spell = { fromMs, toMs: Math.max(fromMs, toMs) };
+    if (list) list.push(spell);
+    else spells.set(memberId, [spell]);
+  };
+
+  /** Who is on, since when, in which slot. */
+  const onPitch = new Map<string, { fromMs: number; slotId: string | null }>();
+  for (const starter of entry.starters) {
+    onPitch.set(starter.memberId, { fromMs: 0, slotId: starter.slotId });
+  }
+
+  const ordered = entry.changes
+    .map((change, index) => ({ change, index, clockMs: resolveChangeClockMs(change, periods) }))
+    // Stable on the coach's typing order, so two changes at the same minute keep their sequence.
+    .sort((a, b) => a.clockMs - b.clockMs || a.index - b.index);
+
+  const changes: RetroResolvedChange[] = [];
+  for (const { change, clockMs } of ordered) {
+    const leaving = onPitch.get(change.outId);
+    const slotId = leaving?.slotId ?? null;
+    if (leaving) {
+      bank(change.outId, leaving.fromMs, clockMs);
+      onPitch.delete(change.outId);
+    }
+    const inAlreadyOn = onPitch.has(change.inId);
+    if (!inAlreadyOn) onPitch.set(change.inId, { fromMs: clockMs, slotId });
+    changes.push({
+      key: change.key,
+      outId: change.outId,
+      inId: change.inId,
+      slotId,
+      clockMs,
+      guessed: change.minute === null,
+      outWasOn: leaving !== undefined,
+      inAlreadyOn,
+    });
+  }
+
+  for (const [memberId, entryOn] of onPitch) bank(memberId, entryOn.fromMs, endMs);
+
+  return { periods, spells, changes };
+}
+
+function resolveChangeClockMs(change: RetroChange, periods: PeriodsConfig): number {
+  if (change.minute === null) return breakClockMs(periods);
+  return clamp(minuteToClockMs(change.minute), 0, regulationMs(periods));
+}
+
+/* -------------------------------------------------------------------------- */
+/* When a fact happened                                                      */
+/* -------------------------------------------------------------------------- */
+
+export type RetroStamp = { clockMs: number; guessed: boolean };
+
+/**
+ * The match time of one fact.
+ *
+ * A minute the coach typed is taken as given (clamped to regulation). A minute he does not have is
+ * the midpoint of the window the event must have fallen in — see the note at the top of the file.
+ */
+export function resolveFactClockMs(fact: RetroFact, pitch: RetroPitch): RetroStamp {
+  const endMs = regulationMs(pitch.periods);
+  if (fact.minute !== null) {
+    return { clockMs: clamp(minuteToClockMs(fact.minute), 0, endMs), guessed: false };
+  }
+
+  const window = plausibleWindow(
+    [fact.memberId, fact.assistId].filter((id): id is string => id !== null),
+    pitch.spells,
+    endMs,
+  );
+  const middle = window.fromMs + (window.toMs - window.fromMs) / 2;
+  return { clockMs: snapToMinute(middle, window.fromMs, window.toMs), guessed: true };
+}
+
+/**
+ * The span an event involving these players can have happened in: their stints on the pitch,
+ * narrowed to the overlap when they have one (a goal and its assist were on the pitch together),
+ * and the whole match when nobody is known to have been on at all.
+ */
+function plausibleWindow(
+  memberIds: readonly string[],
+  spells: ReadonlyMap<string, readonly RetroSpell[]>,
+  endMs: number,
+): RetroSpell {
+  const known = memberIds
+    .map((memberId) => spells.get(memberId) ?? [])
+    .filter((list) => list.length > 0);
+  if (known.length === 0) return { fromMs: 0, toMs: endMs };
+
+  let candidates: readonly RetroSpell[] = known[0];
+  for (const other of known.slice(1)) {
+    const overlap = intersectSpells(candidates, other);
+    // No overlap at all is a contradiction the validation layer reports; here, the first player's
+    // window is still a better guess than the whole match.
+    if (overlap.length > 0) candidates = overlap;
+  }
+
+  return candidates.reduce((longest, spell) =>
+    spell.toMs - spell.fromMs > longest.toMs - longest.fromMs ? spell : longest,
+  );
+}
+
+function intersectSpells(
+  a: readonly RetroSpell[],
+  b: readonly RetroSpell[],
+): readonly RetroSpell[] {
+  const out: RetroSpell[] = [];
+  for (const left of a) {
+    for (const right of b) {
+      const fromMs = Math.max(left.fromMs, right.fromMs);
+      const toMs = Math.min(left.toMs, right.toMs);
+      if (toMs > fromMs) out.push({ fromMs, toMs });
+    }
+  }
+  return out;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Building the log                                                           */
+/* -------------------------------------------------------------------------- */
+
+export type RetroLog = {
+  /** Ready for `matchEventBatchSchema`, in the order they must be inserted. */
+  events: readonly MatchEventInput[];
+  /** How many stamps the app had to invent. The screen says so, in French. */
+  guessedStamps: number;
+};
+
+/**
+ * The whole match as an event log.
+ *
+ * The shape is exactly what game mode leaves behind: a `KICKOFF` per period, the starting seven as
+ * a `LINEUP_APPLIED` at 0′ (so the seven count as starters and the goalkeeper is known), the facts
+ * and substitutions at their minutes, a `PERIOD_END` at each period boundary, and a `FINAL_WHISTLE`
+ * at the end of regulation — which is what lets `finalizeMatch` freeze the match afterwards with no
+ * special case at all.
+ */
+export function buildRetroLog(entry: RetroEntry): RetroLog {
+  const pitch = retroPitch(entry);
+  const periods = pitch.periods;
+  const endMs = regulationMs(periods);
+
+  type Pending = { clockMs: number; order: number; build: () => Omit<Draft, "clockMs" | "period"> };
+
+  const pending: Pending[] = [];
+
+  entry.facts.forEach((fact, index) => {
+    const stamp = resolveFactClockMs(fact, pitch);
+    pending.push({
+      clockMs: stamp.clockMs,
+      order: index,
+      build: () => ({ type: fact.type, payload: retroFactPayload(fact) }),
+    });
+  });
+
+  pitch.changes.forEach((change, index) => {
+    pending.push({
+      clockMs: change.clockMs,
+      order: entry.facts.length + index,
+      build: () => ({
+        type: "SUBSTITUTION" as MatchEventType,
+        payload: change.slotId
+          ? { outId: change.outId, inId: change.inId, slotId: change.slotId }
+          : { outId: change.outId, inId: change.inId },
+      }),
+    });
+  });
+
+  pending.sort((a, b) => a.clockMs - b.clockMs || a.order - b.order);
+
+  const drafts: Draft[] = [];
+  for (let period = 1; period <= periods.periodsCount; period += 1) {
+    drafts.push({ type: "KICKOFF", payload: {}, clockMs: periodStartMs(period, periods), period });
+
+    if (period === 1) {
+      drafts.push({
+        type: "LINEUP_APPLIED",
+        payload: {
+          ...(entry.lineupId ? { lineupId: entry.lineupId } : {}),
+          slots: entry.starters.map((starter) => ({
+            slotId: starter.slotId,
+            memberId: starter.memberId,
+          })),
+        },
+        clockMs: 0,
+        period: 1,
+      });
+    }
+
+    for (const item of pending) {
+      // The boundary belongs to the period that is starting (`periodOfClockMs`), so a change « à la
+      // mi-temps » is recorded after the second kick-off rather than before the first period's end.
+      if (periodOfClockMs(item.clockMs, periods) !== period) continue;
+      drafts.push({ ...item.build(), clockMs: item.clockMs, period });
+    }
+
+    drafts.push({ type: "PERIOD_END", payload: {}, clockMs: periodEndMs(period, periods), period });
+    if (period === periods.periodsCount) {
+      drafts.push({ type: "FINAL_WHISTLE", payload: {}, clockMs: endMs, period });
+    }
+  }
+
+  const guessedStamps =
+    entry.facts.filter((fact) => fact.minute === null).length +
+    pitch.changes.filter((change) => change.guessed).length;
+
+  return {
+    events: drafts.map((draft, index) => toEventInput(draft, index, entry)),
+    guessedStamps,
+  };
+}
+
+type Draft = {
+  type: MatchEventType;
+  payload: Record<string, unknown>;
+  clockMs: number;
+  period: number;
+};
+
+function toEventInput(draft: Draft, index: number, entry: RetroEntry): MatchEventInput {
+  return {
+    clientEventId: retroEventId(entry.submissionId, index),
+    type: draft.type,
+    period: draft.period,
+    minute: clockMsToMinute(draft.clockMs),
+    clockMs: draft.clockMs,
+    // An approximation, and an honest one: the wall clock of a retro-entered event is unknowable.
+    // `clock_ms` is what every consumer reads (`resolveClockMs`); `occurred_at` only ever drives the
+    // projection of a *running* clock, which a match entered after the fact does not have.
+    occurredAt: new Date(entry.kickoffAtMs + draft.clockMs),
+    payload: draft.payload,
+    voidsEventId: null,
+  };
+}
+
+/**
+ * The `payload` of one fact. Shared with the amendment builder, so a corrected goal is written in
+ * exactly the same shape as the one it replaces.
+ */
+export function retroFactPayload(fact: {
+  type: RetroFactType;
+  memberId: string | null;
+  assistId: string | null;
+}): Record<string, unknown> {
+  switch (fact.type) {
+    case "GOAL_FOR":
+      // Both optional: decision 017 keeps `scorerId` absent for a goal whose scorer is forgotten,
+      // which is the whole point of retro entry.
+      return {
+        ...(fact.memberId ? { scorerId: fact.memberId } : {}),
+        ...(fact.assistId ? { assistId: fact.assistId } : {}),
+      };
+    case "GOAL_AGAINST":
+      return {};
+    case "PENALTY_SCORED":
+    case "PENALTY_MISSED":
+    case "OWN_GOAL":
+      return fact.memberId ? { scorerId: fact.memberId } : {};
+    case "FOUL":
+    case "INJURY":
+      return fact.memberId ? { memberId: fact.memberId } : {};
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Idempotency                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The `client_event_id` of the nth event of one submission.
+ *
+ * Derived rather than random so that the whole batch is a pure function of the form: submitting it
+ * twice — a double tap, a retry on a flaky connection — produces the same 21 ids, which
+ * `insertNewEvents` resolves to one log through `on conflict do nothing` (invariant 6).
+ *
+ * The last three hex digits of the submission uuid are replaced by the index. They carry no
+ * meaning: the version nibble (character 14) and the variant nibble (character 19) are further
+ * left, so the result is still a well-formed uuid — which `matchEventInputSchema` insists on.
+ */
+export function retroEventId(submissionId: string, index: number): string {
+  const suffix = clamp(Math.floor(index), 0, 0xfff).toString(16).padStart(3, "0");
+  return `${submissionId.slice(0, 33)}${suffix}`.toLowerCase();
+}
+
+/**
+ * The submission id itself, derived from **what is being submitted** rather than drawn at random.
+ *
+ * This is the load-bearing half of invariant 6 for this screen, and it replaces a hidden field
+ * holding a `crypto.randomUUID()`. Three things fall out of it:
+ *
+ * - a retry is a retry. The same sheet posted twice — a double tap, a browser replaying a POST, a
+ *   response lost on the way back — yields the same submission id, hence the same `client_event_id`s,
+ *   hence one log. A random uuid held in client state survives a double tap but not a page restored
+ *   from the back-forward cache;
+ * - a *different* sheet is a different submission, so nothing is ever silently swallowed as a
+ *   duplicate of something the coach did not type;
+ * - it is the same on the server and in the browser, which a random uuid in a hidden input is not:
+ *   the two would disagree and React would report a hydration mismatch on every load of the form.
+ *
+ * FNV-1a, four times over the same seed with four different offset bases. Not a cryptographic hash
+ * and not meant to be one — a collision would mean two *different* sheets for the same match hashing
+ * together, and the sheet is re-read from the database before anything is written. The version and
+ * variant nibbles are forced, so the result is a well-formed uuid for `matchEventInputSchema`.
+ */
+export function retroSubmissionId(parts: readonly (string | number | null | undefined)[]): string {
+  const seed = parts.map((part) => (part === null || part === undefined ? "" : part)).join("");
+  const words = [0x811c9dc5, 0x01000193, 0x9e3779b9, 0x85ebca6b].map((base) => fnv1a(seed, base));
+  const hex = words.map((word) => word.toString(16).padStart(8, "0")).join("");
+
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `4${hex.slice(13, 16)}`,
+    `8${hex.slice(17, 20)}`,
+    hex.slice(20, 32),
+  ].join("-");
+}
+
+function fnv1a(input: string, base: number): number {
+  let hash = base >>> 0;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+/**
+ * The seed of a whole retro entry: everything that changes what the log will say, and nothing else.
+ *
+ * The row keys are deliberately left out — they are DOM bookkeeping, and re-adding a row the coach
+ * deleted must not turn an identical sheet into a different submission.
+ */
+export function retroEntrySeed(matchId: string, entry: Omit<RetroEntry, "submissionId">): string {
+  return [
+    matchId,
+    entry.lineupId ?? "",
+    entry.periods.periodsCount ?? "",
+    entry.periods.periodMinutes ?? "",
+    entry.starters.map((starter) => `${starter.slotId}=${starter.memberId}`).join(","),
+    entry.changes.map((change) => `${change.outId}>${change.inId}@${change.minute ?? "?"}`).join(","),
+    entry.facts
+      .map((fact) => `${fact.type}:${fact.memberId ?? ""}:${fact.assistId ?? ""}@${fact.minute ?? "?"}`)
+      .join(","),
+  ].join("|");
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reducing what was built                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The synthesised batch as `reduceMatch` wants it.
+ *
+ * The score, the minutes and the clean sheets of a retro-entered match are **not** computed here:
+ * they are read back out of the reducer, exactly like a live match's (invariant 2). The form uses
+ * this to show the coach the score his entry implies before he saves it, and the Server Action uses
+ * it to refuse a log that would reduce with anomalies. `client_event_id` stands in for `id`, which
+ * the database has not handed out yet, and the array index for `seq`, which is what the insert will
+ * assign.
+ */
+export function retroEventRecords(
+  events: readonly MatchEventInput[],
+): readonly MatchEventRecord[] {
+  return events.map((event, index) => ({
+    id: event.clientEventId,
+    clientEventId: event.clientEventId,
+    type: event.type,
+    period: event.period,
+    minute: event.minute,
+    clockMs: event.clockMs,
+    occurredAt: event.occurredAt,
+    payload: event.payload,
+    voidsEventId: event.voidsEventId ?? null,
+    seq: index,
+  }));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Small helpers                                                              */
+/* -------------------------------------------------------------------------- */
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+/** The nearest whole minute inside `[minMs, maxMs]`: stamps stay readable, `12’` not `12’34″`. */
+function snapToMinute(atMs: number, minMs: number, maxMs: number): number {
+  return clamp(minuteToClockMs(Math.round(atMs / MS_PER_MINUTE)), minMs, maxMs);
+}

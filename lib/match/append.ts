@@ -18,6 +18,11 @@ import "server-only";
  * It returns a status and a body rather than throwing, because its only caller is an API route
  * talking to a queue: the outbox has to be able to tell "retry in ten seconds" from "this will
  * never work, show it to the coach", and an HTTP status is how it does that.
+ *
+ * Two ways in, one insert. `appendMatchEvents` is game mode writing as the match happens;
+ * `amendMatchEvents` is the coach entering or correcting a match that is already over (M7). They
+ * differ in *who* may write and in *when* — not in how, which is the point: a retro-entered match
+ * and a live-recorded one leave logs no consumer can tell apart.
  */
 
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -121,6 +126,158 @@ export async function appendMatchEvents(actor: Actor, raw: unknown): Promise<App
   revalidatePath("/calendrier");
 
   return respond(matchId, events, stored);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Amending: writing to a match that is already over                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Why an amendment was refused, in French. Separate from `INGEST_ERRORS` because the situations are
+ * different — nobody here is an "operator", and there is no outbox to retry: the coach is looking at
+ * the screen (decision 012).
+ */
+export const AMEND_ERRORS = {
+  forbidden: "Seul un coach peut corriger un match joué.",
+  notFound: "Ce match n’existe pas dans cette équipe.",
+  malformed: "Cette correction est invalide et n’a pas été enregistrée.",
+  unknownTarget: "L’action à annuler n’appartient pas à ce match.",
+  voidOfVoid: "Une annulation ne s’annule pas : ajoute l’action corrigée à la place.",
+  alreadyVoided: "Cette action a déjà été annulée.",
+} as const;
+
+/**
+ * Append to a match that is no longer live: retro-entry of a whole match, and corrections to a
+ * finished one.
+ *
+ * Everything `appendMatchEvents` guarantees still holds — one insert path, `seq` under the same row
+ * lock, idempotency on `client_event_id` — with three differences that are the whole of M7:
+ *
+ * 1. the permission is `match:amend`, which is coach-only. Game mode's operator may be a delegate
+ *    for the afternoon (decision 004); rewriting history two weeks later is not delegated.
+ * 2. `status = "finished"` is not a refusal. It is the normal case.
+ * 3. a `VOID` is checked against the log before it is written: its target must exist in **this**
+ *    match, must not itself be a `VOID`, and must not already be annulled. `reduceMatch` reports
+ *    those as anomalies rather than crashing, which is right for reading an old log and wrong for
+ *    accepting a new write — a refusal the coach can act on beats a timeline with a warning in it.
+ *
+ * `match_player_stats` is re-frozen whenever the match is finished, so the season table and the
+ * recap agree the moment the correction lands (decision 034).
+ */
+export async function amendMatchEvents(actor: Actor, raw: unknown): Promise<AppendResult> {
+  const parsed = matchEventBatchSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: AMEND_ERRORS.malformed,
+        issues: parsed.error.issues.map((issue) => issue.message),
+      },
+    };
+  }
+
+  const { matchId, events } = parsed.data;
+
+  const [match] = await db
+    .select({
+      id: matches.id,
+      teamId: matches.teamId,
+      status: matches.status,
+      operatorUserId: matches.operatorUserId,
+    })
+    .from(matches)
+    .where(eq(matches.id, matchId))
+    .limit(1);
+
+  if (!match) return fail(404, AMEND_ERRORS.notFound);
+
+  // Invariant 4. Coach-only, and not overridable by being the match's operator.
+  if (!can(actor, "match:amend", { teamId: match.teamId })) {
+    return fail(403, AMEND_ERRORS.forbidden);
+  }
+
+  const clientEventIds = events.map((event) => event.clientEventId);
+  let stored = await selectStored(clientEventIds);
+
+  const foreign = stored.filter((row) => row.matchId !== matchId);
+  if (foreign.length > 0) return fail(409, AMEND_ERRORS.notFound);
+
+  // Invariant 6, and the reason a retro entry carries a submission id: the coach double-tapping
+  // « Enregistrer » on a slow phone must not enter the match twice.
+  const known = new Set(stored.map((row) => row.clientEventId));
+  if (clientEventIds.every((id) => known.has(id))) return respond(matchId, events, stored);
+
+  const targetIssue = await checkVoidTargets(matchId, events);
+  if (targetIssue) return fail(409, targetIssue);
+
+  await insertNewEvents(matchId, actor.userId, events, stored);
+  stored = await selectStored(clientEventIds);
+
+  const effects = batchEffects(events);
+  await applyEffects(matchId, actor, match.status, match.operatorUserId, events, stored, effects);
+
+  /*
+   * Re-freeze. A correction to a finished match changes what `reduceMatch` derives, and
+   * `match_player_stats` is a cache of exactly that — leaving it stale is how `/stats` and the recap
+   * come to disagree about the same match, which decision 034 exists to prevent.
+   */
+  if (effects.endsMatch || match.status === "finished") {
+    await finalizeMatchById(match.teamId, matchId);
+  }
+
+  revalidatePath(`/match/${matchId}`);
+  revalidatePath(`/match/${matchId}/jeu`);
+  revalidatePath(`/match/${matchId}/recap`);
+  revalidatePath(`/match/${matchId}/saisie`);
+  revalidatePath("/stats");
+  revalidatePath("/calendrier");
+
+  return respond(matchId, events, stored);
+}
+
+/**
+ * Check every `voidsEventId` in the batch against the log. Returns the French refusal, or null.
+ *
+ * One query, not one per event: an amendment carries at most a handful of voids, and a retro entry
+ * carries none at all — in which case nothing is asked of the database.
+ */
+async function checkVoidTargets(
+  matchId: string,
+  events: readonly MatchEventInput[],
+): Promise<string | null> {
+  const targetIds = [
+    ...new Set(
+      events
+        .map((event) => event.voidsEventId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+  if (targetIds.length === 0) return null;
+
+  const rows = await db
+    .select({ id: matchEvents.id, type: matchEvents.type, matchId: matchEvents.matchId })
+    .from(matchEvents)
+    .where(inArray(matchEvents.id, targetIds));
+
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  for (const id of targetIds) {
+    const row = byId.get(id);
+    // Scoped by match, so an id guessed from another team's log is indistinguishable from a typo.
+    if (!row || row.matchId !== matchId) return AMEND_ERRORS.unknownTarget;
+    if (row.type === "VOID") return AMEND_ERRORS.voidOfVoid;
+  }
+
+  // Already annulled: a second `VOID` on the same event is at best a double submission the reducer
+  // would flag as `duplicate-void`, and at worst the coach correcting a correction he cannot see.
+  const existingVoids = await db
+    .select({ voidsEventId: matchEvents.voidsEventId })
+    .from(matchEvents)
+    .where(and(eq(matchEvents.matchId, matchId), inArray(matchEvents.voidsEventId, targetIds)));
+
+  if (existingVoids.length > 0) return AMEND_ERRORS.alreadyVoided;
+
+  return null;
 }
 
 /* -------------------------------------------------------------------------- */
