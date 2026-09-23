@@ -12,7 +12,10 @@
  * compositions and every planned change in them. The demo season's next match holds eleven answers,
  * an eleven-row sheet and two compositions, and the sentence mentioned one of those. The training
  * twin said « avec les réponses déjà données » and never mentioned `training_attendance`, which a
- * coach can fill before the session because `AttendanceList` renders whether or not it is over.
+ * deletable séance can hold: decision 099 has since shut the pointage until 30 minutes before
+ * kick-off, and the delete button is offered until the séance is over, so the two windows overlap by
+ * exactly the length of a séance plus its grace. Narrow, and not empty — the count is still worth
+ * saying, because the marks inside it are the ones taken at the pitch.
  *
  * Counting is the point. « avec les disponibilités déclarées » is a category; « et avec lui 11
  * réponses de disponibilité, la feuille de match et 2 compositions » is a quantity, and a quantity is
@@ -49,7 +52,7 @@ export type MatchDeletionHolds = {
 export type TrainingDeletionHolds = {
   /** Rows in `training_availability`. */
   answers: number;
-  /** Rows in `training_attendance` — markable before the session, so possible on a deletable one. */
+  /** Rows in `training_attendance` — markable from 30 minutes before, so possible on a deletable one. */
   attendance: number;
 };
 

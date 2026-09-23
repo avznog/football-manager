@@ -2386,7 +2386,7 @@ Deliberately not listed: `match_events`, `match_player_stats` and `ratings`. The
 match holding any of them has a non-empty log, and both the page and `deleteMatch` refuse that outright
 (decision 003). Naming them would be describing a button nobody can reach.
 
-## NNN — A présence may not be recorded about an evening nobody has lived
+## 099 — A présence may not be recorded about an evening nobody has lived
 
 Decision 090 drew the line: `training_availability` holds what a player says he intends to do,
 `training_attendance` holds what the coach saw, and « pas dispo » is a declaration about a Saturday

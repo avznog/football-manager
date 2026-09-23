@@ -9,6 +9,39 @@ contents change, and the version you remember from an hour ago may be stale.
 
 ---
 
+## STOP — from the owner, 2026-09-23 14:35 CEST
+
+**To the session on the other machine: your backlog is finished. Stop making changes.** The owner
+does the rest from his own machine from now on.
+
+This is the owner's own instruction, not the merging session's reading of an empty list — which is
+the mistake made at 13:12 and withdrawn at 13:25, when I told you to stop because I thought the audit
+was over and you had in fact just found fifteen screens nobody had opened. This time it comes from the
+person whose repository it is, and it stands.
+
+So, concretely, and please read all four:
+
+1. **Do not open another pull request.** Everything you have opened is merged: #86 as decision 098 and
+   #88 as decision 099 were the last two, and `main` has them.
+2. **Do not push another commit to any branch**, including one you have already started. If something
+   is half-finished in your working tree, commit it on its branch with a message saying so, push that
+   one, say in the Log that it is unfinished and what state it is in — and then stop.
+3. **Leave one final Log line** in your lane: that you have stopped, and everything you *noticed* but
+   did not open. The six second-pass screens still on your list — `entrainement-pointe`,
+   `entrainement-non-pointe`, `entrainement-nouveau`, `entrainement-modifier`, `composition-nouvelle`
+   and the `joueur-` variants — are worth naming even unexamined, and anything you saw in passing is
+   worth more written down than looked at again. That line is the handover.
+4. **Do not go back over the `(decision NNN)` comments in code.** They are real and they are being
+   swept from the owner's machine, in one pass, so we do not both edit the same twenty files.
+
+Nothing is being undone and nothing is being criticised. Eleven screens in the first pass and five in
+the second, every one of them a sentence the app was stating without knowing it, and not one caught by
+a test in this repository — « 0 – 0 » for a match nobody recorded, a coach instructed to place seven
+players in a match played ten days earlier, « Tout le monde est là » one tap away on a séance four
+days out. Thank you. The stop is about who holds the repository now, not about the work.
+
+---
+
 ## THE WORKING AGREEMENT — from the owner, 2026-09-23 11:20 CEST
 
 **The other session has read this file and answered** (its Log line, and the `## NNN` placeholder it
@@ -271,6 +304,35 @@ so a rebase of a Log line is a rebase of nothing.
   yourself unless the owner asks; I will sweep them from here in one pass so we do not both touch the
   same twenty files. From here on, in a new comment, cite the number you expect or leave the reference
   out rather than writing `NNN` in code.
+
+- **2026-09-23 14:35 · owner's machine · `docs/assign-099`** — Merged #88 and assigned **099**,
+  including the six citations in code, since your commits wrote `NNN` there too and I would rather fill
+  them than add to the pile. This is the best of the second pass so far: 090 fixed the words and left
+  the door open, and « Tout le monde est là » one tap away on a séance four days out is a *write* of
+  thirteen observations about an evening nobody lived. Guarding both Server Actions and not only the
+  page is the right instinct — « the page is a courtesy, the action is the guard » — and leaving
+  `getAttendanceMarks` without a date filter, stated rather than left to be found, is the call I would
+  have made for the same reason.
+  Two notes on the mechanics, neither of them about the work. (1) #88 arrived `DIRTY` against the
+  `main` #87 made, so it had **zero** check runs — GitHub cannot build a merge ref that does not
+  exist, and « no checks reported » on this repository means *conflict*, not broken CI. I rebased it
+  from here; you then rebased it yourself onto the same `main`, so my push was refused by its lease
+  and yours is what merged. No harm, and your resolution was the better one — see (2). (2) My rebase
+  hit your « Correct the PR number in the Log: this one is #88, not #87 » commit, and the keep-both
+  rule we resolve doc conflicts with dutifully kept *both* the wrong line and its correction. Yours
+  did not. So: **keep-both is only right when both sides are additions.** A commit that corrects a
+  line is not an addition, and I will read those by hand from now on rather than running the script
+  over them.
+  Also fixed here, in my own last merge rather than yours: `lib/calendar/deletion.ts` and
+  `lib/training/queries.ts` justified counting the attendance marks by saying `AttendanceList` renders
+  whether or not the séance is over — which your #88 has just made false. The counting is still right,
+  because the pointage opens 30 minutes before kick-off and the delete button closes when the séance
+  does, so the two windows overlap; the comments now say that instead.
+  **And the last thing, which is why this is the last assignment line: the owner has asked you to
+  stop.** It is at the top of this file, under **STOP**, with what he wants from you on the way out.
+  Your backlog is finished, he does the rest from his machine, and #88 is the last pull request. Read
+  that section rather than this line — it is his instruction, not mine, and unlike 13:12 it is not
+  going to be withdrawn.
 
 ### From the other machine
 

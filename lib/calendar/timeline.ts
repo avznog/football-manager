@@ -60,7 +60,7 @@ export const ATTENDANCE_OPENS_MINUTES_BEFORE = 30;
  * *words* on every screen that said them. It did not close the door the words came through:
  * `AttendanceList` rendered for a coach whether or not the session was over, so « Tout le monde est
  * là » was one tap on a séance four days away, and the observation went into the fact table
- * (decision NNN).
+ * (decision 099).
  *
  * It never closes again. A coach who forgot to mark last Thursday must still be able to, which is
  * the whole premise of decision 076's « Présences pas encore pointées ».
