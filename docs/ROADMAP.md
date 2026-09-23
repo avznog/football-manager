@@ -104,12 +104,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       match nobody had recorded; `pastSectionTitleFr` keeps the narrow word for the list that earns it
       and widens it to « Déjà passé » otherwise. A past match with no score says « rien saisi » where
       the score pill rendered nothing at all — the recap's own words, shared from
-      `lib/calendar/labels.ts` (decision NNN)
+      `lib/calendar/labels.ts` (decision 088)
 - [x] Availability stops borrowing the présences vocabulary. The pinned card counted « 1 absent »
       about a player who had tapped « pas dispo » on a session three days away, and the relance card
       was titled « Relancer les absents » above its own « 4 joueurs n'ont pas répondu ». Both
       sentences are `answersLineFr` / `reminderCardFr` in `lib/calendar/timeline.ts` now, where a test
-      can read them (decision NNN)
+      can read them (decision 090)
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)
@@ -226,7 +226,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] …and the compositions of a match typed up afterwards stop being credited to a confirmation
       nobody made. A retro saisie writes `LINEUP_APPLIED` on purpose, so `applied_event_id` is set on a
       match nobody watched; `appliedNoticeFr` and `lineupsFrozenFr` take `entry_mode` and say
-      « enregistrée avec la saisie du match » where that is what happened (decision NNN)
+      « enregistrée avec la saisie du match » where that is what happened (decision 089)
 
 ## Deployment
 - [x] First-run bootstrap — `npm run db:bootstrap` writes the reference data and the one
@@ -316,7 +316,7 @@ first one live in production too.
       answered `307 /connexion` and the browser reported an invalid image, in production as much as
       locally. The exclusion is now the class of static paths rather than an enumeration, and
       `proxy.test.ts` reads `public/` at test time so a fourth file cannot break it silently
-      (decision NNN). The proxy's redirects had no test before this either
+      (decision 091). The proxy's redirects had no test before this either
 - [x] A local `docker compose up` can be logged into. It left a migrated schema with zero users and
       no way to find that out; `compose.yaml` now has a `seed` service in the `setup` profile
       (`npm run docker:seed`) for the demo season, and the header comment, the `bootstrap` comment

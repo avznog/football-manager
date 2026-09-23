@@ -1967,7 +1967,7 @@ a different question, because they cannot bring anyone on: they are told what it
 « En dehors du terrain », and given no instruction they cannot follow. The empty state stopped being
 « Personne sur le banc. » for the same reason the heading did — there is no bench in it.
 
-## NNN — « Déjà joué » over three trainings and a match nobody recorded
+## 088 — « Déjà joué » over three trainings and a match nobody recorded
 **2026-09-23** · accepted
 
 The history section of `/calendrier` was headed « Déjà joué », hard-coded, over a list that is not a
@@ -1997,7 +1997,7 @@ written first and thrown away for exactly that reason.
 Not « 0 – 0 », for the reason decision 013 gives and decision 061 repeats: a match that ended nil-nil
 and a match nobody wrote down are two different facts, and only one of them is known.
 
-## NNN — A saisie is not a confirmation
+## 089 — A saisie is not a confirmation
 **2026-09-23** · accepted
 
 `lib/retro/log.ts` writes a `LINEUP_APPLIED` at 0′ when a match is typed up after the fact, and it is
@@ -2027,7 +2027,7 @@ The « appliquée » badge on the card is deliberately left alone. It is the vag
 false: that composition *was* applied, by the event in the log. What it must not do is explain, and it
 does not.
 
-## NNN — Availability is an intention, présences are a fact, and they do not share words
+## 090 — Availability is an intention, présences are a fact, and they do not share words
 
 The calendar's pinned card counted « 7 dispo · **1 absent** · 1 peut-être · 4 sans réponse » for the
 26 September training, three days before anybody could be absent from it. One line below, on the
@@ -2057,7 +2057,7 @@ Both sentences moved to `answersLineFr` and `reminderCardFr` in `lib/calendar/ti
 inline JSX, which is to say untestable: Vitest collects `lib/**` and `db/**` and nothing under
 `app/`, so a claim written in a component is a claim no test can read.
 
-## NNN — A route guard's exclusion list is derived from the file class, never enumerated
+## 091 — A route guard's exclusion list is derived from the file class, never enumerated
 **2026-09-23** · accepted
 
 `proxy.ts`'s matcher excluded static assets by naming them: `favicon.ico`, `icon.svg`,

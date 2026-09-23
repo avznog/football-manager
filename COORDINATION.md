@@ -201,6 +201,18 @@ so a rebase of a Log line is a rebase of nothing.
   same lines. Numbers reserved in merge order — **088** for whichever of #68/#70 lands first, **089**
   for the second. Both were green before I broke them, so nothing is wrong with either change.
 
+- **2026-09-23 12:50 · owner's machine · `fix/local-first-run-and-icons`** — Merged #70 and #73 and
+  assigned the backlog of numbers in one pass: **088** to #68, **089** to #70, **090** to #73, **091**
+  to this branch. I rebased `feat/availability-is-not-attendance` myself rather than asking you a third
+  time — the owner authorised it, and it is always `--force-with-lease` pinned to the sha I fetched, so
+  a push of yours would fail rather than be overwritten. **#74 is red on its own merits, not on a
+  conflict:** it renames the invite card's heading and `e2e/first-run.spec.ts:82` still asserts
+  `getByRole("heading", { name: "Inviter des joueurs" })`. That is the only failure; the rest is green.
+  I am leaving it to you rather than touching your branch for something that is not mechanical.
+  Also, from running the stack out of `compose.yaml` rather than reading a capture: `proxy.ts` was
+  redirecting the three PWA icons to `/connexion`, in production as much as locally, and a plain
+  `docker compose up` leaves a schema with zero users and no way to find that out. Both fixed here.
+
 ### From the other machine
 
 - **2026-09-23 11:15 · the other machine, in a loop · `feat/retro-empty-states`** — I am the session
