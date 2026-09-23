@@ -141,6 +141,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       pointées » in a season of two, with Brice credited 1/3 where the truth is 0/2. `attendanceIsOpen`
       opens the pointage 30 minutes before kick-off and never closes it; both Server Actions refuse
       outside the window, and the card says what to use meanwhile (decision 099)
+- [x] A match says where it is played, everywhere it is named. `matches.is_home` had existed since
+      the first migration and the form had always asked for it, and two badges printed it — every
+      other surface printed the bare opponent, so a season of calendar rows read identically, `/stats`
+      hid the fact in a `title` attribute (nowhere, on a phone — decision 072), game mode's final
+      whistle and the availability control said « contre » about matches played away, and the WhatsApp
+      reminder never mentioned the ground at all. « contre X » at home, « à X » away, derived in
+      `lib/calendar/labels.ts` (decision 103)
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)

@@ -12,11 +12,12 @@ import {
   attendanceLineFr,
   AVAILABILITY_LABELS,
   COMPETITION_LABELS,
+  matchNameFr,
   NOT_RECORDED_FR,
   resultLabel,
   resultLetter,
   scoreLineFr,
-  venueSideLabel,
+  venuePhraseFr,
 } from "@/lib/calendar/labels";
 import { capitalizeFirst } from "@/lib/calendar/time";
 import type { AvailabilityCounts, CalendarMatch, CalendarTraining } from "@/lib/calendar/timeline";
@@ -122,20 +123,24 @@ export function PastMatchResult({ match }: { match: CalendarMatch }) {
   return <ScorePill match={match} />;
 }
 
-/** « Championnat · à domicile · Stade des Tilleuls ». */
+/** « Championnat · à domicile, Stade des Tilleuls » — `venuePhraseFr` keeps the two together. */
 export function matchSubtitle(match: CalendarMatch): string {
-  return [
-    COMPETITION_LABELS[match.competition],
-    venueSideLabel(match.isHome),
-    match.venue,
-  ]
-    .filter((part): part is string => Boolean(part))
-    .join(" · ");
+  return [COMPETITION_LABELS[match.competition], venuePhraseFr(match.isHome, match.venue)].join(
+    " · ",
+  );
 }
 
-/** The name of the fixture, as the coach says it: « Étoile du Parc ». */
+/**
+ * The name of the fixture, as the coach says it: « Contre Étoile du Parc », « À Étoile du Parc ».
+ *
+ * The row's own line, not the subtitle under it. A list of a season's matches printed the bare
+ * opponent's name, so every row read the same whether the team travelled or received — and the
+ * subtitle that did say so is 12 px and truncates. The preposition is on the line nothing truncates,
+ * and capitalised because it is a heading: the first letter is the difference, so it is the letter
+ * the eye lands on down a column of rows.
+ */
 export function matchTitle(match: CalendarMatch): string {
-  return match.opponentName;
+  return capitalizeFirst(matchNameFr(match.opponentName, match.isHome));
 }
 
 /** « Gymnase Jean-Moulin » or the session's note, whichever there is. */

@@ -9,11 +9,17 @@ import {
   departedMarksNoteFr,
   entryModeBadgeFr,
   matchLengthHintFr,
+  matchNameFr,
+  matchReminderTitleFr,
   periodsLabel,
   resultLabel,
   resultLetter,
   scoreLineFr,
   unmarkedSessionNoteFr,
+  venueFieldHintFr,
+  venuePhraseFr,
+  venueSideLabel,
+  venueSideShortLabel,
 } from "./labels";
 
 describe("entryModeBadgeFr", () => {
@@ -66,6 +72,62 @@ describe("the labels the match header shares with the calendar", () => {
     // An en dash, not a hyphen: it is a score, not a range of two numbers.
     expect(scoreLineFr(1, 1)).toContain("–");
     expect(scoreLineFr(1, 1)).not.toContain("-");
+  });
+});
+
+describe("home and away, in words", () => {
+  /*
+   * The defect this suite exists for: « il n'y a pas de différence entre les matches à domicile ou à
+   * l'extérieur ». `matches.is_home` had been in the database since the first migration and the app
+   * printed the bare opponent's name everywhere but two badges, so half the season read identically.
+   */
+  it("names a fixture with the preposition that says whose ground it is", () => {
+    expect(matchNameFr("Étoile du Parc", true)).toBe("contre Étoile du Parc");
+    expect(matchNameFr("Étoile du Parc", false)).toBe("à Étoile du Parc");
+  });
+
+  it("keeps the two spellings of the side in one place", () => {
+    expect(venueSideLabel(true)).toBe("à domicile");
+    expect(venueSideLabel(false)).toBe("à l’extérieur");
+    expect(venueSideShortLabel(true)).toBe("Dom.");
+    expect(venueSideShortLabel(false)).toBe("Ext.");
+  });
+
+  /*
+   * A venue never appears without the side that gives it its meaning, and a missing venue never
+   * silences the side: « Stade du Parc » alone does not say whose pitch it is, and a coach who left
+   * the field empty has still said the match is at home.
+   */
+  it("always leads with the side and only appends the pitch", () => {
+    expect(venuePhraseFr(true, "Stade des Tilleuls")).toBe("à domicile, Stade des Tilleuls");
+    expect(venuePhraseFr(false, "Stade du Parc")).toBe("à l’extérieur, Stade du Parc");
+    expect(venuePhraseFr(true, null)).toBe("à domicile");
+    expect(venuePhraseFr(false, null)).toBe("à l’extérieur");
+  });
+
+  it("asks for the right pitch on the form", () => {
+    expect(venueFieldHintFr(true)).toBe("Le terrain où tu reçois.");
+    expect(venueFieldHintFr(false)).toBe("Le terrain de l’adversaire.");
+  });
+
+  it("tells the WhatsApp group where the match is played", () => {
+    expect(
+      matchReminderTitleFr({
+        opponentName: "Étoile du Parc",
+        competitionFr: "Championnat",
+        isHome: false,
+        venue: "Stade du Parc",
+      }),
+    ).toBe("Étoile du Parc (championnat) · à l’extérieur, Stade du Parc");
+
+    expect(
+      matchReminderTitleFr({
+        opponentName: "CS Morvan",
+        competitionFr: "Coupe",
+        isHome: true,
+        venue: null,
+      }),
+    ).toBe("CS Morvan (coupe) · à domicile");
   });
 });
 

@@ -30,6 +30,8 @@ import {
   COMPETITION_LABELS,
   entryModeBadgeFr,
   MATCH_STATUS_LABELS,
+  matchNameFr,
+  matchReminderTitleFr,
   periodsLabel,
   resultLabel,
   scoreLineFr,
@@ -117,7 +119,14 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
     answers.find((answer) => answer.teamMemberId === team.membershipId)?.status ?? null;
 
   const reminder = buildReminderMessage({
-    title: `${match.opponentName} (${COMPETITION_LABELS[match.competition].toLocaleLowerCase("fr-FR")})`,
+    // The group chat is being asked « dispo ? », and the next question is always *where*: the side
+    // and the pitch travel with the opponent's name (`matchReminderTitleFr`).
+    title: matchReminderTitleFr({
+      opponentName: match.opponentName,
+      competitionFr: COMPETITION_LABELS[match.competition],
+      isHome: match.isHome,
+      venue: match.venue,
+    }),
     when: formatWhen(kickoff, now),
     pending: tally.pending,
   });
@@ -184,7 +193,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
             teamId={team.id}
             eventId={match.id}
             value={myAnswer}
-            legend={`Ta disponibilité contre ${match.opponentName}`}
+            legend={`Ta disponibilité pour le match ${matchNameFr(match.opponentName, match.isHome)}`}
           />
         </Card>
       ) : null}

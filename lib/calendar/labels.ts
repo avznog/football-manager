@@ -95,6 +95,68 @@ export function venueSideShortLabel(isHome: boolean): string {
 }
 
 /**
+ * How a team names one of its own fixtures: « contre Étoile du Parc » at home, « à Étoile du Parc »
+ * away.
+ *
+ * This is the one place the two are told apart in a heading, and it is a preposition rather than a
+ * badge because that is what fits: on the calendar row the fixture is a single truncating line at
+ * 390 px, and « à » instead of « contre » costs five characters while a pill costs forty. It is also
+ * how the coach says it out loud, which is the test that matters for a tool a dozen people use on a
+ * Sunday morning.
+ *
+ * Every screen that prints an opponent's name inside a sentence goes through here, so the app cannot
+ * say « contre » about a match played at the opponent's ground — which it did, on `/stats`, in game
+ * mode's final whistle and in the availability control's own label.
+ */
+export function matchNameFr(opponentName: string, isHome: boolean): string {
+  return `${isHome ? "contre" : "à"} ${opponentName}`;
+}
+
+/**
+ * Where the match is played, in one phrase: « à domicile, Stade des Tilleuls ».
+ *
+ * `venue` is free text and optional, and the two fields have to be read together or not at all. A
+ * bare venue says nothing about *whose* ground it is — « Stade du Parc » is our pitch or theirs
+ * depending on a boolean the row never showed — and a venue nobody filled in is not a reason to say
+ * nothing: « à domicile » on its own is still true and still the fact the reader came for. So the
+ * side always leads, and the venue is only ever the detail appended to it.
+ */
+export function venuePhraseFr(isHome: boolean, venue: string | null): string {
+  const side = venueSideLabel(isHome);
+  return venue ? `${side}, ${venue}` : side;
+}
+
+/**
+ * What « Terrain » means on the match form, which depends on the side chosen just above it.
+ *
+ * The field used to sit under the home/away control with no hint at all, and the two could be filled
+ * in to tell different stories — the opponent's ground typed on a match marked « à domicile ». The
+ * form cannot verify a free-text pitch name, but it can say which one it is asking for.
+ */
+export function venueFieldHintFr(isHome: boolean): string {
+  return isHome ? "Le terrain où tu reçois." : "Le terrain de l’adversaire.";
+}
+
+/**
+ * The first line of the WhatsApp reminder: « Étoile du Parc (championnat) · à l’extérieur, Stade du
+ * Parc ».
+ *
+ * The message is pasted into a group of a dozen players who are deciding whether to come, and the
+ * question right behind « dispo ? » is *where*. It used to carry the opponent, the competition and
+ * the kick-off, and nothing at all about the ground — the one thing the app knows that the group
+ * chat does not.
+ */
+export function matchReminderTitleFr(match: {
+  opponentName: string;
+  competitionFr: string;
+  isHome: boolean;
+  venue: string | null;
+}): string {
+  const competition = match.competitionFr.toLocaleLowerCase("fr-FR");
+  return `${match.opponentName} (${competition}) · ${venuePhraseFr(match.isHome, match.venue)}`;
+}
+
+/**
  * A scoreline: **our goals first, always**, whether the match was at home or away.
  *
  * There is no `isHome` parameter, and that is the decision this function exists to hold. Two

@@ -33,7 +33,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
-import { periodsLabel } from "@/lib/calendar/labels";
+import { matchNameFr, periodsLabel } from "@/lib/calendar/labels";
 import { getRetroView } from "@/lib/retro/queries";
 import { RetroCorrections } from "./_components/retro-corrections";
 import { RetroForm } from "./_components/retro-form";
@@ -87,6 +87,7 @@ export default async function SaisiePage({ params, searchParams }: PageProps<"/m
         </h1>
         <p className="text-sm text-ink-muted">
           {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)} ·{" "}
+          {matchNameFr(view.match.opponentName, view.match.isHome)} ·{" "}
           {periodsLabel(view.match.periodsCount, view.match.periodMinutes)}
         </p>
       </header>
