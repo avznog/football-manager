@@ -1,0 +1,33 @@
+# Everything the build context does not need. Keeping node_modules out matters twice: the context
+# is small, and the image installs Linux binaries from the lockfile instead of copying a macOS tree.
+.git
+.github
+node_modules
+.next
+out
+build
+coverage
+test-results
+playwright-report
+blob-report
+playwright/.cache
+audit
+.vercel
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+Dockerfile
+.dockerignore
+compose.yaml
+docs
+e2e
+instructions.md
+README.md
+AGENTS.md
+CLAUDE.md
+
+# Never bake a developer's secrets into an image. `.env.example` stays, it is documentation.
+.env
+.env.*
+!.env.example
