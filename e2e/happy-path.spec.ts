@@ -224,12 +224,12 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     // the pitch is empty until the coach confirms it.
     const prompt = promptCard(page, "Composition de départ");
     await expect(prompt).toContainText(
-      "Proposée, pas appliquée : rien ne change avant votre confirmation.",
+      "Proposée, pas appliquée : rien ne change avant ta confirmation.",
     );
     // The empty pitch says why it is empty, and it is not « aucune composition enregistrée » — one is
     // saved and is on screen right above this line. That copy is what this assertion used to pin.
     await expect(page.getByText("Personne n’est encore sur le terrain.")).toBeVisible();
-    await expect(page.getByText("attend votre confirmation")).toBeVisible();
+    await expect(page.getByText("attend ta confirmation")).toBeVisible();
     await expect(page.getByText("Aucune composition enregistrée.")).toHaveCount(0);
     await expect(onPitch).toHaveCount(0);
 
