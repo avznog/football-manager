@@ -23,6 +23,7 @@ import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { MATCH_STATUS_LABELS } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
+import { countSquadRoles, sheetNextStepFr } from "@/lib/composition/plan";
 import { getCompositionMembers, getFieldedMemberIds } from "@/lib/composition/queries";
 import { getMatch, getMatchAnswers } from "@/lib/match/queries";
 
@@ -73,6 +74,10 @@ export default async function MatchSheetPage({
   const kickoff = new Date(match.kickoffAt);
   const now = new Date();
 
+  // « Et maintenant ? » used to say « Le groupe est fait » on a sheet nobody had touched, and told
+  // the coach to place seven players on a match played a fortnight ago (decision 083).
+  const nextStep = sheetNextStepFr(countSquadRoles(sheetMembers), match.status);
+
   return (
     <div className="space-y-4">
       <header className="space-y-1">
@@ -105,13 +110,17 @@ export default async function MatchSheetPage({
         justSaved={query.enregistre === "1"}
       />
 
-      <Card
-        title="Et maintenant ?"
-        description="Le groupe est fait : place les sept sur le terrain."
-      >
-        <ButtonLink href={`/match/${match.id}/composition`} variant="secondary">
-          Compositions
-        </ButtonLink>
+      <Card title="Et maintenant ?" description={nextStep.description}>
+        {nextStep.cta === "composition" ? (
+          <ButtonLink href={`/match/${match.id}/composition`} variant="secondary">
+            Compositions
+          </ButtonLink>
+        ) : null}
+        {nextStep.cta === "recap" ? (
+          <ButtonLink href={`/match/${match.id}/recap`} variant="secondary">
+            Résumé du match
+          </ButtonLink>
+        ) : null}
       </Card>
     </div>
   );

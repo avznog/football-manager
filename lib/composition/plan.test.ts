@@ -14,6 +14,7 @@ import {
   planInForceBefore,
   planTitleFr,
   sortPlans,
+  sheetNextStepFr,
   squadRoleLabelFr,
   squadSummaryFr,
   suggestNextMinute,
@@ -362,5 +363,70 @@ describe("the match sheet in words", () => {
     expect(squadRoleLabelFr("substitute")).toBe("Remplaçant");
     expect(squadRoleLabelFr("supporter")).toBe("Supporter");
     expect(squadRoleLabelFr(null)).toBe("Hors feuille");
+  });
+});
+
+describe("sheetNextStepFr", () => {
+  const counts = (starters: number) => ({
+    starters,
+    substitutes: 0,
+    supporters: 0,
+    unselected: 13 - starters,
+  });
+
+  it("does not say the group is made on a sheet nobody has touched", () => {
+    const step = sheetNextStepFr(counts(0), "scheduled");
+
+    expect(step.description).not.toContain("Le groupe est fait");
+    expect(step.description).toContain("Personne n’est encore titulaire");
+  });
+
+  it("offers no composition link when there would be nobody to place", () => {
+    expect(sheetNextStepFr(counts(0), "scheduled").cta).toBeNull();
+  });
+
+  it("says how many titulaires are missing, and still lets the coach start placing", () => {
+    const step = sheetNextStepFr(counts(4), "scheduled");
+
+    expect(step.description).toContain("4 titulaires sur 7");
+    expect(step.description).toContain("il en manque 3");
+    expect(step.cta).toBe("composition");
+  });
+
+  it("agrees in number for a single titulaire", () => {
+    const step = sheetNextStepFr(counts(1), "scheduled");
+
+    expect(step.description).toContain("1 titulaire sur 7");
+    expect(step.description).toContain("celui-là");
+    expect(step.description).not.toContain("ceux-là");
+  });
+
+  it("says the group is made only when seven are ticked", () => {
+    expect(sheetNextStepFr(counts(7), "scheduled").description).toBe(
+      "Le groupe est fait : place les sept sur le terrain.",
+    );
+  });
+
+  /** Nothing caps the starters, so nine of them is reachable — and « place les sept » was a lie. */
+  it("says by how much a sheet is over seven, rather than naming a seven that does not exist", () => {
+    const step = sheetNextStepFr(counts(9), "scheduled");
+
+    expect(step.description).toContain("9 titulaires cochés pour 7 places");
+    expect(step.description).toContain("2 de trop");
+    expect(step.description).not.toContain("place les sept");
+  });
+
+  it("stops giving instructions once the match is played, whatever the sheet says", () => {
+    for (const starters of [0, 4, 7, 9]) {
+      const step = sheetNextStepFr(counts(starters), "finished");
+
+      expect(step.description).toContain("Le match est joué");
+      expect(step.description).not.toContain("place");
+      expect(step.cta).toBe("recap");
+    }
+  });
+
+  it("treats a live match like one still to compose: invariant 3 makes a plan a proposal", () => {
+    expect(sheetNextStepFr(counts(7), "live").cta).toBe("composition");
   });
 });
