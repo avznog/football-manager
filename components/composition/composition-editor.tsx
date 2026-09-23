@@ -92,6 +92,7 @@ import {
   placeInSlot,
   remapToShape,
   removeMember,
+  slotOfMember,
   sortAssignments,
   type SlotAssignment,
 } from "@/lib/composition/editor";
@@ -340,21 +341,45 @@ export function CompositionEditor(props: CompositionEditorProps) {
   function place(slotKey: string, memberId: string) {
     const occupant = memberInSlot(assignments, slotKey);
     const slot = shape.find((candidate) => candidate.key === slotKey);
+    // Where he comes *from* decides the sentence: two players on the turf trade posts, while a player
+    // off the bench replaces the one standing there, who goes back to it. `placeInSlot` has always
+    // done both; only the announcement used to call them the same thing.
+    const fromPitch = slotOfMember(assignments, memberId) !== null;
     setAssignments((current) => placeInSlot(current, slotKey, memberId));
     setSelection(null);
     setAnnouncement(
       occupant && occupant !== memberId
-        ? `${nameOf(memberId)} et ${nameOf(occupant)} échangent leurs postes.`
+        ? fromPitch
+          ? `${nameOf(memberId)} et ${nameOf(occupant)} échangent leurs postes.`
+          : `${nameOf(memberId)} remplace ${nameOf(occupant)}.`
         : `${nameOf(memberId)} est placé ${slot ? atPositionFr(slot.positionCode) : "sur le terrain"}.`,
     );
   }
 
-  /** Tapping a player picks him up, or puts him down if he was already picked up. */
+  /**
+   * Tapping a player picks him up, puts him down if he was already picked up — or, if someone else
+   * is already picked up and this one is standing on the turf, **replaces him**.
+   *
+   * That last branch is the gesture the pre-filled editor exists for (decision 106). Dropping a disc
+   * onto an occupied post has always swapped the two (`placeInSlot`), but the *tap* path — the one
+   * the screen leads with, and the one that works when the bench is a scrolling strip — only ever
+   * changed the selection: tapping the outgoing player put the incoming one down again, so a coach
+   * planning one substitution had to empty the post first and find the free slot. Now the two taps
+   * read as one sentence: this one comes on, for that one.
+   */
   function tapPlayer(memberId: string) {
     if (selection?.kind === "member" && selection.id === memberId) {
       setSelection(null);
       setAnnouncement(`${nameOf(memberId)} n’est plus sélectionné.`);
       return;
+    }
+
+    if (selection?.kind === "member") {
+      const occupied = slotOfMember(assignments, memberId);
+      if (occupied !== null) {
+        place(occupied, selection.id);
+        return;
+      }
     }
     setSelection({ kind: "member", id: memberId });
     setAnnouncement(`${nameOf(memberId)} sélectionné. Appuie sur un poste pour le placer.`);
