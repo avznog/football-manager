@@ -1024,3 +1024,36 @@ top of the same page already
 names it — « 1 match terminé sans aucun évènement saisi : ils ne sont comptés nulle part » — so the
 figure is explained on the screen it appears on, and the two numbers are answers to different questions
 rather than one number that is wrong. Recorded here so the next session does not re-open it.
+
+## Seven sentences delivered to nobody
+
+Reading `audit/wave6/light-joueur-stats-1.png` raised a question — why does a player card say
+« MATCHS 6 » above « 7 titulaire »? — and the answer turned out to be that the app had written the
+explanation and then hidden it.
+
+**`title` is not a way of telling anybody anything.** `Figure`, the label/value pair every card on
+`/stats` and on a player's profile is built from, put its `hint` in a `title` attribute: a tooltip
+that needs a mouse to rest on it. On the phone this app exists for, « 7 matchs sur la feuille »,
+« moyenne sur 4 notes », « présences / séances pointées » and three more had never been read by
+anyone. Hints are printed now, under their value — and each was re-judged on the way out rather than
+just revealed, because a column is about 110 px wide: the two that are really sentences moved into
+the `Note` under their card (the keepers' card was already saying one of them in full), the rest were
+cut to « sur 4 notes », « séances pointées », « sur 2 matchs », « sans encaisser », and the sheet
+total went to the full-width appearances line, which is the one place it fits (decision 072).
+
+That last one is the answer to the question that started this. « MATCHS 6 · 7 matchs sur la feuille ·
+7 fois titulaire » is now readable in one glance: a match counts when you have minutes in it, a
+selection is a name on a sheet, and the demo season's one unrecorded match gives nobody a minute.
+
+**« 7 titulaire ».** The same line was also ungrammatical, and the profile card three taps away said
+« 7 fois titulaire » from its own hand-built copy of the same list. One function now, `appearancesLineFr`
+in `lib/stats/format.ts`, with the « N fois » shape that needs no agreement — and in `lib/` because
+Vitest does not collect `app/` (decision 073).
+
+Verified by looking, at 390 px: `/stats` in both themes and both roles, the two sorts the audit script
+does not visit (`?tri=rating` and `?tri=attendance`, where the hint sits under the promoted figure
+beside the name), and a profile in dark mode. The `joueur` role is where the change pays best — Léo
+reads « 7,5 · sur 2 notes » there against the coach's « 7,0 · sur 4 notes », because decision 007 is
+holding two matches back from him, and until now nothing said so beside the figure.
+
+868 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.
