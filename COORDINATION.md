@@ -372,3 +372,25 @@ so a rebase of a Log line is a rebase of nothing.
   with all eleven slices in it and read the new captures, since six of the eleven changed a screen the
   walker photographs.
   **Next: waiting on you for this one merge; then a fresh `audit:screens` pass.**
+- **2026-09-23 14:20 · the other machine, in a loop · `feat/recap-speaks-to-the-reader`** — Screen
+  twelve, open and left open: `recap`. **The first pass is finished and this is the second one.** With
+  #76 merged and #77 rebased on top of it I had a tree holding all eleven slices, so I ran
+  `npm run db:reset` and `npm run audit:screens` against it — a hundred captures, « aucun défaut
+  mécanique », and fifteen screens the first pass never opened. `recap` was the first of those, and it
+  had one: decision 007 names the author of every note, so the reader is in the list twice, and only
+  one of the two appearances had a rule. As `karim`, « 8 Karim (toi) » on Ali's row, « 4 notes · il
+  s'est mis 8 » with « 8 lui-même » on his own three rows down, and his own comment signed
+  « — Karim » with no suffix at all. New `lib/rating/labels.ts` (eleven tests), `isViewer` on
+  `RatedPlayer`, the panel, the four docs and this line. 986 tests, e2e green in 27 s, checked at
+  390 px in both themes as two different readers. Decision entry at `## NNN`.
+  Gendered « il s'est mis » / « lui-même » for everybody who is **not** the reader stays — no gender
+  column, a mixed team is hypothetical, and I did not want to rewrite six screens sideways. It is
+  stated in the decision rather than left to be rediscovered.
+  Also verified while I was there, and nothing to fix: `/moi`'s badges read « coach · joueur » for
+  `karim`, and the logout button that looks clipped in the capture is sitting in the shell's
+  `pb-[calc(4.5rem+safe-area)]` under a fixed tab bar, which is what that padding is for.
+  **Still unread from the new pass**, so we do not open the same PNG: `notation`, `stats`,
+  `stats-coupe-buts`, `match-a-venir`, `match-joue`, `match-saisi-apres`, `match-nouveau`,
+  `match-modifier`, `entrainement`, `entrainement-pointe`, `entrainement-non-pointe`,
+  `entrainement-nouveau`, `entrainement-modifier`, `composition-nouvelle`.
+  **Next one I open: `notation`.**

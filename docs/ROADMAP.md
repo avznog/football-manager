@@ -214,6 +214,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       27 septembre à 10:30 ». `closesAtMs` had been computed since M6 and read by nobody, so three
       screens promised « tu verras les notes des autres quand tu auras fini » without mentioning that
       finishing has a closing time — and `progress.ts` makes missing it permanent (decision 079)
+- [x] …and the recap's rating list calls the reader « toi » wherever he appears in it. He appears
+      twice — as the author of the notes he gave and as the subject of his own row — and only the
+      first had a rule, so his own row said « il s'est mis 8 » and « lui-même » three rows under
+      « 8 Karim (toi) », and his comment was signed a third way again. `lib/rating/labels.ts`
+      (decision NNN)
 - [x] …and a player's average is explained with the matches that hold a note about **him**. The
       profile printed the reader's own season-wide count of unfinished matches — « Les notes de
       2 matchs sont exclus de cette moyenne » where one of the two held no note about that player at

@@ -1855,3 +1855,37 @@ inlined in a Server Component is copy `vitest.config.ts` cannot see, because it 
 nothing under `app/`. Every fix in this run consisted of moving a sentence into a `…Fr()` function and
 only then discovering what it said. The cheapest future guard is the same one: a claim belongs in
 `lib/`.
+
+### « 4 notes · il s’est mis 8 », three rows under « 8 Karim (toi) »
+
+The twelfth slice, and the first of a **second** `audit/` pass: `npm run db:reset` then
+`npm run audit:screens` against a tree holding all eleven of the first pass's slices, which
+photographs a hundred screens in about a minute. The first pass had a list of eleven screens and read
+them; this one starts from the captures the first pass never opened, and `recap` is one of them.
+
+The recap's « Les notes » card names the author of every note, because decision 007 says anonymity in
+a team of thirteen only invites a 2 nobody has to own. That makes the reader a member of the list he
+is reading, twice over — and `RatingsPanel` knew about one of the two appearances.
+
+Read as `karim`, the demo season's `CS Morvan` recap said all three of these inside one card:
+
+- on Ali's row, « 8 **Karim (toi)** » — correct, and the reason the rest is jarring;
+- on Karim's own row, « 4 notes · **il** s’est mis 8 » and the chip « 8 **lui-même** »;
+- under Julien's row, his own comment signed « — **Karim** », with no « (toi) » at all, because the
+  attribution branch was written separately from the chip branch and never grew the suffix.
+
+`lib/rating/labels.ts` (new, eleven tests) answers both questions once: `noteAuthorFr` for a
+signature and `ratingCountNoteFr` for the line under a name. « toi » beats « lui-même » where both
+apply. `RatedPlayer` gained `isViewer`; the query already knew which *notes* were the viewer's and had
+no flag at all for which *row* was his, which is exactly why the row was the half that stayed in the
+third person.
+
+Verified by loading the recap at 390 px in both themes as two different readers: as `karim`, whose row
+now reads « 4 notes · tu t’es mis 8 » with « 8 toi », and as `hugo`, who sees « tu t’es mis 9 » on his
+own row and « il s’est mis 8 » with « lui-même » on Karim's. 986 tests, eleven new. `npm run test:e2e`
+green in 27 s — the happy path walks the recap, so it had to be.
+
+Left in on purpose, and written into the decision rather than quietly: « il s’est mis » and
+« lui-même » stay gendered for everybody who is not the reader. The app has no gender column, the
+question is about a team that does not exist yet, and degendering six screens on the way past a
+ratings card would be a product decision taken sideways.
