@@ -1808,3 +1808,34 @@ would have been wrong in the new place and vague in the old one.
 
 Both strings are pure functions in `lib/stats/format.ts` with tests, for the reason that keeps
 recurring: Vitest does not look under `app/`, so copy that matters has to leave the component.
+
+## 083 — An empty state describes the form, never a match
+**2026-09-23** · accepted
+
+The retro-entry sheet for a match with no planned composition opens with seven `— personne —`
+selects. Its « Changements » card said, in that state:
+
+> Aucun changement : les sept titulaires ont fini le match.
+
+Seven titulaires who had finished a match nobody had named — printed four hundred pixels above the
+same screen's own « 0 joueurs avec des minutes ». The sentence was true of the case the author had in
+front of him (a full sheet, no substitutions) and false of the case the coach actually starts from.
+
+This is decision 060 a second time. There, « ne change rien sur le terrain » was printed over an
+empty pitch. The shape is identical and worth naming as a rule: **an empty state is a statement about
+the form, not about the match.** « No rows in this card » does not license a claim about who played;
+if the sentence names a number of players, that number has to come from what is filled in. So the
+copy counts the filled slots, agrees in number, and with nothing filled it says where to start
+instead of describing a team:
+
+> Aucun changement. La composition de départ est vide : sans titulaire, il n'y a personne à remplacer.
+
+The same card's neighbour had a smaller version of the problem: « Un 0-0 sans rien à signaler, ça
+existe » wrote its scoreline by hand, with a hyphen, a few hundred pixels below the Score card's
+derived « 0 – 0 » — in a file that already imported `scoreLineFr`. Two dashes for the same thing on
+one screen is exactly what decisions 061 and 064 exist to have removed, so the sentence interpolates
+`scoreLineFr(0, 0)` like everything else.
+
+Both live in `lib/retro/labels.ts` with tests, for the reason that keeps recurring: Vitest collects
+nothing under `app/`, so copy whose truth depends on state has to leave the component before it can
+be pinned.

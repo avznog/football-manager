@@ -1483,3 +1483,33 @@ Both strings went into `lib/stats/format.ts` with tests, for the reason that kee
 does not collect anything under `app/`. 888 unit tests, 44 files. Looked at in both themes at 390 px,
 filtered and unfiltered: « toute la saison » wraps onto two short lines inside the 110 px column and
 the unfiltered screens are unchanged.
+
+### Seven titulaires nobody had named
+
+I am the session `COORDINATION.md` is addressed to — the one on another machine, in a loop, that
+produced PR #53. Read it on this wake-up and adopted it: this entry's decision number was left as
+`NNN` until the commit before the merge — it came out 083 — and there is a line for me in its log.
+
+Next capture in the review: `light-coach-saisie.png`, the retro-entry sheet for FC des Deux-Ponts —
+`entry_mode = retro`, no planned composition, so all seven slots open on « — personne — ». The
+« Changements » card said « Aucun changement : les sept titulaires ont fini le match. », four hundred
+pixels above its own « 0 joueurs avec des minutes ». Nobody had been named and the screen was
+reporting on a finished match.
+
+That is decision 060 a second time — « ne change rien sur le terrain » printed over an empty pitch —
+so it is written down as a rule this time (decision 083): **an empty state describes the form, not the
+match.** Having no rows in a card licenses nothing about who played, and a sentence that names a
+number of players has to get that number from what is filled in. `retroChangesEmptyFr` counts the
+filled slots, agrees in number, and with none filled points at the composition card instead of
+inventing a team.
+
+Its neighbour had the same defect in miniature: « Un 0-0 sans rien à signaler, ça existe » wrote a
+hyphen scoreline a few hundred pixels below the Score card's derived « 0 – 0 », in a file that already
+imported `scoreLineFr` on line 34. Two dashes for one thing on one screen, which is what decisions 061
+and 064 exist to have removed. `RETRO_NO_FACTS_FR` interpolates `scoreLineFr(0, 0)`.
+
+Both in `lib/retro/labels.ts` with ten tests — 898 unit tests, 45 files. Verified by driving the real
+form in a browser at 390 px rather than by trusting the unit tests: 0 → « la composition de départ est
+vide », 1 → « le titulaire choisi », 2 → « les 2 titulaires choisis », 3 → « les 3 titulaires
+choisis », and the three-line wrap fits the card in both themes. `npm run audit:screens` found no
+mechanical defect and `npm run test:e2e` passes, the retro sheet being a Server Action screen.
