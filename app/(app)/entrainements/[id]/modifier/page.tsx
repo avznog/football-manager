@@ -13,10 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { trainingDeletionWarningFr } from "@/lib/calendar/deletion";
 import { capitalizeFirst, formatDay, toLocalInput } from "@/lib/calendar/time";
 import { trainingWindowMinutes } from "@/lib/calendar/timeline";
 import { deleteTraining } from "@/lib/training/actions";
-import { getTraining } from "@/lib/training/queries";
+import { getTraining, getTrainingDeletionHolds } from "@/lib/training/queries";
 import { TrainingForm } from "../../_components/training-form";
 
 export const metadata = { title: "Modifier l’entraînement" };
@@ -29,6 +30,8 @@ export default async function EditTrainingPage({
 
   const training = await getTraining(team.id, id);
   if (!training) notFound();
+
+  const holds = await getTrainingDeletionHolds(training.id);
 
   const now = new Date();
   const startsAt = new Date(training.startsAt);
@@ -59,10 +62,9 @@ export default async function EditTrainingPage({
       </Card>
 
       {!over && can(actor, "training:delete", { teamId: team.id }) ? (
-        <Card
-          title="Supprimer"
-          description="La séance disparaît du calendrier, avec les réponses déjà données."
-        >
+        <Card title="Supprimer" description={trainingDeletionWarningFr(holds)}>
+          {/* The attendance marks are counted too: a coach can point a session before it happens,
+              and this button is only offered before it happens (decision NNN). */}
           <form action={deleteTraining}>
             <input type="hidden" name="teamId" value={team.id} />
             <input type="hidden" name="trainingId" value={training.id} />
