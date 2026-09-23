@@ -63,10 +63,6 @@ const STARTERS: readonly (readonly [FixturePlayerKey, string])[] = [
   ["st", "attaquant"],
 ];
 
-/** The same seven at the 30th minute, with the substitute in for the second midfielder. */
-const SECOND_HALF: readonly (readonly [FixturePlayerKey, string])[] = STARTERS.map(([key, slot]) =>
-  key === "cm2" ? (["sub", slot] as const) : ([key, slot] as const),
-);
 
 test("le parcours complet : match, composition, mode match, notation, résumé", async ({ page }) => {
   const fixture = provisionFixture();
@@ -185,9 +181,20 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     // Half of a 2×30 — the app proposes the minute, and the scenario needs exactly this one.
     await expect(page.getByLabel("Minute", { exact: true })).toHaveValue("30");
 
-    for (const [key, slot] of SECOND_HALF) {
-      await place(page, playerOf(fixture, key), slot);
-    }
+    /*
+     * The editor opens on the team in force at the 30th minute — the starting seven — so the coach
+     * makes one substitution instead of placing seven players again (decision NNN). Two things are
+     * asserted before he touches anything, because they are the two ways a pre-filled pitch could
+     * lie: it must not claim to be saved (nothing exists until the submit below, invariant 3), and
+     * the deduced changes must be empty rather than « 7 changements ».
+     */
+    await expect(page.getByText("Rien n’est encore enregistré.")).toBeVisible();
+    await expect(page.getByText("déplace seulement ce qui change")).toBeVisible();
+    await expect(page.getByText("Aucun changement.")).toBeVisible();
+
+    await swap(page, sub, cm2, "milieu central");
+    await expect(page.getByText(`${cm2.displayName} → ${sub.displayName}`)).toBeVisible();
+
     await page.getByRole("button", { name: "Créer la composition" }).click();
 
     const card = compositionCard(page, "À partir de la 30ᵉ minute");
@@ -437,6 +444,28 @@ async function place(page: Page, player: FixturePlayer, positionFr: string): Pro
   await slot.click();
   await expect(
     page.getByRole("button", { name: `${player.displayName}, ${positionFr}` }),
+  ).toBeVisible();
+}
+
+/**
+ * Replaces the player standing in `positionFr` by one from the bench: tap the substitute, tap the
+ * occupied post. The one gesture a pre-filled editor exists for.
+ */
+async function swap(
+  page: Page,
+  incoming: FixturePlayer,
+  outgoing: FixturePlayer,
+  positionFr: string,
+): Promise<void> {
+  await expect(
+    page.getByRole("button", { name: `${outgoing.displayName}, ${positionFr}` }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: `${incoming.displayName}, numéro ${incoming.jerseyNumber}` })
+    .click();
+  await page.getByRole("button", { name: `${outgoing.displayName}, ${positionFr}` }).click();
+  await expect(
+    page.getByRole("button", { name: `${incoming.displayName}, ${positionFr}` }),
   ).toBeVisible();
 }
 

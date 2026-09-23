@@ -30,9 +30,16 @@ const DERIVED_SENTENCES = [
   "Choisis d’abord tes titulaires et tes remplaçants",
   "Le groupe est fait : place les sept sur le terrain",
   "Choisis tes titulaires, tes remplaçants et tes supporters",
+  // And the sentences that are only true of a composition nothing has saved: the pitch of a new
+  // composition is pre-filled with the team in force at that minute (decision 106), which is seven
+  // discs that look exactly like a plan and are not one.
+  "déplace seulement ce qui change",
+  "Rien n’est encore enregistré",
+  "n’a pas pu être replacé",
 ];
 
-const OWNER = join("lib", "composition", "plan.ts");
+/** Where they may be written. Nowhere else, and never in a `.tsx`. */
+const OWNERS = [join("lib", "composition", "plan.ts"), join("lib", "composition", "prefill.ts")];
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
@@ -58,14 +65,16 @@ describe("the composition copy that depends on a match's status", () => {
       .filter((path) => readFileSync(path, "utf8").includes(sentence))
       .map((path) => path.slice(process.cwd().length + 1))
       // A comment quoting the sentence to explain the defect is the point, not a copy of it.
-      .filter((path) => path !== OWNER);
+      .filter((path) => !OWNERS.includes(path));
 
     expect(offenders).toEqual([]);
   });
 
   /** Proof the scan actually reads files, so an empty glob cannot make this vacuously green. */
-  it("reads the module that owns them", () => {
-    expect(files.some((path) => path.endsWith(OWNER))).toBe(true);
-    expect(readFileSync(join(process.cwd(), OWNER), "utf8")).toContain(DERIVED_SENTENCES[0]);
+  it("reads the modules that own them", () => {
+    for (const owner of OWNERS) {
+      expect(files.some((path) => path.endsWith(owner))).toBe(true);
+    }
+    expect(readFileSync(join(process.cwd(), OWNERS[0]), "utf8")).toContain(DERIVED_SENTENCES[0]);
   });
 });

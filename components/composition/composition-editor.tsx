@@ -92,6 +92,7 @@ import {
   placeInSlot,
   remapToShape,
   removeMember,
+  slotOfMember,
   sortAssignments,
   type SlotAssignment,
 } from "@/lib/composition/editor";
@@ -102,6 +103,7 @@ import {
 } from "@/lib/composition/hints";
 import {
   deduceChanges,
+  editorSaveStateFr,
   findPlanIssues,
   nameOfMembers,
   ordinalFr,
@@ -161,8 +163,17 @@ export type CompositionEditorProps = {
   formations: readonly EditorFormation[];
   /** Which formation to start from. */
   formationId: string;
-  /** The saved assignments, keyed on `formation_slots.id`. Empty for a new composition. */
+  /**
+   * What the pitch opens with, keyed on `formation_slots.id`: the saved assignments when modifying,
+   * and — for a new composition — the team in force at that minute, copied by
+   * `lib/composition/prefill.ts` so the coach only moves what changes.
+   */
   assignments: readonly SlotAssignment[];
+  /**
+   * Why the pitch is not empty, when it was pre-filled: where the seven come from, and that nothing
+   * is saved yet. Derived by `prefillNoticeFr`, never written here (decision 097). Empty otherwise.
+   */
+  prefillNoticeFr?: readonly string[];
   fromMinute: number;
   /**
    * Every *other* composition of the match. Used to deduce the changes this one implies and to
@@ -330,21 +341,45 @@ export function CompositionEditor(props: CompositionEditorProps) {
   function place(slotKey: string, memberId: string) {
     const occupant = memberInSlot(assignments, slotKey);
     const slot = shape.find((candidate) => candidate.key === slotKey);
+    // Where he comes *from* decides the sentence: two players on the turf trade posts, while a player
+    // off the bench replaces the one standing there, who goes back to it. `placeInSlot` has always
+    // done both; only the announcement used to call them the same thing.
+    const fromPitch = slotOfMember(assignments, memberId) !== null;
     setAssignments((current) => placeInSlot(current, slotKey, memberId));
     setSelection(null);
     setAnnouncement(
       occupant && occupant !== memberId
-        ? `${nameOf(memberId)} et ${nameOf(occupant)} échangent leurs postes.`
+        ? fromPitch
+          ? `${nameOf(memberId)} et ${nameOf(occupant)} échangent leurs postes.`
+          : `${nameOf(memberId)} remplace ${nameOf(occupant)}.`
         : `${nameOf(memberId)} est placé ${slot ? atPositionFr(slot.positionCode) : "sur le terrain"}.`,
     );
   }
 
-  /** Tapping a player picks him up, or puts him down if he was already picked up. */
+  /**
+   * Tapping a player picks him up, puts him down if he was already picked up — or, if someone else
+   * is already picked up and this one is standing on the turf, **replaces him**.
+   *
+   * That last branch is the gesture the pre-filled editor exists for (decision 106). Dropping a disc
+   * onto an occupied post has always swapped the two (`placeInSlot`), but the *tap* path — the one
+   * the screen leads with, and the one that works when the bench is a scrolling strip — only ever
+   * changed the selection: tapping the outgoing player put the incoming one down again, so a coach
+   * planning one substitution had to empty the post first and find the free slot. Now the two taps
+   * read as one sentence: this one comes on, for that one.
+   */
   function tapPlayer(memberId: string) {
     if (selection?.kind === "member" && selection.id === memberId) {
       setSelection(null);
       setAnnouncement(`${nameOf(memberId)} n’est plus sélectionné.`);
       return;
+    }
+
+    if (selection?.kind === "member") {
+      const occupied = slotOfMember(assignments, memberId);
+      if (occupied !== null) {
+        place(occupied, selection.id);
+        return;
+      }
     }
     setSelection({ kind: "member", id: memberId });
     setAnnouncement(`${nameOf(memberId)} sélectionné. Appuie sur un poste pour le placer.`);
@@ -504,6 +539,20 @@ export function CompositionEditor(props: CompositionEditorProps) {
           value={`${assignment.slotId}:${assignment.memberId}`}
         />
       ))}
+
+      {/* --- why the pitch is not empty ---
+          Only while the pre-fill is untouched: once the coach has moved somebody, « déplace seulement
+          ce qui change » is advice about a state that has passed, and « Changements déduits » below
+          says what he has done instead. */}
+      {!dirty && (props.prefillNoticeFr ?? []).length > 0 ? (
+        <div className="space-y-1 rounded-2xl bg-surface-2 p-3">
+          {(props.prefillNoticeFr ?? []).map((line) => (
+            <p key={line} className="text-sm text-ink-muted">
+              {line}
+            </p>
+          ))}
+        </div>
+      ) : null}
 
       {/* --- formation and minute --- */}
       <Card
@@ -720,8 +769,15 @@ export function CompositionEditor(props: CompositionEditorProps) {
           <p className="min-w-0 flex-1 text-xs leading-snug text-ink-muted">
             {benchHintFr({ mode, benchCount: bench.length, freeSlots })}
           </p>
-          <p aria-live="polite" className="shrink-0 text-xs font-medium text-ink-subtle">
-            {dirty ? "Non enregistré" : "À jour"}
+          {/* `editorSaveStateFr`, not a ternary on `dirty`: a composition being created has never
+              been saved whether or not it has been touched, and it now opens with seven pre-filled
+              discs that look exactly like a plan (decision 106). Allowed to wrap — the sentence is
+              longer than « À jour. » and the dock has a couple of lines to give. */}
+          <p
+            aria-live="polite"
+            className="max-w-[9rem] shrink-0 text-right text-xs font-medium text-ink-subtle"
+          >
+            {editorSaveStateFr({ isNew: props.lineupId === null, dirty })}
           </p>
         </div>
 

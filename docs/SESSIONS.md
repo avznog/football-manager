@@ -2235,3 +2235,35 @@ them rather than hard-coding them; 1044 in all.
 both themes is outstanding, and on this change it is the whole point. Also noted and not fixed, both
 pre-existing: `PlayerDisc`/`SlotTarget` still carry meaning in `title` attributes (decision 072), and
 `components/action-sheet/lineup-composer.tsx` still vouvoies (« Placez au moins un joueur »).
+
+### 2026-09-23 — The second composition starts from the first
+
+Seventh of the owner's eight remarks, and the one that was cut off mid-word: « quand on crée une
+deuxième composition (par exemple pour la 10e minute), il faudrait qu… ». Asked, and he chose the
+pre-fill from the composition in force at that minute.
+
+The rule was already in the repo: `planInForceBefore(plans, minute)` — greatest `from_minute`
+*strictly* below the new one — which is what picks the team « Changements déduits » measures against.
+`lib/composition/prefill.ts` wraps it rather than deriving the same idea a second time, so the team
+the pitch opens with and the team the card compares cannot disagree. Note that « in force » is not
+« latest created »: plan the 20th, then add the 10th, and the 10th inherits the starting seven.
+
+Placement is filtered through the sheet's starters and substitutes, so a player inherited from the 0th
+minute who has since left the sheet is not placed — his post stays open, `findPlanIssues` keeps
+blocking the save, and the notice names him. An applied composition is a legitimate source; copying it
+is a read, and nothing here writes: `prefillFromPlans` is pure and returns `useState` initialisers, so
+invariant 3 is untouched and opening the editor still leaves no row behind.
+
+The part that needed thinking about was not the pre-fill but what the screen then says, because seven
+pre-filled discs look exactly like a plan that exists. The footer used to read « À jour. » under a
+composition that had never been written — decision 097's defect again, in the sentence a coach glances
+at to decide whether he can walk away. `editorSaveStateFr` now answers « Rien n'est encore
+enregistré. » for anything new, and `prefillNoticeFr` states the provenance above the form and
+disappears as soon as he moves somebody.
+
+Decision 106. 24 new cases in `prefill.test.ts`, three sentences added to `copy.test.ts`'s scan, 1096
+unit tests. Landed on top of decision 105, whose dock this notice sits inside: the status line in the
+dock is `editorSaveStateFr` rather than a ternary on `dirty`, and it is allowed to wrap.
+
+Not done: **no 390 px pass.** Two screens' worth of new text at the top of an editor that decision 105
+just spent its whole budget compacting.
