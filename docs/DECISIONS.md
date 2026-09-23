@@ -1676,3 +1676,40 @@ a repository secret, against a window of seconds, for a team of fourteen people 
 The migrations in `db/migrations/` are all additive, which is what makes the window survivable. The
 first migration that cannot be — a dropped column, a narrowed type — is the trigger to revisit this,
 and `DEPLOY.md` says to take that one out of the flow and do it by hand.
+
+## 079 — The rating deadline is on the screen, not only in the rule
+**2026-09-23** · accepted
+
+Decision 007 closes the rating window at the next kick-off, and `lib/rating/window.ts` has returned
+`closesAtMs` — the exact instant — since M6. Nothing read it:
+`grep -rn "closesAt" app lib | grep -v lib/rating/window` returned no output. The app enforced a
+deadline it never stated.
+
+What made that worse than a missing detail is the consequence on the other side of it.
+`lib/rating/progress.ts` hides the team's notes from anybody who has not submitted his own, and the
+window closing does **not** unlock them: a player who runs out of time never sees the notes of that
+match, for ever. That is deliberate — it is what stops copying and anchoring — but it turns a silent
+deadline into a door that shuts on somebody who was never told there was one. Three screens promised
+the reward without the condition:
+
+- the notation flow — « Tu verras les notes des autres quand tu auras noté tout le monde », next to
+  a « Passer » button;
+- the recap's « À toi de noter » card — « dès que tu auras fini »;
+- the match page's « Après le match » card — whose own comment in the source calls it « the one thing
+  a player still has to do, and the one that expires at the next kick-off (decision 007) ».
+
+`ratingDeadlineFr(closesAtMs, nowMs)` is the sentence, and it lives in `window.ts` next to the rule
+it describes so that changing one makes the other obvious. It states both halves of the cost, because
+either alone is misleading: « les notes de ce match ne bougent plus » sounds like an archive being
+sealed, and « tu ne verras pas celles de l'équipe » sounds like a punishment without a reason.
+
+It returns `null` twice, and both silences are the point:
+
+- **no next match on the calendar.** The window has no end yet. Naming a deadline would mean
+  inventing one, and « pas de date limite » would stop being true the moment the coach adds a
+  fixture.
+- **the deadline has passed.** Printing a date in the past as a thing to beat is precisely the defect
+  family this repo keeps finding. The closed states already say so in their own words.
+
+The sentence only appears to a viewer whose notes are unfinished. Somebody who has rated everybody
+can read the notes already, so for him the closing time is a fact about nothing.

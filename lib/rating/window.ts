@@ -25,6 +25,8 @@
  * decision (« the window lasts at least N hours »), not a quiet change here.
  */
 
+import { formatWhen } from "@/lib/calendar/time";
+
 export type RatingWindowState =
   /** The match is not finished: there is nothing to rate yet. */
   | "not-yet"
@@ -61,4 +63,35 @@ export function ratingWindow(input: RatingWindowInput): RatingWindow {
   }
 
   return { state: "open", isOpen: true, closesAtMs };
+}
+
+/**
+ * The deadline, in words, for a player who still owes notes — « À finir avant le coup d’envoi du
+ * match suivant, dimanche 27 septembre à 10:30 : … ».
+ *
+ * `closesAtMs` was computed by `ratingWindow` from the first day and read by nobody for six
+ * milestones: three screens promised « tu verras les notes des autres quand tu auras fini » and not
+ * one of them said that finishing has a closing time, while `progress.ts` makes missing it
+ * permanent. A deadline the app enforces and never states is the defect family the screen audit
+ * exists for.
+ *
+ * Two silences, both deliberate:
+ *
+ * - **no next match on the calendar** (`closesAtMs === null`) — the window has no end yet, so there
+ *   is nothing to warn about. Naming a deadline here would mean inventing one, and it would change
+ *   the moment the coach adds a fixture.
+ * - **already closed** — the caller is in a state that says so in its own words
+ *   (`state === "closed"`). Printing a deadline in the past would be the very thing this fixes.
+ *
+ * Only for a viewer whose notes are unfinished: the second half of the sentence is about notes he
+ * will not see, which is false for somebody who has already rated everybody.
+ */
+export function ratingDeadlineFr(closesAtMs: number | null, nowMs: number): string | null {
+  if (closesAtMs === null || closesAtMs <= nowMs) return null;
+
+  const when = formatWhen(new Date(closesAtMs), new Date(nowMs));
+  return (
+    `À finir avant le coup d’envoi du match suivant, ${when} : après, les notes de ce match ne ` +
+    "bougent plus et tu ne verras pas celles de l’équipe."
+  );
 }

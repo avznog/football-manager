@@ -6,7 +6,8 @@
  * - only members on the **match sheet** as starter or substitute may rate (decision 007), and they
  *   rate everybody including themselves;
  * - the window closes at the **next kick-off**, after which the form is gone rather than merely
- *   disabled — an insert would be refused anyway (`lib/rating/actions.ts`);
+ *   disabled — an insert would be refused anyway (`lib/rating/actions.ts`). While it is open, the
+ *   screen says when that is: `ratingDeadlineFr` (decision 079);
  * - this page **never shows anybody else's notes**, whatever the viewer's progress. Reading them is
  *   the recap's job, and `getRatingResults` gates that (see `lib/rating/queries.ts`).
  *
@@ -27,6 +28,7 @@ import { COMPETITION_LABELS, pluralize } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import { getMatch } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
+import { ratingDeadlineFr } from "@/lib/rating/window";
 import { RatingFlow } from "./_components/rating-flow";
 
 export async function generateMetadata({ params }: PageProps<"/match/[id]/notation">) {
@@ -51,6 +53,7 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
 
   // Invariant 4: the permission comes from `can()`, never from a role read on the spot.
   const mayRate = onSheet && can(actor, "rating:submit", { teamId: team.id });
+  const deadline = ratingDeadlineFr(window.closesAtMs, now.getTime());
 
   return (
     <div className="space-y-6">
@@ -140,6 +143,9 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
             Une note de 0 à 10 par coéquipier, toi compris. Un commentaire si tu veux. Ton nom est
             visible par l’équipe.
           </p>
+          {/* The deadline the app enforces, said out loud (decision 079). Null when no next match is
+              on the calendar: the window has no end yet, so there is nothing to announce. */}
+          {deadline ? <p className="text-sm font-medium text-ink">{deadline}</p> : null}
           <RatingFlow teamId={team.id} matchId={match.id} targets={targets} />
         </>
       )}
