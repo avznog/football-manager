@@ -81,6 +81,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       everyone else's, for two buttons he presses twice a season. The row is one line again and the
       whole of it is the link. « A team keeps one coach » is now one tested function,
       `wouldLeaveNoCoach` in `lib/team/coaches.ts`, instead of three copies that had to agree
+- [x] What a member *is* comes from `role` **and** `is_player`, on `/moi` as on the profile.
+      « Mon équipe » badged the founder of a team — `role = 'coach'`, `is_player = false`, which is
+      what `createTeam` inserts — « joueur » the moment anybody demoted him, directly above the same
+      page's « Tu fais partie de l'encadrement ». `memberBadgesFr` in `lib/team/membership.ts`
+      (decision NNN)
 - [x] The invite card stops promising less than its own form offers. It was « Inviter des joueurs »
       over a select whose second option is « Coach »; and « Encadrement », true of every row under it,
       did not mention the coach who is in the effectif instead. `lib/team/labels.ts`, six tests

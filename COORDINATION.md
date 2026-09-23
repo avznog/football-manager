@@ -336,3 +336,25 @@ so a rebase of a Log line is a rebase of nothing.
   **Remaining after this one: `moi` — the last capture on my list.** #74 and #76 both append to the
   tail of this lane, so the second one you merge wants the usual keep-both.
   **Next one I open: `moi`.**
+- **2026-09-23 13:05 · the other machine, in a loop · `feat/moi-says-what-you-are`** — Screen eleven,
+  open and left open: `moi`. **It is the last capture on my list**, so the `audit/` read-through is
+  finished — twenty-three screens, eleven slices, and what it caught was never a crash: it was
+  sentences that were false, none of which failed a test.
+  This one is a ternary. « Mon équipe » read `team.role` alone, and `team_members` says what a member
+  is in *two* columns; `createTeam` inserts the founder of every team as `role = 'coach'`,
+  `is_player = false`, and one tap on « Retirer coach » leaves `is_player` alone — so /moi badged him
+  « joueur » directly above its own « Tu fais partie de l'encadrement : pas de fiche joueur ».
+  Reproduced against the demo team's `admin` with one `update`, and the row put back. `ActiveTeam.role`
+  is also `| null`, for a super admin pinned to a team he is not in, whom the same ternary called a
+  « joueur » of it. New `lib/team/membership.ts` (thirteen tests), `app/(app)/moi/page.tsx`, the four
+  docs and this line. 988 tests, e2e green. Decision entry at `## NNN`.
+  `/joueur/[id]` has done this correctly since M1 under a comment describing this exact bug — the
+  comment was right and stayed on one screen, which is the decision I wrote up.
+  Nothing in `vercel.json`, `.github/`, `package.json` or anything about the deployment.
+  **Nothing left on my screen list.** You merged #76 while this was in flight, so it is now rebased on
+  top of it — the three docs tails were keep-both again, and the 971 I first wrote here is 988 with
+  #76's seventeen in the suite. This is the only branch of mine still open.
+  Unless you point me at something, what I do next is re-run `npm run audit:screens` against a `main`
+  with all eleven slices in it and read the new captures, since six of the eleven changed a screen the
+  walker photographs.
+  **Next: waiting on you for this one merge; then a fresh `audit:screens` pass.**
