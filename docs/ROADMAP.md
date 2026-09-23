@@ -85,15 +85,15 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       « Mon équipe » badged the founder of a team — `role = 'coach'`, `is_player = false`, which is
       what `createTeam` inserts — « joueur » the moment anybody demoted him, directly above the same
       page's « Tu fais partie de l'encadrement ». `memberBadgesFr` in `lib/team/membership.ts`
-      (decision NNN)
+      (decision 094)
 - [x] The invite card stops promising less than its own form offers. It was « Inviter des joueurs »
       over a select whose second option is « Coach »; and « Encadrement », true of every row under it,
       did not mention the coach who is in the effectif instead. `lib/team/labels.ts`, six tests
-      (decision NNN)
+      (decision 092)
 - [x] …and the profile speaks about the member whose profile it is. The demo team's own non-playing
       coach was told he would « ne plus pouvoir déclarer ses disponibilités ni être convoqué », under
       a card headed « Fiche joueur » saying he is not one, beside a jersey hint about « le joueur ».
-      `lib/player/labels.ts` decides all three now, and Vitest can read them (decision NNN)
+      `lib/player/labels.ts` decides all three now, and Vitest can read them (decision 093)
 
 ## M2 — Calendar
 - [x] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)
@@ -217,7 +217,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] …and a player's average is explained with the matches that hold a note about **him**. The
       profile printed the reader's own season-wide count of unfinished matches — « Les notes de
       2 matchs sont exclus de cette moyenne » where one of the two held no note about that player at
-      all, and under a « — » where nothing was excluded from anything (decision NNN)
+      all, and under a « — » where nothing was excluded from anything (decision 093)
 
 ## M7 — Retro-entry & amendments
 - [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet

@@ -2086,7 +2086,7 @@ the same stale list one layer down. The same suite asserts `/calendrier` and `/m
 are matched, so an exclusion can never quietly swallow the guard, and drives `proxy()` itself with
 real `NextRequest`s for the redirect behaviour that had no test at all.
 
-## NNN — A card may not promise less than the controls inside it
+## 092 — A card may not promise less than the controls inside it
 
 `/equipe`'s invite card was titled « Inviter des joueurs » and described as « Génère un code et
 envoie-le sur WhatsApp. Le joueur choisit lui-même son mot de passe. » The first control inside it is
@@ -2113,7 +2113,7 @@ The general rule: **a heading is answerable not only for the rows under it, but 
 would expect under it.** Splitting a list is a choice the app made; the reader did not make it and
 cannot see it.
 
-## NNN — A profile may only state facts about the member whose profile it is
+## 093 — A profile may only state facts about the member whose profile it is
 **2026-09-23** · accepted
 
 `/joueur/[id]` is one page rendered for twenty-four different members and read by any of them. Three
@@ -2158,7 +2158,7 @@ of the typical member, has to be either recomputed for this member or moved to a
 it is. All four sentences above were inlined in Server Components, where `vitest.config.ts` collects
 nothing, which is why none of them failed a test for four milestones.
 
-## NNN — What a member *is* comes from two columns, and never from one
+## 094 — What a member *is* comes from two columns, and never from one
 **2026-09-23** · accepted
 
 `team_members` says what somebody is twice, on purpose. `role` decides who administers the team;
