@@ -1645,3 +1645,36 @@ does not explain anything. 927 tests, six new. Looked at FC Rivière (retro) and
 all and reads « Saisi sans composition » from decision 085. e2e green — the happy path applies a
 composition in game mode, which is the `live` wording.
 
+### « 1 absent » three days before the session
+
+Screen eight of the `audit/` read-through: `entrainements`, from `light-coach-entrainements.png`,
+`dark-coach-entrainement-non-pointe.png`, `light-joueur-entrainement-pointe.png` and
+`dark-joueur-entrainement.png`. The screen is almost entirely honest — « Séances passées », « Personne
+n'est encore pointé. », « 11 présents sur 14 pointés. 1 joueur pointé ce soir-là a quitté l'équipe
+depuis. », « Annoncé pas dispo » on the pointing list — which is what made the two exceptions worth a
+decision rather than a fix: both of them borrowed a word from the présences to describe an
+availability.
+
+- `AnswersLine`, under the pinned event on `/calendrier`, read « 7 dispo · **1 absent** · 1 peut-être ·
+  4 sans réponse » for the 26 September training. Nico had tapped « pas dispo »; nobody had been absent
+  from anything.
+- `ReminderCard`, on `/entrainements/[id]` and `/match/[id]`, was titled « **Relancer les absents** »
+  and described itself one line below as « 4 joueurs n'ont pas répondu ». The message it copies was
+  already right — « Il manque les réponses de : Brice, Léo, Yanis, Fabien. »
+
+Both are now pure functions in `lib/calendar/timeline.ts`, with nine tests, because nothing under
+`app/` is collected by Vitest: « 7 dispo · 1 pas dispo · 1 peut-être · 4 sans réponse », and
+« Relancer ceux qui n'ont pas répondu » over the same description. `pluralize` and `pendingCount`
+dropped out of the component's imports with the logic.
+
+Verified at 390 px in both themes, as `karim` (coach) on `/calendrier` and on the 26 September
+session, and as `hugo` (player, who sees no relance card): the new title fits on one line. 934 tests
+pass after the rebase onto #68, typecheck and lint clean, and the three e2e specs pass locally in 27 s.
+
+Also rebased #68 and #70 onto `main` and force-pushed both. Both had gone `CONFLICTING` on
+`COORDINATION.md` alone, and a pull request GitHub cannot merge gets no CI run at all — so a rebase is
+not tidiness, it is the difference between a green branch and a branch with no checks. Each log line
+now sits under « From the other machine », which is what the two lanes are for. One thing corrected
+in passing, in a file this branch already touches: #68's own test comment said the demo season
+interleaves « five sessions » with the matches. `psql` says four — 29 August, 12 and 19 September, and
+26 September to come.

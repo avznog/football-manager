@@ -373,6 +373,8 @@ describe("pastSectionTitleFr", () => {
 
   it("is only ever rendered over a non-empty list", () => {
     expect(pastSectionTitleFr([])).toBe("Déjà joué");
+  });
+});
 
 describe("answersLineFr", () => {
   it("reads as one scannable line, in the order the coach asks the questions", () => {

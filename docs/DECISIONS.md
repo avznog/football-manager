@@ -2027,3 +2027,32 @@ The « appliquée » badge on the card is deliberately left alone. It is the vag
 false: that composition *was* applied, by the event in the log. What it must not do is explain, and it
 does not.
 
+## NNN — Availability is an intention, présences are a fact, and they do not share words
+
+The calendar's pinned card counted « 7 dispo · **1 absent** · 1 peut-être · 4 sans réponse » for the
+26 September training, three days before anybody could be absent from it. One line below, on the
+session's own page, the relance card was titled « **Relancer les absents** » directly above its own
+description: « 4 joueurs n'ont pas répondu ».
+
+Nobody in either sentence was absent. This app holds the two things in two tables on purpose —
+`training_availability` records what a player says he intends to do, `training_attendance` records
+what the coach saw — and decision 076 already drew the line between them in the other direction: an
+unmarked player is not an absent one, because nobody looked. The same line has to hold here. « Pas
+dispo » is a declaration about a Saturday that has not happened; « absent » is an observation about
+one that has. Only the second may be contradicted by what happened, and only the first may be
+changed by the player.
+
+So the words are now the player's own: the tally says « 1 pas dispo », which is what he tapped, what
+his badge says on the detail page, and what the relance message asks him for. The relance card is
+« Relancer ceux qui n'ont pas répondu », which is decision 087's rule applied to a title rather than
+a heading — and, unusually, the card was already carrying its own refutation one line below, which is
+what makes this the cheapest class of defect to find and the easiest to leave in place for four
+milestones.
+
+Nothing is pluralised in the tally: « 2 pas dispo » is the same three words as « 1 pas dispo », and a
+line the eye can scan across four rows is worth more than French agreement nobody reads. The card's
+description does agree, because it is a sentence.
+
+Both sentences moved to `answersLineFr` and `reminderCardFr` in `lib/calendar/timeline.ts`. They were
+inline JSX, which is to say untestable: Vitest collects `lib/**` and `db/**` and nothing under
+`app/`, so a claim written in a component is a claim no test can read.
