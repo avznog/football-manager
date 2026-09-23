@@ -2,7 +2,13 @@ import type { ComponentPropsWithRef, ReactNode } from "react";
 
 import { cn } from "./cn";
 
-export type CardProps = ComponentPropsWithRef<"section"> & {
+/**
+ * `title` is deliberately omitted from the intrinsic props before being redeclared: every HTML
+ * element already has a `title` attribute typed `string`, and intersecting that with `ReactNode`
+ * narrows it back to `string`, so `title={<>Composition <Badge/></>}` would not compile. The header
+ * is rendered as a heading, never as a tooltip, so nothing is lost.
+ */
+export type CardProps = Omit<ComponentPropsWithRef<"section">, "title"> & {
   /** Rendered as the card heading. Omit for a bare surface container. */
   title?: ReactNode;
   /** Small muted line under the title. */
