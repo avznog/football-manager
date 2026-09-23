@@ -87,6 +87,9 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   const notes = new Map(answers.map((answer) => [answer.teamMemberId, answer.note]));
 
   const isCoach = can(actor, "match:update", { teamId: team.id });
+  // Typing a match up, or rewriting it days later, is the coach's — not the match operator's
+  // (decision 004). Invariant 4: the permission is `can()`'s answer.
+  const mayAmend = can(actor, "match:amend", { teamId: team.id });
   /**
    * This viewer's rating duty, or null when he has none: not on the sheet, window shut, or not
    * allowed to rate at all. Invariant 4 — the permission is `can()`'s answer, not a role read here.
@@ -214,6 +217,28 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
               fullWidth
             >
               Voir le résumé
+            </ButtonLink>
+          </div>
+        </Card>
+      ) : null}
+
+      {/* « Saisie rétroactive » (`docs/PLAN.md`, screen 8). A match played without the phone is typed
+          up here and becomes an ordinary event log; a match that already has one is corrected action
+          by action. `score === null` means not one event was ever recorded. */}
+      {mayAmend && match.status === "finished" ? (
+        <Card title={score === null ? "Saisir le match" : "Corriger le match"} as="h2">
+          <div className="space-y-3">
+            <p className="text-sm text-ink-muted">
+              {score === null
+                ? "Ce match a été joué sans le téléphone. Renseigne qui a joué et les buts : le score, les minutes et les clean sheets se déduisent."
+                : "Un but attribué au mauvais joueur, une action oubliée : la correction s’ajoute au déroulé, elle ne le réécrit pas."}
+            </p>
+            <ButtonLink
+              href={`/match/${match.id}/saisie`}
+              variant={score === null ? "primary" : "secondary"}
+              fullWidth
+            >
+              {score === null ? "Saisir le match" : "Corriger une action"}
             </ButtonLink>
           </div>
         </Card>
