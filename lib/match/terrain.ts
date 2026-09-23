@@ -30,9 +30,9 @@ import { SNAP_DISTANCE } from "@/lib/formation/shape";
 import { memberInSlot, placeInSlot, removeMember } from "@/lib/composition/editor";
 import { pitchDistance, type PitchPoint } from "@/lib/pitch/geometry";
 import {
-  describePositionChangeFr,
-  describeSubstitutionFr,
+  describeLineupDiffFr,
   diffLineups,
+  unpairedMovements,
   type LineupDiff,
   type SlotAssignment,
 } from "./lineup";
@@ -343,7 +343,7 @@ export function terrainReview(
 ): TerrainReview {
   const { slots, players } = options;
   const diff = diffLineups(base, arranged, { slots: slots.map(toSlotInfo) });
-  const changes = terrainChangesFr(diff, players.nameOf);
+  const changes = describeLineupDiffFr(diff, players.nameOf);
 
   const problems: TerrainProblem[] = [];
   if (arranged.length === 0) {
@@ -387,38 +387,12 @@ export function terrainReview(
   };
 }
 
-/**
- * One line per change, in French.
- *
- * `describeLineupDiffFr` covers substitutions and position changes, which is everything a *planned*
- * composition can contain — both sides always field the same eleven. TERRAIN can change the number
- * of players on the pitch (a sixth man coming on, a tenth minute injury leaving six), and a change
- * with no line would be a change the coach confirms without reading it, so the unpaired arrivals and
- * departures are spelled out here.
- */
-export function terrainChangesFr(diff: LineupDiff, nameOf: (memberId: string) => string): string[] {
-  const paired = new Set<string>();
-  for (const substitution of diff.substitutions) {
-    paired.add(substitution.outId);
-    paired.add(substitution.inId);
-  }
-
-  return [
-    ...diff.substitutions.map((substitution) => describeSubstitutionFr(substitution, nameOf)),
-    ...diff.goingOff.filter((memberId) => !paired.has(memberId)).map((memberId) => `${nameOf(memberId)} sort`),
-    ...diff.comingOn.filter((memberId) => !paired.has(memberId)).map((memberId) => `${nameOf(memberId)} entre`),
-    ...diff.positionChanges.map((change) => describePositionChangeFr(change, nameOf)),
-  ];
-}
-
 /** « 2 changements et 1 repositionnement », « 7 joueurs entrent », « Aucun changement ». */
 export function terrainSummaryFr(diff: LineupDiff): string {
   const moves = diff.positionChanges.length;
-  const paired = new Set(diff.substitutions.flatMap((s) => [s.outId, s.inId]));
+  const unpaired = unpairedMovements(diff);
   const swaps =
-    diff.substitutions.length +
-    diff.goingOff.filter((memberId) => !paired.has(memberId)).length +
-    diff.comingOn.filter((memberId) => !paired.has(memberId)).length;
+    diff.substitutions.length + unpaired.goingOff.length + unpaired.comingOn.length;
 
   // Nobody leaves and nobody moves: the pitch was empty or short-handed, and the commonest case is
   // the starting seven being placed before the kick-off. « 7 changements » under that sheet reads as

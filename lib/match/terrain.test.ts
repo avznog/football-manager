@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { describeLineupDiffFr } from "./lineup";
 import { playerIndex, type LivePlayer, type LiveSlot, type PlayerOption } from "./presenter";
 import {
   nearestTerrainTarget,
   terrainBench,
-  terrainChangesFr,
   terrainDrop,
   terrainLineupId,
   terrainPayload,
@@ -406,12 +406,12 @@ describe("terrainReview", () => {
   });
 });
 
-describe("terrainChangesFr and terrainSummaryFr", () => {
+describe("describeLineupDiffFr and terrainSummaryFr", () => {
   it("counts an unpaired arrival and an unpaired departure as changes", () => {
     const base = terrainRemove(STARTING_SEVEN, "julien");
     const arranged = terrainPlace(base, SLOT.at, "momo");
     const { diff } = review(arranged, base);
-    expect(terrainChangesFr(diff, PLAYER_INDEX.nameOf)).toEqual(["Momo entre"]);
+    expect(describeLineupDiffFr(diff, PLAYER_INDEX.nameOf)).toEqual(["Momo entre"]);
     // Nobody left and nobody moved, so this is a man coming on — not a substitution.
     expect(terrainSummaryFr(diff)).toBe("1 joueur entre");
   });

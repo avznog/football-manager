@@ -261,6 +261,12 @@ describe("unbalanced compositions", () => {
     expect(diff.steps).toEqual([{ kind: "in", memberId: "julien", slotId: "s-at" }]);
     expect(diff.warnings.map((warning) => warning.code)).toContain("size-changed");
     expectStepsAreApplicable(short, STARTERS, diff.steps);
+
+    // The bug this file shipped: a real change described by nothing at all. A side playing on with
+    // six, handed its planned composition for the 30th minute, was shown an empty list while a
+    // seventh man walked on — and `summariseLineupDiffFr` called it « Aucun changement ».
+    expect(describeLineupDiffFr(diff, nameOf)).toEqual(["Julien entre"]);
+    expect(summariseLineupDiffFr(diff, nameOf)).toBe("Julien entre");
   });
 
   it("takes a player off with nobody coming on", () => {
@@ -269,6 +275,26 @@ describe("unbalanced compositions", () => {
     expect(diff.goingOff).toEqual(["julien"]);
     expect(diff.steps).toEqual([{ kind: "out", memberId: "julien", slotId: "s-at" }]);
     expectStepsAreApplicable(STARTERS, short, diff.steps);
+    expect(describeLineupDiffFr(diff, nameOf)).toEqual(["Julien sort"]);
+  });
+
+  it("describes a substitution and a lone departure in the same breath", () => {
+    // Two players off, one on: one substitution, and a man who is simply not replaced.
+    const to = team({
+      "s-gb": "hugo",
+      "s-dg": "samir",
+      "s-dc": "thomas",
+      "s-dd": "nico",
+      "s-mc1": "yanis",
+      "s-mc2": "karim",
+    });
+    const diff = diffLineups(STARTERS, to, options);
+    expect(diff.substitutions).toEqual([
+      { outId: "leo", inId: "yanis", slotId: "s-mc1", positionCode: "MC" },
+    ]);
+    // The departures come before the arrivals, which is the order they happen in on the pitch.
+    expect(describeLineupDiffFr(diff, nameOf)).toEqual(["Léo → Yanis", "Julien sort"]);
+    expectStepsAreApplicable(STARTERS, to, diff.steps);
   });
 
   it("handles a double substitution", () => {
