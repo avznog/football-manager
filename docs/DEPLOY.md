@@ -152,6 +152,45 @@ vercel --prod
 Migrations run before the deploy, and they are written to be safe against the previous version still
 serving traffic for a few seconds.
 
+## Running the whole stack locally with Docker — optional
+
+Vercel plus Neon is the deployment. `compose.yaml` is something else: a way to run the app the way
+production runs it — a real production build, a real Postgres 17 — without Vercel, Neon, or a
+Homebrew service. It is **an addition, not a replacement**. `npm run dev` against the Homebrew
+Postgres is still the development loop (decisions 016 and 076).
+
+Three things it is good for: checking a production build before pushing, giving a machine with no
+Homebrew a database, and reproducing what CI's `postgres:17` service does.
+
+```bash
+npm run docker:db                     # Postgres 17 alone, on 5432, for `npm run dev` on the host
+docker compose run --rm migrate       # apply the committed migrations
+npm run docker:up                     # build and start the app on http://localhost:3000
+npm run docker:logs                   # follow it
+npm run docker:down                   # stop; add docker:reset to drop the volume too
+```
+
+An empty database needs the reference data and the first account, as in step 3:
+
+```bash
+SUPER_ADMIN_USERNAME=admin SUPER_ADMIN_PASSWORD='…' docker compose run --rm bootstrap
+```
+
+Notes worth having before something surprises you:
+
+- The credentials are the ones `.env.example` and CI already use — `football` / `football` /
+  `football_manager` — so nothing else has to be reconfigured. They are development credentials and
+  the compose file is not for production.
+- `app` waits for `db` to be healthy *and* for `migrate` to exit successfully, so the first request
+  never hits a schemaless database.
+- The `app` image is built with `NEXT_OUTPUT_STANDALONE=1`, which is the only thing that turns on
+  `output: "standalone"` in `next.config.ts`. Vercel builds without it and is unaffected.
+- Data lives in the named volume `db-data`. `docker compose down` keeps it; `npm run docker:reset`
+  deletes it.
+- Set `APP_PORT` or `POSTGRES_PORT` if 3000 or 5432 is taken.
+- `npm run test:e2e` still drives `localhost` on the host (decision 043); point its `DATABASE_URL`
+  at the compose Postgres if you want to use it instead of Homebrew.
+
 ## Environment variables, all of them
 
 | Variable | Where | Why |

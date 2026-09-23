@@ -224,3 +224,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
          Neon dashboard. §2 and §3, one command each.
 - [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6. Waits on the two above:
       a phone in daylight currently sees the Vercel login page
+- [x] The whole stack runs in containers, as an option — `compose.yaml` brings up `postgres:17`
+      (named volume, `pg_isready` healthcheck, the credentials `.env.example` and CI already use)
+      and a multi-stage production image of the app, which waits for the database to be healthy and
+      for the migrations to have applied. Development is still `npm run dev` against the Homebrew
+      Postgres: decision 076 adds compose, it does not supersede 016. `output: "standalone"` is
+      gated on `NEXT_OUTPUT_STANDALONE` so Vercel builds unchanged
