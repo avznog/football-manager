@@ -1,0 +1,81 @@
+# The checks `CLAUDE.md` calls the definition of done, run on every push and pull request.
+#
+# The unit job and the end-to-end job are deliberately separate: `npm test` stays Vitest-only and
+# fast, and a browser run — which needs Postgres, the migrations and a production build — never
+# becomes a precondition for it.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: typecheck · lint · vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  e2e:
+    name: end-to-end happy path
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: football
+          POSTGRES_PASSWORD: football
+          POSTGRES_DB: football_manager
+        ports: ["5432:5432"]
+        # Without this the first migration can race the server's own start-up.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://football:football@127.0.0.1:5432/football_manager
+      # `next start` on a built app rather than `next dev`: see `playwright.config.ts`.
+      E2E_WEB_SERVER: npm run start -- --port 3000
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # The schema the app expects, from the migrations committed alongside it — never `db:push`.
+      - run: npm run db:migrate
+
+      # Chromium only: the app is mobile-first and the suite runs one emulated phone viewport.
+      - run: npm run test:e2e:install
+
+      - run: npm run build
+      - run: npm run test:e2e
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

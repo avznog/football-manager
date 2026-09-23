@@ -710,3 +710,45 @@ than rendering something that reads as a bug:
 **Why.** Every one of these was found by reading the demo season the fixtures of decision 037 now
 build. A blank field makes the reader doubt the whole screen; a stated gap makes them doubt only the
 gap, which is the truth.
+
+## 043 — The end-to-end suite drives `localhost`, never `127.0.0.1`
+**2026-09-23** · accepted
+
+Playwright's `baseURL` is `http://localhost:3000`. `http://127.0.0.1:3000` is forbidden, in the suite
+and by hand.
+
+**Why.** Next 16's dev server treats `127.0.0.1` as a foreign origin and blocks its own dev resources
+(`⚠ Blocked cross-origin request to Next.js dev resource /_next/hmr`). The client bundle never finishes
+wiring itself up, so **the page never hydrates** — and nothing looks broken, because the
+server-rendered HTML and the plain-`<form>` Server Actions both still work. The symptom is not a blank
+screen: it is a suite that quietly tests the no-JavaScript fallbacks forever. That was the first
+failure of this slice, diagnosed by finding no `__reactFiber$…` key on any element and
+`AvailabilityControl`'s « Valider ma réponse » fallback still on screen after twenty seconds.
+
+**Consequences.** `playwright.config.ts` says so in a comment at the constant, and the spec asserts the
+fallback button is *gone* before its first tap, so a regression fails loudly instead of passing
+hollowly. `allowedDevOrigins: ["127.0.0.1"]` in `next.config.ts` would be the other fix; it was not
+taken, because one address that always works beats two that sometimes do. Note this only affects
+`next dev` — the screenshot scripts that log in against `127.0.0.1` with a forged cookie read
+server-rendered HTML and are unaffected.
+
+## 044 — The end-to-end suite owns its fixture team; CI runs it apart from `npm test`
+**2026-09-23** · accepted
+
+`e2e/` never imports `db/seed.ts` and never assumes the demo season. Each run provisions its own team
+`e2e-<runId>` with a non-playing coach and eight players, and creates everything else — the match, the
+availability answers, the sheet, both compositions, every event, the ratings — **through the UI**.
+Repeatability comes from pruning (`teams` whose slug starts with `e2e-`, then the matching `users`),
+never from truncation; reference data is ensured, never re-created.
+
+**Why.** The demo season is a *reading* fixture: it exists so a human can look at the app, and it
+changes whenever a slice needs a new situation to look at (decision 037). A suite pinned to it would
+break every time it improved, and a suite that mutated it would destroy the thing it is for. Driving
+the UI rather than the database is also the point: an assertion that the score reads « 1 – 1 » is only
+worth making if a coach's taps are what put it there.
+
+**Consequences.** `npm test` stays Vitest-only, as `CLAUDE.md` says, and `.github/workflows/ci.yml`
+keeps the two apart: `typecheck · lint · vitest` on one job, and the browser run — which needs
+Postgres, the committed migrations and a production build — on another, so a browser flake can never
+block the fast checks. `npm run test:e2e` locally reuses a dev server if one is up; CI overrides the
+command with `next start` on a built app via `E2E_WEB_SERVER`.
