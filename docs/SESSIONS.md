@@ -706,3 +706,58 @@ tap. Four consecutive clean runs at ~7 s before it was called done.
 automated except the last line, which is a human holding a phone in daylight.
 
 **Next:** deployment. It needs a Neon `DATABASE_URL` from the owner.
+
+## 2026-09-23 — the app had no French word for « it broke »
+
+Nothing was left in the backlog but deployment, which is blocked on a `DATABASE_URL`. So this session
+did the thing `CLAUDE.md` says is the cheapest review tool in the repo: walked every screen at 390 px,
+in both themes, as a coach and as a player, and asked the DOM what a screenshot hides — whether the page
+scrolls sideways, whether any box is clipped by the viewport, whether the console said anything.
+
+Thirteen routes, four passes. No clipping, no console errors, and the one overflow the first version of
+the probe reported was the competition filter on `/stats`, which is a deliberate sideways scroller with
+`w-max` inside `overflow-x-auto` — the probe was wrong and was taught to ignore anything a scroll
+container owns.
+
+The finding was in the fourteenth screen, the one the walk reached by accident: a player asking for
+`/match/<id>/saisie`. « **This page could not be found.** » Fifteen pages call `notFound()` and nothing
+caught any of them, so all fifteen answered in English, in an app whose first rule is that the UI is
+French and the code is English and the two are never mixed. And there was no `error.tsx` anywhere in the
+tree, so any failing query did the same thing with a different sentence.
+
+Five screens now, and the interesting part is why it is five and not one — decision 058 has the whole of
+it. In short: the two `not-found` pages exist for the **copy**, not the chrome (Next keeps the layouts
+that matched, so the root one already renders inside the shell — checked by deleting the other), because
+« cette adresse ne correspond à aucun écran » is true of a typo and false of a coach-only screen, and
+most of the fifteen are the second kind. The two `error` boundaries exist because a boundary cannot catch
+a failure in the layout that renders it, and `app/(app)/layout.tsx` is where `requireTeamContext()`
+talks to the database — a Neon connection limit takes the header and the tab bar with it, and only
+`app/error.tsx` is above that. There is no `global-error.tsx` on purpose: it could only fire on a root
+layout that holds no data and awaits nothing, and an unreachable screen cannot be walked at 390 px.
+
+Game mode got its own, and it is the only one that promises anything: « les actions déjà validées sont
+dans la file d'envoi, pas dans cet écran ». That is true because the outbox writes to IndexedDB before it
+POSTs and `reset()` remounts into `outbox.hydrate()` — the same reason a reload at 78′ is survivable. The
+generic boundary deliberately says no such thing, because it also catches a render that failed just after
+a Server Action, and whether that action landed is exactly what is not known. A first draft of the shared
+copy said « rien n'a été perdu » on every screen; it was cut for being unprovable.
+
+All five were provoked on purpose — a throwaway page that throws, a cookie that makes the layout throw,
+a query param that makes game mode throw — and walked **against a production build**, which is where
+they actually appear: no dev overlay, and `digest` only exists there. It is on screen as « Code de
+l'erreur » and it read `1986838792`, which is the only handle tying what a user saw to a line in the
+Vercel logs.
+
+**Tested:** one step added to `happy-path.spec.ts` — the goalkeeper, already signed in, asks for the
+coach-only entry screen and must get « Page introuvable » *and* « réservée aux coachs », must not get any
+English, and « Retour au calendrier » must land on the calendar. It pins the sentence and not just the
+heading for a specific reason: falling through to the root not-found gives the same heading in the same
+shell, and only the copy gives it away. **Mutation-tested:** removing `app/(app)/not-found.tsx` fails it
+on that sentence. Loosening the `can()` check on `/saisie` fails it on the heading, which is the second
+thing it protects.
+
+845 unit tests in 43 files, 3 e2e specs in 29 s.
+
+**Debt after this:** none outside deployment.
+
+**Next:** deployment. It still needs a Neon `DATABASE_URL` from the owner.

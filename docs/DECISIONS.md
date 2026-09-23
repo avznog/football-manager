@@ -1081,3 +1081,41 @@ was not in the queue but in what the screen did *after* the queue said « kept, 
 - A fixed clock (`page.clock.setFixedTime`) can never reach the end of a backoff, so that spec provokes
   the retry with an `online` event rather than by moving time. Worth knowing before writing the next
   test that touches the queue.
+
+## 058 — Every dead end is in French, and the one in game mode says the queue is safe
+**2026-09-23** · accepted · found by a 390 px walk of screens nothing had looked at
+
+The app now owns its failure screens: `app/not-found.tsx`, `app/(app)/not-found.tsx`, `app/error.tsx`,
+`app/(app)/error.tsx`, and `app/(app)/match/[id]/jeu/error.tsx`. There is deliberately **no**
+`global-error.tsx`.
+
+**Why.** Fifteen pages call `notFound()` and nothing caught any of them, so every one landed the user
+on Next's built-in page: « This page could not be found. » — English, in an app whose first rule is
+that the UI is French and the code is English, never mixed. And there was no error boundary of any kind
+anywhere in the tree, so one failing query took the whole screen. Neither failure mode was visible to a
+test; both were visible immediately at 390 px.
+
+**Consequences.**
+
+- **Two not-found pages, for the copy and not for the chrome.** Next keeps the layouts that matched, so
+  the root file renders inside the shell — verified by removing the other one. What differs is what is
+  true: « cette adresse ne correspond à aucun écran » fits a typo, and not a coach-only screen a player
+  asked for. Most of the fifteen calls are the second kind, which is why the in-app page says « la page
+  n'existe pas, ou elle est réservée aux coachs » — it must cover both without resolving which, because
+  answering `notFound()` instead of 403 is exactly how those screens avoid confirming a match exists.
+- **Two error boundaries, because one cannot catch its own layout.** An error in `app/(app)/layout.tsx`
+  — which is where `requireTeamContext()` talks to the database — is caught by the *parent* boundary.
+  That is not hypothetical: it is what a Neon connection limit looks like, and it takes the header and
+  the tab bar with it. So `app/error.tsx` stands alone and carries its own way back, while
+  `app/(app)/error.tsx` only replaces the content and lets the tab bar be the exit.
+- **No `global-error.tsx`.** It could only fire on a failure of the root layout, which holds no data and
+  awaits nothing. An unreachable screen cannot be verified at 390 px in both themes, and this project
+  does not ship screens it has not looked at.
+- **The digest is on screen**, as « Code de l'erreur ». In production React replaces a server error's
+  message with that hash, and it is the only thing tying what the user saw to a line in the Vercel
+  logs — on this project the person reading those logs is the person the app broke in front of.
+- **Game mode gets its own boundary, and it is the only one allowed to promise anything.** « Les actions
+  déjà validées sont dans la file d'envoi, pas dans cet écran » is true for the same reason a reload at
+  78′ is survivable: the outbox writes to IndexedDB *before* it POSTs, and `reset()` remounts, which
+  calls `outbox.hydrate()`. The generic boundary says no such thing, because it also catches a render
+  that failed just after a Server Action, and whether *that* landed is exactly what is not known.

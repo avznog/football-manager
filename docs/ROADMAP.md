@@ -6,6 +6,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Next.js + TypeScript + Tailwind scaffold, mobile-first shell, light/dark theming
 - [x] PWA manifest (installable, no push)
 - [x] `docs/` + `CLAUDE.md`
+- [x] The app owns its dead ends — `not-found` and `error` boundaries at the root and inside the
+      shell, plus one for game mode that can truthfully say the queued actions are safe
+      (decision 058). Fifteen pages called `notFound()` and every one of them landed on Next's
+      built-in « This page could not be found. », in English, in a French app; there was no error
+      boundary of any kind, so one failing query took the whole screen. All five walked at 390 px
+      in both themes against a production build
 - [x] Local Postgres via Homebrew (`npm run db:start`), Drizzle config, `DATABASE_URL` only
       — Docker was abandoned, see decision 016
 - [x] Full schema in `db/schema.ts` + first migration committed
