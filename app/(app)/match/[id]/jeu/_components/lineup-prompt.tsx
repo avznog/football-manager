@@ -10,6 +10,11 @@ export type LineupPromptProps = {
   slots: readonly PitchSlot[];
   kit: KitColors;
   onApply: () => void;
+  /**
+   * Opens TERRAIN pre-filled with this composition, for the coach who wants it *almost* as planned.
+   * Null when the viewer cannot operate the match.
+   */
+  onAdjust: (() => void) | null;
   onLater: () => void;
 };
 
@@ -24,8 +29,13 @@ export type LineupPromptProps = {
  * It is a card at the top of the page and not a modal on purpose: a dialog that appears at 45′ over
  * the pitch, while the coach is mid-tap on something else, is a dialog that gets dismissed by
  * accident — and the composition would be lost from view.
+ *
+ * « Ajuster » is the third answer, and the honest one: the plan was drawn on Thursday and somebody
+ * did not turn up. It opens TERRAIN pre-filled with the plan, so the coach changes the one thing that
+ * is wrong instead of applying a composition he knows to be stale — and it still writes nothing until
+ * he validates there.
  */
-export function LineupPrompt({ view, slots, kit, onApply, onLater }: LineupPromptProps) {
+export function LineupPrompt({ view, slots, kit, onApply, onAdjust, onLater }: LineupPromptProps) {
   return (
     <Card
       title={view.title}
@@ -63,13 +73,22 @@ export function LineupPrompt({ view, slots, kit, onApply, onLater }: LineupPromp
           className="mx-auto max-w-xs"
         />
 
-        <div className="flex gap-2">
-          <Button variant="secondary" fullWidth onClick={onLater}>
-            Plus tard
-          </Button>
-          <Button fullWidth onClick={onApply}>
-            Appliquer
-          </Button>
+        <div className="space-y-2">
+          {/* Grid, not flex: `Button` is `shrink-0`, and two `w-full` buttons in a flex row push the
+              second one off a 390 px screen. */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="secondary" fullWidth onClick={onLater}>
+              Plus tard
+            </Button>
+            <Button fullWidth onClick={onApply}>
+              Appliquer
+            </Button>
+          </div>
+          {onAdjust ? (
+            <Button variant="ghost" fullWidth onClick={onAdjust}>
+              Ajuster sur le terrain
+            </Button>
+          ) : null}
         </div>
       </div>
     </Card>
