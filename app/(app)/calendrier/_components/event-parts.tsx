@@ -13,7 +13,6 @@ import {
   AVAILABILITY_LABELS,
   COMPETITION_LABELS,
   NOT_RECORDED_FR,
-  pluralize,
   resultLabel,
   resultLetter,
   scoreLineFr,
@@ -21,7 +20,7 @@ import {
 } from "@/lib/calendar/labels";
 import { capitalizeFirst } from "@/lib/calendar/time";
 import type { AvailabilityCounts, CalendarMatch, CalendarTraining } from "@/lib/calendar/timeline";
-import { pendingCount } from "@/lib/calendar/timeline";
+import { answersLineFr } from "@/lib/calendar/timeline";
 
 /** « Match » or « Entraînement » — the one thing to read first on a mixed list. */
 export function KindBadge({ kind }: { kind: "match" | "training" }) {
@@ -61,7 +60,12 @@ export function MatchStatusBadge({ status }: { status: MatchStatus }) {
   return null;
 }
 
-/** « 9 dispo · 2 absents · 1 peut-être · 1 sans réponse », dropping whatever is zero. */
+/**
+ * « 9 dispo · 2 pas dispo · 1 peut-être · 1 sans réponse », dropping whatever is zero.
+ *
+ * The wording is `answersLineFr`, in `lib/calendar/timeline.ts`, because it was wrong here and
+ * untestable here: nothing under `app/` is collected by Vitest (decision NNN).
+ */
 export function AnswersLine({
   answers,
   squadSize,
@@ -71,19 +75,7 @@ export function AnswersLine({
   squadSize: number;
   className?: string;
 }) {
-  const pending = pendingCount(squadSize, answers);
-  const parts = [
-    answers.yes > 0 ? `${answers.yes} dispo` : null,
-    answers.no > 0 ? pluralize(answers.no, "absent") : null,
-    answers.maybe > 0 ? `${answers.maybe} peut-être` : null,
-    pending > 0 ? `${pending} sans réponse` : null,
-  ].filter((part): part is string => part !== null);
-
-  if (parts.length === 0) {
-    return <p className={className}>Personne n’a encore répondu.</p>;
-  }
-
-  return <p className={className}>{parts.join(" · ")}</p>;
+  return <p className={className}>{answersLineFr(answers, squadSize)}</p>;
 }
 
 /**

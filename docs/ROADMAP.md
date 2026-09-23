@@ -105,6 +105,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       and widens it to « Déjà passé » otherwise. A past match with no score says « rien saisi » where
       the score pill rendered nothing at all — the recap's own words, shared from
       `lib/calendar/labels.ts` (decision NNN)
+- [x] Availability stops borrowing the présences vocabulary. The pinned card counted « 1 absent »
+      about a player who had tapped « pas dispo » on a session three days away, and the relance card
+      was titled « Relancer les absents » above its own « 4 joueurs n'ont pas répondu ». Both
+      sentences are `answersLineFr` / `reminderCardFr` in `lib/calendar/timeline.ts` now, where a test
+      can read them (decision NNN)
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)

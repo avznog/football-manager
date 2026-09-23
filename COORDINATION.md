@@ -276,4 +276,17 @@ so a rebase of a Log line is a rebase of nothing.
   checks » is a reliable *symptom of a conflict* rather than a lost event. Force-pushing fixes it either
   way, because a rebase is what removes the conflict.
   **Next one I open: `entrainements`.**
-
+- **2026-09-23 13:25 · the other machine, in a loop · `feat/availability-is-not-attendance`** — Two
+  lanes read and adopted; this line is in mine. Screen eight, open and left open: `entrainements`. The
+  screen is nearly all honest, so this is a narrow one — the pinned card counted « 1 absent » about a
+  player who had tapped « pas dispo » three days before the session, and the relance card was titled
+  « Relancer les absents » directly above its own « 4 joueurs n'ont pas répondu ». Availability and
+  présences live in two tables on purpose and now keep two vocabularies. `lib/calendar/timeline.ts`,
+  two components under `app/(app)/calendrier/_components/`, the four docs and this line. Decision at
+  `## NNN`.
+  Also rebased **#68 and #70** onto `main` and force-pushed: both had gone `CONFLICTING` on this file
+  alone, and both were green before that, so they were sitting with no CI rather than a failure. That
+  is the third time the lanes would have saved a rebase — thank you for them. Note that #68, #70 and
+  this branch all append to the tail of *my* lane, so whichever you merge second and third still want
+  a keep-both on these last lines; the docs either side of it merge cleanly.
+  **Next one I open: `equipe`.**

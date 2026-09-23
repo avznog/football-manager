@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
 import {
   addMinutes,
+  answersLineFr,
   availabilityIsWorthShowing,
   buildReminderMessage,
   byStartAscending,
@@ -13,6 +14,7 @@ import {
   matchWindowMinutes,
   pastSectionTitleFr,
   pendingCount,
+  reminderCardFr,
   splitTimeline,
   tallyAvailability,
   trainingWindowMinutes,
@@ -356,7 +358,7 @@ describe("pastSectionTitleFr", () => {
     expect(pastSectionTitleFr([played, played])).toBe("Déjà joué");
   });
 
-  /** The demo season interleaves five sessions with the matches: an entraînement is not « joué ». */
+  /** The demo season interleaves four sessions with the matches: an entraînement is not « joué ». */
   it("widens the word as soon as a training is in the list", () => {
     expect(pastSectionTitleFr([played, session])).toBe("Déjà passé");
   });
@@ -371,5 +373,67 @@ describe("pastSectionTitleFr", () => {
 
   it("is only ever rendered over a non-empty list", () => {
     expect(pastSectionTitleFr([])).toBe("Déjà joué");
+  });
+});
+
+describe("answersLineFr", () => {
+  it("reads as one scannable line, in the order the coach asks the questions", () => {
+    expect(answersLineFr({ yes: 7, no: 1, maybe: 1 }, 13)).toBe(
+      "7 dispo · 1 pas dispo · 1 peut-être · 4 sans réponse",
+    );
+  });
+
+  /**
+   * The 26 September session, read three days early: one player had tapped « pas dispo » and the line
+   * called him « 1 absent », a fact about an evening nobody had attended yet.
+   */
+  it("never calls a player who said no an absent one", () => {
+    const line = answersLineFr({ yes: 7, no: 1, maybe: 1 }, 13);
+    expect(line).not.toContain("absent");
+    expect(line).toContain("1 pas dispo");
+  });
+
+  /** « 2 pas dispo » is the same words as « 1 pas dispo »: nothing here is pluralised. */
+  it("does not pluralise, so every row reads the same way", () => {
+    expect(answersLineFr({ yes: 0, no: 2, maybe: 0 }, 2)).toBe("2 pas dispo");
+  });
+
+  it("drops whatever is zero rather than printing « 0 »", () => {
+    expect(answersLineFr({ yes: 13, no: 0, maybe: 0 }, 13)).toBe("13 dispo");
+  });
+
+  /** Thirteen people owing an answer is the coach's call to action, not an empty state. */
+  it("counts the silence when a squad has not answered at all", () => {
+    expect(answersLineFr({ yes: 0, no: 0, maybe: 0 }, 13)).toBe("13 sans réponse");
+  });
+
+  /** Only a squad with nobody in it has nothing to count. */
+  it("falls back to a sentence when there is nothing to count", () => {
+    expect(answersLineFr({ yes: 0, no: 0, maybe: 0 }, 0)).toBe("Personne n’a encore répondu.");
+  });
+});
+
+describe("reminderCardFr", () => {
+  /**
+   * The card was headed « Relancer les absents » over its own description, « 4 joueurs n’ont pas
+   * répondu ». Not answering is not refusing — and decision 087: a heading is a claim about every row
+   * under it.
+   */
+  it("does not call the players it is about absent", () => {
+    const heading = reminderCardFr(4);
+    expect(heading.titleFr).toBe("Relancer ceux qui n’ont pas répondu");
+    expect(heading.titleFr).not.toContain("absent");
+    expect(heading.descriptionFr).toBe("4 joueurs n’ont pas répondu.");
+  });
+
+  it("agrees with itself in the singular", () => {
+    expect(reminderCardFr(1).descriptionFr).toBe("1 joueur n’a pas répondu.");
+  });
+
+  it("does not invite a relance when there is nobody to relancer", () => {
+    expect(reminderCardFr(0)).toEqual({
+      titleFr: "Personne à relancer",
+      descriptionFr: "Tout le monde a répondu. Rien à faire.",
+    });
   });
 });
