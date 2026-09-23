@@ -123,6 +123,14 @@ calling `tsc` directly: `PageProps<"/route">` does not exist until the route typ
 One branch per slice, named `feat/<slice>`. Open a PR describing what the slice does and how to
 verify it. **Squash-merge** into `main`. Never commit directly to `main`.
 
+Only `main` deploys — a push to any other branch builds nothing on Vercel (decision 080), so the
+preview URL to check a change on is the one CI's browser job builds, or a local `npm run build`.
+
+**Versions are the `version` field in `package.json`, and CI turns them into tags.** Bump it in the PR
+that earns the bump and the `tag` job cuts `v<version>` on `main` once the tests and the migration have
+passed (decision 081). Never create a release tag by hand: a tag that does not follow that path is a
+claim about a version nothing verified.
+
 **Nothing is done until it is on `origin`.** The whole reason this project keeps its spec, its
 decisions and its migrations in git is that sessions share no memory: work that exists only in a
 local working tree is work the next session cannot find. So, without being asked:

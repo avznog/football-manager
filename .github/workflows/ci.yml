@@ -118,3 +118,39 @@ jobs:
             exit 1
           fi
           npm run db:migrate
+
+  # One annotated tag per version of the app, cut from `main` once that commit is tested *and*
+  # migrated — so a tag never names a version whose schema change failed to apply (decision 081).
+  #
+  # The version lives in `package.json` and nowhere else. Bump it in the pull request that earns the
+  # bump; this job does the rest, because a convention that needs a human to remember it is one the
+  # next session will not know about. Re-running a push whose tag exists is a no-op, not a failure.
+  tag:
+    name: tag the version
+    needs: [checks, e2e, migrate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tags, so the "does it already exist" check can see them.
+          fetch-depth: 0
+
+      - name: tag this commit with the version in package.json
+        run: |
+          version="v$(node -p 'require("./package.json").version')"
+
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "$version already exists — nothing to do. Bump package.json to cut a new one."
+            exit 0
+          fi
+
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "$version" -m "$version — $(git log -1 --format=%s)"
+          git push origin "refs/tags/$version"
+          echo "::notice::Tagged $version at $(git rev-parse --short HEAD)."

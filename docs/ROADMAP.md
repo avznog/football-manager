@@ -242,6 +242,16 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       applied the committed SQL to Neon in 41 seconds — `migrations applied`, exit 0 — after
       typecheck · lint · Vitest · the browser run. Every previous observation of it was a *skip* on a
       pull request, so the one branch that matters had been untested
+- [x] Only `main` deploys. Vercel built every branch — nine preview deployments in twenty-three
+      minutes of one session, each a running copy of the app pointed at the production Neon database,
+      because `DATABASE_URL` is the same value for Preview and Production. `vercel.json` holds the one
+      rule that stops it and nothing else (decision 080). The minimatch trap is written down: `*` does
+      not cross a `/`, so a lone `*` would have matched `main` and missed every `feat/<slice>` branch
+- [x] Versions are tagged. There were none — eight milestones and a live deployment with no way to name
+      what was running except a commit hash. The version is `package.json`'s `version` field, and the
+      `tag` job cuts `v<version>` on `main` after the tests *and* the migration pass, so a tag never
+      names a version whose schema change failed (decision 081). Bumping is still a human judgement;
+      remembering to tag is not
 - [ ] `db:bootstrap` — the super admin. This is the last thing between a working deployment and a
       usable one: the schema is there and every screen is reachable, but there is no account to log in
       with, and an invite-only app cannot make one from the browser (decision 052). One command,
@@ -254,6 +264,6 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       both, because it is idempotent and re-hashes the password every time
 - [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6. No longer blocked by the
       login page; it now waits only on an account to log in with
-- [ ] Give Preview its own Neon branch. `DATABASE_URL` is set for Preview too and points at
-      production, so every pull request previews against the real season — behind Vercel
-      Authentication, which is what makes it tolerable rather than fine
+- [ ] Give Preview its own Neon branch — **before** previews are ever turned back on, not now. Decision
+      080 removed the hazard by removing the previews; this is the fix that would make them safe to
+      have again, and the roadmap keeps it because « we turned it off » is not « we solved it »
