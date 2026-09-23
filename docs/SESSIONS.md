@@ -1920,3 +1920,32 @@ manner. They should not be considered clear.
 Verified at 390 px in both themes as `ali`, whose own card is « joueur 8 sur 11 » and now reads « Ta
 note pour ce match ». 1002 tests, three new. `npm run test:e2e` green in 28 s — the happy path walks
 the notation flow.
+
+### « 3 hors feuille » on a team of thirteen with eleven on the sheet
+
+The first defect this pass found by *doing arithmetic on a screenshot* rather than by reading it as
+somebody. `dark-coach-match-a-venir.png`, the composition card: « 7 titulaires · 3 remplaçants · 1
+supporter · 3 hors feuille ». Fourteen. The availability card directly above it on the same screen
+says « 11 réponses sur 13 joueurs », and `dark-coach-feuille.png` — the same match, one tap away —
+says « 2 hors feuille ». Both cannot be true, and the true one is the one nobody would open to check.
+
+The thirteenth « player » is `Coach`, the demo team's `is_player = false` member: decision 094's row
+two, the row `createTeam` inserts on every new deployment. So this is not a demo-data artifact. It is
+the state a real team is in from the moment it is created until somebody joins it, and it was
+mis-stating the squad on two of the three screens that print the line.
+
+The filter was already written, correctly, once — inline in `feuille/page.tsx`. `getCompositionMembers`
+hands every caller `isPlayer` on the row, so the two defective call sites had the column and no reason
+to suspect they needed it. `isSheetCandidate` in `lib/composition/plan.ts` is that inline predicate
+given a name, and `countSquadRoles` now applies it to its own input instead of trusting its caller.
+`SheetMember` carries `isPlayer` so the sheet screen can go through the same function it used to
+open-code. Decision NNN; the rule is decision 094's, applied to a subtraction instead of a label.
+
+Worth recording for whoever audits next: `squadSummaryFr`'s doc comment has said « a thirteen-player
+squad … leaves **two** players unaccounted for » since it was written. The prose was right and the code
+was wrong, and the prose is what a reviewer reads. A doc comment is not a test.
+
+Verified at 390 px in light and dark, on all three screens, as `karim`: 7 + 3 + 1 + 2 = 13 on the match
+page and the sheet, and 7 + 4 + 1 + 1 = 13 on the CS Morvan compositions header, whose « 1 hors
+feuille » is Mehdi — the one name SQL says is missing from that sheet. 1005 tests, three new, one of
+which asserts the four counts sum to the number of *players* and not to the size of the membership.

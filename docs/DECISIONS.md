@@ -2246,3 +2246,49 @@ but it is a product question about a team that does not exist yet, not a false s
 that does, and inventing « iel » or a genderless rewrite of six screens on the way past a ratings
 card would be a decision taken sideways. Written down here so the next session finds it stated rather
 than missed.
+
+## NNN — « Hors feuille » counts players, and the app knows which members are players
+
+**2026-09-23.** Decision 094 found `/moi` deciding what a member *is* from `role` alone and ignoring
+`is_player`. This is the same column being ignored one screen over, except that here it does not
+produce a wrong label — it produces a wrong number, printed in three places, two of which disagree
+with the third about the same eleven names.
+
+The match sheet against Étoile du Parc holds eleven of the demo team's thirteen players: seven
+titulaires, three remplaçants, one supporter. The team has a fourteenth member, `Coach`, who is
+`is_player = false` and has never played a minute — row two of decision 094's table, the row every
+new deployment starts in, because `createTeam` inserts exactly it.
+
+- `/match/[id]`, the composition card: « 7 titulaires · 3 remplaçants · 1 supporter · **3 hors
+  feuille** ».
+- `/match/[id]/composition`, the header: the same line, from the same unfiltered list.
+- `/match/[id]/feuille`, one tap away: « … · **2 hors feuille** », which is right.
+
+Two of those are false, they sit one tap either side of the true one, and the first of them adds up to
+fourteen on a card whose neighbour on the same screen says « 11 réponses sur **13 joueurs** ». A coach
+counting on his fingers finds a player he cannot name. `squadSummaryFr`'s own doc comment predicted
+the right answer — « a thirteen-player squad … leaves **two** players unaccounted for » — so the
+sentence describing the code was correct while the code was not, for four milestones.
+
+The cause is not the filter being wrong anywhere. It is that the filter existed in exactly one place,
+inline in a `.tsx` page:
+
+```
+.filter((member) => member.isPlayer || member.squadRole !== null)
+```
+
+`getCompositionMembers` returns every member and carries `isPlayer` on the row, so both defective call
+sites had the column in their hands and no reason to think they needed it. **A rule that lives at one
+call site is not a rule, it is a habit** — and it is untestable where it sat, because Vitest collects
+`lib/**` and nothing under `app/` (the same mechanism behind decisions 094 and 095).
+
+`isSheetCandidate` in `lib/composition/plan.ts` is that line, named, and `countSquadRoles` now applies
+it to its own input rather than trusting the caller to have done it. Trusting the caller is the thing
+that broke. The disjunction is kept and is the interesting half: a non-player who *is* on the sheet
+stays in the pool, because hiding him would leave the one screen that can take him back off as the one
+screen that no longer shows him.
+
+The rule, which is decision 094's applied to arithmetic rather than to a label: **a total the reader
+can count has to be counted over the same set the reader is counting.** « Hors feuille » is not the
+complement of the sheet within the membership, it is the complement within the players — and when a
+sentence and a subtraction disagree about who is in the set, it is the subtraction that is lying.

@@ -23,7 +23,7 @@ import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { MATCH_STATUS_LABELS } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
-import { countSquadRoles, sheetNextStepFr } from "@/lib/composition/plan";
+import { countSquadRoles, isSheetCandidate, sheetNextStepFr } from "@/lib/composition/plan";
 import { getCompositionMembers, getFieldedMemberIds } from "@/lib/composition/queries";
 import { getMatch, getMatchAnswers } from "@/lib/match/queries";
 
@@ -56,14 +56,17 @@ export default async function MatchSheetPage({
   const availability = new Map(answers.map((answer) => [answer.teamMemberId, answer.status]));
 
   // Coaches who never play are not offered, but one already on the sheet stays visible: dropping a
-  // row behind the coach's back would be worse than showing it.
+  // row behind the coach's back would be worse than showing it. The rule is `isSheetCandidate`'s,
+  // shared with the counting — this screen had it inline, which is why the two screens either side
+  // of it counted a thirteenth player nobody had left out (decision NNN).
   const sheetMembers: SheetMember[] = members
-    .filter((member) => member.isPlayer || member.squadRole !== null)
+    .filter(isSheetCandidate)
     .map((member) => ({
       membershipId: member.membershipId,
       name: member.name,
       jerseyNumber: member.jerseyNumber,
       squadRole: member.squadRole,
+      isPlayer: member.isPlayer,
       isInjured: member.isInjured,
       primaryPositionLabelFr: member.primaryPositionCode
         ? positionLabelFr(member.primaryPositionCode)

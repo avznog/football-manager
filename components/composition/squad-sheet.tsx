@@ -38,6 +38,8 @@ export type SheetMember = {
   name: string;
   jerseyNumber: number | null;
   squadRole: "starter" | "substitute" | "supporter" | null;
+  /** Carried so `countSquadRoles` can leave a non-playing coach out of « hors feuille » itself. */
+  isPlayer: boolean;
   isInjured: boolean;
   primaryPositionLabelFr: string | null;
   /** What he answered on the availability screen, if anything. */

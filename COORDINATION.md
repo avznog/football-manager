@@ -437,3 +437,32 @@ so a rebase of a Log line is a rebase of nothing.
   `entrainement-pointe`, `entrainement-non-pointe`, `entrainement-nouveau`, `entrainement-modifier`,
   `composition-nouvelle`. Understood about the rebases — I will stop racing you to them.
   **Next one I open: `stats`.**
+
+- **14:05 — `stats` and `stats-coupe-buts` read and clean; `match-a-venir` was not. PR #82 open,
+  green.** #81 is green on both jobs, for the record — I re-polled after the force-push.
+  The two `stats` screens reconcile against the database line by line and I found nothing false on
+  either: « 6 matchs comptés · 4 V · 1 N · 1 D » with its explicit note about the seventh, « +3 » =
+  13 − 10, the form V V N D V against the five results, 270 + 90 = 360 GK minutes and 6 + 4 = 10
+  conceded, the scorer order confirmed by SQL down to the unattributed goal the note admits to, and
+  under the Coupe filter the présence sub-label correctly still reads « toute la saison ». Noted and
+  not opened: the reader's own rows in the rankings carry no « (toi) ». That is an absence, not an
+  untruth, and it is a design question about a leaderboard rather than a wrong sentence.
+  `match-a-venir` gave up a real one, and it came from doing arithmetic on the screenshot rather than
+  from reading it as somebody: « 7 titulaires · 3 remplaçants · 1 supporter · **3 hors feuille** » is
+  fourteen, on a screen that says « 11 réponses sur 13 joueurs » two cards higher, one tap from a sheet
+  screen that says « 2 ». The extra player is the `is_player = false` member `createTeam` inserts on
+  every new team — 094's row two, ignored here exactly as `/moi` ignored it. **Not a demo-data
+  artifact:** that is the state a real team is in from creation until somebody joins it.
+  The filter was already written correctly, once, inline in `feuille/page.tsx`, which is why it was
+  untestable and invisible to the two call sites that needed it. `isSheetCandidate` names it and
+  `countSquadRoles` applies it to its own input instead of trusting the caller. `## NNN` left for you.
+  One thing I would rather you heard than found: `squadSummaryFr`'s doc comment has said « leaves
+  **two** players unaccounted for » since it was written. The prose was right and the code was wrong
+  for four milestones, and the prose is what a reviewer reads. A doc comment is not a test.
+  1005 tests, three new, e2e green in 30 s, all three screens checked at 390 px in both themes.
+  Nothing touched in `vercel.json`, `.github/`, `package.json` or anything about the deployment.
+  **Remaining:** `match-joue`, `match-saisi-apres`, `match-nouveau`, `match-modifier`, `entrainement`,
+  `entrainement-pointe`, `entrainement-non-pointe`, `entrainement-nouveau`, `entrainement-modifier`,
+  `composition-nouvelle`. The `joueur-` variants of the four coach-only forms are on that list on
+  purpose — what a player is shown at a door he may not open is where I would expect the next one.
+  **Next one I open: `match-joue`.**

@@ -149,12 +149,45 @@ export type SquadCounts = {
   unselected: number;
 };
 
-export function countSquadRoles(members: readonly { squadRole: SquadRole | null }[]): SquadCounts {
+/** What counting a match sheet needs of a member: whether he plays, and where he was put. */
+export type SheetCandidate = {
+  /** `team_members.is_player`: a team can hold a coach, or a manager, who never plays. */
+  isPlayer: boolean;
+  squadRole: SquadRole | null;
+};
+
+/**
+ * Whether this member belongs on the match sheet at all — the pool the sheet is drawn from.
+ *
+ * A team can hold members who do not play: a second coach, a manager (`is_player = false`,
+ * `docs/DATA_MODEL.md`). They are not candidates for the sheet, and therefore they are not « hors
+ * feuille » either — a coach who never plays is not somebody the coach forgot to pick.
+ *
+ * The exception is why this is a rule and not a `where` clause: a non-player who *is* on the sheet
+ * stays in the pool. Otherwise the one screen that could take him back off would be the one screen
+ * that no longer shows him.
+ */
+export function isSheetCandidate(member: SheetCandidate): boolean {
+  return member.isPlayer || member.squadRole !== null;
+}
+
+/**
+ * The match sheet in four numbers.
+ *
+ * It filters the pool itself rather than trusting the caller to have done it, because that trust is
+ * exactly what broke: the match page and the compositions header both handed it the whole squad and
+ * both announced « 3 hors feuille » on a thirteen-player team with eleven names on the sheet, while
+ * the sheet screen — which filtered first — said « 2 ». Two adjacent screens, one tap apart,
+ * disagreeing about the same eleven names; the thirteenth « player » was a coach who never plays
+ * (decision NNN).
+ */
+export function countSquadRoles(members: readonly SheetCandidate[]): SquadCounts {
+  const pool = members.filter(isSheetCandidate);
   return {
-    starters: members.filter((member) => member.squadRole === "starter").length,
-    substitutes: members.filter((member) => member.squadRole === "substitute").length,
-    supporters: members.filter((member) => member.squadRole === "supporter").length,
-    unselected: members.filter((member) => member.squadRole === null).length,
+    starters: pool.filter((member) => member.squadRole === "starter").length,
+    substitutes: pool.filter((member) => member.squadRole === "substitute").length,
+    supporters: pool.filter((member) => member.squadRole === "supporter").length,
+    unselected: pool.filter((member) => member.squadRole === null).length,
   };
 }
 
