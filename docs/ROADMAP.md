@@ -60,7 +60,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       `components/action-sheet/terrain-sheet.tsx`): drag, tap-then-tap or keyboard, one
       `LINEUP_APPLIED` per confirmation, and « Ajuster sur le terrain » on the planned-composition
       prompt — see decision 045, which amends 032
-- [x] Planned composition prompts, pre-filled and confirmed
+- [x] Planned composition prompts, pre-filled and confirmed — including against a pitch that is a
+      player short, where the prompt used to list nothing at all while a man walked on
 - [x] Event timeline with per-event "annuler" (VOID)
 - [x] Final whistle → freeze `match_player_stats`
 

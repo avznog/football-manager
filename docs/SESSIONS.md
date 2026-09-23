@@ -414,4 +414,20 @@ and for everybody else the row is the same single line it was.
   beats compact, but the right answer is probably to move the two controls onto the player's profile
   page and leave the list to reading.
 
+**Then, the same day:** PR #26, the third debt from the entry above — `describeLineupDiffFr` printing
+nothing for an unpaired arrival or departure.
+
+It was filed as a tidiness item: `terrainChangesFr` works around it, the shared helper is still
+wrong for other callers. Reading the other callers turned it into a defect in game mode.
+`pendingLineupView` diffs a planned composition against the **pitch**, not against the previous
+plan — and a seven-a-side side plays on with six whenever somebody limps off and the bench is empty.
+Julien goes off at the 20th, the composition planned for the 45th brings Yanis on, and the prompt
+listed nothing at all while `summariseLineupDiffFr` called it « Aucun changement ». Invariant 3 says
+the app proposes and the coach confirms; it was satisfied to the letter and empty in substance.
+
+The unpaired lines moved from `terrain.ts` into the shared helper and the workaround is gone. The one
+thing the omission was accidentally getting right — seven arrivals against an empty pitch are a team
+sheet, not seven changes — is now said out loud in `deduceChanges` and `pendingLineupView`, with a
+test on each. Seven tests fail if the unpaired lines are removed again; two fail if either guard is.
+
 **Next:** deployment, and nothing else. It needs a Neon `DATABASE_URL` from the owner.
