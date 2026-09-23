@@ -322,7 +322,12 @@ describe("prefillNoticeFr", () => {
       nameOf,
     );
 
-    expect(lines[0]).toContain("à partir de la 30ᵉ minute");
+    // A reference, not the heading: « de la composition de la 30ᵉ minute », never the card's own
+    // « À partir de la 30ᵉ minute » quoted inside a sentence.
+    expect(lines[0]).toBe(
+      "Équipe reprise de la composition de la 30ᵉ minute : déplace seulement ce qui change. " +
+        "Rien n’est enregistré avant que tu valides.",
+    );
   });
 
   it("names a single player it could not replace, in the singular", () => {

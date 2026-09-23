@@ -23,7 +23,7 @@
 import type { SlotAssignment } from "@/lib/match/lineup";
 
 import { restrictToMembers, restrictToSlots } from "./editor";
-import { planInForceBefore, planTitleFr, type PlannedLineup } from "./plan";
+import { ordinalFr, planInForceBefore, type PlannedLineup } from "./plan";
 
 export type PlanPrefill = {
   /** The composition being copied, or `null` when nothing is in force before that minute. */
@@ -95,6 +95,20 @@ export function prefillFromPlans(input: {
 }
 
 /**
+ * Which composition the team was taken from, as the tail of a sentence: « de la composition de
+ * départ », « de la composition de la 30ᵉ minute ».
+ *
+ * `planTitleFr` is a heading and cannot be quoted inside a sentence: « reprise de la composition
+ * « composition de départ » » stutters, and « reprise de la composition « à partir de la 30ᵉ
+ * minute » » puts a preposition inside a noun. A title and a reference to that title are two
+ * different strings, so this is the second one.
+ */
+export function planSourcePhraseFr(lineup: { fromMinute: number; isInitial: boolean }): string {
+  if (lineup.isInitial || lineup.fromMinute === 0) return "de la composition de départ";
+  return `de la composition de la ${ordinalFr(lineup.fromMinute)} minute`;
+}
+
+/**
  * What the editor says while it is pre-filled, one sentence per paragraph.
  *
  * Two things have to be true at once, and the second is the one this repo keeps getting wrong: the
@@ -112,17 +126,17 @@ export function prefillNoticeFr(
 ): string[] {
   if (!prefill.source) return [];
 
-  const from = planTitleFr(prefill.source).toLocaleLowerCase("fr-FR");
+  const from = planSourcePhraseFr(prefill.source);
 
   if (prefill.assignments.length === 0) {
     return [
-      `Rien n’a pu être repris de la composition « ${from} » : sa formation n’est plus disponible. ` +
+      `Rien n’a pu être repris ${from} : sa formation n’est plus disponible. ` +
         "Place tes joueurs — rien n’est enregistré avant que tu valides.",
     ];
   }
 
   const lines = [
-    `Équipe reprise de la composition « ${from} » : déplace seulement ce qui change. ` +
+    `Équipe reprise ${from} : déplace seulement ce qui change. ` +
       "Rien n’est enregistré avant que tu valides.",
   ];
 
