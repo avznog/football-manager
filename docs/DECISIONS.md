@@ -2056,3 +2056,32 @@ description does agree, because it is a sentence.
 Both sentences moved to `answersLineFr` and `reminderCardFr` in `lib/calendar/timeline.ts`. They were
 inline JSX, which is to say untestable: Vitest collects `lib/**` and `db/**` and nothing under
 `app/`, so a claim written in a component is a claim no test can read.
+
+## NNN — A route guard's exclusion list is derived from the file class, never enumerated
+**2026-09-23** · accepted
+
+`proxy.ts`'s matcher excluded static assets by naming them: `favicon.ico`, `icon.svg`,
+`apple-icon.png`, `manifest.webmanifest`, `robots.txt`, `sitemap.xml`. Its comment said "the files
+served from `public/`", and `public/` holds three files, none of which was in the list —
+`icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, the three `app/manifest.ts` points at.
+
+So every request for a PWA icon was guarded, and an unauthenticated browser asking for one got
+`307 /connexion?suivant=%2Ficon-192.png`, followed it, received HTML, and reported
+« Download error or resource isn't a valid image ». Verified against the compose stack with `curl`.
+Not a local quirk: production answered the same way, which means the install prompt has had no icon
+since the day the icons were added.
+
+The lesson is about the shape, not the six names. **An exclusion list in a route guard is a claim
+about every file that will ever be static, so it cannot be a list.** It has to be maintained by
+whoever adds a file, nothing reminds them, and the failure is silent — a manifest icon that fails to
+download breaks no page, no build and no assertion. The matcher now excludes the class: `_next/static`,
+`_next/image`, and any path ending in `.<ext>`. Every route in this app is a French word with no dot in
+it, so nothing routable is lost, and the fourth file dropped into `public/` is served without anyone
+editing this file.
+
+And it has a test, which is the part that makes the claim checkable rather than merely true today:
+`proxy.test.ts` compiles `config.matcher[0]` into a `RegExp` and asserts every entry of `public/`,
+**read from the directory at test time**, is not matched — hardcoding the three names would rebuild
+the same stale list one layer down. The same suite asserts `/calendrier` and `/match/1/jeu` still
+are matched, so an exclusion can never quietly swallow the guard, and drives `proxy()` itself with
+real `NextRequest`s for the redirect behaviour that had no test at all.

@@ -305,3 +305,21 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Give Preview its own Neon branch — **before** previews are ever turned back on, not now. Decision
       080 removed the hazard by removing the previews; this is the fix that would make them safe to
       have again, and the roadmap keeps it because « we turned it off » is not « we solved it »
+
+## First run and static assets
+
+Two defects found by running the app out of `compose.yaml` rather than by reading a screen — the
+first one live in production too.
+
+- [x] The PWA install prompt has an icon. `proxy.ts` was guarding `public/` — its exclusion list
+      named six static files and not one of the three the manifest points at, so every icon request
+      answered `307 /connexion` and the browser reported an invalid image, in production as much as
+      locally. The exclusion is now the class of static paths rather than an enumeration, and
+      `proxy.test.ts` reads `public/` at test time so a fourth file cannot break it silently
+      (decision NNN). The proxy's redirects had no test before this either
+- [x] A local `docker compose up` can be logged into. It left a migrated schema with zero users and
+      no way to find that out; `compose.yaml` now has a `seed` service in the `setup` profile
+      (`npm run docker:seed`) for the demo season, and the header comment, the `bootstrap` comment
+      and `docs/DEPLOY.md` state that `up` creates no account and that `admin`/`change-me` is a seed
+      account `db:bootstrap` deliberately refuses. `db/seed.ts`'s `NODE_ENV=production` guard is
+      untouched — the service runs from the `tools` image, which sets no `NODE_ENV`
