@@ -35,7 +35,7 @@
  * rather than in production. There is deliberately no second way to write a match.
  */
 
-// Must come first: `db/client.ts` reads DATABASE_URL as it loads.
+// Must come first: nothing below may read `process.env` before `.env.local` is loaded.
 import "./load-env";
 
 import { randomUUID } from "node:crypto";

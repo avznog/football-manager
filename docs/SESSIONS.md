@@ -1094,3 +1094,37 @@ sur 13 pointés » directly under a note claiming the session merely ran short.
 sentence the app displays disagreed with both. Demo data is the first thing the owner and any reviewer
 read (`CLAUDE.md`: walking the season after `db:reset` is the cheapest review tool in the repo), so a
 fixture that contradicts itself is a screen stating something untrue like any other.
+
+## A build that needed a secret
+
+The owner connected the repository to Vercel this morning. Three deploys, three failures, 36 to 43
+seconds each — and the cause was in this repository, not in the Vercel project: `db/client.ts` read
+`DATABASE_URL` at module scope and threw. `next build` imports every route module to collect its
+configuration, so the throw landed in « Collecting page data » and took the build down after
+TypeScript had already passed and every page had already compiled.
+
+`db` and `sql` are proxies over a lazily opened connection now. Nothing happens on import; the check
+throws on the first query, with a message that names Vercel as well as `.env.local` — the old one
+said « Copy .env.example to .env.local », which is not something you can do on a serverless host.
+Decision 075 has the reasoning and the trade it accepts.
+
+Verified rather than assumed, because a proxy in front of an ORM is exactly the kind of change that
+typechecks and then fails at runtime:
+
+- `DATABASE_URL= npm run build` — the whole build passes, all 23 routes dynamic, which is the state
+  Vercel was in
+- `npm run test:e2e` — 3 passed in 27.6s, real Postgres, real queries, `db.transaction`, `sql.end()`
+- a throwaway script through `tsx --conditions=react-server`: the tagged template, `sql.unsafe` and
+  a Drizzle `select` all return the same row
+- with no URL at all: the import is silent and the query throws the new sentence, which is the
+  behaviour the decision claims
+
+Three comments elsewhere said the client « reads DATABASE_URL as it loads ». It does not any more,
+so they say what is actually true now: load the environment first because nothing below may read
+`process.env` before it.
+
+`docs/DEPLOY.md` §4 gained the consequence, which is the part that will matter to whoever deploys
+next: **a green build is no longer evidence that `DATABASE_URL` is set.** A deploy without it
+compiles perfectly and then fails on every screen. Step 5 in a browser is the proof.
+
+Still blocked on the owner: the variable itself. Nothing in the repository can supply it.

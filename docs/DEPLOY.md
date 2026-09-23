@@ -72,6 +72,12 @@ vercel --prod
 
 Next.js is detected without configuration; there is no `vercel.json` and none is needed.
 
+**A green build does not mean `DATABASE_URL` is set.** The build deliberately does not need it
+(decision 075): the connection opens on the first query, not on import, so a deploy with no database
+compiles perfectly and then answers every page with « Un problème est survenu ». The proof that the
+variable is right is step 5, in a browser. If the site builds and every screen fails, it is this
+variable — the server log will say so in as many words.
+
 `SUPER_ADMIN_USERNAME` and `SUPER_ADMIN_PASSWORD` are **not** needed in Vercel. They are read by
 `db/bootstrap.ts` and `db/seed.ts`, both of which run from a command line, never from the
 application. Leaving a password in the deployment environment for no reason is how it leaks.
