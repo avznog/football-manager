@@ -442,7 +442,12 @@ function picker(page: Page, title: string): Locator {
 /**
  * Gives every player on the sheet a note, in the order the flow presents them: 9 to the man of the
  * match, 5 to everybody else. The card on screen is read rather than assumed, so the loop cannot
- * silently rate the same player eight times if the auto-advance ever changes.
+ * silently rate the same player eight times.
+ *
+ * Two taps per teammate, not one: selecting a note no longer advances (decision 102). Tapping the
+ * number and asserting it is checked *before* tapping « Suivant » is the regression this suite owes
+ * the owner's report — the old flow replaced the card so fast that no state existed in which the
+ * chosen number was visibly chosen.
  */
 async function rateEveryone(page: Page, fixture: Fixture, best: FixturePlayer): Promise<void> {
   await expect(page.getByRole("heading", { level: 1, name: "Noter mes coéquipiers" })).toBeVisible();
@@ -464,6 +469,21 @@ async function rateEveryone(page: Page, fixture: Fixture, best: FixturePlayer): 
 
     const note = player.membershipId === best.membershipId ? 9 : 5;
     await segment(card, `score:${player.membershipId}-${note}`).click();
+
+    // Still on the same teammate, with the note visibly his: the card did not move under the thumb.
+    await expect(card.getByRole("heading", { level: 2 })).toHaveText(name);
+    // An attribute selector, not `#id`: these ids contain a `:`, which a CSS id selector would read
+    // as the start of a pseudo-class.
+    await expect(card.locator(`input[id="score:${player.membershipId}-${note}"]`)).toBeChecked();
+    await expect(card.getByText(`Note choisie : ${note} / 10`)).toBeVisible();
+
+    const isLast = step === fixture.players.length - 1;
+    if (isLast) {
+      // Nothing to press on: the last card offers no forward button, only the submit below.
+      await expect(page.getByRole("button", { name: "Suivant" })).toHaveCount(0);
+    } else {
+      await page.getByRole("button", { name: "Suivant", exact: true }).click();
+    }
   }
 
   await expect(page.getByText(`${fixture.players.length} / ${fixture.players.length} notés`)).toBeVisible();

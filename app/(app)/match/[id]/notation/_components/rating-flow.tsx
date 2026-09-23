@@ -12,9 +12,10 @@
  * - **It works with JavaScript disabled.** The markup is native radios and textareas inside one
  *   `<form>`; the pagination only starts once the component has mounted. Server-rendered, the page
  *   is a long but complete form that submits correctly.
- * - **Tapping a note moves you on.** That is the whole interaction: tap, tap, tap. It does *not*
- *   advance if you have started a comment for that player — you would lose the thread of what you
- *   were writing.
+ * - **Selecting and advancing are two taps** (decision 102). Tapping a note used to move you on by
+ *   itself, which meant the number you had just chosen was replaced by the next teammate's card
+ *   before it had time to look chosen: the reader never saw his own answer register. Now the tap
+ *   selects, the selection is unmistakable, and « Suivant » is the only thing that advances.
  * - **A note already given is shown, locked.** Ratings are final (see `lib/rating/actions.ts`), so
  *   those cards render as a read-only line with no input to resubmit.
  * - **No animation.** The card swap is a visibility change. Nothing here to stutter on an old
@@ -29,6 +30,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Textarea } from "@/components/ui/textarea";
 import { submitRatings } from "@/lib/rating/actions";
+import { chosenScoreFr, nextIndex, previousIndex, ratingStep } from "@/lib/rating/flow";
 import { ratingLegendFr } from "@/lib/rating/labels";
 import { playedLabelFr, ratingCardPositionFr } from "@/lib/rating/progress";
 import { RATING_COMMENT_MAX } from "@/lib/rating/validation";
@@ -59,6 +61,8 @@ const subscribeToNothing = () => () => {};
 
 type Draft = { score: number | null; comment: string };
 
+const EMPTY_DRAFT: Draft = { score: null, comment: "" };
+
 export function RatingFlow({ teamId, matchId, targets }: RatingFlowProps) {
   const [state, action, pending] = useActionState(submitRatings, undefined);
 
@@ -83,36 +87,37 @@ export function RatingFlow({ teamId, matchId, targets }: RatingFlowProps) {
   const [index, setIndex] = useState(firstOpen);
 
   const current = targets[Math.min(index, targets.length - 1)];
-  const draftOf = (membershipId: string): Draft =>
-    drafts[membershipId] ?? { score: null, comment: "" };
+  const draftOf = (membershipId: string): Draft => drafts[membershipId] ?? EMPTY_DRAFT;
 
   const filled = remaining.filter((target) => draftOf(target.membershipId).score !== null).length;
   const done = targets.length - remaining.length;
   const total = targets.length;
 
+  // Selecting a note no longer advances (decision 102): it replaces the draft's score and stops
+  // there, so the chosen number stays on screen long enough to be seen — and long enough to be
+  // changed by tapping another one.
   function setScore(target: RatingFlowTarget, score: number) {
-    const draft = draftOf(target.membershipId);
     setDrafts((previous) => ({
       ...previous,
-      [target.membershipId]: { ...draft, score },
+      [target.membershipId]: { ...(previous[target.membershipId] ?? EMPTY_DRAFT), score },
     }));
-
-    // Move on — unless the player is in the middle of writing something about this teammate.
-    if (draft.comment.trim().length === 0) goNext();
   }
 
   function setComment(membershipId: string, comment: string) {
     setDrafts((previous) => ({
       ...previous,
-      [membershipId]: { ...draftOf(membershipId), comment },
+      [membershipId]: { ...(previous[membershipId] ?? EMPTY_DRAFT), comment },
     }));
   }
 
-  function goNext() {
-    setIndex((value) => Math.min(value + 1, targets.length - 1));
-  }
-
-  const allFilled = filled === remaining.length && remaining.length > 0;
+  const step = ratingStep({
+    index,
+    total,
+    currentLocked: current !== undefined && current.myScore !== null,
+    currentSelected: current ? draftOf(current.membershipId).score !== null : false,
+    filled,
+    remaining: remaining.length,
+  });
 
   return (
     <form action={action} className="space-y-4">
@@ -143,7 +148,7 @@ export function RatingFlow({ teamId, matchId, targets }: RatingFlowProps) {
 
       <ul className="space-y-4">
         {targets.map((target, position) => (
-          <li key={target.membershipId} hidden={paginated && position !== index}>
+          <li key={target.membershipId} hidden={paginated && position !== step.index}>
             <RatingCard
               target={target}
               draft={draftOf(target.membershipId)}
@@ -158,32 +163,49 @@ export function RatingFlow({ teamId, matchId, targets }: RatingFlowProps) {
       </ul>
 
       {paginated ? (
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => setIndex((value) => Math.max(0, value - 1))}
-            disabled={index === 0}
-            className="flex-1"
-          >
-            Précédent
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={goNext}
-            disabled={index >= total - 1}
-            className="flex-1"
-          >
-            {current && draftOf(current.membershipId).score === null && current.myScore === null
-              ? "Passer"
-              : "Suivant"}
-          </Button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setIndex((value) => previousIndex(value, total))}
+              disabled={!step.canGoPrevious}
+              className="flex-1"
+            >
+              Précédent
+            </Button>
+            {/* Nothing on the last card: there is no teammate after him, and a greyed « Suivant »
+                there would be the third button in this repository to look pressable and do nothing.
+                The submit button underneath is the way out. */}
+            {step.next ? (
+              <Button
+                variant={step.next.variant}
+                onClick={() => setIndex((value) => nextIndex(value, total))}
+                className="flex-1"
+              >
+                {step.next.label}
+              </Button>
+            ) : null}
+          </div>
+          {step.hint ? (
+            <p className="text-center text-xs text-ink-muted" aria-live="polite">
+              {step.hint}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
       <div className="space-y-2">
-        <Button type="submit" fullWidth pending={pending} disabled={filled === 0}>
-          {allFilled ? "Terminer et voir le résumé" : "Enregistrer mes notes"}
+        <Button type="submit" fullWidth pending={pending} disabled={!step.submit.enabled}>
+          {step.submit.label}
         </Button>
+        {/* Nothing is written card by card — the whole sheet is one POST — so the notes chosen so far
+            are still only on this phone. The reader has to be told, now that choosing a note no
+            longer looks like committing it. */}
+        {step.unsent ? (
+          <p className="text-center text-xs font-medium text-warning" aria-live="polite">
+            {step.unsent}
+          </p>
+        ) : null}
         <p className="text-center text-xs text-ink-subtle">
           Une note est définitive. Tu verras les notes des autres quand tu auras noté tout le monde.
         </p>
@@ -243,6 +265,7 @@ function RatingCard({
   const commentField = `comment:${target.membershipId}`;
   const commentId = `${commentField}-input`;
   const playedLabel = playedLabelFr(target.minutes);
+  const chosenLabel = chosenScoreFr(draft.score);
 
   return (
     <Card
@@ -288,7 +311,9 @@ function RatingCard({
             <legend className="mb-2 text-sm text-ink-muted">
               {ratingLegendFr(target.isSelf)}
             </legend>
-            <div className="grid grid-cols-6 gap-1.5">
+            {/* `gap-2` is what the selected token's ring needs: 2 px of ring plus 1 px of offset on
+                each of two neighbours is exactly 6 px, and at `gap-1.5` two rings touched. */}
+            <div className="grid grid-cols-6 gap-2">
               {SCORES.map((score) => {
                 const id = `${scoreField}-${score}`;
                 return (
@@ -305,8 +330,15 @@ function RatingCard({
                     <label
                       htmlFor={id}
                       className={cn(
-                        "flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-border/60 bg-surface-2 font-mono text-base font-semibold text-ink-muted tabular-nums select-none",
+                        "flex min-h-12 cursor-pointer items-center justify-center rounded-xl border-2 border-border/60 bg-surface-2 font-mono text-base font-semibold text-ink-muted tabular-nums select-none",
+                        // The selection has to survive being glanced at in daylight, one-handed, and
+                        // it cannot lean on colour alone: the fill and the border change hue, and the
+                        // ring and the bigger, bolder digit change the shape of the token.
+                        // accent/accent-ink is the pair `globals.css` documents at 6.59 light and
+                        // 7.16 dark, so the fill is legible in either theme.
                         "peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink",
+                        "peer-checked:text-lg peer-checked:font-bold",
+                        "peer-checked:ring-2 peer-checked:ring-accent peer-checked:ring-offset-1 peer-checked:ring-offset-surface",
                         "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent",
                       )}
                     >
@@ -316,6 +348,13 @@ function RatingCard({
                 );
               })}
             </div>
+            {/* The token is highlighted, but a phone in the sun is a poor place to read a fill, and
+                a live region is the only way the choice is announced at all. */}
+            {chosenLabel !== null ? (
+              <p className="mt-2 text-sm font-semibold text-ink" aria-live="polite">
+                {chosenLabel}
+              </p>
+            ) : null}
           </fieldset>
 
           <div>

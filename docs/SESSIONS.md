@@ -2134,3 +2134,36 @@ Zod schema cannot drift from the 12 in the column. 1054 unit tests.
 Not done: **no 390 px pass**, and the migration has not been applied anywhere but a test database.
 The flocage is deliberately absent from the pitch discs — a 44 px target already carrying a number
 and a short name — which is a judgement rather than an omission.
+
+### 2026-09-23 — The note nobody ever saw selected
+
+Third of the owner's eight remarks, and the one where the fix was to remove a line rather than add a
+feature: « il n'y a aucun effet visuel car on passe directement au joueur suivant ».
+
+The pad in `rating-flow.tsx` has had a selected state since M6 — `peer-checked:bg-accent`,
+`peer-checked:text-accent-ink` — and it was correct. `setScore` called `goNext()` two lines after
+writing the draft, so the card carrying the highlighted number was hidden in the same render. The
+state existed and was never displayed once, which is decision 097's lesson from the other side: a
+screen can be right in the source and absent on the phone.
+
+So: the tap selects, « Suivant » advances, and the advance is the only thing that button does. The
+old flow had a second, invisible rule — it did *not* advance if a comment had been started — so the
+same gesture behaved differently depending on a textarea, which is worse than either behaviour.
+
+The selection got two cues that are not colour (a ring, and a bolder, larger digit) and one that is
+not visual at all: « Note choisie : 8 / 10 » in an `aria-live` region. `gap-1.5` became `gap-2` on
+the grid because two adjacent rings touched at 6 px. On a card with nothing selected the forward
+button says « Passer sans noter » — a partial sheet is legal (decision 023) — and on the last card
+there is no forward button at all rather than a greyed one.
+
+One thing the second tap forced into the open: nothing is written card by card, so « chosen » and
+« sent » are two different states, and the auto-advance made the first feel like the second. The
+screen says so now, under the submit: « 3 notes choisies, pas encore envoyées. »
+
+Decision 102. `lib/rating/flow.ts` is new and pure, 20 tests, 1049 in all. The happy path taps twice
+per teammate and asserts the card did not move between the taps.
+
+Not done: **no 390 px pass in either theme**, and the visual is most of this change. Also noted and
+not touched, because it predates this and is a different argument: the submit button carries
+`disabled` when nothing is selected, so with JavaScript off it is server-rendered disabled, which
+contradicts the file's own claim to work without JavaScript.

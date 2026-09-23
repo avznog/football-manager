@@ -2564,3 +2564,40 @@ the list a coach reads when he orders a set of shirts — as « floqué MOMO »,
 between two « · » separators reads as another position code. Not on the pitch discs, and that is a
 choice rather than an omission: a disc is a 44 px target that already carries a number and a short
 name, and the flocage would be the same person printed on it twice.
+
+## 102 — Noter est deux gestes : choisir, puis avancer
+
+**2026-09-23** · accepted
+
+In the rating flow, tapping a score selects it and does nothing else. « Suivant » is the only thing
+that advances. On a card with no score selected that button says « Passer sans noter »; on the last
+card there is no forward button at all, only the submit beneath it.
+
+**Why.** The owner: « quand on note les joueurs, il faut que l'on remarque la note qui est
+sélectionnée. pour l'instant, il n'y a aucun effet visuel car on passe directement au joueur
+suivant. » The pad already *had* a selected state — accent fill, accent-ink digit — and it was
+correct. It was simply never on screen: `setScore` called `goNext()` in the same handler, so the card
+the reader had just answered was replaced in the same frame. There was no moment in which his answer
+was visible, which means no way to check it and no way to notice a mis-tap on a thumb-sized target.
+The second tap costs eleven taps across a sheet and buys the only thing the pad was for.
+
+It also removes an invisible rule: the old flow advanced *unless* a comment had been started, so one
+gesture did two different things depending on a textarea the reader may have typed one character
+into.
+
+**Consequences.** The selection cannot lean on colour alone — a filled token, a `ring` halo, a
+larger and bolder digit, and « Note choisie : 8 / 10 » in words in an `aria-live` region, because a
+fill is hard to read on a phone in the sun and silent to a screen reader. « Passer sans noter »
+rather than a disabled « Suivant »: a partial set is legal (decision 023), so skipping must stay
+possible, and a button that looks pressable and does nothing is a defect this repository has already
+paid for twice. The last card renders no forward button rather than a greyed one, for the same
+reason.
+
+The write contract does not change — one POST for the whole sheet — but the second tap makes the gap
+between *chosen* and *sent* visible, so the screen now states it: « 3 notes choisies, pas encore
+envoyées. » A reader who selects a note and closes the tab still loses it, as before; he is no longer
+left to find that out for himself.
+
+Labels, enablement and the derived sentences live in `lib/rating/flow.ts` (decision 097). The
+Playwright happy path now taps twice per teammate and asserts the card did *not* move between the two
+taps, which is the regression itself.
