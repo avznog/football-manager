@@ -296,6 +296,11 @@ export type SeasonStatsResult = SeasonStats & {
   /** Sessions with at least one player judged — the denominator's denominator. */
   markedSessions: number;
   /**
+   * Per member, how many of those hidden matches hold a note about *them* — which is the only number
+   * a single player's average may be explained with (`ratings.ts`).
+   */
+  hiddenRatingMatchesByMember: Record<string, number>;
+  /**
    * Matches whose numbers had to be replayed from the log because the cache had no row for them.
    * Zero once M4 freezes every final whistle; useful while it does not.
    */
@@ -411,6 +416,7 @@ export const getSeasonStats = cache(
       matchesConsidered: matchRows.length,
       liveMatches: liveCount,
       markedSessions,
+      hiddenRatingMatchesByMember: visibility.hiddenRatedCounts,
       reducedFromLog: reducedMatchIds.length,
     };
   },

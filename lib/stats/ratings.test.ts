@@ -120,3 +120,39 @@ describe("the decision 007 gate, read season-wide", () => {
     expect(visibility("karim").visibleMatchIds).toContain("m1");
   });
 });
+
+describe("how many hidden matches hold a note about one player", () => {
+  /**
+   * Hugo cannot read m1, which carries notes about Karim and about himself. Both of them are one
+   * match short; nobody else is short of anything, and « no key » has to mean zero rather than
+   * « the season's number », which is the defect this map exists to kill.
+   */
+  it("counts a hidden match once per player judged in it", () => {
+    expect(visibility("hugo").hiddenRatedCounts).toEqual({ karim: 1, hugo: 1 });
+  });
+
+  /** Two notes about Karim in m1 are one match he is short of, not two. */
+  it("does not count a match twice for a player judged twice", () => {
+    const seen = visibility("hugo", [
+      ...AUTHORS,
+      { matchId: "m1", raterMemberId: "nico", ratedMemberId: "karim" },
+    ]);
+    expect(seen.hiddenRatedCounts.karim).toBe(1);
+  });
+
+  /** A player nobody judged in the hidden match is not short of it — his average never had it. */
+  it("leaves out a player the hidden match holds no note about", () => {
+    const seen = visibility("hugo", [
+      ...AUTHORS,
+      { matchId: "m2", raterMemberId: "karim", ratedMemberId: "nico" },
+    ]);
+    expect(seen.hiddenMatchIds).toEqual(["m1", "m2"]);
+    expect(seen.hiddenRatedCounts).toEqual({ karim: 1, hugo: 1, nico: 1 });
+    expect(seen.hiddenRatedCounts.gerard).toBeUndefined();
+  });
+
+  it("holds nothing back from a reader who has earned every match", () => {
+    expect(visibility("karim").hiddenRatedCounts).toEqual({});
+  });
+});
+
