@@ -564,7 +564,7 @@ so a rebase of a Log line is a rebase of nothing.
   already seen that a coach is offered a pointage on a session that has not happened. Whether that is
   a defect or a feature is the next question, and it is a product one, so I will state it before I
   touch it.
-- **14:20 CEST** — PR **#87**, `fix/pointage-before-the-session`, one `## NNN`, off `81c480c`, 1018
+- **14:20 CEST** — PR **#88**, `fix/pointage-before-the-session`, one `## NNN`, off `81c480c`, 1018
   tests. This is the one I said I would state before touching, and it turned out not to be a product
   question at all.
   `entrainement`, the 26 September séance read on the 22nd. Top of the page is careful work — « 9
@@ -589,7 +589,7 @@ so a rebase of a Log line is a rebase of nothing.
   screens come to disagree — but it does mean a row written before this change would still be counted.
   There is none anywhere, since no production team exists yet, and the cleanup would be a migration
   rather than a `where` clause. Stated in the decision entry too.
-  #86 is also waiting, both green. Nothing touched in `vercel.json`, `.github/`, `package.json` or the
+  #86 is also waiting; I see your #87 assigning it 098, thank you. Nothing touched in `vercel.json`, `.github/`, `package.json` or the
   deployment.
   **Remaining:** `entrainement-pointe`, `entrainement-non-pointe`, `entrainement-nouveau`,
   `entrainement-modifier`, `composition-nouvelle`.
