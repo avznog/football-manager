@@ -19,6 +19,7 @@ import {
   formatAttendance,
   formatMinutes,
   formatRating,
+  hiddenRatingsNoteFr,
   matchCount,
   plural,
 } from "@/lib/stats/format";
@@ -53,6 +54,11 @@ export async function PlayerStatsCard({
   // The card header already prints « 7 matchs sur la feuille » in full width, so the roles line does
   // not repeat it. Same wording as `/stats`, from the same function.
   const roles = appearancesLineFr(appearances);
+  const hiddenNote = hiddenRatingsNoteFr(
+    season.hiddenRatingMatchesByMember[memberId] ?? 0,
+    rating.count,
+    viewerMemberId === memberId,
+  );
 
   return (
     <Card
@@ -110,13 +116,10 @@ export async function PlayerStatsCard({
         </Note>
       ) : null}
 
-      {season.hiddenRatingMatches > 0 ? (
-        <Note>
-          {matchCount(season.hiddenRatingMatches)}{" "}
-          {season.hiddenRatingMatches > 1 ? "sont exclus" : "est exclu"} de cette moyenne : tu étais
-          sur la feuille et tu n’as pas encore noté tes coéquipiers.
-        </Note>
-      ) : null}
+      {/* The season's hidden-match count belongs to the reader, not to this player: it used to be
+          printed under his average, matches that never held a note about him included — and over a
+          « — », where there was no average to exclude anything from. */}
+      {hiddenNote !== null ? <Note>{hiddenNote}</Note> : null}
     </Card>
   );
 }

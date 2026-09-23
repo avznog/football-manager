@@ -60,6 +60,18 @@ export type RatingVisibility = {
   visibleMatchIds: string[];
   /** Matches that hold ratings the viewer has not earned the right to see yet. */
   hiddenMatchIds: string[];
+  /**
+   * Per member, how many hidden matches hold a note **about them**.
+   *
+   * `hiddenMatchIds.length` is a fact about the season and about the reader; this is the fact a
+   * profile needs. A player whose average is short of two matches is not the same reader as one whose
+   * average is short of none, and until this existed the profile card quoted the season number under
+   * a single player's average — a match that never held a note about him included (decision NNN).
+   *
+   * Computed from the author rows, which carry `ratedMemberId` and no score: knowing *that* somebody
+   * was judged is not reading the judgement, so this costs no extra query and leaks nothing.
+   */
+  hiddenRatedCounts: Record<string, number>;
 };
 
 export function ratingVisibility(input: {
@@ -84,9 +96,14 @@ export function ratingVisibility(input: {
 
   const hasRatings = new Set<string>();
   const ratedByViewer = new Map<string, string[]>();
+  /** matchId → who was judged in it, deduplicated: thirteen notes about Ali are one match. */
+  const judgedIn = new Map<string, Set<string>>();
   for (const author of input.authors) {
     if (!wanted.has(author.matchId)) continue;
     hasRatings.add(author.matchId);
+    const judged = judgedIn.get(author.matchId);
+    if (judged) judged.add(author.ratedMemberId);
+    else judgedIn.set(author.matchId, new Set([author.ratedMemberId]));
     if (input.viewerMemberId === null || author.raterMemberId !== input.viewerMemberId) continue;
     const submitted = ratedByViewer.get(author.matchId);
     if (submitted) submitted.push(author.ratedMemberId);
@@ -95,6 +112,7 @@ export function ratingVisibility(input: {
 
   const visibleMatchIds: string[] = [];
   const hiddenMatchIds: string[] = [];
+  const hiddenRatedCounts: Record<string, number> = {};
 
   for (const matchId of input.matchIds) {
     const sheet = sheets.get(matchId) ?? [];
@@ -111,8 +129,12 @@ export function ratingVisibility(input: {
       continue;
     }
     // Only worth telling the viewer about a match that actually holds ratings.
-    if (hasRatings.has(matchId)) hiddenMatchIds.push(matchId);
+    if (!hasRatings.has(matchId)) continue;
+    hiddenMatchIds.push(matchId);
+    for (const memberId of judgedIn.get(matchId) ?? []) {
+      hiddenRatedCounts[memberId] = (hiddenRatedCounts[memberId] ?? 0) + 1;
+    }
   }
 
-  return { visibleMatchIds, hiddenMatchIds };
+  return { visibleMatchIds, hiddenMatchIds, hiddenRatedCounts };
 }

@@ -12,6 +12,7 @@ import {
   formatRating,
   formatRecord,
   formatSigned,
+  hiddenRatingsNoteFr,
   matchCount,
   plural,
   resultLabelOf,
@@ -172,3 +173,38 @@ describe("ATTENDANCE_NOT_FILTERED_FR", () => {
     expect(ATTENDANCE_NOT_FILTERED_FR).not.toContain("cette carte");
   });
 });
+
+describe("hiddenRatingsNoteFr", () => {
+  /** Nothing held back: the dash beside it means what it says, and a note would invent a reason. */
+  it("says nothing when the reader has earned every match", () => {
+    expect(hiddenRatingsNoteFr(0, 4, false)).toBeNull();
+  });
+
+  /**
+   * Ali's own profile: every note he has received sits in a match he has not rated, so the card shows
+   * « — ». The old sentence announced two matches « exclus de cette moyenne » under no moyenne at all.
+   */
+  it("explains a missing average rather than excluding matches from it", () => {
+    const note = hiddenRatingsNoteFr(2, 0, true);
+    expect(note).toBe(
+      "Tes notes sur 2 matchs restent cachées tant que tu n’as pas noté tes coéquipiers : " +
+        "c’est pourquoi il n’y a pas de moyenne.",
+    );
+    expect(note).not.toContain("exclus de cette moyenne");
+  });
+
+  /** Somebody else's profile, same gate, same reason — it is always the reader who has not voted. */
+  it("says « ses notes » on another player's profile", () => {
+    expect(hiddenRatingsNoteFr(1, 0, false)).toContain("Ses notes sur 1 match");
+    expect(hiddenRatingsNoteFr(1, 0, true)).toContain("Tes notes sur 1 match");
+  });
+
+  /** With something visible, the average is real and the sentence says what it covers. */
+  it("bounds an average that exists instead of denying it", () => {
+    expect(hiddenRatingsNoteFr(1, 4, false)).toBe(
+      "Ses notes sur 1 match restent cachées tant que tu n’as pas noté tes coéquipiers. " +
+        "La moyenne ne porte que sur les matchs que tu as notés.",
+    );
+  });
+});
+

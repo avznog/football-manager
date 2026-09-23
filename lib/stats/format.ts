@@ -145,3 +145,36 @@ export function appearancesLineFr(
 
   return parts.length > 0 ? parts.join(" · ") : null;
 }
+
+/**
+ * Why a player's average is short, or missing altogether.
+ *
+ * The profile card used to print the **season's** hidden-match count under **one player's** average:
+ * « 2 matchs sont exclus de cette moyenne ». Two things were wrong with it. The count is a fact about
+ * the reader's own unrated matches, so it included matches that never held a note about this player
+ * and were therefore never in his average. And it said « cette moyenne » over a « — », on a profile
+ * where every note received is hidden — announcing the exclusion of two matches from an average that
+ * was not there.
+ *
+ * So the sentence takes both numbers — how many hidden matches hold a note about *this* player, and
+ * how many notes the reader can actually see — and whose profile it is, because « tes notes » on one's
+ * own page is the whole point of the gate. Null when there is nothing held back, in which case the
+ * dash means what it says: nobody has rated him.
+ *
+ * The reason is always the reader's own doing — decision 007's gate, applied season-long by decision
+ * 021 — which is why it is second person, on one's own profile and on somebody else's alike.
+ */
+export function hiddenRatingsNoteFr(
+  hiddenMatches: number,
+  visibleNotes: number,
+  isSelf: boolean,
+): string | null {
+  if (hiddenMatches <= 0) return null;
+
+  const whose = isSelf ? "Tes notes" : "Ses notes";
+  const held = `${whose} sur ${matchCount(hiddenMatches)} restent cachées tant que tu n’as pas noté tes coéquipiers`;
+
+  return visibleNotes === 0
+    ? `${held} : c’est pourquoi il n’y a pas de moyenne.`
+    : `${held}. La moyenne ne porte que sur les matchs que tu as notés.`;
+}

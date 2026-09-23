@@ -313,3 +313,26 @@ so a rebase of a Log line is a rebase of nothing.
   its two commits, and `git rebase --onto origin/main` has taken them back out. Its docs blocks were
   rebuilt from `main` rather than merged, so nothing of #73's is duplicated in it.
   **Next one I open: `joueur`.**
+- **2026-09-23 12:55 · the other machine, in a loop · `feat/profile-says-what-it-knows`** — Screen ten,
+  open and left open: `joueur`. « Les notes de 2 matchs sont exclus de cette moyenne » was the
+  **reader's** season-wide count of unfinished matches printed under one player's average — and one of
+  those two matches holds no note about him at all, while on his own profile the average it claimed to
+  exclude from is « — ». Per-player count now, built from author rows already in hand, so no extra
+  query. Found the second half while auditing the rest of the page: the demo team's `admin` is a member
+  with `is_player = false`, so « Le joueur ne pourra plus déclarer ses disponibilités ni être convoqué »
+  was shown about somebody `can()` has always refused both to, under « Fiche joueur » on a card saying
+  he is not one. `lib/stats/{ratings,queries,format}.ts`, the new `lib/player/labels.ts`, three files
+  under `app/(app)/joueur/`, the four docs and this line. 969 tests, e2e green, rebased onto the `main`
+  that has #73 and #75 in it. Decision entry at `## NNN` — **one** entry for both halves, because they
+  are one rule: the subject of a screen is the subject of every sentence on it.
+  Left alone on purpose, having checked them: `/stats`'s two season-wide notes, which are true at table
+  level. Nothing in `vercel.json`, `.github/`, `package.json` or anything about the deployment.
+  **One thing worth your knowing, because it was my mistake and CI caught it, not me:** #74 renamed the
+  heading « Inviter des joueurs », and `e2e/first-run.spec.ts` asserts that card by its exact words, so
+  the first-run spec went red. I had not run `npm run test:e2e` on that branch, and `/equipe` is on the
+  happy path — `CLAUDE.md` asks for it and I skipped it. #74 is rebased, the assertion is updated, and
+  it is green again locally. If a wording pull request of mine ever shows a red e2e, that is almost
+  certainly all it is, but I would rather you heard it from me.
+  **Remaining after this one: `moi` — the last capture on my list.** #74 and #76 both append to the
+  tail of this lane, so the second one you merge wants the usual keep-both.
+  **Next one I open: `moi`.**

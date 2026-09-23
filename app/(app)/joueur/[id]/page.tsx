@@ -20,6 +20,7 @@ import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { formatDateFr, injuryStatus, parisDate } from "@/lib/player/injury";
+import { noPlayerSheetTitleFr, removeMemberCardFr } from "@/lib/player/labels";
 import { positionsSignature } from "@/lib/player/positions";
 import { getPlayerProfile } from "@/lib/player/queries";
 import { removeMember, setMemberRole } from "@/lib/team/actions";
@@ -56,6 +57,10 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
 
   const today = parisDate(new Date());
   const status = injuryStatus(profile.injuries, today);
+  // The card below used to be one string promising « le joueur » would lose his availabilities and
+  // his convocations — neither of which a member of the encadrement has ever had, and the demo team
+  // has such a member. What the removal actually takes away is now derived (decision NNN).
+  const removal = removeMemberCardFr(profile.displayName, profile.isPlayer);
 
   return (
     <div className="space-y-6">
@@ -177,7 +182,8 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
           isSelf={isSelf}
         />
       ) : (
-        <Card title="Fiche joueur">
+        /* Not « Fiche joueur »: the one sentence under that heading says this member is not one. */
+        <Card title={noPlayerSheetTitleFr()}>
           <p className="text-sm text-ink-muted">
             Ce membre fait partie de l’encadrement&nbsp;: pas de postes ni de blessures à suivre.
           </p>
@@ -193,23 +199,15 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
       ) : null}
 
       {canRemove && !isSelf && !profile.isLastCoach ? (
-        <Card
-          title="Retirer de l’effectif"
-          description="Le joueur ne pourra plus déclarer ses disponibilités ni être convoqué. Les matchs qu’il a joués gardent son nom : rien n’est effacé."
-        >
+        <Card title={removal.titleFr} description={removal.descriptionFr}>
           {/* A plain form, as with « Supprimer ce match »: no confirmation dialog to get wrong, and
               it works without JavaScript. `removeMember` sets `left_at` and sends the coach back to
               the squad list — this page would be a 404 on the next render. */}
           <form action={removeMember}>
             <input type="hidden" name="teamId" value={team.id} />
             <input type="hidden" name="memberId" value={profile.membershipId} />
-            <Button
-              type="submit"
-              variant="danger"
-              fullWidth
-              aria-label={`Retirer ${profile.displayName} de l’effectif`}
-            >
-              Retirer {profile.displayName} de l’effectif
+            <Button type="submit" variant="danger" fullWidth aria-label={removal.buttonFr}>
+              {removal.buttonFr}
             </Button>
           </form>
         </Card>
