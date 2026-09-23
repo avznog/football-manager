@@ -1,33 +1,50 @@
 /**
  * Who may see which ratings — the season-long reading of decision 007.
  *
- * Decision 007 gates the *match* screen: « a player cannot see anyone else's ratings until they have
- * submitted their own », which stops anchoring and copying. A season average would be a hole
- * straight through that gate: publish the average of a match to somebody who has not rated it yet
- * and they have read the ratings, just with one number instead of thirteen.
+ * Decision 007 gates the *match* screen: « a player cannot see anyone else's ratings until they
+ * have submitted their own ». A season average would be a hole straight through that gate: publish
+ * the average of a match to somebody who has not rated it and they have read the ratings, just with
+ * one number instead of thirteen. So the same gate applies here, match by match (decision 021).
  *
- * So the same gate applies here, per match:
+ * **The rule itself lives in `lib/rating/progress.ts`** and this module does not restate it. It only
+ * applies it to many matches at once, for one viewer:
  *
- * - a viewer who **could rate** the match (on the sheet as `starter` or `substitute`, which is the
- *   invariant `docs/DATA_MODEL.md` puts on `ratings`) sees it only once they have submitted;
- * - a viewer who **could not** rate it — a supporter, a non-playing coach, a super admin, somebody
- *   who joined the team afterwards — has nothing to submit and nothing to anchor on, so the match
- *   is visible to them. Gating them instead would hide the season from the coach for ever, which
- *   decision 007 never asked for.
+ * - who may rate a match, and whom they owe a note, comes from `rateableMemberIds`;
+ * - whether a set is complete comes from `ratingProgress`;
+ * - whether that unlocks the reading comes from `ratingVisibility`.
  *
- * "Has submitted" is "has at least one rating for that match". M6 submits a player's whole set in
- * one action, so the two coincide — **that is a contract M6 must keep**: a flow that saves one card
- * at a time would let a player see the averages after rating a single teammate.
+ * That indirection is the point. « Has submitted » is **a complete set**, not "has submitted
+ * something": decision 023 deliberately keeps a partial set, so a player who rated four teammates
+ * in the car has rows in the table and has still earned nothing. Two implementations of this rule
+ * would drift the day one of them was relaxed, and the one that drifted would leak the notes.
  *
- * Pure. The query layer fetches the rows, this decides, and the screen says how many matches are
- * still hidden so a missing average never reads as a bug.
+ * Pure. The query layer decides what to fetch from the answer (`queries.ts` selects no score for a
+ * gated match at all), and the screen says how many matches are still hidden so that a missing
+ * average never reads as a bug.
  */
 
 import type { SquadRole } from "@/db/schema";
+import {
+  type SheetEntry,
+  isOnRateableSheet,
+  rateableMemberIds,
+  ratingProgress,
+  ratingVisibility as gateFor,
+} from "@/lib/rating/progress";
 
-export type RatingRowWithRater = {
+/**
+ * Who rated whom, in which match — **without the scores**. This is all the gate needs, and asking
+ * for no more than it needs is what lets `queries.ts` leave a gated match's scores in the database.
+ */
+export type RatingAuthorRow = {
   matchId: string;
   raterMemberId: string;
+  ratedMemberId: string;
+};
+
+/** A score the viewer has earned the right to read. */
+export type VisibleRatingRow = {
+  matchId: string;
   ratedMemberId: string;
   score: number;
 };
@@ -45,67 +62,57 @@ export type RatingVisibility = {
   hiddenMatchIds: string[];
 };
 
-/** Only a member on the sheet as a starter or a substitute may rate (`docs/DATA_MODEL.md`). */
-export function couldRate(role: SquadRole | undefined): boolean {
-  return role === "starter" || role === "substitute";
-}
-
 export function ratingVisibility(input: {
   /** The matches under consideration — already filtered by competition. */
   matchIds: readonly string[];
   squad: readonly SquadRoleRow[];
-  ratings: readonly RatingRowWithRater[];
+  /** Who rated whom, scores excluded. */
+  authors: readonly RatingAuthorRow[];
   /** The viewer's `team_members.id`, or null for a super admin who is not a member. */
   viewerMemberId: string | null;
 }): RatingVisibility {
   const wanted = new Set(input.matchIds);
 
-  const roleOfViewer = new Map<string, SquadRole>();
-  if (input.viewerMemberId !== null) {
-    for (const row of input.squad) {
-      if (row.teamMemberId === input.viewerMemberId && wanted.has(row.matchId)) {
-        roleOfViewer.set(row.matchId, row.role);
-      }
-    }
+  const sheets = new Map<string, SheetEntry[]>();
+  for (const row of input.squad) {
+    if (!wanted.has(row.matchId)) continue;
+    const entry: SheetEntry = { teamMemberId: row.teamMemberId, role: row.role };
+    const sheet = sheets.get(row.matchId);
+    if (sheet) sheet.push(entry);
+    else sheets.set(row.matchId, [entry]);
   }
 
   const hasRatings = new Set<string>();
-  const viewerHasRated = new Set<string>();
-  for (const rating of input.ratings) {
-    if (!wanted.has(rating.matchId)) continue;
-    hasRatings.add(rating.matchId);
-    if (input.viewerMemberId !== null && rating.raterMemberId === input.viewerMemberId) {
-      viewerHasRated.add(rating.matchId);
-    }
+  const ratedByViewer = new Map<string, string[]>();
+  for (const author of input.authors) {
+    if (!wanted.has(author.matchId)) continue;
+    hasRatings.add(author.matchId);
+    if (input.viewerMemberId === null || author.raterMemberId !== input.viewerMemberId) continue;
+    const submitted = ratedByViewer.get(author.matchId);
+    if (submitted) submitted.push(author.ratedMemberId);
+    else ratedByViewer.set(author.matchId, [author.ratedMemberId]);
   }
 
   const visibleMatchIds: string[] = [];
   const hiddenMatchIds: string[] = [];
 
   for (const matchId of input.matchIds) {
-    const gated = couldRate(roleOfViewer.get(matchId)) && !viewerHasRated.has(matchId);
-    if (gated) {
-      // Only worth telling the viewer about a match that actually holds ratings.
-      if (hasRatings.has(matchId)) hiddenMatchIds.push(matchId);
+    const sheet = sheets.get(matchId) ?? [];
+    const { visible } = gateFor({
+      mayRate: isOnRateableSheet(sheet, input.viewerMemberId),
+      progress: ratingProgress({
+        requiredIds: rateableMemberIds(sheet),
+        submittedIds: ratedByViewer.get(matchId) ?? [],
+      }),
+    });
+
+    if (visible) {
+      visibleMatchIds.push(matchId);
       continue;
     }
-    visibleMatchIds.push(matchId);
+    // Only worth telling the viewer about a match that actually holds ratings.
+    if (hasRatings.has(matchId)) hiddenMatchIds.push(matchId);
   }
 
   return { visibleMatchIds, hiddenMatchIds };
-}
-
-/** The rows the season aggregate may use, with the rater dropped: it needs only who was rated. */
-export function visibleRatings(
-  ratings: readonly RatingRowWithRater[],
-  visibleMatchIds: readonly string[],
-): Array<{ matchId: string; ratedMemberId: string; score: number }> {
-  const visible = new Set(visibleMatchIds);
-  return ratings
-    .filter((rating) => visible.has(rating.matchId))
-    .map((rating) => ({
-      matchId: rating.matchId,
-      ratedMemberId: rating.ratedMemberId,
-      score: rating.score,
-    }));
 }

@@ -55,7 +55,7 @@ import {
   matchesNeedingReduction,
   resolveMatchStatLines,
 } from "./match-lines";
-import { type RatingRowWithRater, ratingVisibility, visibleRatings } from "./ratings";
+import { type RatingAuthorRow, type VisibleRatingRow, ratingVisibility } from "./ratings";
 
 /* -------------------------------------------------------------------------- */
 /* The filter                                                                 */
@@ -229,18 +229,37 @@ async function getEventsFor(matchIds: readonly string[]): Promise<MatchEventReco
     .orderBy(matchEvents.matchId, matchEvents.seq);
 }
 
-/** Every rating cast on the matches under consideration, rater included: `ratings.ts` needs it. */
-async function getRatingRows(matchIds: readonly string[]): Promise<RatingRowWithRater[]> {
+/**
+ * Who rated whom, **without the scores** — everything the gate in `ratings.ts` needs to decide what
+ * this viewer has earned. Deliberately selects no `score` column: a score the viewer may not read
+ * should not leave the database at all, rather than be fetched and then filtered out in JavaScript,
+ * where a later refactor could quietly forget the filter.
+ */
+async function getRatingAuthors(matchIds: readonly string[]): Promise<RatingAuthorRow[]> {
   if (matchIds.length === 0) return [];
   return db
     .select({
       matchId: ratings.matchId,
       raterMemberId: ratings.raterMemberId,
       ratedMemberId: ratings.ratedMemberId,
-      score: ratings.score,
     })
     .from(ratings)
     .where(inArray(ratings.matchId, [...matchIds]));
+}
+
+/** The scores themselves, for the matches the gate has opened — and for no others. */
+async function getVisibleRatingScores(
+  visibleMatchIds: readonly string[],
+): Promise<VisibleRatingRow[]> {
+  if (visibleMatchIds.length === 0) return [];
+  return db
+    .select({
+      matchId: ratings.matchId,
+      ratedMemberId: ratings.ratedMemberId,
+      score: ratings.score,
+    })
+    .from(ratings)
+    .where(inArray(ratings.matchId, [...visibleMatchIds]));
 }
 
 /**
@@ -306,11 +325,11 @@ export const getSeasonStats = cache(
 
     const matchIds = matchRows.map((match) => match.id);
 
-    const [scores, cached, squad, ratingRows] = await Promise.all([
+    const [scores, cached, squad, ratingAuthors] = await Promise.all([
       getMatchScores(matchIds),
       getCachedStatRows(matchIds),
       getSquadRows(matchIds),
-      getRatingRows(matchIds),
+      getRatingAuthors(matchIds),
     ]);
 
     // « sur N séances pointées » — counted here rather than in a second `count(distinct)` round
@@ -359,9 +378,11 @@ export const getSeasonStats = cache(
     const visibility = ratingVisibility({
       matchIds,
       squad,
-      ratings: ratingRows,
+      authors: ratingAuthors,
       viewerMemberId,
     });
+    // A second round trip, on purpose: the gate decides first, and only then are any scores read.
+    const visibleRatingRows = await getVisibleRatingScores(visibility.visibleMatchIds);
 
     const statsMatches: StatsMatch[] = matchRows.map((match) => ({
       id: match.id,
@@ -380,7 +401,7 @@ export const getSeasonStats = cache(
       lines,
       squad,
       attendance,
-      ratings: visibleRatings(ratingRows, visibility.visibleMatchIds),
+      ratings: visibleRatingRows,
       hiddenRatingMatches: visibility.hiddenMatchIds.length,
     });
 
