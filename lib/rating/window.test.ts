@@ -60,10 +60,10 @@ describe("ratingDeadlineFr", () => {
    * shutting 48 hours later shuts on the Thursday evening.
    */
   it("names the instant the window shuts", () => {
-    const sentence = ratingDeadlineFr(NOW + 48 * HOUR, NOW);
-    expect(sentence).toContain("jeudi 24 septembre");
-    expect(sentence).toContain("20:00");
-    expect(sentence).toContain("coup d’envoi du match suivant");
+    expect(ratingDeadlineFr(NOW + 48 * HOUR, NOW)).toBe(
+      "À finir avant le coup d’envoi du match suivant, jeudi 24/09/2026 à 20:00 : après, les " +
+        "notes de ce match ne bougent plus et tu ne verras pas celles de l’équipe.",
+    );
   });
 
   /** Both halves of what missing it costs — the notes freeze, *and* the others stay hidden. */
@@ -73,9 +73,15 @@ describe("ratingDeadlineFr", () => {
     expect(sentence).toContain("tu ne verras pas celles de l’équipe");
   });
 
-  /** A deadline the reader can place against tonight, not a date he has to count days from. */
-  it("uses the relative day when the next match is tomorrow", () => {
-    expect(ratingDeadlineFr(NOW + 24 * HOUR, NOW)).toContain("demain à 20:00");
+  /**
+   * A deadline the reader can place against tonight, not a date he has to count days from — and
+   * the digits alongside it, so the sentence stays true in a screenshot read the next morning.
+   */
+  it("uses the relative day when the next match is tomorrow, with the date behind it", () => {
+    expect(ratingDeadlineFr(NOW + 24 * HOUR, NOW)).toBe(
+      "À finir avant le coup d’envoi du match suivant, demain, 23/09/2026 à 20:00 : après, les " +
+        "notes de ce match ne bougent plus et tu ne verras pas celles de l’équipe.",
+    );
   });
 
   /**

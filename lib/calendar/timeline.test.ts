@@ -297,20 +297,20 @@ describe("buildReminderMessage", () => {
   it("names everyone who has not answered", () => {
     const message = buildReminderMessage({
       title: "Étoile du Parc (championnat)",
-      when: "dimanche 27 septembre à 10:30",
+      when: "dimanche 27/09/2026 à 10:30",
       pending: [
         { membershipId: "m-mehdi", displayName: "Mehdi" },
         { membershipId: "m-fabien", displayName: "Fabien" },
       ],
     });
-    expect(message).toContain("Étoile du Parc (championnat) — dimanche 27 septembre à 10:30");
+    expect(message).toContain("Étoile du Parc (championnat) — dimanche 27/09/2026 à 10:30");
     expect(message).toContain(`Il manque les réponses de${NBSP}: Mehdi, Fabien.`);
   });
 
   it("uses the singular for a single straggler", () => {
     const message = buildReminderMessage({
       title: "Entraînement",
-      when: "mardi 29 septembre à 19:00",
+      when: "mardi 29/09/2026 à 19:00",
       pending: [{ membershipId: "m-mehdi", displayName: "Mehdi" }],
     });
     expect(message).toContain(`Il manque la réponse de${NBSP}: Mehdi.`);
@@ -319,7 +319,7 @@ describe("buildReminderMessage", () => {
   it("says thank you when the whole squad has answered", () => {
     const message = buildReminderMessage({
       title: "Entraînement",
-      when: "mardi 29 septembre à 19:00",
+      when: "mardi 29/09/2026 à 19:00",
       pending: [],
     });
     expect(message).toContain("Tout le monde a répondu.");

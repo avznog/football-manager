@@ -86,7 +86,7 @@ export default async function SaisiePage({ params, searchParams }: PageProps<"/m
           {view.hasLog ? "Corriger le match" : "Saisie du match"}
         </h1>
         <p className="text-sm text-ink-muted">
-          {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)} ·{" "}
+          {capitalizeFirst(formatDay(kickoff))} à {formatTime(kickoff)} ·{" "}
           {matchNameFr(view.match.opponentName, view.match.isHome)} ·{" "}
           {periodsLabel(view.match.periodsCount, view.match.periodMinutes)}
         </p>

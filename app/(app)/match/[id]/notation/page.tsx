@@ -74,7 +74,7 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
           Noter mes coéquipiers
         </h1>
         <p className="text-sm text-ink-muted">
-          {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)} ·{" "}
+          {capitalizeFirst(formatDay(kickoff))} à {formatTime(kickoff)} ·{" "}
           {matchNameFr(match.opponentName, match.isHome)}
         </p>
       </header>

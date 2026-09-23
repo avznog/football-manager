@@ -161,7 +161,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         </h1>
 
         <p className="text-sm text-ink-muted">
-          {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)}
+          {capitalizeFirst(formatDay(kickoff))} à {formatTime(kickoff)}
           {match.venue ? ` · ${match.venue}` : ""}
           {` · ${periodsLabel(match.periodsCount, match.periodMinutes)}`}
         </p>

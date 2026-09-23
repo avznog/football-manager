@@ -115,14 +115,16 @@ describe("dayDifference and daysFromNow", () => {
 describe("French formatting", () => {
   const kickoff = new Date("2026-09-27T08:30:00Z"); // 10:30 Paris, a Sunday
 
-  it("writes the day in French", () => {
-    expect(formatDay(kickoff)).toBe("dimanche 27 septembre");
-    expect(formatShortDay(kickoff)).toBe("dim. 27 sept.");
+  it("writes the weekday in French and the date in digits", () => {
+    expect(formatDay(kickoff)).toBe("dimanche 27/09/2026");
+    expect(formatShortDay(kickoff)).toBe("dim. 27/09/2026");
   });
 
-  it("adds the year when it is not the current one", () => {
-    expect(formatDay(kickoff, new Date("2025-09-27T08:30:00Z"))).toContain("2026");
-    expect(formatDay(kickoff, kickoff)).not.toContain("2026");
+  it("always carries the year, whichever season the reader is in", () => {
+    // No `now` to compare against any more: a heading that omits the year is a day the reader
+    // cannot place in February, and a season spans two of them (decision 101).
+    expect(formatDay(new Date("2027-01-09T12:00:00Z"))).toBe("samedi 09/01/2027");
+    expect(formatShortDay(new Date("2027-01-09T12:00:00Z"))).toBe("sam. 09/01/2027");
   });
 
   it("writes the date as DD/MM/YYYY", () => {
@@ -155,11 +157,12 @@ describe("French formatting", () => {
   });
 
   it("labels the neighbouring days relatively and everything else by date", () => {
+    // The relative word never stands alone: the pinned card must still say which day it means.
     const now = new Date("2026-09-27T06:00:00Z");
-    expect(formatDayLabel(kickoff, now)).toBe("aujourd’hui");
-    expect(formatDayLabel(new Date("2026-09-28T08:30:00Z"), now)).toBe("demain");
-    expect(formatDayLabel(new Date("2026-09-26T08:30:00Z"), now)).toBe("hier");
-    expect(formatDayLabel(new Date("2026-10-04T08:30:00Z"), now)).toBe("dimanche 4 octobre");
+    expect(formatDayLabel(kickoff, now)).toBe("aujourd’hui, 27/09/2026");
+    expect(formatDayLabel(new Date("2026-09-28T08:30:00Z"), now)).toBe("demain, 28/09/2026");
+    expect(formatDayLabel(new Date("2026-09-26T08:30:00Z"), now)).toBe("hier, 26/09/2026");
+    expect(formatDayLabel(new Date("2026-10-04T08:30:00Z"), now)).toBe("dimanche 04/10/2026");
   });
 
   it("counts in days up to a fortnight, then in weeks", () => {
@@ -171,14 +174,17 @@ describe("French formatting", () => {
 
   it("joins day and time with « à »", () => {
     expect(formatWhen(kickoff, new Date("2026-09-20T08:30:00Z"))).toBe(
-      "dimanche 27 septembre à 10:30",
+      "dimanche 27/09/2026 à 10:30",
+    );
+    expect(formatWhen(kickoff, new Date("2026-09-26T08:30:00Z"))).toBe(
+      "demain, 27/09/2026 à 10:30",
     );
   });
 });
 
 describe("capitalizeFirst", () => {
   it("capitalises the first letter and leaves the rest alone", () => {
-    expect(capitalizeFirst("dimanche 27 septembre")).toBe("Dimanche 27 septembre");
+    expect(capitalizeFirst("dimanche 27/09/2026")).toBe("Dimanche 27/09/2026");
     expect(capitalizeFirst("aujourd’hui")).toBe("Aujourd’hui");
     expect(capitalizeFirst("")).toBe("");
     expect(capitalizeFirst("étoile")).toBe("Étoile");
