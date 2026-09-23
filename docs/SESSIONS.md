@@ -431,3 +431,29 @@ sheet, not seven changes — is now said out loud in `deduceChanges` and `pendin
 test on each. Seven tests fail if the unpaired lines are removed again; two fail if either guard is.
 
 **Next:** deployment, and nothing else. It needs a Neon `DATABASE_URL` from the owner.
+
+**Then, still the same day:** PR #27, the fourth debt — `match_squad.role` being read as a statement
+about what happened.
+
+The notation card printed « entré en jeu » beside anybody the sheet listed as a substitute. The sheet
+records the coach's intention before the match; in an amateur seven-a-side squad the commonest fate of
+a named substitute is to stay on the bench for the whole hour. Fabien and Yanis were on the CS Morvan
+sheet with zero minutes, and the card told them — and their team-mates, at the moment they rated them
+— that they had come on.
+
+The log already knows: `PlayerMatchState.minutes`. The badge now reads « 60’ » or « non entré », and
+**nothing at all** when there is no log to read — a finished match nobody recorded (decision 013),
+where « non entré » would be the same invention as « 0 – 0 » for its score. `playedLabelFr` in
+`lib/rating/progress.ts` is the one place that decides, `getNotationView` reduces the match once for
+the minutes, and three tests pin the three answers.
+
+Decision 053 records the general rule the fix follows, because the same question comes up in the
+stats: the sheet records the intention, the log records what happened, and neither corrects the
+other. `match_squad.role` is never rewritten after the fact — `lib/stats/aggregate.ts` rule 4
+deliberately counts selections from the sheet, and everything about what happened comes from the
+reducer. So the retro-entry path was already right, and the defect was only ever this label.
+
+Verified at 390 px in both themes on the demo season: Hugo's card reads « 60’ », Yanis's « non
+entré », no console errors.
+
+**Next:** deployment, and nothing else. It needs a Neon `DATABASE_URL` from the owner.

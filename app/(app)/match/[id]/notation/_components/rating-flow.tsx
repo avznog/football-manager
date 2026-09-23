@@ -29,6 +29,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Textarea } from "@/components/ui/textarea";
 import { submitRatings } from "@/lib/rating/actions";
+import { playedLabelFr } from "@/lib/rating/progress";
 import { RATING_COMMENT_MAX } from "@/lib/rating/validation";
 
 export type RatingFlowTarget = {
@@ -36,6 +37,8 @@ export type RatingFlowTarget = {
   displayName: string;
   jerseyNumber: number | null;
   squadRole: "starter" | "substitute" | "supporter";
+  /** Minutes actually played, from the log — null when the match has no log to read. */
+  minutes: number | null;
   isSelf: boolean;
   /** Already submitted, and therefore final. */
   myScore: number | null;
@@ -238,6 +241,7 @@ function RatingCard({
   const scoreField = `score:${target.membershipId}`;
   const commentField = `comment:${target.membershipId}`;
   const commentId = `${commentField}-input`;
+  const playedLabel = playedLabelFr(target.minutes);
 
   return (
     <Card
@@ -253,7 +257,10 @@ function RatingCard({
       action={
         <span className="flex items-center gap-1.5">
           {target.isSelf ? <Badge variant="accent">toi</Badge> : null}
-          {target.squadRole === "substitute" ? <Badge>entré en jeu</Badge> : null}
+          {/* What he did, not what the sheet planned: « entré en jeu » here was read off
+              `squadRole === "substitute"`, so a substitute who never left the bench was announced
+              as having come on — to the whole team, at the moment they rated him. */}
+          {playedLabel !== null ? <Badge variant="neutral">{playedLabel}</Badge> : null}
         </span>
       }
       as="h2"

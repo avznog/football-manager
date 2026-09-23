@@ -177,6 +177,12 @@ export type RatingTarget = {
   displayName: string;
   jerseyNumber: number | null;
   squadRole: SquadRole;
+  /**
+   * Whole minutes he actually played, from the log — or null when the match has no log at all. The
+   * sheet says what the coach intended; only this says what happened, and the rater is being asked
+   * about what happened. See `playedLabelFr`.
+   */
+  minutes: number | null;
   /** The rater himself — decision 007 says he rates himself too. */
   isSelf: boolean;
   /** What this rater already put, if anything. A note, once given, is final. */
@@ -218,11 +224,21 @@ export async function getNotationView(input: {
   const match = await getMatch(input.teamId, input.matchId);
   if (!match) return null;
 
-  const [sheet, directory, window] = await Promise.all([
+  const nowMs = input.nowMs ?? Date.now();
+  const [sheet, directory, window, state] = await Promise.all([
     getMatchSheet(match.id),
     getTeamDirectory(match.teamId),
-    getRatingWindow(match, input.nowMs ?? Date.now()),
+    getRatingWindow(match, nowMs),
+    loadMatchState(match, nowMs),
   ]);
+
+  /*
+   * Minutes come from the log or from nowhere. `state.started` is false when no `KICKOFF` was ever
+   * recorded — a match nobody opened game mode for and nobody backfilled — and every player would
+   * then read 0’, which is not « nobody came on » but « we do not know » (decision 013). A retro
+   * entry writes a `KICKOFF` per period (`lib/retro/log.ts`), so backfilled matches are covered.
+   */
+  const minutesOf = new Map(state.players.map((player) => [player.memberId, player.minutes]));
 
   const onSheet = isOnRateableSheet(sheet, input.membershipId);
   const requiredIds = rateableMemberIds(sheet);
@@ -242,6 +258,7 @@ export async function getNotationView(input: {
         displayName: member?.displayName ?? "Joueur inconnu",
         jerseyNumber: member?.jerseyNumber ?? null,
         squadRole: roleOf.get(membershipId) ?? ("starter" as SquadRole),
+        minutes: state.started ? minutesOf.get(membershipId) ?? 0 : null,
         isSelf: membershipId === input.membershipId,
         myScore: own?.score ?? null,
         myComment: own?.comment ?? null,

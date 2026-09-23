@@ -79,6 +79,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Window closes at the next kick-off
 - [x] Derived man of the match
 - [x] Celebratory post-match recap screen
+- [x] The rating card states what a player did, not what the coach planned — « 60’ » or
+      « non entré », read from the log, and nothing at all for a match nobody recorded. It used to
+      read « entré en jeu » off `match_squad.role`, so a named substitute who spent the whole hour
+      on the bench was announced as having come on, to the team, as they rated him (decision 053)
 
 ## M7 — Retro-entry & amendments
 - [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet
