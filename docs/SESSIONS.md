@@ -359,3 +359,59 @@ browser at 390 px, which turned up two more holes behind the same door:
   Vercel account and the owner's phone.
 - The e2e suite covers the season loop, not the first run. The bootstrap path was verified by hand
   against a scratch database; a regression in `/rejoindre`'s super-admin branch would not fail a test.
+
+## 2026-09-23 — the two debts the previous entry named, and a row with no name in it
+
+**Shipped.** PR #25: the first run is now covered by a test, and the last coach is told why he
+cannot be demoted.
+
+The previous entry ended with four named debts. Two of them were mine to pay, and both are paid.
+
+- **`e2e/first-run.spec.ts`.** Every one of the four bugs the previous session fixed by hand on the
+  first-run path would have shipped again unnoticed, because the suite only ever walked the season
+  loop, which starts from a seeded team with a squad in it. The spec needs no empty database — it
+  tests the state `db/bootstrap.ts` *leaves behind*, which is just a super admin with no membership,
+  so `e2e/fixtures/seed.ts` grew one and this runs against the same shared database as everything
+  else (decision 044). It was mutation-tested: removing the `redirect`, hiding the create form,
+  restoring the empty box and deleting « Réglages de l'équipe » each make it fail.
+- **The silent last-coach refusal.** `setMemberRole` and `removeMember` both keep a team from losing
+  its only coach, and both are plain `void` form actions so the page works with no JavaScript —
+  which is exactly why they refused by returning, and the buttons appeared to do nothing. Rather
+  than invent an error channel for a no-JS form, the row stops offering taps the server will refuse
+  and says « seul coach : nomme quelqu'un d'autre d'abord ».
+
+**And then looking at it at 390 px, which is the point of that rule.**
+
+The note was 261 px wide in a row with 326 px of usable width, and it overflowed to within 4 px of
+the card border — the « confirm button 8 px off the right edge » failure mode, again. Fixing it by
+letting the row wrap exposed the defect underneath, on the demo season, on the coach's own view of
+his squad: « Nommer coach » and « Retirer » take 200 px of that row, and the name block was the only
+thing that could shrink. It did, to nothing. First names read « Tho… », « Ya… », « Fa… », the
+username and position codes were cut to « @hugo · … », and Brice — the one injured player — had a
+jersey number, a « blessé » badge and **no name at all**. Fourteen rows of a screen a coach uses
+constantly, unreadable, and no test failed.
+
+The name now keeps a floor of `basis-44`, so for a coach the two controls drop onto a second line
+and for everybody else the row is the same single line it was.
+
+**Worth knowing.**
+
+- A failed `npm run test:e2e` used to break `npm run lint`. `playwright-report/` embeds a bundled
+  copy of its own HTML viewer, so the gate reported 3054 problems in vendored JavaScript.
+  `.gitignore` is not read by ESLint; both output directories are now in `globalIgnores`.
+- `scrollIntoViewIfNeeded` parks an element under the fixed tab bar, and an element screenshot then
+  captures the tab bar on top of it. `scrollIntoView({ block: "center" })` is what to use when
+  reviewing a card by screenshot.
+- Measuring beats squinting: printing the bounding box of the text against the bounding box of its
+  card is what turned « looks a bit tight » into « overflows the padding by 12 px ».
+
+**Debt, named.** Unchanged from the previous entry apart from the two paid above:
+
+- No crest upload: `teams.crest_url` is read by the header and set by nothing.
+- `docs/DEPLOY.md` §4 and §6 are the only steps in this repo never executed. They need the owner's
+  Vercel account and the owner's phone.
+- A coach's squad list is now two lines per player, so fourteen players is a long scroll. Legible
+  beats compact, but the right answer is probably to move the two controls onto the player's profile
+  page and leave the list to reading.
+
+**Next:** deployment, and nothing else. It needs a Neon `DATABASE_URL` from the owner.
