@@ -42,7 +42,7 @@ export function PlayerList({
   /**
    * Every figure on a row is inside the competition filter except the attendance, which cannot be:
    * a training belongs to no competition. So the rows have to say which one is the exception
-   * (decision 080).
+   * (decision 082).
    */
   const filtered = query.competition !== null;
 

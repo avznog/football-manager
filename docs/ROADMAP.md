@@ -147,6 +147,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       reconciles « Matchs 6 » with « 7 fois titulaire » — had never been read by anyone (decision 072)
 - [x] One wording for a player's appearances, shared by `/stats` and the profile card, and French:
       « 7 fois titulaire », not « 7 titulaire » (decision 073)
+- [x] …and the one figure the competition filter cannot reach says so on the row that prints it.
+      Under « Coupe », Ali's card was five dashes and « PRÉSENCE 1/2 · 50 % » — a season figure beside
+      five « rien dans cette sélection ». The hint now reads « séances pointées, toute la saison »
+      whenever a filter is on, and the reason is one sentence shared with the présence card
+      (decision 082)
 
 - [x] One register in the French: the app tutoies everywhere. Eight strings vouvoied, including the
       banner a player reads in game mode, with the same coach addressed both ways on one screen

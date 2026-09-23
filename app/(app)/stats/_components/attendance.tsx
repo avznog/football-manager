@@ -9,7 +9,7 @@
  *   - the competition filter does not apply here. A training belongs to no competition, so filtering
  *     by « Coupe » would leave this card either empty or, worse, unchanged and misread. The sentence
  *     that says so is `ATTENDANCE_NOT_FILTERED_FR`, shared with the per-player cards, which had the
- *     same figure and said nothing about it (decision 080).
+ *     same figure and said nothing about it (decision 082).
  */
 
 import { Card } from "@/components/ui/card";
