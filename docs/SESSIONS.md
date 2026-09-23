@@ -1290,7 +1290,7 @@ reasoned about. `DEPLOY.md` §4 says that this happened, because the runbook alr
 and saying so twice is cheaper than a leak. Also that preview deployments share the production
 database, which Vercel Authentication makes tolerable rather than fine.
 
-873 unit tests, build green with no `DATABASE_URL` at all, lint and typecheck clean. The end-to-end
+878 unit tests, build green with no `DATABASE_URL` at all, lint and typecheck clean. The end-to-end
 suite was not run locally — this machine has no Postgres and no `.env.local`, and `npm run db:start`
 is `brew services` on a Linux box; CI runs it on the pull request, which is the documented gate.
 
