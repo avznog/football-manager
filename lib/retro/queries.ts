@@ -9,7 +9,9 @@ import "server-only";
  *
  * Almost all of it comes from `getLiveMatch`, deliberately: retro entry writes the same log game
  * mode writes, so it reads the same inputs and derives its preview through the same `reduceLive`.
- * The only thing added is `matches.entry_mode`, which `getMatch` does not select.
+ * The only thing added is `matches.entry_mode` and the competition, which `LiveMatchRow` drops at the
+ * client boundary — game mode has no use for either. The screens that only need to *say* how the log
+ * came to exist read `MatchRow.entryMode` instead (`entryModeBadgeFr`).
  *
  * Everything returned is plain and serialisable — the timeline crosses into a client component.
  */
@@ -17,7 +19,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { entryMode, matches } from "@/db/schema";
+import { matches, type EntryMode } from "@/db/schema";
 import { getLiveMatch, type LiveMatch } from "@/lib/match/live";
 import { reduceLive } from "@/lib/match/presenter";
 import type { TimelineEntry } from "@/lib/match/reducer";
@@ -25,11 +27,7 @@ import type { TimelineEntry } from "@/lib/match/reducer";
 import { isAmendableEventType } from "./amend";
 import { RETRO_FACT_TYPES, type RetroFactType } from "./log";
 
-/**
- * `"live" | "retro"`, derived from the column rather than retyped: `db/schema.ts` does not export a
- * type alias for this enum, and hard-coding the two strings here would go stale in silence.
- */
-export type EntryMode = (typeof entryMode.enumValues)[number];
+export type { EntryMode };
 
 /** A player the coach can name on the sheet. */
 export type RetroRosterPlayer = {

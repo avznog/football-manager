@@ -7,7 +7,7 @@
  */
 
 import type { SegmentOption } from "@/components/ui";
-import type { AvailabilityStatus, Competition, MatchStatus } from "@/db/schema";
+import type { AvailabilityStatus, Competition, EntryMode, MatchStatus } from "@/db/schema";
 
 export const COMPETITION_LABELS: Record<Competition, string> = {
   league: "Championnat",
@@ -24,6 +24,35 @@ export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   live: "En cours",
   finished: "Terminé",
 };
+
+/**
+ * « saisi après le match » — or nothing at all.
+ *
+ * Only one of the two modes is worth saying. A live log is the normal case and the badge would be
+ * noise on every card of the season; a match typed up afterwards is the case where a number on the
+ * screen was not observed by anybody, and decision 013 put `matches.entry_mode` in the database
+ * precisely so the UI could say so.
+ *
+ * `recorded` is the second half of the rule, and the reason this is a function rather than a map.
+ * `entry_mode` is **a label on a log** — `lib/retro/actions.ts` sets it as it writes one — so with an
+ * empty log it describes nothing, and « saisi après le match » about a match nobody has saisi is the
+ * same invention as « 0 – 0 » for its score (decision 013). The demo season contains exactly that
+ * row: nine men named on the sheet for FC des Deux-Ponts and not one event.
+ */
+export function entryModeBadgeFr(mode: EntryMode, options: { recorded: boolean }): string | null {
+  return mode === "retro" && options.recorded ? "saisi après le match" : null;
+}
+
+/**
+ * What being typed up afterwards costs, in the words the entry form already uses.
+ *
+ * Decision 048: an action whose minute the coach cannot remember is stamped at the midpoint of the
+ * spell it has to fall inside, « au mieux ». That makes the minutes played a good estimate and the
+ * score exact, and a player reading « 43’ » next to his name is entitled to know which of the two
+ * he is looking at. The form says it while he types; this says it to everybody who reads it after.
+ */
+export const RETRO_MINUTES_NOTE =
+  "Ce match a été saisi après coup : les actions sans minute précise ont été placées au mieux, donc les temps de jeu sont approximatifs. Le score et les buts, eux, sont exacts.";
 
 export const AVAILABILITY_LABELS: Record<AvailabilityStatus, string> = {
   yes: "Dispo",

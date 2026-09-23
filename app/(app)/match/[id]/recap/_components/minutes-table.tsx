@@ -8,9 +8,18 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { RETRO_MINUTES_NOTE } from "@/lib/calendar/labels";
+import type { EntryMode } from "@/db/schema";
 import type { RecapPlayerLine } from "@/lib/rating/recap";
 
-export function MinutesTable({ players }: { players: readonly RecapPlayerLine[] }) {
+export function MinutesTable({
+  players,
+  entryMode,
+}: {
+  players: readonly RecapPlayerLine[];
+  /** `retro` adds the caveat below the table: these minutes were reconstructed, not timed. */
+  entryMode: EntryMode;
+}) {
   if (players.length === 0) return null;
 
   return (
@@ -79,6 +88,14 @@ export function MinutesTable({ players }: { players: readonly RecapPlayerLine[] 
           </tbody>
         </table>
       </div>
+
+      {/* The one number on this table that can be an estimate is the one it is named after. A player
+          reading « 43’ » next to his name should know whether somebody timed it or the app placed it
+          at the midpoint of his spell (decision 048) — the entry form says so while the coach types,
+          and until now nothing said it to the eleven people who read it afterwards. */}
+      {entryMode === "retro" ? (
+        <p className="px-4 pt-3 pb-4 text-xs text-ink-subtle">{RETRO_MINUTES_NOTE}</p>
+      ) : null}
     </Card>
   );
 }

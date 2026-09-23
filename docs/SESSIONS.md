@@ -457,3 +457,40 @@ Verified at 390 px in both themes on the demo season: Hugo's card reads « 60’
 entré », no console errors.
 
 **Next:** deployment, and nothing else. It needs a Neon `DATABASE_URL` from the owner.
+
+**Then, PR #28:** the fifth debt — `matches.entry_mode` written by the entry action and read by
+nobody.
+
+Decision 013 put the column in the database for one purpose, in its own words: « so the UI can say
+*saisi après le match* ». Nothing ever said it. The only reader was the retro screen itself, deciding
+whether it was an entry form or a corrections list — so a match reconstructed from memory a fortnight
+later was indistinguishable, on every screen a player reads, from one somebody stood and timed.
+
+That matters because of decision 048: an action whose minute the coach cannot remember is stamped at
+the midpoint of the spell it has to fall inside. « Léo 38’ » on a retro match is the app's best
+placement, « Léo 38’ » on a live one was observed, and the recap printed both in the same font with
+no way to tell. The score is exact either way, which is the number the season table is built on.
+
+`MatchRow` now carries `entryMode` (the schema exports an `EntryMode` alias, which `lib/retro/queries.ts`
+had been deriving locally for want of one), the match page and the recap header show a
+« saisi après le match » badge, and « Temps de jeu » gains one line saying the minutes are approximate
+and the score is not.
+
+**The bug in the first version of it.** The badge was `mode === "retro"` and nothing else, and the
+demo season immediately showed what that costs: FC des Deux-Ponts is `entry_mode = retro` with nine
+men on the sheet and **an empty log** — the retro entry of M7 is still owed. The badge announced
+« saisi après le match » about an afternoon nobody has typed up yet. `entry_mode` is a label *on a
+log*; with no log it describes nothing. `entryModeBadgeFr(mode, { recorded })` is the one place that
+decides, three unit tests pin it, and each screen passes the flag it already computes for its own
+« rien saisi » state.
+
+Verified at 390 px in both themes on the demo season: FC Rivière (retro, 18 events) shows the badge
+in a three-badge row that still fits one line and the note under the table; FC des Deux-Ponts (retro,
+no log) shows neither and still offers « Saisir le match »; CS Morvan (live) shows neither.
+
+**Debt, named.** Game mode's own header does not carry the badge: it is built on `LiveMatchRow`, which
+deliberately stops at what the pitch and the clock need, and « Voir le déroulé » is reached from the
+match page, which now says it one screen earlier. The rest is unchanged — no crest upload, the
+`usePitchDrag` duplication of decision 045, the two-line squad row, and `docs/DEPLOY.md` §4 and §6.
+
+**Next:** deployment, and nothing else. It needs a Neon `DATABASE_URL` from the owner.

@@ -12,7 +12,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { matchAvailability, matchEvents, matches } from "@/db/schema";
-import type { AvailabilityStatus, Competition, MatchStatus } from "@/db/schema";
+import type { AvailabilityStatus, Competition, EntryMode, MatchStatus } from "@/db/schema";
 
 export type MatchRow = {
   id: string;
@@ -27,6 +27,17 @@ export type MatchRow = {
   periodMinutes: number;
   status: MatchStatus;
   operatorUserId: string | null;
+  /**
+   * How the log came to exist: `live` means somebody stood on the touchline with the phone, `retro`
+   * means the match was typed up afterwards.
+   *
+   * A **label, not a behaviour** — `lib/retro/actions.ts` says the same thing where it sets it, and
+   * one reducer serves both paths (decision 013). It is here because a reader deserves to know:
+   * decision 048 stamps the minutes a coach could not remember, so « 34’ » on a retro match is the
+   * app's best guess while the score is exact either way. Every screen that prints a minute a human
+   * did not type owes him that sentence.
+   */
+  entryMode: EntryMode;
 };
 
 const MATCH_COLUMNS = {
@@ -41,6 +52,7 @@ const MATCH_COLUMNS = {
   periodMinutes: matches.periodMinutes,
   status: matches.status,
   operatorUserId: matches.operatorUserId,
+  entryMode: matches.entryMode,
 };
 
 function toMatchRow(row: {
@@ -55,6 +67,7 @@ function toMatchRow(row: {
   periodMinutes: number;
   status: MatchStatus;
   operatorUserId: string | null;
+  entryMode: EntryMode;
 }): MatchRow {
   return { ...row, kickoffAt: row.kickoffAt.toISOString() };
 }

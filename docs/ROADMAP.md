@@ -92,6 +92,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       `amendMatchEvents`) — a `VOID` plus a replacement, keeping the target's minute (decision 049)
 - [x] Recompute frozen stats after an amendment — `amendMatchEvents` re-freezes
       `match_player_stats` through `finalizeMatchById` whenever the match is or becomes finished
+- [x] A match typed up afterwards says so where it is read: « saisi après le match » on the match
+      page and the recap, and a note under « Temps de jeu » explaining that the minutes are the
+      app's best placement and the score is exact (decisions 013 and 048). `matches.entry_mode` was
+      written by the entry action and read by nothing but the entry screen itself
 
 ## Deployment
 - [x] First-run bootstrap — `npm run db:bootstrap` writes the reference data and the one
