@@ -2,11 +2,17 @@
 
 import { useMemo, useRef, useState } from "react";
 
-import { positionLabelFr } from "@/db/reference";
-import { PitchLayout, PitchPoint, PlayerDisc, type KitColors, type PitchSlot } from "@/components/pitch";
+import { atPositionFr, positionLabelFr } from "@/db/reference";
+import {
+  PitchLayout,
+  PitchPoint,
+  PlayerDisc,
+  usePitchDrag,
+  type KitColors,
+  type PitchSlot,
+} from "@/components/pitch";
 import { Badge, Button, Sheet, cn } from "@/components/ui";
 import { assignmentsSignature } from "@/lib/composition/editor";
-import { fromClientPoint, type Box, type PitchPoint as PitchCoordinates } from "@/lib/pitch/geometry";
 import type { LiveSlot, PlayerIndex, PlayerOption } from "@/lib/match/presenter";
 import {
   nearestTerrainTarget,
@@ -24,24 +30,11 @@ import {
 /* Gesture state                                                              */
 /* -------------------------------------------------------------------------- */
 
-type Drag = {
-  pointerId: number;
-  /** `team_members.id` — only players are dragged here; the shape is fixed during a match. */
-  memberId: string;
-  /** The slot the gesture started on, or null for a player picked up from the bench. */
-  fromSlotId: string | null;
-  /** Where the finger went down, in screen coordinates: how a tap is told from a drag. */
-  origin: { x: number; y: number };
-  /** Where the finger is now, in pitch coordinates. `null` once it has left the turf. */
-  point: PitchCoordinates | null;
-  moved: boolean;
-};
-
-/** Pixels of travel below which a pointer sequence is a tap, not a drag. */
-const TAP_SLOP = 8;
-
-/** How far outside the pitch box a drop still counts as a drop on the pitch. */
-const PITCH_MARGIN_PX = 12;
+/**
+ * What a gesture here is carrying. Only players are dragged: the shape is fixed during a match, since
+ * moving a slot is a planning act. `fromSlotId` is null for a player picked up from the bench.
+ */
+type Carried = { memberId: string; fromSlotId: string | null };
 
 /* -------------------------------------------------------------------------- */
 /* Props                                                                      */
@@ -119,7 +112,6 @@ export function TerrainSheet({
 }: TerrainSheetProps) {
   const [arranged, setArranged] = useState<SlotAssignment[]>(() => [...initialAssignments]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [drag, setDrag] = useState<Drag | null>(null);
   const [announcement, setAnnouncement] = useState("");
 
   const pitchRef = useRef<HTMLDivElement | null>(null);
@@ -165,90 +157,28 @@ export function TerrainSheet({
 
   /* --- the gesture -------------------------------------------------------- */
 
-  function boxOfPitch(): Box | null {
-    const element = pitchRef.current;
-    if (!element) return null;
-    const rect = element.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return null;
-    return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
-  }
-
-  /** Screen point → pitch point, plus whether the finger is still over the turf. */
-  function locate(
-    clientX: number,
-    clientY: number,
-  ): { point: PitchCoordinates; inside: boolean } | null {
-    const box = boxOfPitch();
-    if (!box) return null;
-    const inside =
-      clientX >= box.left - PITCH_MARGIN_PX &&
-      clientX <= box.left + box.width + PITCH_MARGIN_PX &&
-      clientY >= box.top - PITCH_MARGIN_PX &&
-      clientY <= box.top + box.height + PITCH_MARGIN_PX;
-    return { point: fromClientPoint({ x: clientX, y: clientY }, box), inside };
-  }
-
-  function beginDrag(
-    event: React.PointerEvent<HTMLElement>,
-    memberId: string,
-    fromSlotId: string | null,
-  ) {
-    // Mouse: left button only. Touch and pen have no buttons to speak of.
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const located = locate(event.clientX, event.clientY);
-    setDrag({
-      pointerId: event.pointerId,
-      memberId,
-      fromSlotId,
-      origin: { x: event.clientX, y: event.clientY },
-      point: located?.inside ? located.point : null,
-      moved: false,
-    });
-  }
-
-  function continueDrag(event: React.PointerEvent<HTMLElement>) {
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    const travelled =
-      Math.abs(event.clientX - drag.origin.x) + Math.abs(event.clientY - drag.origin.y);
-    const located = locate(event.clientX, event.clientY);
-    setDrag({
-      ...drag,
-      moved: drag.moved || travelled > TAP_SLOP,
-      point: located?.inside ? located.point : null,
-    });
-  }
-
-  function endDrag(event: React.PointerEvent<HTMLElement>) {
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    const located = locate(event.clientX, event.clientY);
-
-    if (!drag.moved) {
-      // A pointer sequence that went nowhere is a tap. On the pitch it goes through `tapSlot`, so
-      // that tapping an occupied slot while somebody is selected *swaps them* rather than changing
-      // the selection: the tap path has to be able to do everything the drag can.
-      if (drag.fromSlotId) tapSlot(drag.fromSlotId);
-      else tapPlayer(drag.memberId);
-    } else {
-      const target = located?.inside ? nearestTerrainTarget(targets, located.point) : null;
+  const gesture = usePitchDrag<Carried>({
+    pitchRef,
+    // A pointer sequence that went nowhere is a tap. On the pitch it goes through `tapSlot`, so that
+    // tapping an occupied slot while somebody is selected *swaps them* rather than changing the
+    // selection: the tap path has to be able to do everything the drag can.
+    onTap: (carried) =>
+      carried.fromSlotId ? tapSlot(carried.fromSlotId) : tapPlayer(carried.memberId),
+    onDrop: (carried, point) => {
+      const target = point ? nearestTerrainTarget(targets, point) : null;
       if (target) {
-        place(target.id, drag.memberId);
-      } else {
-        // The safety rule, said out loud. The composition editor benches a player dropped outside a
-        // slot; at 70′ that is how a slipped thumb costs you a player, so here it is a no-op.
-        setAnnouncement(
-          `${players.nameOf(drag.memberId)} n’a pas bougé : relâchez-le sur un poste, ou utilisez « Faire sortir ».`,
-        );
-        setSelected(null);
+        place(target.id, carried.memberId);
+        return;
       }
-    }
-
-    setDrag(null);
-  }
-
-  function cancelDrag() {
-    setDrag(null);
-  }
+      // The safety rule, said out loud. The composition editor benches a player dropped outside a
+      // slot; at 70′ that is how a slipped thumb costs you a player, so here it is a no-op.
+      setAnnouncement(
+        `${players.nameOf(carried.memberId)} n’a pas bougé : relâchez-le sur un poste, ou utilisez « Faire sortir ».`,
+      );
+      setSelected(null);
+    },
+  });
+  const drag = gesture.drag;
 
   /* --- what a gesture does ------------------------------------------------- */
 
@@ -260,7 +190,7 @@ export function TerrainSheet({
     setAnnouncement(
       occupant && occupant !== memberId
         ? `${players.nameOf(memberId)} et ${players.nameOf(occupant)} échangent leurs postes.`
-        : `${players.nameOf(memberId)} est placé ${slot ? `au poste de ${positionNameFr(slot.positionCode)}` : "sur le terrain"}.`,
+        : `${players.nameOf(memberId)} est placé ${slot ? atPositionFr(slot.positionCode) : "sur le terrain"}.`,
     );
   }
 
@@ -313,7 +243,7 @@ export function TerrainSheet({
     tapPlayer(memberId);
   }
 
-  const dragged = drag?.moved && drag.point ? players.get(drag.memberId) : undefined;
+  const dragged = drag?.moved && drag.point ? players.get(drag.subject.memberId) : undefined;
 
   /* --- render -------------------------------------------------------------- */
 
@@ -387,15 +317,16 @@ export function TerrainSheet({
                   className="touch-none rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   aria-label={slotButtonLabelFr(slot)}
                   onPointerDown={(event) => {
-                    if (slot.player) beginDrag(event, slot.player.id, slot.id);
+                    if (slot.player)
+                      gesture.begin(event, { memberId: slot.player.id, fromSlotId: slot.id });
                   }}
-                  onPointerMove={continueDrag}
+                  onPointerMove={gesture.handlers.onPointerMove}
                   onPointerUp={(event) => {
-                    if (slot.player) endDrag(event);
+                    if (slot.player) gesture.handlers.onPointerUp(event);
                     // An empty slot starts no drag, so its own pointer-up is the tap that fills it.
                     else if (isPrimary(event)) tapSlot(slot.id);
                   }}
-                  onPointerCancel={cancelDrag}
+                  onPointerCancel={gesture.handlers.onPointerCancel}
                   onKeyDown={(event) => onSlotKeyDown(event, slot.id)}
                 >
                   {content}
@@ -458,10 +389,10 @@ export function TerrainSheet({
                         entry.comingOff ? "border-warning/60 bg-warning/10" : null,
                         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                       )}
-                      onPointerDown={(event) => beginDrag(event, entry.memberId, null)}
-                      onPointerMove={continueDrag}
-                      onPointerUp={endDrag}
-                      onPointerCancel={cancelDrag}
+                      onPointerDown={(event) =>
+                        gesture.begin(event, { memberId: entry.memberId, fromSlotId: null })
+                      }
+                      {...gesture.handlers}
                       onKeyDown={(event) => onPlayerKeyDown(event, entry.memberId)}
                     >
                       <PlayerDisc

@@ -19,6 +19,7 @@ import {
   formationDistribution,
   formationLabelOf,
   isPositionCode,
+  atPositionFr,
   positionLabelFr,
 } from "./reference";
 import {
@@ -270,5 +271,23 @@ describe("formationLabelOf", () => {
 
   it("returns 0-0-0-0 for an empty formation", () => {
     expect(formationLabelOf([])).toBe("0-0-0-0");
+  });
+});
+
+describe("atPositionFr", () => {
+  it("elides « de » before the three positions that start with a vowel", () => {
+    expect(atPositionFr("AT")).toBe("au poste d’attaquant");
+    expect(atPositionFr("AG")).toBe("au poste d’ailier gauche");
+    expect(atPositionFr("AD")).toBe("au poste d’ailier droit");
+  });
+
+  it("keeps « de » everywhere else, in lower case", () => {
+    expect(atPositionFr("GB")).toBe("au poste de gardien de but");
+    expect(atPositionFr("DC")).toBe("au poste de défenseur central");
+    expect(atPositionFr("MOC")).toBe("au poste de milieu offensif central");
+  });
+
+  it("falls back to an unknown code rather than inventing a name", () => {
+    expect(atPositionFr("XX")).toBe("au poste de xx");
   });
 });

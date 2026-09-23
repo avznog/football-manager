@@ -17,4 +17,5 @@ export {
   type KitColors,
 } from "./PitchLayout";
 export { PositionPicker, type PositionPickerProps } from "./PositionPicker";
+export { usePitchDrag, type PitchDragHandle } from "./usePitchDrag";
 export { DISC_SIZES, DEFAULT_DISC_SIZE, type DiscSize, type DiscMetrics } from "./sizes";

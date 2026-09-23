@@ -128,6 +128,18 @@ export function positionLabelFr(code: string): string {
   return isPositionCode(code) ? POSITION_BY_CODE[code].labelFr : code;
 }
 
+/**
+ * « au poste de gardien de but », but « au poste d’attaquant ».
+ *
+ * French elides `de` before a vowel, and three of the eleven positions start with one — attaquant
+ * and the two ailiers. Screen readers speak these announcements out loud, so the app either gets
+ * the elision right or sounds like a robot every time a winger is placed.
+ */
+export function atPositionFr(code: string): string {
+  const name = positionLabelFr(code).toLocaleLowerCase("fr-FR");
+  return /^[aeiouyéèêàâîïôöûü]/.test(name) ? `au poste d’${name}` : `au poste de ${name}`;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Formation templates                                                        */
 /* -------------------------------------------------------------------------- */
