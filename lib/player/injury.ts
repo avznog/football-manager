@@ -149,13 +149,17 @@ const MONTHS_FR = [
   "décembre",
 ];
 
-/** « 13 septembre 2026 ». `1er` because French does not say « 1 septembre ». */
+/**
+ * « 13/09/2026 » — the French numeric date, for the dates that are read off a list or a record
+ * rather than read as a sentence: the injury history, « Arrivé le ». Same shape as
+ * `formatDate` in `lib/calendar/time.ts`, reached from an ISO day instead of an instant, so a
+ * `YYYY-MM-DD` column never has to be turned into a `Date` and a timezone question.
+ */
 export function formatDateFr(value: string): string {
   const match = ISO_DATE.exec(value);
   if (!match) return value;
   const [, year, month, day] = match;
-  const dayNumber = Number(day);
-  return `${dayNumber === 1 ? "1er" : dayNumber} ${MONTHS_FR[Number(month) - 1]} ${Number(year)}`;
+  return `${day}/${month}/${year}`;
 }
 
 /** « 13 septembre » — the year is noise inside the current season. */

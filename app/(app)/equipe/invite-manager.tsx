@@ -5,12 +5,11 @@ import { useFormStatus } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { formatDate } from "@/lib/calendar/time";
 import { createInvite, revokeInvite } from "@/lib/team/actions";
 import { inviteCardFr } from "@/lib/team/labels";
 import { formatInviteCode } from "@/lib/team/invite-code";
 import type { ActiveInvite } from "@/lib/team/queries";
-
-const DATE_FORMAT = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" });
 
 export function InviteManager({
   teamId,
@@ -84,7 +83,7 @@ export function InviteManager({
                 <p className="text-xs text-ink-subtle">
                   {invite.role === "coach" ? "Coach" : "Joueur"} · {invite.uses}/{invite.maxUses}{" "}
                   utilisé{invite.uses > 1 ? "s" : ""} · expire le{" "}
-                  {DATE_FORMAT.format(invite.expiresAt)}
+                  {formatDate(invite.expiresAt)}
                 </p>
               </div>
               <form action={revokeInvite}>

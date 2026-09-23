@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 
-import { formatShortDay, formatTime } from "@/lib/calendar/time";
+import { formatDate, formatShortWeekday, formatTime } from "@/lib/calendar/time";
 import type { CalendarEvent } from "@/lib/calendar/timeline";
 import {
   AvailabilityBadge,
@@ -48,8 +48,14 @@ export function EventRow({ event, variant }: EventRowProps) {
         href={href}
         className="flex min-h-14 items-center gap-3 px-4 py-2.5 hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
+        {/*
+          The weekday, then the date in digits, then the kick-off. Three short lines rather than
+          « dim. 27 sept. », because this list spans a season that crosses a new year and a row
+          with no year on it cannot say which 27 September it means.
+        */}
         <span className="w-20 shrink-0 text-xs leading-tight text-ink-subtle">
-          <span className="block font-medium text-ink-muted">{formatShortDay(startsAt)}</span>
+          <span className="block font-medium text-ink-muted">{formatShortWeekday(startsAt)}</span>
+          <span className="block tabular-nums text-ink-muted">{formatDate(startsAt)}</span>
           <span className="block tabular-nums">{formatTime(startsAt)}</span>
         </span>
 

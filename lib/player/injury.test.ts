@@ -156,9 +156,11 @@ describe("isFutureDate", () => {
 });
 
 describe("French formatting", () => {
-  it("writes a full date", () => {
-    expect(formatDateFr("2026-09-22")).toBe("22 septembre 2026");
-    expect(formatDateFr("2026-08-01")).toBe("1er août 2026");
+  it("writes a full date as DD/MM/YYYY", () => {
+    // Day first, zero-padded, four-digit year. "9/22/2026" and "22 September 2026" are both wrong.
+    expect(formatDateFr("2026-09-22")).toBe("22/09/2026");
+    expect(formatDateFr("2026-08-01")).toBe("01/08/2026");
+    expect(formatDateFr("2027-01-09")).toBe("09/01/2027");
   });
 
   it("drops the year inside a season", () => {

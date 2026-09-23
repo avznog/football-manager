@@ -182,8 +182,34 @@ const SHORT_DAY_FORMAT = new Intl.DateTimeFormat("fr-FR", {
   month: "short",
 });
 
+/**
+ * `27/09/2026` — the French numeric date, day first, four-digit year, zero-padded.
+ *
+ * `2-digit` on both day and month rather than `numeric`: a season list where `3/10` sits under
+ * `27/09` is a column that does not line up, and `tabular-nums` cannot fix a missing digit. The
+ * locale is spelled out for the same reason it is everywhere in this file — the host's default
+ * locale on Vercel is not French, and an implicit one renders `9/27/2026` in production and
+ * nowhere else.
+ */
+const DATE_FORMAT = new Intl.DateTimeFormat("fr-FR", {
+  timeZone: TIME_ZONE,
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+const SHORT_WEEKDAY_FORMAT = new Intl.DateTimeFormat("fr-FR", {
+  timeZone: TIME_ZONE,
+  weekday: "short",
+});
+
+/**
+ * `hour12: false` is explicit even though `fr-FR` already implies it: the locale is the only thing
+ * keeping the clock off `7:00 PM`, and one day someone will pass a different one.
+ */
 const TIME_FORMAT = new Intl.DateTimeFormat("fr-FR", {
   timeZone: TIME_ZONE,
+  hour12: false,
   hour: "2-digit",
   minute: "2-digit",
 });
@@ -199,6 +225,19 @@ export function formatDay(instant: Date, now?: Date): string {
 /** `"dim. 27 sept."` — for dense rows where the full weekday would wrap. */
 export function formatShortDay(instant: Date): string {
   return SHORT_DAY_FORMAT.format(instant);
+}
+
+/** `"dim."` — the weekday alone, above a numeric date in a dense column. */
+export function formatShortWeekday(instant: Date): string {
+  return SHORT_WEEKDAY_FORMAT.format(instant);
+}
+
+/**
+ * `"27/09/2026"` — the date in digits, French order. For anywhere a date is a fact to read off
+ * rather than a sentence to read: a list column, an expiry, a record of a day.
+ */
+export function formatDate(instant: Date): string {
+  return DATE_FORMAT.format(instant);
 }
 
 /** `"10:30"`, always 24-hour: that is how a French kick-off is written. */
