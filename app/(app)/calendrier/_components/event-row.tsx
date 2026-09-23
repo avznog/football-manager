@@ -28,7 +28,14 @@ export type EventRowProps = {
 export function EventRow({ event, variant }: EventRowProps) {
   const startsAt = new Date(event.startsAt);
   const isMatch = event.kind === "match";
-  const href = isMatch ? `/match/${event.id}` : `/entrainements/${event.id}`;
+  // A match already played is opened to be *read*, not organised: the score is right there on the
+  // row, so the thing the tap is asking for is the recap — who scored, who played, the notes. The
+  // recap links back to the match page for anyone who came for the availability grid instead.
+  const href = isMatch
+    ? variant === "past"
+      ? `/match/${event.id}/recap`
+      : `/match/${event.id}`
+    : `/entrainements/${event.id}`;
   const title = isMatch ? matchTitle(event) : "Entraînement";
   const subtitle = isMatch ? matchSubtitle(event) : trainingSubtitle(event);
   const attendance = !isMatch ? attendanceSummary(event) : null;
