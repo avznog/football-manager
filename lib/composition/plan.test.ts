@@ -9,6 +9,7 @@ import {
   compositionsScreenFr,
   countSquadRoles,
   deduceChanges,
+  draftChangesPendingFr,
   findPlanIssues,
   minuteIsTaken,
   nameOfMembers,
@@ -112,13 +113,47 @@ describe("deduceChanges", () => {
   });
 
   it("spells the positions out in full when asked", () => {
-    const target = STARTERS.map((assignment) =>
-      assignment.slotId === STRIKER.id ? { ...assignment, memberId: "karim" } : assignment,
-    ).filter((assignment) => assignment.slotId !== PIVOT_RIGHT.id);
+    // Seven players, not six: an empty slot makes the target a draft and stops the deduction.
+    const target = STARTERS.map((assignment) => {
+      if (assignment.slotId === STRIKER.id) return { ...assignment, memberId: "karim" };
+      if (assignment.slotId === PIVOT_RIGHT.id) return { ...assignment, memberId: "yanis" };
+      return assignment;
+    });
 
     const changes = deduceChanges(team(STARTERS), team(target), nameOf, { long: true });
 
     expect(changes.lines).toContain("Karim passe Milieu central → Attaquant");
+  });
+
+  it("deduces nothing at all from a pitch nobody has been placed on", () => {
+    // « Nouvelle composition » opens like this. Seven « X sort » lines were printed here.
+    const changes = deduceChanges(team(STARTERS), team([]), nameOf);
+
+    expect(changes.slotsLeft).toBe(7);
+    expect(changes.lines).toEqual([]);
+    expect(changes.summary).toBe("Aucun changement");
+    expect(changes.substitutions).toEqual([]);
+    expect(changes.positionChanges).toEqual([]);
+  });
+
+  it("waits for the last post to be filled before deducing anything", () => {
+    const halfDone = STARTERS.filter((assignment) => assignment.slotId !== STRIKER.id);
+
+    const changes = deduceChanges(team(STARTERS), team(halfDone), nameOf);
+
+    expect(changes.slotsLeft).toBe(1);
+    expect(changes.lines).toEqual([]);
+  });
+
+  it("counts a slot nobody is standing in, not a player who is missing", () => {
+    // Six players in seven slots is a draft; the same six in six slots is a team playing short.
+    const six = STARTERS.filter((assignment) => assignment.slotId !== STRIKER.id);
+    const sixSlots = SLOTS.filter((slot) => slot.id !== STRIKER.id);
+
+    const changes = deduceChanges(team(STARTERS), { assignments: six, slots: sixSlots }, nameOf);
+
+    expect(changes.slotsLeft).toBe(0);
+    expect(changes.lines).toEqual(["Ali sort"]);
   });
 
   it("says nothing when two players simply swap sides of the same double pivot", () => {
@@ -485,5 +520,17 @@ describe("compositionsScreenFr", () => {
     expect(compositionsScreenFr(played).frozenNoticeFr).toBe(LINEUPS_FROZEN_FR);
     expect(LINEUPS_FROZEN_FR).toContain("ne changent plus");
     expect(LINEUPS_FROZEN_FR).toContain("par sa saisie");
+  });
+});
+
+describe("draftChangesPendingFr", () => {
+  it("agrees in number", () => {
+    expect(draftChangesPendingFr(1)).toContain("Il reste un poste à pourvoir");
+    expect(draftChangesPendingFr(4)).toContain("Il reste 4 postes à pourvoir");
+  });
+
+  it("says the changes are coming rather than that there are none", () => {
+    expect(draftChangesPendingFr(7)).not.toContain("Aucun changement");
+    expect(draftChangesPendingFr(7)).toContain("quand l’équipe sera complète");
   });
 });
