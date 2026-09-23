@@ -4,6 +4,7 @@ import { MS_PER_MINUTE } from "./clock";
 import {
   availableOptions,
   clockActionFr,
+  enterableCardFr,
   eventLabel,
   mergeEvents,
   minuteLabelFr,
@@ -388,6 +389,55 @@ describe("the player pickers", () => {
     expect(options[0].warn).toBe(true);
     // The sheet says nothing about Fabien, but a coach one short at 20′ still needs him.
     expect(options.at(-1)?.subtitle).toBe("hors feuille");
+  });
+
+  it("does not call the list « Remplaçants » when most of it is not", () => {
+    // Before the kick-off nobody is on the pitch, so the list is the whole squad (invariant 3).
+    const before = reduceLive(live(log([])), [], T0);
+    const all = availableOptions(before, PLAYERS);
+    const substitutes = all.filter((option) =>
+      PLAYERS.some(
+        (player) => player.memberId === option.memberId && player.squadRole === "substitute",
+      ),
+    );
+
+    expect(all.length).toBeGreaterThan(substitutes.length);
+    const card = enterableCardFr({ available: all, players: PLAYERS, canAct: true });
+    expect(card.titleFr).not.toBe("Remplaçants");
+    expect(card.titleFr).toBe("Qui peut entrer");
+    expect(card.hintFr).toContain("puis le reste du groupe");
+  });
+
+  it("says nothing about the order when the list really is the substitutes", () => {
+    const state = reduceLive(live(log(KICKED_OFF)), [], T0 + 20 * MIN);
+    const onlySubs = availableOptions(state, PLAYERS).filter((option) =>
+      PLAYERS.some(
+        (player) => player.memberId === option.memberId && player.squadRole === "substitute",
+      ),
+    );
+
+    const card = enterableCardFr({ available: onlySubs, players: PLAYERS, canAct: true });
+
+    expect(card.hintFr).toBe("Touchez un joueur pour le faire entrer.");
+  });
+
+  it("tells a spectator what the list is, not what to do with it", () => {
+    const state = reduceLive(live(log(KICKED_OFF)), [], T0 + 20 * MIN);
+    const card = enterableCardFr({
+      available: availableOptions(state, PLAYERS),
+      players: PLAYERS,
+      canAct: false,
+    });
+
+    expect(card.titleFr).toBe("En dehors du terrain");
+    expect(card.hintFr).toBeNull();
+  });
+
+  it("does not call an empty list a bench nobody is sitting on", () => {
+    const card = enterableCardFr({ available: [], players: PLAYERS, canAct: true });
+
+    expect(card.emptyFr).toBe("Tous les joueurs sont sur le terrain.");
+    expect(card.emptyFr).not.toContain("banc");
   });
 
   it("says out loud that a player has already played, rather than hiding them", () => {
