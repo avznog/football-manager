@@ -2,14 +2,18 @@
 
 import { PitchLayout, type KitColors, type PitchSlot } from "@/components/pitch/PitchLayout";
 import { Button, Card } from "@/components/ui";
-import type { PendingLineupView } from "@/lib/match/presenter";
+import { pendingLineupChangesFr, type PendingLineupView } from "@/lib/match/presenter";
 
 export type LineupPromptProps = {
   view: PendingLineupView;
   /** The proposal, drawn as ghosts. */
   slots: readonly PitchSlot[];
   kit: KitColors;
-  onApply: () => void;
+  /**
+   * Applies the plan. Null when the viewer cannot operate the match — the card still shows, because
+   * following the plan from the touchline is the point, but the operator's button is not offered.
+   */
+  onApply: (() => void) | null;
   /**
    * Opens TERRAIN pre-filled with this composition, for the coach who wants it *almost* as planned.
    * Null when the viewer cannot operate the match.
@@ -36,10 +40,16 @@ export type LineupPromptProps = {
  * he validates there.
  */
 export function LineupPrompt({ view, slots, kit, onApply, onAdjust, onLater }: LineupPromptProps) {
+  const changes = pendingLineupChangesFr(view);
+
   return (
     <Card
       title={view.title}
-      description="Proposée, pas appliquée : rien ne change avant votre confirmation."
+      description={
+        onApply
+          ? "Proposée, pas appliquée : rien ne change avant votre confirmation."
+          : "Proposée, pas appliquée : rien ne change avant la confirmation de l’opérateur."
+      }
       className="border-accent/50 ring-1 ring-accent/20"
     >
       <div className="space-y-4">
@@ -53,16 +63,16 @@ export function LineupPrompt({ view, slots, kit, onApply, onAdjust, onLater }: L
           </ul>
         ) : null}
 
-        {view.changes.length > 0 ? (
+        {changes.kind === "list" ? (
           <ol className="space-y-1">
-            {view.changes.map((change) => (
+            {changes.lines.map((change) => (
               <li key={change} className="text-sm text-ink">
                 {change}
               </li>
             ))}
           </ol>
         ) : (
-          <p className="text-sm text-ink-muted">Cette composition ne change rien sur le terrain.</p>
+          <p className="text-sm text-ink-muted">{changes.text}</p>
         )}
 
         <PitchLayout
@@ -76,14 +86,24 @@ export function LineupPrompt({ view, slots, kit, onApply, onAdjust, onLater }: L
         <div className="space-y-2">
           {/* Grid, not flex: `Button` is `shrink-0`, and two `w-full` buttons in a flex row push the
               second one off a 390 px screen. */}
-          <div className="grid grid-cols-2 gap-2">
+          {onApply ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="secondary" fullWidth onClick={onLater}>
+                Plus tard
+              </Button>
+              <Button fullWidth onClick={onApply}>
+                Appliquer
+              </Button>
+            </div>
+          ) : (
+            /* A viewer who cannot operate the match was being offered « Appliquer » all the same, and
+               the server refused the event it produced — a rejected action in the queue for a tap the
+               screen should never have invited. Hiding the card is still theirs to do, but it is
+               « Masquer »: « Plus tard » would promise them something they will not be doing. */
             <Button variant="secondary" fullWidth onClick={onLater}>
-              Plus tard
+              Masquer
             </Button>
-            <Button fullWidth onClick={onApply}>
-              Appliquer
-            </Button>
-          </div>
+          )}
           {onAdjust ? (
             <Button variant="ghost" fullWidth onClick={onAdjust}>
               Ajuster sur le terrain

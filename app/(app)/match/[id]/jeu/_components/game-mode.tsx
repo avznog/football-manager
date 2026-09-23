@@ -422,12 +422,18 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           view={prompt}
           slots={promptSlots}
           kit={live.kit}
-          onApply={() =>
-            void emit(
-              "LINEUP_APPLIED",
-              { lineupId: prompt.lineupId, slots: prompt.slots },
-              { atMs: Date.now() },
-            )
+          // Same condition as « Ajuster » below, which was the only one of the two that had it: a
+          // member who may not operate the match must not be handed the button that applies a
+          // composition, because the route handler answers 403 and the tap becomes a rejected action.
+          onApply={
+            canOperate && !state.finished
+              ? () =>
+                  void emit(
+                    "LINEUP_APPLIED",
+                    { lineupId: prompt.lineupId, slots: prompt.slots },
+                    { atMs: Date.now() },
+                  )
+              : null
           }
           onAdjust={
             canOperate && !state.finished

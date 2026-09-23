@@ -10,6 +10,7 @@ import {
   nextEventStamp,
   onPitchOptions,
   pendingCountLabelFr,
+  pendingLineupChangesFr,
   pendingLineupView,
   periodsOf,
   phaseLabelFr,
@@ -25,6 +26,7 @@ import {
   type LivePlayer,
   type LiveSlot,
   type PendingEvent,
+  type PendingLineupView,
 } from "./presenter";
 
 /* -------------------------------------------------------------------------- */
@@ -569,6 +571,13 @@ describe("the planned-composition prompt", () => {
     // The diff against an empty pitch is seven arrivals; the ghost pitch beside this list is where
     // the coach reads the team sheet, and « Hugo entre, Nico entre, … » under it says nothing.
     expect(view?.changes).toEqual([]);
+    // …but the diff itself is *not* empty, which is what tells the card that this silence is a team
+    // sheet and not « nothing would happen ». The card used to print the second one over the first.
+    expect(view?.isEmpty).toBe(false);
+    expect(pendingLineupChangesFr(view!)).toEqual({
+      kind: "sentence",
+      text: "7 joueurs entrent en jeu.",
+    });
   });
 
   it("spells out a man walking on when the team is a player short", () => {
@@ -603,6 +612,45 @@ describe("the planned-composition prompt", () => {
     expect(state.onPitch).toHaveLength(6);
     expect(view?.isEmpty).toBe(false);
     expect(view?.changes).toEqual(["Yanis entre"]);
+    expect(pendingLineupChangesFr(view!)).toEqual({ kind: "list", lines: ["Yanis entre"] });
+  });
+
+  /*
+   * The two silences. `changes` is empty both for the starting composition — on purpose, because
+   * seven arrivals are a team sheet — and for a plan that would genuinely change nothing, and the
+   * card printed « ne change rien sur le terrain » for both. Over a full starting seven that is a
+   * screen stating the opposite of the truth, which is the defect class this repo keeps finding by
+   * looking rather than by testing. Now there is a test.
+   */
+  it("tells « rien ne changerait » apart from « c'est la feuille de match »", () => {
+    const nothingWouldChange: PendingLineupView = {
+      lineupId: "l-45",
+      title: "Composition prévue à la 45’",
+      changes: [],
+      warnings: [],
+      flags: [],
+      slots: STARTING_SEVEN,
+      isEmpty: true,
+    };
+    expect(pendingLineupChangesFr(nothingWouldChange)).toEqual({
+      kind: "sentence",
+      text: "Cette composition ne change rien sur le terrain.",
+    });
+
+    // Same empty list, opposite meaning: the diff is not empty, so somebody is walking on.
+    expect(pendingLineupChangesFr({ ...nothingWouldChange, isEmpty: false })).toEqual({
+      kind: "sentence",
+      text: "7 joueurs entrent en jeu.",
+    });
+    // A seven-a-side sheet is never one player, but the sentence is built from the slots and a
+    // formation the coach drew himself could be anything.
+    expect(
+      pendingLineupChangesFr({
+        ...nothingWouldChange,
+        isEmpty: false,
+        slots: [STARTING_SEVEN[0]!],
+      }),
+    ).toEqual({ kind: "sentence", text: "1 joueur entre en jeu." });
   });
 });
 

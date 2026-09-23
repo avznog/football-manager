@@ -694,6 +694,40 @@ export function pendingLineupView(
   };
 }
 
+/** Either the ordered list of changes, or the one sentence that stands in for it. */
+export type PendingLineupChanges =
+  | { kind: "list"; lines: readonly string[] }
+  | { kind: "sentence"; text: string };
+
+/**
+ * What the prompt says about what would happen — and why « aucun changement » is not always it.
+ *
+ * `pendingLineupView` sends **no** change list for the starting composition on purpose: seven
+ * arrivals are the team sheet, not seven substitutions, and the ghost pitch beside the list already
+ * shows them. « 7 changements » for the starting seven was a real defect.
+ *
+ * But an empty list and *nothing would happen* are opposite things, and the card rendered both as
+ * « Cette composition ne change rien sur le terrain. » — printed over a full starting seven waiting
+ * to walk onto an empty pitch. The lie was fixed in one direction and reappeared in the other.
+ *
+ * So the two silences are told apart here, and by the diff rather than by the list: `isEmpty` is the
+ * reducer's answer to « would applying this change anything ». It is a function and not an `if` in
+ * the component because the component cannot be unit-tested (`environment: "node"`) and this sentence
+ * has now been wrong twice.
+ */
+export function pendingLineupChangesFr(view: PendingLineupView): PendingLineupChanges {
+  if (view.changes.length > 0) return { kind: "list", lines: view.changes };
+  if (view.isEmpty) {
+    return { kind: "sentence", text: "Cette composition ne change rien sur le terrain." };
+  }
+  // The starting composition: every slot is an arrival, because the pitch is empty.
+  const count = view.slots.length;
+  return {
+    kind: "sentence",
+    text: count === 1 ? "1 joueur entre en jeu." : `${count} joueurs entrent en jeu.`,
+  };
+}
+
 /**
  * The reducer's flags plus the ones only the roster knows about.
  *
