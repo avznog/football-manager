@@ -56,6 +56,9 @@ const PASSWORD = "motdepasse-e2e";
 
 const COACH_DISPLAY_NAME = "Coach Renard";
 
+/** The bootstrap account of the first-run scenario: super admin, and in no team. */
+const ADMIN_DISPLAY_NAME = "Patron Vasseur";
+
 /**
  * Eight players: seven starters in a 1-3-2-1 and one substitute. The names are distinct enough that
  * no one of them is a substring of another — the specs look players up by visible French text, and
@@ -169,6 +172,19 @@ async function createTeam(runId: string): Promise<Fixture> {
     .values({ teamId: team.id, userId: coachUser.id, role: "coach", isPlayer: false })
     .returning({ id: teamMembers.id });
 
+  /**
+   * The first-run account: super admin, deliberately **without** a `team_members` row. That is the
+   * whole point — `requireTeamContext` bounces a user with no team to `/rejoindre` (invariant 5), and
+   * the spec checks that screen is not the dead end it used to be.
+   */
+  const adminUsername = `${PREFIX}${runId}-admin`;
+  await db.insert(users).values({
+    username: adminUsername,
+    passwordHash,
+    displayName: ADMIN_DISPLAY_NAME,
+    isSuperAdmin: true,
+  });
+
   const playerUsers = await db
     .insert(users)
     .values(
@@ -220,6 +236,7 @@ async function createTeam(runId: string): Promise<Fixture> {
       membershipId: coachMember.id,
     },
     players,
+    admin: { username: adminUsername, displayName: ADMIN_DISPLAY_NAME },
   };
 }
 
