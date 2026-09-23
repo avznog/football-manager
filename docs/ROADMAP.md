@@ -218,7 +218,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       twice — as the author of the notes he gave and as the subject of his own row — and only the
       first had a rule, so his own row said « il s'est mis 8 » and « lui-même » three rows under
       « 8 Karim (toi) », and his comment was signed a third way again. `lib/rating/labels.ts`
-      (decision NNN)
+      (decision 095)
 - [x] …and a player's average is explained with the matches that hold a note about **him**. The
       profile printed the reader's own season-wide count of unfinished matches — « Les notes de
       2 matchs sont exclus de cette moyenne » where one of the two held no note about that player at

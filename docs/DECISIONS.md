@@ -2204,7 +2204,7 @@ The rule, and it is the reason to write this down rather than just fix it: **whe
 two columns to say what something is, so does the sentence.** A label derived from one of them is not
 a simplification, it is a claim about the other one.
 
-## NNN — A screen that names people names the reader as « toi », in every sentence
+## 095 — A screen that names people names the reader as « toi », in every sentence
 
 **2026-09-23.** Decision 007 makes the authors of ratings visible to everyone, which is what turns
 the recap's « Les notes » card into a list the reader appears in twice: once as the author of the
