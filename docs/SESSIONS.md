@@ -2012,7 +2012,7 @@ a coach can mark attendance before the séance — the one window where the butt
 cascades. Not hypothetical, just unwritten.
 
 `lib/calendar/deletion.ts` writes both from counted holds, fed by two scalar-subquery queries. Eleven
-tests; 1022 with the suite. Decision NNN, whose rule is that a destructive control states what it
+tests; 1022 with the suite. Decision 098, whose rule is that a destructive control states what it
 destroys in numbers, and whose stated limitation is that nothing enforces it: a `cascade` added next
 month will not appear in the two `…Holds` types by itself, and the suite will stay green.
 

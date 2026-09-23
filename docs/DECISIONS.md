@@ -2344,7 +2344,7 @@ match nobody checked, and it is emphatically not a ban on French in `.tsx`. Scan
 substitute for testing a component. It is also the only cheap thing that can see across the boundary
 `vitest.config.ts` draws, and this defect survived a whole milestone behind it.
 
-## NNN — A destructive button's description is the confirmation dialog, so it names everything
+## 098 — A destructive button's description is the confirmation dialog, so it names everything
 
 The two « Supprimer » cards — `/match/[id]/modifier` and `/entrainements/[id]/modifier` — are plain
 `<form action={…}>` with no dialog in front of them. That is deliberate and it stays: a confirmation

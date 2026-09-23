@@ -64,7 +64,7 @@ export default async function EditTrainingPage({
       {!over && can(actor, "training:delete", { teamId: team.id }) ? (
         <Card title="Supprimer" description={trainingDeletionWarningFr(holds)}>
           {/* The attendance marks are counted too: a coach can point a session before it happens,
-              and this button is only offered before it happens (decision NNN). */}
+              and this button is only offered before it happens (decision 098). */}
           <form action={deleteTraining}>
             <input type="hidden" name="teamId" value={team.id} />
             <input type="hidden" name="trainingId" value={training.id} />

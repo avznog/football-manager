@@ -128,7 +128,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       named the cheapest thing the cascade destroys: « avec les disponibilités déclarées » over a
       match holding eleven answers, an eleven-row sheet and two compositions. The training twin never
       mentioned `training_attendance`, markable before the séance because `AttendanceList` is not
-      gated on `over`. `lib/calendar/deletion.ts`, eleven tests (decision NNN)
+      gated on `over`. `lib/calendar/deletion.ts`, eleven tests (decision 098)
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)
