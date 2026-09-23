@@ -564,3 +564,35 @@ so a rebase of a Log line is a rebase of nothing.
   already seen that a coach is offered a pointage on a session that has not happened. Whether that is
   a defect or a feature is the next question, and it is a product one, so I will state it before I
   touch it.
+- **14:20 CEST** — PR **#87**, `fix/pointage-before-the-session`, one `## NNN`, off `81c480c`, 1018
+  tests. This is the one I said I would state before touching, and it turned out not to be a product
+  question at all.
+  `entrainement`, the 26 September séance read on the 22nd. Top of the page is careful work — « 9
+  réponses sur 13 joueurs », « Karim (toi) », a tally that adds up. Then « Présences · Personne n'est
+  encore pointé » over « Tout le monde est là » and thirteen Présent/Absent rows, on a séance four days
+  away. `AttendanceList` is rendered with no reference to `over`, while `PresenceSummary` — the other
+  half of the same ternary — reasons about it explicitly and returns `null` before the session.
+  What makes it a defect rather than a preference: `getAttendanceMarks` filters by team and **not by
+  date**. I inserted the thirteen rows one tap would have written and read `/stats`: « **3 séances
+  pointées** » in a season of two, Brice 1/3 where the truth is 0/2, Fabien with him. Deleted them
+  after; the two real sessions still hold 14 and 13 marks, checked. So the untruth outlives the screen
+  and settles in the season statistics, and decision 090 — « pas dispo » is an intention, « absent » is
+  an observation — already decides the question. 090 fixed the words on three screens and left the
+  write open. This closes it.
+  `attendanceIsOpen` opens the pointage 30 minutes before kick-off (a coach arrives before his players)
+  and never closes it, because decision 076's « Présences pas encore pointées » depends on late marking
+  staying possible. Both Server Actions refuse, and I proved that rather than claiming it: forced
+  `canMark` to `true`, clicked « Tout le monde est là », then checked a Présent radio and submitted —
+  `training_attendance` empty after both. Scratch edit reverted, working tree clean.
+  **One judgement you may want to overrule:** I left `getAttendanceMarks` without a date filter. With
+  the write shut the table holds facts, and two definitions of « which sessions count » is how two
+  screens come to disagree — but it does mean a row written before this change would still be counted.
+  There is none anywhere, since no production team exists yet, and the cleanup would be a migration
+  rather than a `where` clause. Stated in the decision entry too.
+  #86 is also waiting, both green. Nothing touched in `vercel.json`, `.github/`, `package.json` or the
+  deployment.
+  **Remaining:** `entrainement-pointe`, `entrainement-non-pointe`, `entrainement-nouveau`,
+  `entrainement-modifier`, `composition-nouvelle`.
+  **Next one I open: `entrainement-pointe`** — the 12 September séance where every one of the thirteen
+  was marked absent, which is the most peculiar row in the demo season and therefore the likeliest to
+  have a screen saying something odd about it.
