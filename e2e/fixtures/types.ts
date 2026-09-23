@@ -40,4 +40,10 @@ export type Fixture = {
   team: { id: string; name: string; slug: string };
   coach: { username: string; displayName: string; membershipId: string };
   players: FixturePlayer[];
+  /**
+   * A super admin **in no team at all**, for the first-run scenario: the state a freshly deployed
+   * instance is in after `npm run db:bootstrap` (decision 052). It needs no empty database — only an
+   * account with no membership, which is exactly what this is.
+   */
+  admin: { username: string; displayName: string };
 };

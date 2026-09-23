@@ -18,6 +18,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Playwright end-to-end happy path (`e2e/happy-path.spec.ts`, `npm run test:e2e`) — the whole
       PLAN scenario driven through the UI on a 390×844 viewport, with a run-scoped fixture team
       instead of the demo season (decision 044), plus CI in `.github/workflows/ci.yml`
+- [x] Playwright first run (`e2e/first-run.spec.ts`) — the state a fresh deployment is in: a super
+      admin with no team creates one from `/rejoindre`, lands in the app, sees an empty squad that
+      says what to do next, and renames the team. Mutation-tested against the four bugs it covers
 
 ## M1 — Squad & profiles
 - [x] Squad list with jersey numbers, injury badges and preferred positions, each row linking
@@ -27,6 +30,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Injuries: declared by the player for themselves or by a coach for anyone, with an expected
       return date, and resolvable
 - [x] Invite management and coach appointment UI
+- [x] The team's last coach is told why he cannot be demoted or removed, instead of being offered
+      two buttons the server refuses in silence — and the squad row wraps so his name still fits
 
 ## M2 — Calendar
 - [x] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)

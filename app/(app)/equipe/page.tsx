@@ -18,6 +18,14 @@ export default async function TeamPage() {
   const players = squad.filter((member) => member.isPlayer);
   const staff = squad.filter((member) => !member.isPlayer);
 
+  /**
+   * A team must always keep one coach, and `setMemberRole` / `removeMember` enforce it by refusing.
+   * Counted here so the row can say so instead of offering a button that does nothing — `getSquad`
+   * already excludes anybody who has left, which is the condition those actions check too.
+   */
+  const coaches = squad.filter((member) => member.role === "coach");
+  const lastCoachId = coaches.length === 1 ? coaches[0].membershipId : null;
+
   return (
     <div className="space-y-6">
       <header className="flex items-baseline justify-between gap-3">
@@ -44,6 +52,7 @@ export default async function TeamPage() {
                 member={member}
                 teamId={team.id}
                 canManage={team.isCoach}
+                isLastCoach={member.membershipId === lastCoachId}
               />
             ))}
           </ul>
@@ -59,6 +68,7 @@ export default async function TeamPage() {
                 member={member}
                 teamId={team.id}
                 canManage={team.isCoach}
+                isLastCoach={member.membershipId === lastCoachId}
               />
             ))}
           </ul>
