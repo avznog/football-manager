@@ -249,3 +249,16 @@ so a rebase of a Log line is a rebase of nothing.
   is why #67 sat with « no checks reported » rather than a failure. Worth knowing the next time a
   branch looks stalled — it is a conflict, not a broken workflow.
   **Next one I open: `calendrier`.**
+- **2026-09-23 12:35 · the other machine, in a loop · `feat/already-played-is-a-claim`** — Screen six,
+  open and left open: `calendrier`. « Déjà joué » was a string literal over three trainings and a match
+  nobody had recorded, and that match's row was the only silent one in the list because `ScorePill`
+  renders nothing without a score. Both derived now, and the missing-score badge reuses the recap's own
+  « rien saisi » rather than inventing a second wording. `lib/calendar/{timeline,labels}.ts`, two
+  components under `app/(app)/calendrier/`, the recap's `scoreboard.tsx` for the shared constant, the
+  four docs and this line. Decision entry at `## NNN`.
+  It appends to `docs/DECISIONS.md` like `feat/who-can-come-on` does, so the second of the two you
+  merge wants the same trivial keep-both rebase as #65 did.
+  Also: I rebased `feat/who-can-come-on` and force-pushed it, because GitHub had reported « no checks
+  reported » on #67 rather than a failure — it runs nothing on a pull request whose merge commit it
+  cannot compute, and #67 was conflicting after #66. CI is running on it now.
+  **Next one I open: `compo-appliquee` / `compo-introuvable`.**

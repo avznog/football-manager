@@ -18,7 +18,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { getCalendar } from "@/lib/calendar/queries";
-import { splitTimeline } from "@/lib/calendar/timeline";
+import { pastSectionTitleFr, splitTimeline } from "@/lib/calendar/timeline";
 import { EventRow } from "./_components/event-row";
 import { NextEventCard } from "./_components/next-event-card";
 
@@ -76,7 +76,7 @@ export default async function CalendarPage() {
 
       {past.length > 0 ? (
         <Card
-          title="Déjà joué"
+          title={pastSectionTitleFr(past)}
           description="Le plus récent en premier."
           flush
           as="h2"

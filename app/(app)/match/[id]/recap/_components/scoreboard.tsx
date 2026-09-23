@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import type { MatchStatus } from "@/db/schema";
-import { scoreLineFr } from "@/lib/calendar/labels";
+import { NOT_RECORDED_FR, scoreLineFr } from "@/lib/calendar/labels";
 import type { MatchRecap } from "@/lib/rating/recap";
 
 const RESULT_TONE: Record<"win" | "draw" | "loss", string> = {
@@ -62,7 +62,7 @@ export function Scoreboard({
 
         <div className="flex flex-wrap items-center justify-center gap-2">
           {unrecorded ? (
-            <Badge variant="neutral">rien saisi</Badge>
+            <Badge variant="neutral">{NOT_RECORDED_FR}</Badge>
           ) : recap.resultLabel ? (
             <Badge variant={recap.result === "win" ? "success" : "neutral"} solid={recap.result === "win"}>
               {recap.resultLabel}

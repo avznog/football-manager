@@ -12,7 +12,7 @@ import { formatShortDay, formatTime } from "@/lib/calendar/time";
 import type { CalendarEvent } from "@/lib/calendar/timeline";
 import {
   AvailabilityBadge,
-  ScorePill,
+  PastMatchResult,
   attendanceSummary,
   matchSubtitle,
   matchTitle,
@@ -72,7 +72,7 @@ export function EventRow({ event, variant }: EventRowProps) {
         </span>
 
         {variant === "past" && isMatch ? (
-          <ScorePill match={event} />
+          <PastMatchResult match={event} />
         ) : variant === "upcoming" ? (
           <AvailabilityBadge status={event.myAvailability} />
         ) : null}

@@ -12,12 +12,14 @@ import {
   attendanceLineFr,
   AVAILABILITY_LABELS,
   COMPETITION_LABELS,
+  NOT_RECORDED_FR,
   pluralize,
   resultLabel,
   resultLetter,
   scoreLineFr,
   venueSideLabel,
 } from "@/lib/calendar/labels";
+import { capitalizeFirst } from "@/lib/calendar/time";
 import type { AvailabilityCounts, CalendarMatch, CalendarTraining } from "@/lib/calendar/timeline";
 import { pendingCount } from "@/lib/calendar/timeline";
 
@@ -107,6 +109,25 @@ export function ScorePill({ match }: { match: CalendarMatch }) {
       </Badge>
     </span>
   );
+}
+
+/**
+ * The right-hand end of a past match row: the score, or the fact that there is not one.
+ *
+ * `ScorePill` says nothing when nobody has recorded the match, which is correct where it is pinned
+ * at the top of the screen — a match starting in an hour has no score and needs no excuse. In the
+ * history it left the one row asking to be filled in as the only silent row of the list.
+ */
+export function PastMatchResult({ match }: { match: CalendarMatch }) {
+  if (match.score === null) {
+    return (
+      <Badge variant="neutral" className="shrink-0">
+        {capitalizeFirst(NOT_RECORDED_FR)}
+      </Badge>
+    );
+  }
+
+  return <ScorePill match={match} />;
 }
 
 /** « Championnat · à domicile · Stade des Tilleuls ». */

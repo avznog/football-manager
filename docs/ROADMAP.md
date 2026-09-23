@@ -100,6 +100,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] …and the audit looks at a past session at all now. It picked its training with
       `order by starts_at desc`, so it always visited the one still to come: `PresenceSummary`,
       `departedMarksNoteFr` and the blank page had never been screenshotted. 100 visits, not 92
+- [x] The history section is headed by what is in it. « Déjà joué » stood over three trainings and a
+      match nobody had recorded; `pastSectionTitleFr` keeps the narrow word for the list that earns it
+      and widens it to « Déjà passé » otherwise. A past match with no score says « rien saisi » where
+      the score pill rendered nothing at all — the recap's own words, shared from
+      `lib/calendar/labels.ts` (decision NNN)
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)
