@@ -34,7 +34,9 @@ export function RatingsPanel({
           description={
             canStillRate
               ? `Tu en as mis ${results.progress.submittedCount} sur ${results.progress.requiredCount}. Les notes des autres apparaissent quand tu as noté tout le monde — comme ça personne ne recopie.`
-              : `La notation est fermée et tu n’avais noté que ${results.progress.submittedCount} joueurs sur ${results.progress.requiredCount}. Les notes de ce match restent masquées.`
+              : results.progress.submittedCount === 0
+                ? "La notation est fermée et tu n’avais mis aucune note. Les notes de ce match restent masquées."
+                : `La notation est fermée et tu n’avais noté que ${pluralize(results.progress.submittedCount, "joueur")} sur ${results.progress.requiredCount}. Les notes de ce match restent masquées.`
           }
           action={
             canStillRate ? (
@@ -69,7 +71,7 @@ export function RatingsPanel({
   return (
     <Card
       title="Les notes"
-      description={`${pluralize(results.ratingCount, "note")} de ${results.raterCount} joueurs sur ${results.raterTotal}.`}
+      description={`${pluralize(results.ratingCount, "note")} de ${pluralize(results.raterCount, "joueur")} sur ${results.raterTotal}.`}
       as="h2"
       flush
     >

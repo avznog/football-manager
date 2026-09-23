@@ -189,6 +189,12 @@ export type NotationView = {
   window: RatingWindow;
   /** The viewer is on the sheet as `starter` or `substitute`, so he may rate. */
   onSheet: boolean;
+  /**
+   * How the viewer was listed on the sheet, or null if he was not on it at all. `onSheet` answers
+   * « may he rate »; this answers « why not », and the two are not the same question: a supporter was
+   * on the sheet and still rates nobody (decision 039), so telling him he was not on it is a lie.
+   */
+  sheetRole: SquadRole | null;
   /** Everybody he owes a note, himself included. Starters first, then substitutes, by shirt. */
   targets: RatingTarget[];
   progress: RatingProgress;
@@ -247,6 +253,7 @@ export async function getNotationView(input: {
     match,
     window,
     onSheet,
+    sheetRole: input.membershipId ? roleOf.get(input.membershipId) ?? null : null,
     targets,
     progress: ratingProgress({
       requiredIds,

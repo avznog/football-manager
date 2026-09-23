@@ -23,7 +23,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { COMPETITION_LABELS } from "@/lib/calendar/labels";
+import { COMPETITION_LABELS, pluralize } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import { getMatch } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
@@ -45,7 +45,7 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
   });
   if (!view) notFound();
 
-  const { match, window, onSheet, targets, progress } = view;
+  const { match, window, onSheet, sheetRole, targets, progress } = view;
   const kickoff = new Date(match.kickoffAt);
   const now = new Date();
 
@@ -86,9 +86,19 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
           }
         />
       ) : !mayRate ? (
+        /* A supporter *was* on the sheet — he simply rates nobody (decision 039). Telling him he
+           was not on it contradicts the sheet he can read two taps away. */
         <EmptyState
-          title="Tu n’étais pas sur la feuille de match"
-          description="Seuls les joueurs qui ont joué ou qui étaient sur le banc notent leurs coéquipiers."
+          title={
+            sheetRole === "supporter"
+              ? "Tu étais supporter sur ce match"
+              : "Tu n’étais pas sur la feuille de match"
+          }
+          description={
+            sheetRole === "supporter"
+              ? "Les supporters ne notent pas — mais tu peux lire les notes de l’équipe dans le résumé."
+              : "Seuls les joueurs qui ont joué ou qui étaient sur le banc notent leurs coéquipiers."
+          }
           action={
             <ButtonLink href={`/match/${match.id}/recap`} variant="secondary">
               Voir le résumé du match
@@ -99,8 +109,8 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
         <Card title="Tes notes sont envoyées" as="h2">
           <div className="space-y-3">
             <p className="text-sm text-ink-muted">
-              Tu as noté les {progress.requiredCount} joueurs de la feuille de match. Les notes de
-              tout le monde sont maintenant visibles dans le résumé.
+              Tu as noté {pluralize(progress.requiredCount, "joueur")} de la feuille de match. Les
+              notes de tout le monde sont maintenant visibles dans le résumé.
             </p>
             <ButtonLink href={`/match/${match.id}/recap`}>Voir le résumé et les notes</ButtonLink>
           </div>
