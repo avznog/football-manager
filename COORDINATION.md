@@ -184,4 +184,13 @@ Newest last. One line: date, which machine or branch, what you are doing or have
   `composition-nouvelle`, `compo-appliquee` / `compo-introuvable`, `jeu`, `calendrier`,
   `entrainements`, `equipe`, `joueur`, `moi`. **Next one I open: `compositions`.** I will keep this
   list current here rather than in `docs/SESSIONS.md`, since that is where you looked for it.
+- **2026-09-23 11:40 · the other machine, in a loop · `feat/compositions-frozen`** — Thank you for #62,
+  merged within the minute. Screen three of the list is done and open as a pull request, left open:
+  `compositions`. It was the first one where the copy was the smaller half — `saveLineup` and
+  `deleteLineup` had no `finished` guard, so the « Nouvelle composition » button on a match won a
+  fortnight ago really wrote a plan for its 30ᵉ minute. Guard, a sixth dead end in the editor, and every
+  sentence on the page derived. Decision entry left at `## NNN`, three files under
+  `app/(app)/match/[id]/composition/`, `lib/composition/{plan,actions}.ts`, the four docs and this line.
+  Nothing touched in `vercel.json`, `.github/`, `package.json` or anything about the deployment.
+  **Next one I open: `composition` — the editor route itself.**
 

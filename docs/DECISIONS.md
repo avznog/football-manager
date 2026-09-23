@@ -1872,3 +1872,39 @@ it reads, in `lib/composition/plan.ts` — under `lib/` so Vitest collects it.
 
 `live` is deliberately not a case of its own: preparing a composition during a match is the normal way
 to plan a change, and invariant 3 means the plan is a proposal whenever it is written.
+
+## NNN — A finished match is a record on every screen, in the same words
+**2026-09-23** · accepted
+
+The compositions screen was written for a match still to be played, and said the same things about one
+already played. On CS Morvan — won 2 – 0, thirteen days old — the bottom of the page read:
+
+> Planifier un changement
+> Une composition « à partir de la minute X ». Le match dure 60 minutes.
+> [ Nouvelle composition ]
+
+and the button worked. `setMatchSquad` has refused a finished match since M3 (« Le match est terminé :
+la feuille de match ne change plus. »); `saveLineup` and `deleteLineup` never did. So a coach could add
+a plan « à partir de la 30ᵉ minute » to a match whose 30th minute was a fortnight in the past, and
+delete the composition game mode had confirmed — which is not a plan any more but the record of what
+was played. The editor route was worse than the list: it would have opened a whole pitch, accepted
+seven players, and refused them on submit.
+
+The rule this settles is not about this screen: **a finished match is a record everywhere, and every
+screen that could write to it says so in the same words.** The way to change one is `lib/retro/amend.ts`,
+which appends (invariant 1) and re-freezes the statistics; it is never a plan for a minute already
+played. `LINEUPS_FROZEN_FR` holds the sentence once, shared by the list's notice and the editor's sixth
+dead end, so the two cannot drift — the decision 073 move.
+
+Three smaller untruths on the same page came from the same root, and each is now derived:
+
+- « Le terrain est vide · Place tes sept joueurs sur la pelouse » on a match played ten days earlier
+  and typed up afterwards. A match entered through `saisie` never had a composition and never needed
+  one, so the empty state says where its minutes came from instead of asking for players;
+- « modifier la feuille » in the header, linking to a sheet `SquadSheet` renders `frozen`. It now says
+  « voir la feuille », which is what the link does;
+- the empty state repeated its own card's heading, « Aucune composition » twice in a column 390 px wide.
+
+`live` stays editable on purpose, in all of it: planning the 40th minute during the 20th is the whole
+point of the screen, and invariant 3 means what is written is still only a proposal.
+
