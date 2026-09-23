@@ -12,7 +12,7 @@ import "server-only";
  * crosses into the client component without a `Date` in sight (`CLAUDE.md`).
  */
 
-import { asc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { DEFAULT_FORMATION_LABEL } from "@/db/reference";
@@ -23,7 +23,9 @@ import {
   lineups,
   matchEvents,
   matchSquad,
+  teamMembers,
   teams,
+  users,
 } from "@/db/schema";
 import type { SquadRole } from "@/db/schema";
 import { getSquad, type SquadMember } from "@/lib/team/queries";
@@ -117,7 +119,15 @@ export async function getLiveMatch(teamId: string, matchId: string): Promise<Liv
     getSquad(teamId),
   ]);
 
-  const lineupSlotRows = await loadLineupSlots(lineupRows.map((row) => row.id));
+  const [lineupSlotRows, departed] = await Promise.all([
+    loadLineupSlots(lineupRows.map((row) => row.id)),
+    // The men on this sheet who have since left the team. `getSquad` above hides them — that is
+    // what the soft `leftAt` is for — but the log of a match played while they were here still
+    // mentions them, and `reduceLive` takes the reducer's squad from this roster. Without them a
+    // re-freeze writes their cached row with `squad_role = null`: a cache that no longer matches a
+    // recomputation of the same log, which is the one thing that cache may never be.
+    getDepartedSheetMembers(matchId),
+  ]);
 
   const slotsByFormation = new Map<string, LiveSlot[]>();
   for (const slot of slotRows) {
@@ -150,7 +160,12 @@ export async function getLiveMatch(teamId: string, matchId: string): Promise<Liv
     slots: slotRows,
     formations: formationsOut,
     defaultFormationId: pickDefaultFormationId(formationsOut, lineupRows),
-    players: roster.map((member) => toLivePlayer(member, squadRoles)),
+    // The current squad in `getSquad`'s order, then whoever has left: they belong to this match's
+    // sheet and to no other screen in the app, so this is the only bench they appear on.
+    players: [
+      ...roster.map((member) => toLivePlayer(member, squadRoles)),
+      ...departed.map((member) => toDepartedLivePlayer(member, squadRoles)),
+    ],
     hasSquadSheet: squadRows.length > 0,
   };
 }
@@ -180,6 +195,29 @@ export async function getMatchEvents(matchId: string): Promise<LiveEvent[]> {
     .orderBy(asc(matchEvents.seq));
 
   return rows.map((row) => ({ ...row, occurredAt: row.occurredAt.toISOString() }));
+}
+
+/**
+ * The members of a match sheet who have since left the team.
+ *
+ * Returns nothing at all for an ordinary match — a player only leaves *after* the matches they
+ * played. Deliberately no injuries and no position preferences: neither means anything for somebody
+ * who can no longer be picked, and both would cost a join for a row that exists so that the history
+ * of this match stays complete (decision 040).
+ */
+async function getDepartedSheetMembers(matchId: string): Promise<DepartedSheetMember[]> {
+  return db
+    .select({
+      teamMemberId: teamMembers.id,
+      displayName: users.displayName,
+      jerseyNumber: teamMembers.jerseyNumber,
+      isPlayer: teamMembers.isPlayer,
+    })
+    .from(matchSquad)
+    .innerJoin(teamMembers, eq(teamMembers.id, matchSquad.teamMemberId))
+    .innerJoin(users, eq(users.id, teamMembers.userId))
+    .where(and(eq(matchSquad.matchId, matchId), isNotNull(teamMembers.leftAt)))
+    .orderBy(asc(teamMembers.jerseyNumber), asc(users.displayName));
 }
 
 async function loadLineupSlots(
@@ -214,6 +252,13 @@ async function loadLineupSlots(
 /* Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
+type DepartedSheetMember = {
+  teamMemberId: string;
+  displayName: string;
+  jerseyNumber: number | null;
+  isPlayer: boolean;
+};
+
 function toLivePlayer(member: SquadMember, squadRoles: Map<string, SquadRole>): LivePlayer {
   return {
     memberId: member.membershipId,
@@ -222,6 +267,22 @@ function toLivePlayer(member: SquadMember, squadRoles: Map<string, SquadRole>): 
     isInjured: member.isInjured,
     squadRole: squadRoles.get(member.membershipId) ?? null,
     positionCodes: member.positions.map((position) => position.code),
+    isPlayer: member.isPlayer,
+  };
+}
+
+/** The same shape from the leaner row: no injury flag, no preferences, nothing to pick him for. */
+function toDepartedLivePlayer(
+  member: DepartedSheetMember,
+  squadRoles: Map<string, SquadRole>,
+): LivePlayer {
+  return {
+    memberId: member.teamMemberId,
+    displayName: member.displayName,
+    jerseyNumber: member.jerseyNumber,
+    isInjured: false,
+    squadRole: squadRoles.get(member.teamMemberId) ?? null,
+    positionCodes: [],
     isPlayer: member.isPlayer,
   };
 }

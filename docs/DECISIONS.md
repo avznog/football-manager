@@ -663,6 +663,13 @@ attendance rate change as people leave.
 **Consequences.** Same reasoning as the season scorer table keeping a departed scorer: `lib/stats/`
 deliberately reads every membership, including those with `left_at` set.
 
+The same applies to a **match sheet**, and it took a fix: `getLiveMatch` built its roster from
+`getSquad`, which hides departed members, and `reduceLive` takes the reducer's squad from that roster
+— so re-freezing a match a since-departed player had started wrote his cached row with
+`squad_role = null`. `lib/match/live.ts` now unions the departed members of *that sheet* into the
+roster. A cache that disagrees with a recomputation of the same log is the one thing
+`match_player_stats` may never be, and M7's amendments re-freeze finished matches by design.
+
 ## 041 — A match with an empty log reads « ? – ? », never « 0 – 0 »
 **2026-09-23** · accepted
 
