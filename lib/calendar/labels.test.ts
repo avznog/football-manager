@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   attendanceCountFr,
   entryModeBadgeFr,
+  matchLengthHintFr,
   periodsLabel,
   resultLabel,
   resultLetter,
@@ -76,5 +77,39 @@ describe("attendanceCountFr", () => {
   it("keeps both halves singular when both are one", () => {
     expect(attendanceCountFr(1, 1)).toBe("1 présent sur 1 pointé");
     expect(attendanceCountFr(0, 13)).toBe("0 présent sur 13 pointés");
+  });
+});
+
+describe("matchLengthHintFr", () => {
+  /**
+   * The default, and the one a coach actually needs told: the second period of a 2×30 runs 30′→60′,
+   * because this app never resets the clock at half time (decision 009).
+   */
+  it("states the total and where the last period starts", () => {
+    expect(matchLengthHintFr(2, 30)).toBe(
+      "2×30 minutes : 60 minutes de jeu, et la 2ᵉ période va de la 30ᵉ à la 60ᵉ minute.",
+    );
+    expect(matchLengthHintFr(4, 15)).toBe(
+      "4×15 minutes : 60 minutes de jeu, et la 4ᵉ période va de la 45ᵉ à la 60ᵉ minute.",
+    );
+  });
+
+  it("says nothing about a second half when there is one period", () => {
+    const hint = matchLengthHintFr(1, 40);
+    expect(hint).toBe("1×40 minutes : 40 minutes de jeu.");
+    expect(hint).not.toContain("période");
+  });
+
+  /**
+   * An emptied field gives `Number("") === 0` and a half-typed one `NaN`. Computing « 0×30 minutes :
+   * 0 minutes de jeu » from either would be the form stating something false about the match being
+   * created, which is the whole reason this sentence is built by a function with a test.
+   */
+  it("refuses a pair it cannot read rather than invent a duration", () => {
+    expect(matchLengthHintFr(0, 30)).toBeNull();
+    expect(matchLengthHintFr(2, 0)).toBeNull();
+    expect(matchLengthHintFr(Number.NaN, 30)).toBeNull();
+    expect(matchLengthHintFr(2, Number.NaN)).toBeNull();
+    expect(matchLengthHintFr(2.5, 30)).toBeNull();
   });
 });

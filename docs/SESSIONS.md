@@ -906,3 +906,21 @@ the triangle it suppressed — a grey panel of text with an invisible `cursor-po
 affordance. It now has a chevron that turns when it opens, and reads as the action it is.
 
 849 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.
+
+## The hint that was true of no match in particular
+
+Reading the remaining screenshots, `match-nouveau` and `match-modifier` both carried « 2 par défaut. »
+and « 30 par défaut. » under fields already showing 2 and 30 — a sentence that is redundant on the
+create form and false on the edit form of any match that does not run 2×30. And the ambiguity it left
+untouched was the real one: « Minutes » is *per period*, and this app's clock never resets, so the
+second half of a 2×30 runs 30′→60′.
+
+The field is « Minutes par période » now, and the two hints are replaced by one sentence that states
+what the pair comes to, live: « 2×30 minutes : 60 minutes de jeu, et la 2ᵉ période va de la 30ᵉ à la
+60ᵉ minute. » `matchLengthHintFr` builds it in `lib/` with a test, and returns `null` instead of a
+duration when a field is empty or half-typed — otherwise the form would have flashed « 0 minutes de
+jeu » on the way to every value a coach types. Decision 066.
+
+Checked at 390 px in both themes with the fields at 2×30, at 3×20, and mid-edit with the minutes
+cleared: the label fits on one line, the two inputs stay aligned, and the sentence disappears rather
+than lying. 852 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.

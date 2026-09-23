@@ -12,7 +12,7 @@
  * Europe/Paris (`lib/calendar/time.ts`). Never as the browser's zone.
  */
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -20,7 +20,11 @@ import { Input } from "@/components/ui/input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
 import type { Competition } from "@/db/schema";
-import { COMPETITION_LABELS, COMPETITION_ORDER } from "@/lib/calendar/labels";
+import {
+  COMPETITION_LABELS,
+  COMPETITION_ORDER,
+  matchLengthHintFr,
+} from "@/lib/calendar/labels";
 import { createMatch, updateMatch } from "@/lib/match/actions";
 
 export type MatchFormDefaults = {
@@ -44,6 +48,14 @@ export type MatchFormProps = {
 export function MatchForm({ teamId, matchId, defaults }: MatchFormProps) {
   const editing = matchId !== undefined;
   const [state, action, pending] = useActionState(editing ? updateMatch : createMatch, undefined);
+
+  // The two fields stay uncontrolled — `defaultValue`, so the no-JavaScript post still carries what
+  // was typed — and this mirror exists only to write the sentence under them. `Number("")` is 0 and
+  // `Number("x")` is NaN; `matchLengthHintFr` refuses both rather than compute a duration from them.
+  const [periodsCount, setPeriodsCount] = useState(defaults.periodsCount);
+  const [periodMinutes, setPeriodMinutes] = useState(defaults.periodMinutes);
+  const lengthHint = matchLengthHintFr(periodsCount, periodMinutes);
+  const lengthHintId = "match-length";
 
   return (
     <form action={action} className="space-y-5">
@@ -131,52 +143,57 @@ export function MatchForm({ teamId, matchId, defaults }: MatchFormProps) {
         )}
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field
-          htmlFor="periodsCount"
-          label="Périodes"
-          hint="2 par défaut."
-          error={state?.fieldErrors?.periodsCount}
-        >
-          {({ id, describedBy, invalid }) => (
-            <Input
-              id={id}
-              name="periodsCount"
-              type="number"
-              min={1}
-              max={4}
-              step={1}
-              inputMode="numeric"
-              defaultValue={defaults.periodsCount}
-              aria-describedby={describedBy}
-              invalid={invalid}
-              className="tabular-nums"
-            />
-          )}
-        </Field>
+      {/* The pair, then one sentence saying what the pair comes to. Both fields point at it with
+          `aria-describedby`, which is why the hint is not simply rendered after the grid: whichever
+          number you are editing, the consequence is read out with it. */}
+      <div className="space-y-1.5">
+        <div className="grid grid-cols-2 gap-3">
+          <Field htmlFor="periodsCount" label="Périodes" error={state?.fieldErrors?.periodsCount}>
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                name="periodsCount"
+                type="number"
+                min={1}
+                max={4}
+                step={1}
+                inputMode="numeric"
+                defaultValue={defaults.periodsCount}
+                onChange={(event) => setPeriodsCount(Number(event.target.value))}
+                aria-describedby={[describedBy, lengthHintId].filter(Boolean).join(" ")}
+                invalid={invalid}
+                className="tabular-nums"
+              />
+            )}
+          </Field>
 
-        <Field
-          htmlFor="periodMinutes"
-          label="Minutes"
-          hint="30 par défaut."
-          error={state?.fieldErrors?.periodMinutes}
-        >
-          {({ id, describedBy, invalid }) => (
-            <Input
-              id={id}
-              name="periodMinutes"
-              type="number"
-              min={5}
-              max={60}
-              step={1}
-              inputMode="numeric"
-              defaultValue={defaults.periodMinutes}
-              aria-describedby={describedBy}
-              invalid={invalid}
-              className="tabular-nums"
-            />
-          )}
-        </Field>
+          <Field
+            htmlFor="periodMinutes"
+            label="Minutes par période"
+            error={state?.fieldErrors?.periodMinutes}
+          >
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                name="periodMinutes"
+                type="number"
+                min={5}
+                max={60}
+                step={1}
+                inputMode="numeric"
+                defaultValue={defaults.periodMinutes}
+                onChange={(event) => setPeriodMinutes(Number(event.target.value))}
+                aria-describedby={[describedBy, lengthHintId].filter(Boolean).join(" ")}
+                invalid={invalid}
+                className="tabular-nums"
+              />
+            )}
+          </Field>
+        </div>
+
+        <p id={lengthHintId} aria-live="polite" className="text-sm text-ink-muted">
+          {lengthHint}
+        </p>
       </div>
 
       {state?.error ? (
