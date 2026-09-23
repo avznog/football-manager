@@ -1176,3 +1176,53 @@ not so.
   Game mode gets an `sr-only` heading: every pixel above the pitch is the clock and the score on
   purpose, and a title bar would push the ACTION button down the screen, but a page still needs a
   name. The audit checks for this now, so the class cannot come back.
+
+## 061 — One scoreline, ours first, on every screen
+**2026-09-23** · accepted
+
+`scoreLineFr(goalsFor, goalsAgainst)` in `lib/calendar/labels.ts` is the only way the app writes a
+score, and it takes **no orientation argument**: our goals come first whether the match was at home or
+away. Who was at home is said in words, by `venueSideLabel` and the badges that use it.
+
+**Why.** Two conventions had grown up side by side. The calendar pill and the match page wrote our
+goals first — with a docstring saying « never « 1-3 » read the wrong way round » — while both
+scoreboards, game mode's and the recap's, put the *home* side first the way a broadcast does. Nobody
+had decided this; it was two authors on two days.
+
+Walking the recap of an away win at 390 px is what made the cost visible: the scoreboard read
+« CS Morvan — Nous · 0 – 2 » in 60 px numerals, under a green « Victoire » badge, over a timeline that
+wrote the same two goals « 1 – 0 » and « 2 – 0 ». One screen, one match, two scorelines, and the big
+one handed the win to the opponent. The timeline was not wrong — it had no orientation to be wrong
+about, and no names next to it either.
+
+**Why ours and not the home side's.** Broadcast convention is for a league table, where the reader has
+no side. This app has exactly one: every number on every screen is about this team. And in game mode
+the score is 36 px while the caption naming the sides is 12 px and truncates — so on an away match a
+coach reading at arm's length in daylight had to work out which figure was his, at 58’, with the ball
+in play. That is the wrong thing to make somebody compute.
+
+**Consequences.** Game mode's scoreboard keeps `isHome` but spends it on a « Dom. » / « Ext. » badge
+instead of on reordering the figures, so nothing is lost. The recap's dropped the prop — the match
+header already carries « À l'extérieur ». The timeline needed no change at all, which is the sign the
+convention was the problem and not the code. `lib/calendar/labels.test.ts` asserts the absence of the
+flip, with the reason, so that adding an orientation argument means deleting a test that explains why
+not to.
+
+## 062 — An empty pitch is not an empty `lineups`
+**2026-09-23** · accepted
+
+Game mode's empty pitch says « Personne n'est encore sur le terrain » when a composition exists, and
+keeps « Aucune composition enregistrée » for when one genuinely does not. `emptyPitchFr` in
+`lib/match/presenter.ts` decides which, and says whose confirmation is being waited on.
+
+**Why.** The copy was keyed on `state.onPitch.length === 0` alone and claimed something else entirely
+— that nothing had been saved. But an empty pitch before kick-off is the normal state of a **properly
+prepared** match: invariant 3 means a plan is proposed and never applied on its own, so the pitch stays
+empty on purpose until the coach taps « Appliquer ». The screen that exposed it was showing the
+composition twenty pixels above the sentence denying it existed.
+
+**Consequences.** The e2e happy path had pinned the old string, at exactly the moment a composition was
+saved and proposed — a test encoding the lie rather than catching it. It now asserts the true copy and
+that the false one is absent. And like `pendingLineupChangesFr` (decision 060) the function lives in
+`lib/` rather than as a condition in JSX, because Vitest runs in `node` and cannot render a client
+component: copy this easy to get backwards has to live where a test can read it.

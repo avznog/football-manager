@@ -226,7 +226,11 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(prompt).toContainText(
       "Proposée, pas appliquée : rien ne change avant votre confirmation.",
     );
-    await expect(page.getByText("Aucune composition enregistrée.")).toBeVisible();
+    // The empty pitch says why it is empty, and it is not « aucune composition enregistrée » — one is
+    // saved and is on screen right above this line. That copy is what this assertion used to pin.
+    await expect(page.getByText("Personne n’est encore sur le terrain.")).toBeVisible();
+    await expect(page.getByText("attend votre confirmation")).toBeVisible();
+    await expect(page.getByText("Aucune composition enregistrée.")).toHaveCount(0);
     await expect(onPitch).toHaveCount(0);
 
     await prompt.getByRole("button", { name: "Appliquer" }).click();

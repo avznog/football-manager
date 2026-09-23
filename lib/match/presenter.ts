@@ -715,6 +715,49 @@ export type PendingLineupChanges =
  * the component because the component cannot be unit-tested (`environment: "node"`) and this sentence
  * has now been wrong twice.
  */
+/**
+ * What to say about a pitch with nobody on it.
+ *
+ * It said « Aucune composition enregistrée » on the strength of an empty pitch alone, which is a
+ * different fact and often the wrong one: the screen that found this was showing a saved composition
+ * *twenty pixels above*, proposed and waiting for a confirmation that invariant 3 requires. An empty
+ * pitch before kick-off is the normal state of a match that has been prepared properly.
+ *
+ * Here rather than in the component for the same reason as `pendingLineupChangesFr`: Vitest runs in
+ * `node` and cannot render a client component, so copy this easy to get backwards has to live where a
+ * test can read it.
+ */
+export function emptyPitchFr(input: {
+  /** Any composition saved for this match, applied or not. */
+  hasLineups: boolean;
+  /** One of them is on screen right now, proposed and unapplied. */
+  isProposed: boolean;
+  /** The viewer may operate the match, so the confirmation is theirs to give. */
+  canOperate: boolean;
+}): { title: string; description: string } {
+  if (!input.hasLineups) {
+    return {
+      title: "Aucune composition enregistrée.",
+      description:
+        "Sans composition, personne n’accumule de minutes. Renseignez-la avant le coup d’envoi.",
+    };
+  }
+  if (input.isProposed) {
+    return {
+      title: "Personne n’est encore sur le terrain.",
+      description: input.canOperate
+        ? "La composition ci-dessus attend votre confirmation : c’est elle qui fait entrer les joueurs."
+        : "La composition ci-dessus attend la confirmation de l’opérateur : c’est elle qui fait entrer les joueurs.",
+    };
+  }
+  return {
+    title: "Personne n’est encore sur le terrain.",
+    description: input.canOperate
+      ? "La composition est enregistrée mais pas encore appliquée : ouvrez-la pour faire entrer les joueurs."
+      : "La composition est enregistrée mais pas encore appliquée.",
+  };
+}
+
 export function pendingLineupChangesFr(view: PendingLineupView): PendingLineupChanges {
   if (view.changes.length > 0) return { kind: "list", lines: view.changes };
   if (view.isEmpty) {

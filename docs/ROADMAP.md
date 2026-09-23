@@ -20,6 +20,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       the match (the server answered 403), « ne change rien sur le terrain » printed over a starting
       seven about to walk onto an empty pitch, and two screens with no `h1` at all — game mode, and
       the composition editor in each of its four dead ends (decision 060)
+- [x] One scoreline convention — ours first, on all five screens that print one, with the venue said
+      in words. The recap of an away win showed « 0 – 2 » in 60 px numerals under « Victoire », over a
+      timeline writing the same goals « 2 – 0 » (decision 061)
+- [x] « Aucune composition enregistrée » no longer printed twenty pixels under the composition it
+      denied: an empty pitch before kick-off is what invariant 3 *produces* (decision 062)
 - [x] Local Postgres via Homebrew (`npm run db:start`), Drizzle config, `DATABASE_URL` only
       — Docker was abandoned, see decision 016
 - [x] Full schema in `db/schema.ts` + first migration committed

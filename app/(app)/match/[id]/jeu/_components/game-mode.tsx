@@ -36,6 +36,7 @@ import {
   playerIndex,
   proposedPitchView,
   reduceLive,
+  emptyPitchFr,
   timelineLines,
   type LiveMatch,
   type PendingEvent,
@@ -296,6 +297,14 @@ export function GameMode({ live, canOperate }: GameModeProps) {
 
   const canAct = canOperate && state.started && !state.finished;
 
+  // An empty pitch is not the same fact as an empty `lineups`, and the copy used to say the second
+  // on the strength of the first — under a card showing the very composition it said did not exist.
+  const emptyPitch = emptyPitchFr({
+    hasLineups: live.lineups.length > 0,
+    isProposed: prompt !== null,
+    canOperate,
+  });
+
   /* ---------------------------------------------------------------------- */
   /* Emitting                                                               */
   /* ---------------------------------------------------------------------- */
@@ -492,10 +501,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         }
       >
         {state.onPitch.length === 0 ? (
-          <EmptyState
-            title="Aucune composition enregistrée."
-            description="Sans composition, personne n’accumule de minutes. Renseignez-la avant le coup d’envoi."
-          />
+          <EmptyState {...emptyPitch} />
         ) : (
           <PitchLayout slots={pitch} kit={live.kit} pitchLabel="Joueurs sur le terrain" />
         )}
