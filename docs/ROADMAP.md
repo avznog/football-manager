@@ -37,10 +37,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)
 - [x] Turf pitch component (light/dark, mobile + desktop) — `components/pitch/`
-- [ ] Drag-and-drop composition editor, swap on drop
-- [ ] Custom formation creation (dragging the slots)
-- [ ] Match sheet selection: titulaire / remplaçant / supporter
-- [ ] Planned compositions from minute X, with the deduced-changes diff
+- [x] Drag-and-drop composition editor, swap on drop
+- [x] Custom formation creation (dragging the slots)
+- [x] Match sheet selection: titulaire / remplaçant / supporter
+- [x] Planned compositions from minute X, with the deduced-changes diff
 - [x] `lib/match/lineup.ts` + unit tests (including chained position changes)
 
 ## M4 — Game mode
