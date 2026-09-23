@@ -45,8 +45,21 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   /**
-   * Everything except Next's own assets and the files served from `public/`. Matching the
-   * manifest or an icon would cost a redirect on every install prompt.
+   * Everything except Next's own build output and any path that names a file.
+   *
+   * This used to enumerate the static files — `favicon.ico`, `icon.svg`, `manifest.webmanifest`
+   * and friends — and the enumeration was a claim about the whole of `public/` that nobody
+   * maintained: the three PWA icons `app/manifest.ts` points at were never in it, so every
+   * `GET /icon-192.png` answered `307 /connexion?suivant=%2Ficon-192.png`, the browser followed
+   * it, got HTML, and reported an invalid image. The install prompt had no icon from the first
+   * day, in production too. Nothing caught it because a missing manifest icon breaks nothing a
+   * test asserts on — the list failed silently, which is what lists that must be maintained do.
+   *
+   * So the exclusion is the *class* instead: a trailing file extension. Every route in this app
+   * is a French word with no dot in it (`/calendrier`, `/match/1/jeu`), so excluding anything
+   * ending in `.<ext>` loses nothing routable, and a fourth file dropped into `public/` is
+   * served without this file having to be edited. `proxy.test.ts` asserts that by reading the
+   * directory rather than naming its contents.
    */
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|manifest.webmanifest|robots.txt|sitemap.xml).*)"],
+  matcher: ["/((?!_next/static|_next/image|.*\\.[a-zA-Z0-9]+$).*)"],
 };
