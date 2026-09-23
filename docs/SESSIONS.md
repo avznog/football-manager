@@ -1582,3 +1582,21 @@ that target is now a draft — which is the sort of fixture that should have bee
 
 911 tests. Checked at 390 px in both themes on the empty draft and with one player placed.
 
+### Ten players who were not remplaçants, under « Remplaçants »
+
+Fifth screen, game mode. Nothing on it is wrong about the match — the clock, the score and the
+timeline are all derived and all honest — but the last card was headed « Remplaçants » over thirteen
+rows, of which three were. Before the kick-off nobody is on the pitch (invariant 3), so the list of
+players who could come on is the entire squad, plus the two the sheet does not mention, plus an
+injured supporter.
+
+What makes it worth a decision rather than a one-word edit is that the list is deliberately that
+wide, and was documented as such in M4: a coach a man short at 20′ is offered whoever turned up. The
+defect was never the rows. The lesson is that a heading has to be true of the widest row it will ever
+stand over, and this one was written while looking at the first three.
+
+`enterableCardFr` also splits the card by what the reader can do with it: the operator is told what to
+tap, a player watching is told what the list is. 921 tests. Checked at 390 px in both themes, before
+the kick-off and after it, then `npm run db:reset` because tapping « Coup d'envoi » to see the second
+state starts the demo match for real.
+

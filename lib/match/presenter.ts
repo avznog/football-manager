@@ -520,6 +520,48 @@ export function availableOptions(state: MatchState, players: readonly LivePlayer
     });
 }
 
+/**
+ * The heading of that list, and the hint under it.
+ *
+ * It said « Remplaçants ». On the demo season's Étoile du Parc, before kick-off, that heading stood
+ * over thirteen rows: three actual substitutes, the seven titulaires — nobody is on the pitch until
+ * the coach confirms the composition (invariant 3) — two players the sheet does not mention, and a
+ * supporter who is injured. Ten of the thirteen were not substitutes, and each one said so, in grey,
+ * two millimetres under its own name.
+ *
+ * The list is right and deliberately wide: `availableOptions` explains why a coach one man short at
+ * 20′ is offered whoever turned up. So the heading is what has to change, to the question the list
+ * actually answers. For somebody who is only watching it answers a different question — they cannot
+ * bring anyone on — so they are told what the list is instead of what to do with it.
+ */
+export function enterableCardFr(input: {
+  available: readonly PlayerOption[];
+  players: readonly LivePlayer[];
+  canAct: boolean;
+}): { titleFr: string; hintFr: string | null; emptyFr: string } {
+  const roleOf = new Map(input.players.map((player) => [player.memberId, player.squadRole]));
+  const notSubstitutes = input.available.filter(
+    (option) => roleOf.get(option.memberId) !== "substitute",
+  ).length;
+
+  if (!input.canAct) {
+    return {
+      titleFr: "En dehors du terrain",
+      hintFr: null,
+      emptyFr: "Tous les joueurs sont sur le terrain.",
+    };
+  }
+
+  return {
+    titleFr: "Qui peut entrer",
+    hintFr:
+      notSubstitutes === 0
+        ? "Touchez un joueur pour le faire entrer."
+        : "Touchez un joueur pour le faire entrer. Les remplaçants d’abord, puis le reste du groupe.",
+    emptyFr: "Tous les joueurs sont sur le terrain.",
+  };
+}
+
 /** Named substitutes first, then the rest of the squad, then supporters and non-selected players. */
 function optionRank(player: LivePlayer): number {
   if (player.squadRole === "substitute") return 0;

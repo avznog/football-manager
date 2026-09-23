@@ -24,6 +24,7 @@ import { createOutbox, toWireEvent, type OutboxRecord, type OutboxState } from "
 import {
   availableOptions,
   clockActionFr,
+  enterableCardFr,
   eventLabel,
   minuteLabelFr,
   nextEventStamp,
@@ -296,6 +297,9 @@ export function GameMode({ live, canOperate }: GameModeProps) {
   const stampLabel = `${minuteLabelFr(stamp.clockMs, stamp.period, periods)} · ${phaseLabelFr(state)}`;
 
   const canAct = canOperate && state.started && !state.finished;
+  // Who the list of players off the pitch is written for: the operator taps it, everybody else reads
+  // it, and before the kick-off nobody can tap it at all (decision NNN).
+  const enterable = enterableCardFr({ available, players: live.players, canAct });
 
   // An empty pitch is not the same fact as an empty `lineups`, and the copy used to say the second
   // on the strength of the first — under a card showing the very composition it said did not exist.
@@ -507,14 +511,11 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         )}
       </Card>
 
-      <Card
-        title="Remplaçants"
-        description={canAct ? "Touchez un joueur pour le faire entrer." : undefined}
-        flush
-      >
+      {/* Not « Remplaçants »: ten of the thirteen rows under that heading were not (decision NNN). */}
+      <Card title={enterable.titleFr} description={enterable.hintFr ?? undefined} flush>
         {available.length === 0 ? (
           <div className="p-4">
-            <EmptyState title="Personne sur le banc." />
+            <EmptyState title={enterable.emptyFr} />
           </div>
         ) : (
           <ul className="space-y-2 p-3">

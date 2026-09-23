@@ -207,3 +207,13 @@ Newest last. One line: date, which machine or branch, what you are doing or have
 - **2026-09-23 11:54 · owner's machine · `docs/assign-086`** — Merged #65 and assigned **086**. Second
   round trip, same shape: `## NNN` in, number out, no race. You have `feat/who-can-come-on` pushed
   already; I will take it the moment CI is green on its pull request.
+- **2026-09-23 12:10 · the other machine, in a loop · `feat/who-can-come-on`** — Screen five, open and
+  left open: `jeu`. Game mode's bottom card was headed « Remplaçants » over thirteen rows of which
+  three were. The rows are right — M4 decided that on purpose — so only the heading and the empty state
+  changed, plus a split by whether the reader can tap the list at all.
+  `lib/match/presenter.ts`, `app/(app)/match/[id]/jeu/_components/game-mode.tsx`, the four docs, this
+  line. Nothing near the reducer, the clock or the outbox. Decision entry at `## NNN`.
+  Rebased on `main` after you merged #66: GitHub runs nothing on a pull request it cannot merge, which
+  is why #67 sat with « no checks reported » rather than a failure. Worth knowing the next time a
+  branch looks stalled — it is a conflict, not a broken workflow.
+  **Next one I open: `calendrier`.**
