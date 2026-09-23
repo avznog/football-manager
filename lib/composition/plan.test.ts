@@ -4,7 +4,8 @@ import { formationByLabel } from "@/db/reference";
 import type { SlotAssignment } from "@/lib/match/lineup";
 
 import {
-  LINEUPS_FROZEN_FR,
+  lineupsFrozenFr,
+  appliedNoticeFr,
   blockingIssues,
   compositionsScreenFr,
   countSquadRoles,
@@ -517,9 +518,9 @@ describe("compositionsScreenFr", () => {
   });
 
   it("says once, above the compositions, that they have stopped being plans", () => {
-    expect(compositionsScreenFr(played).frozenNoticeFr).toBe(LINEUPS_FROZEN_FR);
-    expect(LINEUPS_FROZEN_FR).toContain("ne changent plus");
-    expect(LINEUPS_FROZEN_FR).toContain("par sa saisie");
+    expect(compositionsScreenFr(played).frozenNoticeFr).toBe(lineupsFrozenFr("live"));
+    expect(lineupsFrozenFr("live")).toContain("ne changent plus");
+    expect(lineupsFrozenFr("live")).toContain("par sa saisie");
   });
 });
 
@@ -532,5 +533,56 @@ describe("draftChangesPendingFr", () => {
   it("says the changes are coming rather than that there are none", () => {
     expect(draftChangesPendingFr(7)).not.toContain("Aucun changement");
     expect(draftChangesPendingFr(7)).toContain("quand l’équipe sera complète");
+  });
+});
+
+describe("appliedNoticeFr", () => {
+  it("credits a confirmation to the coach who was there with the phone", () => {
+    const notice = appliedNoticeFr("live");
+    expect(notice.howFr).toBe("confirmée pendant le match");
+    expect(notice.listFr).toBe(
+      "Cette composition a été confirmée pendant le match : elle ne change plus.",
+    );
+  });
+
+  /**
+   * FC Rivière in the demo season: `entry_mode = 'retro'`, and its starting composition is marked
+   * applied because `lib/retro/log.ts` writes a `LINEUP_APPLIED` at 0′ on purpose. Nobody confirmed
+   * anything during that match — there was nobody watching it with the app open.
+   */
+  it("says a saisie was a saisie", () => {
+    const notice = appliedNoticeFr("retro");
+    expect(notice.howFr).toBe("enregistrée avec la saisie du match");
+    expect(notice.listFr).not.toContain("pendant le match");
+    expect(notice.editorFr).not.toContain("pendant le match");
+    expect(notice.refusalFr).not.toContain("pendant le match");
+  });
+
+  it("keeps each sentence's own ending, so the three surfaces still read differently", () => {
+    const notice = appliedNoticeFr("retro");
+    expect(notice.listFr).toContain("elle ne change plus");
+    expect(notice.editorFr).toContain("ce qui s’est passé");
+    expect(notice.refusalFr).toContain("ne peut plus être modifiée");
+  });
+
+  it("never calls it « appliquée », which said nothing about how", () => {
+    for (const mode of ["live", "retro"] as const) {
+      expect(appliedNoticeFr(mode).refusalFr).not.toContain("appliquée");
+    }
+  });
+});
+
+describe("lineupsFrozenFr", () => {
+  it("credits the mode that was actually used", () => {
+    expect(lineupsFrozenFr("live")).toContain("le mode match a confirmées");
+    expect(lineupsFrozenFr("retro")).not.toContain("mode match");
+    expect(lineupsFrozenFr("retro")).toContain("viennent de la saisie");
+  });
+
+  it("says the same two things either way: it is over, and the saisie is the way in", () => {
+    for (const mode of ["live", "retro"] as const) {
+      expect(lineupsFrozenFr(mode)).toContain("ne changent plus");
+      expect(lineupsFrozenFr(mode)).toContain("sa saisie");
+    }
   });
 });

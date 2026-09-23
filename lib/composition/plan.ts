@@ -269,17 +269,58 @@ export function sheetNextStepFr(
  * So this settles the rule for the whole match, not just this screen (decision NNN): **a finished
  * match is a record everywhere, and every screen that could write to it says so in the same words.**
  * The way to change one is `lib/retro/amend.ts`, which appends (invariant 1) and re-freezes the
- * statistics; it is not a plan for a minute that has already been played. `LINEUPS_FROZEN_FR` says so
+ * statistics; it is not a plan for a minute that has already been played. `lineupsFrozenFr` says so
  * in one place, shared by this screen's notice and the editor's dead end, so the two cannot drift
  * (the decision 073 move).
  *
  * `live` is editable on purpose: planning the 40th minute during the 20th is the point of the screen,
  * and invariant 3 means the plan is still only a proposal.
  */
-export const LINEUPS_FROZEN_FR =
-  "Les compositions d’un match joué ne changent plus : elles disent ce qui était prévu, et celles " +
-  "que le mode match a confirmées disent ce qui a été joué. Pour corriger le match lui-même, passe " +
-  "par sa saisie.";
+export function lineupsFrozenFr(entryMode: EntryMode): string {
+  // It was a constant for a day, and it credited « le mode match » on matches nobody watched — the
+  // same defect as the notice below, in the sentence written to fix it (decision NNN).
+  return entryMode === "retro"
+    ? "Les compositions d’un match joué ne changent plus : elles disent ce qui était prévu, et " +
+      "celles qui viennent de la saisie disent ce qui a été joué. Pour corriger le match lui-même, " +
+      "repasse par sa saisie."
+    : "Les compositions d’un match joué ne changent plus : elles disent ce qui était prévu, et " +
+      "celles que le mode match a confirmées disent ce qui a été joué. Pour corriger le match " +
+      "lui-même, passe par sa saisie.";
+}
+
+/**
+ * Why an applied composition has stopped being editable — in words that are true of *this* match.
+ *
+ * « Elle a été confirmée pendant le match » was said about every applied composition, including the
+ * ones on a match nobody watched: `lib/retro/log.ts` writes a `LINEUP_APPLIED` at 0′ for a retro
+ * entry, deliberately, so that the seven count as starters and the goalkeeper is known. The demo
+ * season has exactly that row — FC Rivière, `entry_mode = 'retro'`, its starting composition marked
+ * applied — and the screen credited a confirmation to a match the coach typed up on his sofa.
+ *
+ * The state is the same in both cases, and it is the right state: a record, not a plan. Only the
+ * account of how it got there changes, which is decision 013's distinction again: `entry_mode` is in
+ * the database so the UI can stop describing a saisie as something somebody witnessed.
+ */
+export function appliedNoticeFr(entryMode: EntryMode): {
+  /** « confirmée pendant le match » — a participle, so each sentence keeps its own ending. */
+  howFr: string;
+  /** Under the pitch, in the list of compositions. */
+  listFr: string;
+  /** The editor's dead end, which has a heading of its own above it. */
+  editorFr: string;
+  /** What `saveLineup` answers if a form reaches it anyway. */
+  refusalFr: string;
+} {
+  const howFr =
+    entryMode === "retro" ? "enregistrée avec la saisie du match" : "confirmée pendant le match";
+
+  return {
+    howFr,
+    listFr: `Cette composition a été ${howFr} : elle ne change plus.`,
+    editorFr: `Elle a été ${howFr} : elle décrit ce qui s’est passé, pas ce qui était prévu.`,
+    refusalFr: `Cette composition a été ${howFr} : elle ne peut plus être modifiée.`,
+  };
+}
 
 export function compositionsScreenFr(match: { status: MatchStatus; entryMode: EntryMode }): {
   /** Whether the screen may offer to create, modify or delete a composition. */
@@ -319,7 +360,7 @@ export function compositionsScreenFr(match: { status: MatchStatus; entryMode: En
 
   return {
     editable: false,
-    frozenNoticeFr: LINEUPS_FROZEN_FR,
+    frozenNoticeFr: lineupsFrozenFr(match.entryMode),
     sheetLinkFr: "voir la feuille",
     emptySheetFr: {
       title: "Aucune feuille de match",

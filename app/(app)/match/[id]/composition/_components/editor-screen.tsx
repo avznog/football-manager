@@ -18,7 +18,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { BUILTIN_FORMATIONS } from "@/db/reference";
 import type { ActiveTeam } from "@/lib/auth/dal";
 import {
-  LINEUPS_FROZEN_FR,
+  appliedNoticeFr,
+  lineupsFrozenFr,
   planTitleFr,
   sortPlans,
   suggestNextMinute,
@@ -94,7 +95,7 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
     return shell(
       <Guidance
         title="Elle ne se modifie plus"
-        description="Elle a été confirmée pendant le match : elle décrit ce qui s’est passé, pas ce qui était prévu."
+        description={appliedNoticeFr(match.entryMode).editorFr}
         backHref={backHref}
       />,
     );
@@ -102,10 +103,14 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
 
   // A sixth dead end, and the one this route had no opinion about: `saveLineup` now refuses a finished
   // match (decision NNN), so the editor says so here instead of taking a composition and losing it on
-  // submit. Same sentence as the list's notice, `LINEUPS_FROZEN_FR`.
+  // submit. Same sentence as the list's notice, `lineupsFrozenFr`.
   if (match.status === "finished") {
     return shell(
-      <Guidance title="Le match est joué" description={LINEUPS_FROZEN_FR} backHref={backHref} />,
+      <Guidance
+        title="Le match est joué"
+        description={lineupsFrozenFr(match.entryMode)}
+        backHref={backHref}
+      />,
     );
   }
 
