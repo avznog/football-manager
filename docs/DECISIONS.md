@@ -1048,3 +1048,36 @@ had to go, and the two rare controls are worth less there than the name is.
   the controls and both actions still refuse the case, so all three ask `wouldLeaveNoCoach`
   (`lib/team/coaches.ts`, pure, tested). The last coach gets the sentence instead of the buttons, which
   is what the previous slice established and this one keeps.
+
+## 057 — A refresh is a network read: never on a tap that did not reach the server
+**2026-09-23** · accepted · found by the offline check `docs/PLAN.md` asked for
+
+`emit` in game mode ends with `router.refresh()`, and it now does so **only if the action reached the
+server** (`outbox.state().online`). The catch-up for actions that sync later is wired to the queue
+draining instead: the first flush that succeeds after a network failure refreshes once.
+
+**Why.** Offline, `router.refresh()` is not a no-op and it does not fail quietly. The RSC request
+fails, and Next's recovery is to **fall back to a full browser navigation** — which offline lands on
+the browser's error page. So the first action of a match played on a pitch with no signal blanked game
+mode, threw away the client state that was holding the optimistic score, and left the coach unable to
+reload his way back in until coverage returned. The queue had done its job perfectly; the screen threw
+the match away anyway.
+
+This is the whole reason `docs/PLAN.md` asked for the offline walk by hand. Eighteen unit tests cover
+the outbox's policy against an injected transport, and every one of them passed throughout: the bug
+was not in the queue but in what the screen did *after* the queue said « kept, not sent ».
+
+**Consequences.**
+
+- The rule generalises past this one call site: in game mode, a network read is only worth making when
+  there is reason to believe the network is there. Anything added to `emit` later belongs behind the
+  same test.
+- Something must still reconcile a queue that drains on its own three-second timer, with nobody
+  tapping anything — a coach walking back into coverage at half time. That is `owedARefresh` in the
+  subscription: set when a flush fails, cleared with one `router.refresh()` when the queue is empty and
+  online again. One refresh per outage, not one per action.
+- `e2e/offline.spec.ts` is now the test for all of it, because none of it can be tested in Vitest:
+  `environment: "node"`, and this is a hook in a client component talking to a real route handler.
+- A fixed clock (`page.clock.setFixedTime`) can never reach the end of a backoff, so that spec provokes
+  the retry with an `online` event rather than by moving time. Worth knowing before writing the next
+  test that touches the queue.

@@ -153,7 +153,26 @@ export function GameMode({ live, canOperate }: GameModeProps) {
   /* ---------------------------------------------------------------------- */
 
   useEffect(() => {
-    const unsubscribe = outbox.subscribe(setQueue);
+    /**
+     * True once a flush has failed on the network, until the queue is empty again. It is what tells
+     * the screen it owes the server a read: a tap only refreshes when it reached the server, so a
+     * queue that catches up on its own three-second timer — nobody tapping anything, the coach just
+     * walking back into coverage — would otherwise leave the page showing a snapshot from before the
+     * signal died until the next action.
+     */
+    let owedARefresh = false;
+
+    const unsubscribe = outbox.subscribe((next) => {
+      setQueue(next);
+      if (!next.online) {
+        owedARefresh = true;
+        return;
+      }
+      if (owedARefresh && next.pending.length === 0) {
+        owedARefresh = false;
+        router.refresh();
+      }
+    });
     // Pick the queue back up after a reload, then attach the browser's triggers: `online`,
     // `visibilitychange` and a slow retry tick.
     void outbox.hydrate();
@@ -162,7 +181,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
       outbox.stop();
       unsubscribe();
     };
-  }, [outbox]);
+  }, [outbox, router]);
 
   /* ---------------------------------------------------------------------- */
   /* The state, derived                                                     */
@@ -304,7 +323,14 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         toWireEvent(record),
       ]);
       await outbox.flush();
-      router.refresh();
+      // Only when the action actually reached the server. A refresh is a network read: with no
+      // network it has nothing to fetch, and it does not fail quietly — Next answers a failed RSC
+      // request by **falling back to a full browser navigation**, which offline lands on the
+      // browser's error page. Game mode would go blank on the first tap of a match played on a
+      // pitch with no signal, taking the optimistic score with it, and the coach could not even
+      // reload his way back in. The queue keeps the action either way; the catch-up is wired to the
+      // queue draining instead (see « Wiring » above).
+      if (outbox.state().online) router.refresh();
     },
     [outbox, state, router, live.events],
   );

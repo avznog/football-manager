@@ -660,3 +660,49 @@ now reads « Encadrement ». `db:reset` after, since the walk removed a player.
 **Debt after this:** none outside deployment.
 
 **Next:** deployment, and nothing else. It needs a Neon `DATABASE_URL` from the owner.
+
+## 2026-09-23 — the check that was left by hand, and the bug that was waiting in it
+
+**PR #33** — `e2e/offline.spec.ts`, and the defect it found on its first run.
+
+`docs/PLAN.md` asked for one verification by hand: « open game mode, disable the network in devtools,
+log three events, re-enable — the three events land once each, at the right minutes, with no
+duplicates. » Every other line of that section had become a test; this one was still a sentence, and a
+session note from wave 3 admitted it: *nobody has tapped game mode in a real browser.*
+
+It is a test now, and it failed the first time it ran — not in the queue, but in the screen. `emit`
+ended with `router.refresh()` after every tap. Offline, that refresh is a failed RSC request, and Next
+answers a failed RSC request by **falling back to a full browser navigation**, which offline lands on
+the browser's error page. So the first action of a match played on a municipal pitch with no signal
+blanked game mode and took the optimistic score with it, and the coach could not even reload his way
+back in. The outbox had kept every event in IndexedDB exactly as designed — and the screen threw the
+match away anyway. Decision **057**: a refresh is a network read, so only when the action reached the
+server; the catch-up for actions that sync later is wired to the queue draining instead, one refresh
+per outage rather than one per action.
+
+That is precisely the class of bug the by-hand check existed to find, and precisely why 18 green unit
+tests around `createOutbox` could not find it: they inject a transport, so nothing in them ever reaches
+`fetch`, a browser, or Next's router.
+
+The spec's second half is the one that could not be written by hand at all. The network does not fail,
+it **lies**: the POST reaches the server and the event is written, then Playwright replaces the response
+with a 503, so the client believes the batch was lost and sends the same `client_event_id` again. That
+is invariant 6 tested over HTTP for the first time — and it holds twice over. Removing the log's own
+memory of stored `client_event_id`s from `prepareEventBatch` does not break the outcome, because the
+unique index and `onConflictDoNothing` still keep exactly one row.
+
+Two things learned about testing this screen, both written down where the next person will hit them. A
+**fixed clock can never reach the end of a backoff** — `nextAttemptAt` is stamped with the queue's own
+`now()`, so `setFixedTime` forward is a race with the moment the failure is recorded; the retry is
+provoked with an `online` event instead, which zeroes every backoff by design. And `Card` renders a bare
+`<section>`, so « Déroulé du match » is not a landmark you can ask for by role.
+
+**Mutation-tested:** the unconditional `router.refresh()` restored fails the spec on its first offline
+tap. Four consecutive clean runs at ~7 s before it was called done.
+
+845 unit tests in 43 files, **3 e2e specs in 25 s**.
+
+**Debt after this:** none outside deployment. `docs/PLAN.md`'s « Verification » section is now fully
+automated except the last line, which is a human holding a phone in daylight.
+
+**Next:** deployment. It needs a Neon `DATABASE_URL` from the owner.

@@ -60,6 +60,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] `lib/match/reducer.ts` — pure reducer + extensive unit tests
 - [x] Event ingestion API, idempotent on `client_event_id`
 - [x] `lib/match/outbox.ts` — IndexedDB queue with retry and pending badge
+- [x] The offline walk `docs/PLAN.md` left by hand, automated (`e2e/offline.spec.ts`): three actions
+      tapped with the network cut land once each at the minute they were tapped, and a POST that
+      succeeds but answers 503 does not count its event twice. It found a real defect on its first
+      run — `router.refresh()` after every tap blanked game mode offline, because Next answers a
+      failed RSC request with a full browser navigation (decision 057)
 - [x] Game mode screen: clock, pitch, bench, ACTION sheet
 - [x] TERRAIN fast-change inside game mode (`lib/match/terrain.ts`,
       `components/action-sheet/terrain-sheet.tsx`): drag, tap-then-tap or keyboard, one
