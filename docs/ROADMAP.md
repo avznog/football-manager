@@ -141,6 +141,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] One wording for a player's appearances, shared by `/stats` and the profile card, and French:
       « 7 fois titulaire », not « 7 titulaire » (decision 073)
 
+- [x] One register in the French: the app tutoies everywhere. Eight strings vouvoied, including the
+      banner a player reads in game mode, with the same coach addressed both ways on one screen
+      (decision 074, and the rule is in `CLAUDE.md`)
+
 ## M6 — Ratings & recap
 - [x] Rating flow: one teammate per card, 0–10, optional comment
 - [x] Results hidden until you have submitted your own

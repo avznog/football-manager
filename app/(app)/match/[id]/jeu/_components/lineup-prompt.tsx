@@ -47,7 +47,7 @@ export function LineupPrompt({ view, slots, kit, onApply, onAdjust, onLater }: L
       title={view.title}
       description={
         onApply
-          ? "Proposée, pas appliquée : rien ne change avant votre confirmation."
+          ? "Proposée, pas appliquée : rien ne change avant ta confirmation."
           : "Proposée, pas appliquée : rien ne change avant la confirmation de l’opérateur."
       }
       className="border-accent/50 ring-1 ring-accent/20"

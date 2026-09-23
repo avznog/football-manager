@@ -270,7 +270,7 @@ export function TerrainSheet({
 
           <p className="text-xs text-ink-muted">
             {review.isEmpty
-              ? "Rien n’est enregistré tant que vous ne validez pas."
+              ? "Rien n’est enregistré tant que tu ne valides pas."
               : `${review.summary} · une seule action enregistrée.`}
           </p>
 

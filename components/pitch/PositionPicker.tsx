@@ -60,7 +60,7 @@ function stateOf(preference: PositionPreference | undefined): "none" | PositionP
 function actionLabelFr(preference: PositionPreference | undefined): string {
   const next = nextPreference(preference);
   if (next === "secondary") return "appuyer pour en faire un poste secondaire";
-  if (next === "primary") return "appuyer pour en faire votre poste principal";
+  if (next === "primary") return "appuyer pour en faire le poste principal";
   return "appuyer pour ne plus souhaiter ce poste";
 }
 

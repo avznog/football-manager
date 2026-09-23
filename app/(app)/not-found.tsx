@@ -9,7 +9,8 @@
  * indistinguishable: the row is gone, *or* `can()` refused and the screen answers `notFound()`
  * rather than 403 so that it does not confirm the thing exists (`saisie/page.tsx` is the clearest
  * case — a player asking for the retro-entry screen must not learn whether the match is there).
- * Hence « n'existe pas, ou ne vous est pas accessible » rather than a guess at which.
+ * Hence « la page n’existe pas, ou elle est réservée aux coachs » — both halves, neither
+ * confirmed, and the page never says which of the two applies to the link you followed.
  */
 
 import { ButtonLink } from "@/components/ui";

@@ -1057,3 +1057,27 @@ reads « 7,5 · sur 2 notes » there against the coach's « 7,0 · sur 4 notes �
 holding two matches back from him, and until now nothing said so beside the figure.
 
 868 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits.
+
+## One register
+
+Reading the `joueur` role's game-mode capture: « Vous suivez le match en direct. Seul l’opérateur du
+match peut enregistrer les actions. » Every other sentence a player reads says « tu ».
+
+Seventy-five strings tutoied, eight vouvoied, and not along any line that could be defended — the
+same coach is told « Tu n’es pas l’opérateur de ce match » by `ingest.ts` and « rien ne change avant
+votre confirmation » by `presenter.ts`, about the same tap. So: « tu », everywhere, and the rule is in
+`CLAUDE.md` now because it applies to every string added after this one (decision 074).
+
+Two of the eight were not politeness. « Ce que vous travaillez » on the training form is the plural
+« vous » — the team, not the reader — so it loses the pronoun and becomes « Le thème de la séance ».
+And the position picker's screen-reader label « appuyer pour en faire votre poste principal » is read
+to a coach editing somebody else's preferences, where « votre » was wrong about whose poste it is; it
+matches its two sibling labels now.
+
+`CLAUDE.md` also gained decision 072's rule, for the same reason: nothing is explained on hover.
+
+**Two things checked and found honest.** Game mode before the kick-off shows « 0 – 0 » beside a clock
+reading « 00:00 · Avant le coup d’envoi » — derived, not invented, and unambiguous in that frame. And
+the recap of the match nobody recorded, which a player reaches by the only button on the page, says
+« ? — ? · rien saisi · Ce match est terminé mais rien n’a été saisi : ni score, ni buteurs, ni temps
+de jeu. » Decision 013 is holding.

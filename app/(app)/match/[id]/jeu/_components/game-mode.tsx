@@ -414,7 +414,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
 
       {!canOperate ? (
         <p className="rounded-xl border border-border/60 bg-surface-2 px-3 py-2 text-sm text-ink-muted">
-          Vous suivez le match en direct. Seul l’opérateur du match peut enregistrer les actions.
+          Tu suis le match en direct. Seul l’opérateur du match peut enregistrer les actions.
         </p>
       ) : null}
 
