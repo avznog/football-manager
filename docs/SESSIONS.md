@@ -2267,3 +2267,35 @@ dock is `editorSaveStateFr` rather than a ternary on `dirty`, and it is allowed 
 
 Not done: **no 390 px pass.** Two screens' worth of new text at the top of an editor that decision 105
 just spent its whole budget compacting.
+
+### Competitions become the team's own list (decision 107)
+
+The last of the owner's eight remarks, and the only one that was a question rather than a defect:
+*qui définit les compétitions ?* Nobody did — they were four enum values compiled into the app. Now
+they are a table the coach edits on `/equipe`: add, rename, reorder, archive, delete when nothing
+holds it.
+
+Every team that exists is backfilled with the four labels the enum used to print (« Championnat »,
+« Coupe », « Amical », « Tournoi »), and every match is repointed at its own team's row by that label
+before the column goes `NOT NULL` — so the migration cannot half-succeed and lose which competition a
+match was played in. `on delete restrict` on `matches.competition_id`, archiving for the ones the team
+stops playing, and the stats filter keys on the id so a rename does not orphan anything.
+
+The migration was generated as `0003_boring_sunspot.sql` after the agent's draft collided with the
+shirt-name `0002`: the journal and the snapshot were rebuilt by `db:generate` from the real 0002, then
+the generated SQL was replaced by the hand-written eleven-step version, which the generator cannot
+produce because the backfill is data. Conflicts with decision 103 (home/away) were resolved by hand:
+`matchSubtitle` and `matchReminderTitleFr` keep their venue phrasing and now take
+`match.competitionLabel` instead of the deleted map.
+
+`package.json` goes to **0.2.0**, which is the release for the whole wave of eight remarks — dates,
+ratings, home/away, shirt names, the compact composition editor, the pre-filled second composition,
+the stats scroll and this. CI cuts `v0.2.0` on `main` (decision 081).
+
+Still outstanding on all eight: the 390 px light/dark pass. Nothing in this wave was looked at in a
+browser.
+
+Tags now come with releases: the `tag` job publishes a GitHub release for the tag it cut, notes being
+the squashed subjects since the previous tag (decision 108, superseding 081's one sentence that said
+CI would not write release notes). Asked for by the owner, and cheap because the squash subjects are
+already one line per slice.
