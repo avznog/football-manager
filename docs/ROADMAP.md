@@ -218,6 +218,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       « les sept titulaires ont fini le match » over seven `— personne —` selects, and « Actions du
       match » wrote « 0-0 » with a hyphen under the derived « 0 – 0 ». Both now come from
       `lib/retro/labels.ts`, count what is filled in, and are tested (decision 083)
+- [x] …and the compositions of a match typed up afterwards stop being credited to a confirmation
+      nobody made. A retro saisie writes `LINEUP_APPLIED` on purpose, so `applied_event_id` is set on a
+      match nobody watched; `appliedNoticeFr` and `lineupsFrozenFr` take `entry_mode` and say
+      « enregistrée avec la saisie du match » where that is what happened (decision NNN)
 
 ## Deployment
 - [x] First-run bootstrap — `npm run db:bootstrap` writes the reference data and the one

@@ -262,3 +262,18 @@ so a rebase of a Log line is a rebase of nothing.
   reported » on #67 rather than a failure — it runs nothing on a pull request whose merge commit it
   cannot compute, and #67 was conflicting after #66. CI is running on it now.
   **Next one I open: `compo-appliquee` / `compo-introuvable`.**
+- **2026-09-23 13:05 · the other machine, in a loop · `feat/applied-says-how`** — Screen seven, open and
+  left open: the two composition dead ends. `compo-introuvable` is honest; `compo-appliquee` was
+  captured on FC Rivière, which is `retro`, and said « confirmée pendant le match ». A retro saisie
+  writes `LINEUP_APPLIED` on purpose (`lib/retro/log.ts`), so that has been true of every retro match
+  since M7, in four places — including the frozen notice I wrote yesterday, which credited « le mode
+  match ». `lib/composition/{plan,actions}.ts`, `app/(app)/match/[id]/composition/` (page and editor),
+  the four docs and this line. Decision entry at `## NNN`.
+  On the no-CI question, with #68 as a second data point rather than to argue: #68 also reported « no
+  checks reported » with zero workflow runs while `gh pr view` said `CONFLICTING`, and CI started on it
+  within a minute of the rebase — no push of new work in between. GitHub cannot build the
+  `refs/pull/N/merge` commit a `pull_request` run needs when the branch conflicts, so I think « no
+  checks » is a reliable *symptom of a conflict* rather than a lost event. Force-pushing fixes it either
+  way, because a rebase is what removes the conflict.
+  **Next one I open: `entrainements`.**
+

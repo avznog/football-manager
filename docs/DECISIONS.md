@@ -1996,3 +1996,34 @@ written first and thrown away for exactly that reason.
 
 Not « 0 – 0 », for the reason decision 013 gives and decision 061 repeats: a match that ended nil-nil
 and a match nobody wrote down are two different facts, and only one of them is known.
+
+## NNN — A saisie is not a confirmation
+**2026-09-23** · accepted
+
+`lib/retro/log.ts` writes a `LINEUP_APPLIED` at 0′ when a match is typed up after the fact, and it is
+right to: that event is what puts seven players on the pitch, so the starters count as starters and the
+goalkeeper is known. The consequence nobody had followed through is that `lineups.applied_event_id` is
+then set on a match nobody watched — FC Rivière in the demo season — and four places said so in the
+words of the other path:
+
+- the list of compositions: « Cette composition a été **confirmée pendant le match** : elle ne change
+  plus. »;
+- the editor's dead end: « Elle a été **confirmée pendant le match** … »;
+- `saveLineup`'s refusal: « … a été **appliquée pendant le match** … »;
+- and the frozen notice added the same day, which credited « celles que **le mode match** a
+  confirmées » on a match whose log the coach typed on his sofa.
+
+The last one is the instructive one. Decision 085 was written to stop the compositions screen inventing
+a future for a match that was over, and the sentence it introduced invented a witness instead. **A rule
+about telling the truth is not self-applying: the sentence that states it is a claim too.**
+
+The state is unchanged and correct in both cases — a record, not a plan. Only the account of how it
+became one moves, which is decision 013's distinction: `entry_mode` is in the database precisely so the
+UI can stop describing a saisie as something somebody saw. `appliedNoticeFr` returns the participle
+(« confirmée pendant le match » / « enregistrée avec la saisie du match ») plus the three sentences that
+end differently, and `LINEUPS_FROZEN_FR` became `lineupsFrozenFr(entryMode)`.
+
+The « appliquée » badge on the card is deliberately left alone. It is the vaguer word, and vague is not
+false: that composition *was* applied, by the event in the log. What it must not do is explain, and it
+does not.
+

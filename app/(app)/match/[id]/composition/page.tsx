@@ -22,6 +22,7 @@ import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { deleteLineup } from "@/lib/composition/actions";
 import {
+  appliedNoticeFr,
   compositionsScreenFr,
   countSquadRoles,
   deduceChanges,
@@ -72,6 +73,7 @@ export default async function CompositionsPage({
   // The whole screen used to be written for a match still to be played: it offered « Planifier un
   // changement » under a match won three days earlier, and `saveLineup` accepted it (decision NNN).
   const screen = compositionsScreenFr(match);
+  const applied = appliedNoticeFr(match.entryMode);
 
   const kit = { primaryColor: team.primaryColor, secondaryColor: team.secondaryColor };
 
@@ -199,9 +201,9 @@ export default async function CompositionsPage({
                   ) : null}
 
                   {plan.isApplied ? (
-                    <p className="text-sm text-ink-muted">
-                      Cette composition a été confirmée pendant le match : elle ne change plus.
-                    </p>
+                    // Not « confirmée pendant le match » on a match nobody watched: a retro saisie
+                    // writes `LINEUP_APPLIED` too, and it was not a confirmation (decision NNN).
+                    <p className="text-sm text-ink-muted">{applied.listFr}</p>
                   ) : !screen.editable ? null : (
                     <div className="flex flex-wrap items-center gap-2">
                       <ButtonLink

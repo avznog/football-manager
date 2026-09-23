@@ -28,7 +28,14 @@ import { insertTeamFormation } from "@/lib/formation/persist";
 import { getFormations } from "@/lib/formation/queries";
 import { mapShapeToSlots, orderShape, shapeProblemsFr, type ShapeSlot } from "@/lib/formation/shape";
 
-import { blockingIssues, findPlanIssues, minuteIsTaken, ordinalFr, type PlanSlot } from "./plan";
+import {
+  appliedNoticeFr,
+  blockingIssues,
+  findPlanIssues,
+  minuteIsTaken,
+  ordinalFr,
+  type PlanSlot,
+} from "./plan";
 import { getCompositionMembers, getFieldedMemberIds, getMatchLineups } from "./queries";
 import {
   lineupTargetSchema,
@@ -52,7 +59,15 @@ function revalidateComposition(matchId: string): void {
 async function findMatch(teamId: string, matchId: string) {
   return db.query.matches.findFirst({
     where: and(eq(matches.id, matchId), eq(matches.teamId, teamId)),
-    columns: { id: true, status: true, periodsCount: true, periodMinutes: true },
+    // `entryMode` is here for the refusal's wording, not for a rule: how a composition became a
+    // record is what the message has to get right (decision NNN).
+    columns: {
+      id: true,
+      status: true,
+      periodsCount: true,
+      periodMinutes: true,
+      entryMode: true,
+    },
   });
 }
 
@@ -212,10 +227,7 @@ export async function saveLineup(_prev: FormState, formData: FormData): Promise<
   const target = lineupId ? existing.find((lineup) => lineup.id === lineupId) : undefined;
   if (lineupId && !target) return { error: "Cette composition n’existe pas sur ce match." };
   if (target?.isApplied) {
-    return {
-      error:
-        "Cette composition a été appliquée pendant le match : elle ne peut plus être modifiée.",
-    };
+    return { error: appliedNoticeFr(match.entryMode).refusalFr };
   }
   if (minuteIsTaken(existing, fromMinute, lineupId ?? null)) {
     return {
