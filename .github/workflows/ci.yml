@@ -161,6 +161,10 @@ jobs:
       # commit subjects since the previous tag — one line per pull request, which is exactly the
       # granularity this repository merges at. Only ever runs on the push that cut the tag, so a
       # re-run of an already-tagged commit publishes nothing twice.
+      #
+      # A version with a hyphen in it is a semver pre-release — `1.0.0-beta.1`. It is published as
+      # `--prerelease`, which keeps GitHub's "Latest" badge on the last stable version: a beta that
+      # advertises itself as the current release is worse than no release page at all (decision 110).
       - name: publish the release for that tag
         if: steps.tag.outputs.version != ''
         env:
@@ -177,5 +181,11 @@ jobs:
           fi
           echo >> /tmp/notes.md
           git log --format='- %s' "$range" >> /tmp/notes.md
-          gh release create "$VERSION" --title "$VERSION" --notes-file /tmp/notes.md
-          echo "::notice::Published the release $VERSION."
+
+          case "$VERSION" in
+            *-*) prerelease=--prerelease ;;
+            *)   prerelease= ;;
+          esac
+
+          gh release create "$VERSION" --title "$VERSION" --notes-file /tmp/notes.md $prerelease
+          echo "::notice::Published the release $VERSION${prerelease:+ as a pre-release}."
