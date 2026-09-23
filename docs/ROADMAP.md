@@ -75,9 +75,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Celebratory post-match recap screen
 
 ## M7 — Retro-entry & amendments
-- [ ] "Saisie rétroactive" screen synthesising events
-- [ ] Amend a finished match by appending corrections
-- [ ] Recompute frozen stats after an amendment
+- [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet
+      (`lib/retro/log.ts`, `app/(app)/match/[id]/saisie/`) — minutes are optional and stamped,
+      see decision 048
+- [x] Amend a finished match by appending corrections (`lib/retro/amend.ts`,
+      `amendMatchEvents`) — a `VOID` plus a replacement, keeping the target's minute (decision 049)
+- [x] Recompute frozen stats after an amendment — `amendMatchEvents` re-freezes
+      `match_player_stats` through `finalizeMatchById` whenever the match is or becomes finished
 
 ## Deployment
 - [ ] **Blocked:** needs a Neon `DATABASE_URL` from the owner (interactive signup).

@@ -96,6 +96,25 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
         status={match.status}
       />
 
+      {/* What decision 041 promised: the state that says « rien saisi » is the state that offers to
+          fix it. A coach who lands here from the calendar should not have to find his way back to the
+          match page to type the afternoon up. */}
+      {match.status === "finished" &&
+      !recap.recorded &&
+      can(actor, "match:amend", { teamId: team.id }) ? (
+        <Card title="Saisir le match" as="h2">
+          <div className="space-y-3">
+            <p className="text-sm text-ink-muted">
+              Renseigne qui a joué et les buts : le score, les minutes et les clean sheets se
+              déduisent, et ce résumé se remplira tout seul.
+            </p>
+            <ButtonLink href={`/match/${match.id}/saisie`} fullWidth>
+              Saisir le match
+            </ButtonLink>
+          </div>
+        </Card>
+      ) : null}
+
       {/* The prompt of screen 6: the recap asks for the notes, it does not wait to be found. */}
       {canStillRate && gated ? (
         <Card title="À toi de noter" as="h2" className="border-accent/40 bg-accent/10">

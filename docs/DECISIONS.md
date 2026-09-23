@@ -693,7 +693,8 @@ my match".
 
 **Consequences.** The minutes table is hidden rather than listing every man on the sheet as « non
 entré » at 0’: on an unrecorded match that is not « he did not come on » but « nobody knows », and the
-scoreboard has already said so. Once M7's retro-entry lands, this state is the one that offers it.
+scoreboard has already said so. This state is also the one that offers M7's retro-entry: a coach who
+lands on « rien saisi » from the calendar gets « Saisir le match » on the spot.
 
 ## 042 — The recap states a gap rather than leaving a blank
 **2026-09-23** · accepted
@@ -793,3 +794,88 @@ instead of five annulments that must be undone in the right order.
 **Consequences.** `describeActorsFr` needed a `LINEUP_APPLIED` branch: the single-actor fallback printed
 one arbitrary name, so the timeline hid two thirds of what the coach would open it to check. It now
 reads « Sortent : Karim, Ali · Entrent : Momo, Yanis · Change de poste : Léo ».
+
+## 047 — A retro-entered match is an ordinary event log; `entry_mode` is only a label
+**2026-09-23** · accepted
+
+« Saisie rétroactive » (`docs/PLAN.md`, screen 8) writes the same event types, through the same
+ingestion, as game mode: `KICKOFF · LINEUP_APPLIED · facts and substitutions · PERIOD_END · … ·
+FINAL_WHISTLE`. `matches.entry_mode = 'retro'` is set so a screen can say « saisi après le match », and
+**nothing reads it to decide anything**.
+
+**Why.** The alternative is a "retro" branch in the reducer, in the recap, in the statistics and in the
+ratings — four places where a season table can start disagreeing with itself, and four places where a
+bug only shows up on the matches nobody watched being recorded.
+
+**Consequences.** The entry screen never computes a score of its own: it runs the app's own
+`reduceMatch` over the log it is about to write and displays that. `submitRetroMatch` then refuses any
+log its own reducer reports a blocking anomaly for, so a retro match can never be the reason `/stats`
+looks odd. Amendments are not retro-only either — correcting a match recorded live goes through the
+same path and leaves `entry_mode` at `live`.
+
+## 048 — The minute of an action is optional; the app stamps what the coach cannot remember
+**2026-09-23** · accepted
+
+Three rules, in `lib/retro/log.ts`:
+
+| What has no minute | Where it lands |
+|---|---|
+| a substitution | the break — the middle of a single-period match |
+| a fact attached to a player | the middle of that player's own spell on the pitch, narrowed to the overlap with the assister |
+| a fact attached to nobody | the middle of regulation |
+
+**Why.** A coach typing up a match a fortnight later cannot reconstruct a timeline. Making minutes
+mandatory means the match never gets entered at all; stamping everything at 0′ produces goals scored by
+players who were not yet on the pitch, and the reducer is right to refuse them. The midpoint of a
+player's own spell is the only guess that cannot contradict the log it is being written into.
+
+**Consequences.** Order within one stamp is carried by `seq`, so the running score stays monotone. The
+form tells the coach how many actions were placed « au mieux ». Minutes played and clean-sheet minutes
+are only as good as the substitution minutes, and the screen says so — **the score is exact
+regardless**, which is the number the season table is built on.
+
+## 049 — A correction keeps the stamp of what it corrects, and only football facts may be corrected
+**2026-09-23** · accepted
+
+An amendment is a `VOID`, a replacement fact, or both — and it carries **its target's** minute, never
+the wall clock of the correction. `KICKOFF`, `PERIOD_END`, `FINAL_WHISTLE` and `LINEUP_APPLIED` cannot
+be annulled at all: `isAmendableEventType` is a pure exported predicate, asked both by the screen
+(whether to offer « Corriger ») and by the action (a crafted POST).
+
+**Why.** Stamping "now" would put a corrected goal after the `FINAL_WHISTLE` and rob everybody of the
+clean minutes they played. And those four types are the **frame**: annulling one does not fix a mistake,
+it changes what every minute in the log means — proved by crafting the POST and getting a log with a
+voided second-half kick-off. Changing how long a match lasted is « Modifier le match », not a
+correction.
+
+**Consequences.** A substitution can only be annulled and re-entered, because its two players and its
+minute are one fact. The `VOID` carrying its target's stamp is what makes the two lines sit together in
+the timeline. Every amendment is previewed through `reduceMatch` before it is written, which is how
+« Ce joueur n'était pas sur le terrain à cette minute. » can be refused — and how voiding a
+substitution whose substitute had scored is refused too.
+
+## 050 — Retro-entry and corrections are `match:amend`, coach-only
+**2026-09-23** · accepted
+
+Game mode's operator may be a delegate for the afternoon (decision 004). Typing a match up, or
+rewriting it days later, is the coach's. No change to `lib/auth/can.ts` was needed — `match:amend`
+already existed and already answered this way.
+
+**Why.** The two are different acts. Recording what is happening in front of you is a job you hand to
+whoever is holding the phone; rewriting a match that is already in the season table is not.
+
+## 051 — Submission ids are derived from content, never drawn at random
+**2026-09-23** · accepted
+
+`retroSubmissionId(retroEntrySeed(matchId, sheet))` for an entry, and
+`(matchId, intent, targetEventId, fact…)` for a correction; every `client_event_id` follows from it by
+index.
+
+**Why.** A random id minted in a client component is a hydration mismatch, and it does not survive a
+bfcache restore or a browser replaying a POST — which are exactly the cases invariant 6 exists for. Row
+keys are deliberately excluded from the seed, so deleting a row and re-adding it identically is the
+same submission.
+
+**Consequences.** The second tap on « Enregistrer » is answered as the success it is — a redirect — and
+not as an error. The replay check must therefore run **before** « cette action est déjà annulée »: after
+a correction succeeds, its target is precisely that.
