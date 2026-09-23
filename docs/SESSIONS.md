@@ -1378,3 +1378,9 @@ already, so for him the closing time is a fact about nothing.
 Verified by looking: `npm run audit:screens`, then the notation screen, the played match page and the
 recap at 390 px in **both** themes — four crops, each one carrying the sentence. 879 unit tests
 (43 files), e2e 3 passed in 29.3s.
+
+The note above, written by another session an hour earlier, was right and this entry is its fifth
+data point: the branch was opened against `97a1256`, two pull requests merged while it was being
+written, and « 077 » had been taken by the Docker Compose decision before this one reached GitHub —
+which GitHub reported not as a stale number but as a conflicting pull request with no CI run at all.
+Renumbered to 079 against `origin/main`, rebased, checks re-run.
