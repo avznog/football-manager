@@ -238,7 +238,9 @@ written down.
 The version of the app is the `version` field in `package.json` and lives nowhere else. **Bump it in
 the pull request that earns the bump**; the `tag` job in `.github/workflows/ci.yml` creates the
 annotated `v<version>` tag on `main` after the tests and the migration have passed, and pushing a
-`main` commit whose version is already tagged does nothing (decision 081).
+`main` commit whose version is already tagged does nothing (decision 081). Both halves have now run:
+`v0.1.0` was cut on the merge that added the job, and the next `main` push logged `v0.1.0 already
+exists — nothing to do` and finished green, leaving the tag where it was.
 
 So: to cut a release, edit one number. To find what a tag contains, `git show v0.1.0`. To see which
 version is live, read `package.json` on `main` — Vercel deploys `main` and nothing else, so they cannot
