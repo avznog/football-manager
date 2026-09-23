@@ -125,7 +125,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
               de tout le monde dès que tu auras fini.
             </p>
             {/* « dès que tu auras fini » has a closing time, and this card never said it
-                (decision 077). */}
+                (decision 079). */}
             {deadline ? <p className="text-sm font-medium text-ink">{deadline}</p> : null}
             <ButtonLink href={`/match/${match.id}/notation`}>
               {results !== null && !results.visible && results.progress.submittedCount > 0

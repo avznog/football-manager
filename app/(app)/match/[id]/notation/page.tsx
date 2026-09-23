@@ -7,7 +7,7 @@
  *   rate everybody including themselves;
  * - the window closes at the **next kick-off**, after which the form is gone rather than merely
  *   disabled — an insert would be refused anyway (`lib/rating/actions.ts`). While it is open, the
- *   screen says when that is: `ratingDeadlineFr` (decision 077);
+ *   screen says when that is: `ratingDeadlineFr` (decision 079);
  * - this page **never shows anybody else's notes**, whatever the viewer's progress. Reading them is
  *   the recap's job, and `getRatingResults` gates that (see `lib/rating/queries.ts`).
  *
@@ -143,7 +143,7 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
             Une note de 0 à 10 par coéquipier, toi compris. Un commentaire si tu veux. Ton nom est
             visible par l’équipe.
           </p>
-          {/* The deadline the app enforces, said out loud (decision 077). Null when no next match is
+          {/* The deadline the app enforces, said out loud (decision 079). Null when no next match is
               on the calendar: the window has no end yet, so there is nothing to announce. */}
           {deadline ? <p className="text-sm font-medium text-ink">{deadline}</p> : null}
           <RatingFlow teamId={team.id} matchId={match.id} targets={targets} />

@@ -220,7 +220,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
                     : "Tu n’as pas encore noté tes coéquipiers. Les notes des autres restent cachées jusque-là."}
                 </p>
                 {/* The comment above calls this « the one that expires at the next kick-off », and
-                    the card never said when that was (decision 077). */}
+                    the card never said when that was (decision 079). */}
                 {ratingDeadline ? (
                   <p className="text-sm font-medium text-ink">{ratingDeadline}</p>
                 ) : null}

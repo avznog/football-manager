@@ -1346,3 +1346,35 @@ password every time, so creating the account with a *new* password is also the r
 that sat in the Vercel environment needs.
 
 **Next:** §3, then §6 on a real phone in daylight.
+
+### A deadline nobody was told about
+
+`grep -rn "closesAt" app lib | grep -v lib/rating/window` → nothing. `ratingWindow()` has computed
+the instant the rating window shuts since M6, and no screen had ever printed it. So the rule from
+decision 007 was enforced in full and announced nowhere.
+
+The reason that is a defect and not a missing nicety is what `lib/rating/progress.ts` does on the
+other side of the deadline: it hides the team's notes from anybody who has not submitted his own, and
+**the window closing does not unlock them.** A player who runs out of time never reads the notes of
+that match. Its own module comment says « for ever. That is deliberate. » It is — and it is also a
+door closing on somebody who was never told there was a door. The three screens that ask for notes
+each promised the reward and omitted the condition: the notation flow (« Tu verras les notes des
+autres quand tu auras noté tout le monde », directly above a « Passer » button), the recap's « À toi
+de noter » card, and the match page's « Après le match » card — whose comment in the source already
+calls it « the one that expires at the next kick-off ».
+
+`ratingDeadlineFr(closesAtMs, nowMs)` now says it: « À finir avant le coup d'envoi du match suivant,
+dimanche 27 septembre à 10:30 : après, les notes de ce match ne bougent plus et tu ne verras pas
+celles de l'équipe. » It lives in `window.ts`, beside the rule, so the sentence and the rule cannot
+drift apart. Both halves of the consequence are in it on purpose: « ne bougent plus » alone reads as
+an archive being sealed, and « tu ne verras pas » alone reads as a penalty with no cause.
+
+It returns `null` in two states and both silences are deliberate — no next match on the calendar (the
+window has no end yet; announcing one would mean inventing it) and a deadline already passed (a date
+in the past presented as a thing to beat is exactly the family of defect this audit keeps finding).
+It is only rendered to a viewer who still owes notes: somebody who has finished can read the notes
+already, so for him the closing time is a fact about nothing.
+
+Verified by looking: `npm run audit:screens`, then the notation screen, the played match page and the
+recap at 390 px in **both** themes — four crops, each one carrying the sentence. 879 unit tests
+(43 files), e2e 3 passed in 29.3s.

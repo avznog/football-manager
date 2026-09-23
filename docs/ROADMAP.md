@@ -167,6 +167,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       had already rated him — which decision 007 exists to hide (decision 070)
 - [x] The recap's minutes table spells out « Passes ». Its header was « PD », two letters that are a
       slur in French, on the one screen the whole squad reads (decision 071)
+- [x] …and the window says when it shuts: « À finir avant le coup d’envoi du match suivant, dimanche
+      27 septembre à 10:30 ». `closesAtMs` had been computed since M6 and read by nobody, so three
+      screens promised « tu verras les notes des autres quand tu auras fini » without mentioning that
+      finishing has a closing time — and `progress.ts` makes missing it permanent (decision 079)
 
 ## M7 — Retro-entry & amendments
 - [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet
