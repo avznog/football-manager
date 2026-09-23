@@ -22,6 +22,7 @@ import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { deleteLineup } from "@/lib/composition/actions";
 import {
+  compositionsScreenFr,
   countSquadRoles,
   deduceChanges,
   findPlanIssues,
@@ -68,6 +69,9 @@ export default async function CompositionsPage({
   const totalMinutes = match.periodsCount * match.periodMinutes;
   const nextMinute = suggestNextMinute(plans, totalMinutes);
   const savedId = typeof query.enregistre === "string" ? query.enregistre : null;
+  // The whole screen used to be written for a match still to be played: it offered « Planifier un
+  // changement » under a match won three days earlier, and `saveLineup` accepted it (decision NNN).
+  const screen = compositionsScreenFr(match);
 
   const kit = { primaryColor: team.primaryColor, secondaryColor: team.secondaryColor };
 
@@ -87,7 +91,7 @@ export default async function CompositionsPage({
             href={`/match/${match.id}/feuille`}
             className="font-medium text-accent hover:underline"
           >
-            modifier la feuille
+            {screen.sheetLinkFr}
           </Link>
         </p>
       </header>
@@ -95,10 +99,12 @@ export default async function CompositionsPage({
       {selectable === 0 ? (
         <Card title="Feuille de match vide">
           <EmptyState
-            title="Personne n’est encore retenu"
-            description="Choisis d’abord tes titulaires et tes remplaçants : seuls eux peuvent être placés sur le terrain."
+            title={screen.emptySheetFr.title}
+            description={screen.emptySheetFr.description}
             action={
-              <ButtonLink href={`/match/${match.id}/feuille`}>Remplir la feuille</ButtonLink>
+              screen.emptySheetFr.withCta ? (
+                <ButtonLink href={`/match/${match.id}/feuille`}>Remplir la feuille</ButtonLink>
+              ) : undefined
             }
           />
         </Card>
@@ -107,15 +113,21 @@ export default async function CompositionsPage({
           {plans.length === 0 ? (
             <Card title="Aucune composition">
               <EmptyState
-                title="Le terrain est vide"
-                description="Place tes sept joueurs sur la pelouse : tu pourras ensuite planifier les changements."
+                title={screen.noPlansFr.title}
+                description={screen.noPlansFr.description}
                 action={
-                  <ButtonLink href={`/match/${match.id}/composition/nouvelle?minute=0`}>
-                    Composition de départ
-                  </ButtonLink>
+                  screen.noPlansFr.withCta ? (
+                    <ButtonLink href={`/match/${match.id}/composition/nouvelle?minute=0`}>
+                      Composition de départ
+                    </ButtonLink>
+                  ) : undefined
                 }
               />
             </Card>
+          ) : null}
+
+          {screen.frozenNoticeFr !== null && plans.length > 0 ? (
+            <p className="text-sm text-ink-muted">{screen.frozenNoticeFr}</p>
           ) : null}
 
           {lineups.map((row) => {
@@ -190,7 +202,7 @@ export default async function CompositionsPage({
                     <p className="text-sm text-ink-muted">
                       Cette composition a été confirmée pendant le match : elle ne change plus.
                     </p>
-                  ) : (
+                  ) : !screen.editable ? null : (
                     <div className="flex flex-wrap items-center gap-2">
                       <ButtonLink
                         href={`/match/${match.id}/composition/${plan.id}`}
@@ -215,7 +227,7 @@ export default async function CompositionsPage({
             );
           })}
 
-          {plans.length > 0 ? (
+          {plans.length > 0 && screen.editable ? (
             <Card
               title="Planifier un changement"
               description={`Une composition « à partir de la minute X ». Le match dure ${totalMinutes} minutes.`}

@@ -114,6 +114,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       a fortnight ago, and on a sheet with nine titulaires ticked. `sheetNextStepFr` returns the
       sentence and the call to action together, so the button can disappear when there is nowhere
       useful to go (decision 084)
+- [x] The compositions screen stops offering to plan the 30ᵉ minute of a match played a fortnight ago.
+      `saveLineup` and `deleteLineup` now refuse a finished match like `setMatchSquad` always has, the
+      editor gained a sixth dead end, and the header, the notice and both empty states are derived from
+      the match's status and entry mode (decision NNN)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses

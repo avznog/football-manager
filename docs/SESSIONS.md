@@ -1540,3 +1540,26 @@ AS Coteaux's sheet is genuinely empty in the demo season, so four and nine start
 fait… » · « 9 titulaires cochés pour 7 places : il y en a 2 de trop. Repasse-les en remplaçants… » ·
 « Le match est joué : la feuille reste ici pour mémoire. » The first capture of the over-seven case is
 also what caught « Repasse les » without its hyphen; an imperative with a pronoun takes one.
+
+### « Planifier un changement » on a match won a fortnight ago
+
+Third screen out of the audit captures, `/match/[id]/composition`, and the first where the copy was
+the smaller half of the defect. The capture of CS Morvan — finished, won 2 – 0 — offered a « Nouvelle
+composition » button under a played match, and the action behind it had no `finished` guard: the match
+sheet has refused one since M3, the compositions never did. Checked against the demo season with psql
+before writing anything, and the second finished match, FC des Deux-Ponts, showed the other half:
+typed up afterwards, no composition ever saved, and the page telling the coach to place seven players
+on a pelouse for a match played on 13 September.
+
+So the guard went into `saveLineup` and `deleteLineup`, a sixth dead end into the editor route — it
+would have taken a full composition and lost it on submit — and every sentence on the page into
+`compositionsScreenFr`, which reads `status` and `entryMode`. `LINEUPS_FROZEN_FR` is shared between the
+list's notice and the editor's dead end so the two cannot drift. Decision NNN writes the rule down for
+the whole match rather than for this screen.
+
+Two things only the captures found, at 390 px, which is why they get looked at: the header still said
+« modifier la feuille » pointing at a sheet rendered `frozen`, and in the frozen branch the empty state
+and the card around it both read « Aucune composition », stacked. 911 tests before the two extra
+assertions, and the live case was checked by flipping Étoile du Parc to `live` in psql and putting it
+back.
+

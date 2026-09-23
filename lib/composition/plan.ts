@@ -12,7 +12,7 @@
  */
 
 import { FORMATION_SLOT_COUNT } from "@/db/reference";
-import type { MatchStatus, SquadRole } from "@/db/schema";
+import type { EntryMode, MatchStatus, SquadRole } from "@/db/schema";
 import {
   type LineupDiff,
   type PositionChange,
@@ -252,6 +252,94 @@ export function sheetNextStepFr(
     };
   }
   return { description: "Le groupe est fait : place les sept sur le terrain.", cta: "composition" };
+}
+
+/**
+ * What the compositions screen may offer, and what its empty states should say.
+ *
+ * The page was written for a match that has not been played, and said the same things for one that
+ * has. On the demo season's FC des Deux-Ponts — finished, typed up afterwards, no composition ever
+ * saved — it read « Le terrain est vide · Place tes sept joueurs sur la pelouse : tu pourras ensuite
+ * planifier les changements », about a match played ten days earlier. Below the compositions of CS
+ * Morvan, played and won, it offered « Planifier un changement … Le match dure 60 minutes » and a
+ * button that actually worked: `saveLineup` had no `finished` guard, so a coach could add a plan « à
+ * partir de la 30ᵉ minute » to a match that was over. The match sheet had refused exactly that since
+ * M3 — « Le match est terminé : la feuille de match ne change plus. »
+ *
+ * So this settles the rule for the whole match, not just this screen (decision NNN): **a finished
+ * match is a record everywhere, and every screen that could write to it says so in the same words.**
+ * The way to change one is `lib/retro/amend.ts`, which appends (invariant 1) and re-freezes the
+ * statistics; it is not a plan for a minute that has already been played. `LINEUPS_FROZEN_FR` says so
+ * in one place, shared by this screen's notice and the editor's dead end, so the two cannot drift
+ * (the decision 073 move).
+ *
+ * `live` is editable on purpose: planning the 40th minute during the 20th is the point of the screen,
+ * and invariant 3 means the plan is still only a proposal.
+ */
+export const LINEUPS_FROZEN_FR =
+  "Les compositions d’un match joué ne changent plus : elles disent ce qui était prévu, et celles " +
+  "que le mode match a confirmées disent ce qui a été joué. Pour corriger le match lui-même, passe " +
+  "par sa saisie.";
+
+export function compositionsScreenFr(match: { status: MatchStatus; entryMode: EntryMode }): {
+  /** Whether the screen may offer to create, modify or delete a composition. */
+  editable: boolean;
+  /** Said once, above the compositions, when they have stopped being plans. */
+  frozenNoticeFr: string | null;
+  /**
+   * The link in the header to the match sheet. « modifier la feuille » is a promise the sheet does
+   * not keep once the match is over: `SquadSheet` gets `frozen` and refuses every checkbox.
+   */
+  sheetLinkFr: string;
+  /** Nobody on the match sheet, so there is nobody to place. */
+  emptySheetFr: { title: string; description: string; withCta: boolean };
+  /** Somebody on the sheet, but no composition saved. */
+  noPlansFr: { title: string; description: string; withCta: boolean };
+} {
+  if (match.status !== "finished") {
+    return {
+      editable: true,
+      frozenNoticeFr: null,
+      sheetLinkFr: "modifier la feuille",
+      emptySheetFr: {
+        title: "Personne n’est encore retenu",
+        description:
+          "Choisis d’abord tes titulaires et tes remplaçants : seuls eux peuvent être placés sur " +
+          "le terrain.",
+        withCta: true,
+      },
+      noPlansFr: {
+        title: "Le terrain est vide",
+        description:
+          "Place tes sept joueurs sur la pelouse : tu pourras ensuite planifier les changements.",
+        withCta: true,
+      },
+    };
+  }
+
+  return {
+    editable: false,
+    frozenNoticeFr: LINEUPS_FROZEN_FR,
+    sheetLinkFr: "voir la feuille",
+    emptySheetFr: {
+      title: "Aucune feuille de match",
+      description:
+        "Le match est joué et personne n’a été retenu sur la feuille : il n’y a rien à composer.",
+      withCta: false,
+    },
+    noPlansFr: {
+      // Not « Aucune composition » again: the card around it is already titled that, and at 390 px the
+      // two headings landed one under the other, the same three words twice.
+      title: match.entryMode === "retro" ? "Saisi sans composition" : "Le terrain est resté vide",
+      description:
+        match.entryMode === "retro"
+          ? "Ce match a été saisi après coup, sans composition : les temps de jeu viennent de la " +
+            "saisie et non d’un placement sur le terrain."
+          : "Aucune composition n’a été enregistrée pour ce match, et il est joué : il n’y a plus " +
+            "rien à placer.",
+      withCta: false,
+    },
+  };
 }
 
 /* -------------------------------------------------------------------------- */

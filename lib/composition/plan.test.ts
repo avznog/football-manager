@@ -4,7 +4,9 @@ import { formationByLabel } from "@/db/reference";
 import type { SlotAssignment } from "@/lib/match/lineup";
 
 import {
+  LINEUPS_FROZEN_FR,
   blockingIssues,
+  compositionsScreenFr,
   countSquadRoles,
   deduceChanges,
   findPlanIssues,
@@ -429,5 +431,59 @@ describe("sheetNextStepFr", () => {
 
   it("treats a live match like one still to compose: invariant 3 makes a plan a proposal", () => {
     expect(sheetNextStepFr(counts(7), "live").cta).toBe("composition");
+  });
+});
+
+describe("compositionsScreenFr", () => {
+  const live = { status: "live" as const, entryMode: "live" as const };
+  const scheduled = { status: "scheduled" as const, entryMode: "live" as const };
+  const played = { status: "finished" as const, entryMode: "live" as const };
+  const typedUp = { status: "finished" as const, entryMode: "retro" as const };
+
+  it("lets a match still to be played be composed, and says so the old way", () => {
+    const screen = compositionsScreenFr(scheduled);
+
+    expect(screen.editable).toBe(true);
+    expect(screen.frozenNoticeFr).toBeNull();
+    expect(screen.noPlansFr.title).toBe("Le terrain est vide");
+    expect(screen.noPlansFr.withCta).toBe(true);
+    expect(screen.emptySheetFr.withCta).toBe(true);
+    expect(screen.sheetLinkFr).toBe("modifier la feuille");
+  });
+
+  /** Planning the 40th minute during the 20th is the point of the screen; invariant 3 keeps it a plan. */
+  it("keeps a live match editable", () => {
+    expect(compositionsScreenFr(live).editable).toBe(true);
+  });
+
+  it("never tells a coach to place seven players in a match that is over", () => {
+    for (const match of [played, typedUp]) {
+      const screen = compositionsScreenFr(match);
+
+      expect(screen.editable).toBe(false);
+      expect(screen.noPlansFr.withCta).toBe(false);
+      expect(screen.emptySheetFr.withCta).toBe(false);
+      expect(screen.noPlansFr.description).not.toContain("Place tes sept joueurs");
+      expect(screen.noPlansFr.description).not.toContain("planifier");
+      expect(screen.emptySheetFr.description).not.toContain("Choisis d’abord");
+      // The sheet itself is `frozen` on a finished match, so « modifier » is a promise it breaks.
+      expect(screen.sheetLinkFr).toBe("voir la feuille");
+    }
+  });
+
+  it("does not repeat the heading of the card it sits in", () => {
+    expect(compositionsScreenFr(played).noPlansFr.title).not.toBe("Aucune composition");
+    expect(compositionsScreenFr(typedUp).noPlansFr.title).not.toBe("Aucune composition");
+  });
+
+  it("says where a typed-up match's minutes come from, since no composition made them", () => {
+    expect(compositionsScreenFr(typedUp).noPlansFr.description).toContain("saisi après coup");
+    expect(compositionsScreenFr(played).noPlansFr.description).not.toContain("saisi après coup");
+  });
+
+  it("says once, above the compositions, that they have stopped being plans", () => {
+    expect(compositionsScreenFr(played).frozenNoticeFr).toBe(LINEUPS_FROZEN_FR);
+    expect(LINEUPS_FROZEN_FR).toContain("ne changent plus");
+    expect(LINEUPS_FROZEN_FR).toContain("par sa saisie");
   });
 });
