@@ -1241,3 +1241,68 @@ Verified, not assumed:
 `npm run docker:db` / `docker:up` / `docker:down` / `docker:reset` / `docker:logs` wrap the commands
 anybody would otherwise have to remember. CI is deliberately unchanged: building an image on every
 push would add minutes to prove what the local build already proves.
+
+---
+
+## The deploy, and two sessions fixing the same bug
+
+The owner created the Neon project and the Vercel project and asked for the repository to be linked,
+CI/CD added, and the app deployed.
+
+**Diagnosed the three failed builds, and then found them already fixed.** `DATABASE_URL` was present
+and correct for Production, the build said it was not set, and the reason is that Vercel exposes a
+variable marked **sensitive at runtime only** — never to the build — while `db/client.ts` threw at
+module scope. That is decision 075, written and merged by another session (#48) at the same time as
+this one was writing the same proxy from the same evidence. Two sessions, one repository, no shared
+memory: the collision cost a rebase and is worth noting as a thing that happens.
+
+Main's version is the better one and was kept. It says more than mine did about where the throw lands
+in `next build`, and it also rewrote the message, which needed it: « Copy .env.example to .env.local »
+is advice nobody can follow on a serverless host.
+
+**What survived the collision is the test.** `db/client.test.ts` — the module imports with
+`DATABASE_URL` empty, the first query still throws, and `sql` is still both callable and indexable.
+Decision 075's own verification was a `DATABASE_URL= npm run build` and a throwaway script; nothing
+pinned it, and all 868 existing tests ran with the variable set, so the suite was structurally unable
+to catch this class of bug. It needs `vi.mock("server-only", …)`: the empty module sits behind the
+`react-server` export condition, which Vitest does not apply and the `db:*` scripts pass explicitly.
+
+**CI/CD.** The `migrate` job applies the committed SQL to Neon on pushes to `main`, after both
+existing jobs, with `cancel-in-progress: false` of its own — the workflow's group is right to cancel a
+superseded test run and wrong to cancel a migration mid-statement. Deliberately **not** the Vercel
+build command, the obvious place: that needs `DATABASE_URL` at build time, which decision 075 exists
+to avoid, and every preview build would migrate whatever it points at. Deliberately not ordered
+against Vercel either, which is a real gap accepted on the record in decision 076, along with the
+migration that would force it open — the first one that cannot be additive.
+
+**Three variables removed from the Vercel project**, where the first attempt had left them:
+`SUPER_ADMIN_PASSWORD` and `SUPER_ADMIN_USERNAME`, read only by `db/bootstrap.ts` and `db/seed.ts`
+from a command line, and `TEST_DATABASE_URL`, read by nothing in the repository at all. The password
+is for the account that can read and rewrite every team on the instance; it should be reset rather
+than reasoned about. `DEPLOY.md` §4 now records that this happened, because the runbook already said
+not to do it and saying so twice is cheaper than a leak.
+
+**Also recorded:** three variables removed from the Vercel project, where the first attempt had left
+them — `SUPER_ADMIN_PASSWORD` and `SUPER_ADMIN_USERNAME`, read only by `db/bootstrap.ts` and
+`db/seed.ts` from a command line, and `TEST_DATABASE_URL`, read by nothing here at all. The password
+is for the account that can read and rewrite every team on the instance, so it is reset rather than
+reasoned about. `DEPLOY.md` §4 says that this happened, because the runbook already said not to do it
+and saying so twice is cheaper than a leak. Also that preview deployments share the production
+database, which Vercel Authentication makes tolerable rather than fine.
+
+873 unit tests, build green with no `DATABASE_URL` at all, lint and typecheck clean. The end-to-end
+suite was not run locally — this machine has no Postgres and no `.env.local`, and `npm run db:start`
+is `brew services` on a Linux box; CI runs it on the pull request, which is the documented gate.
+
+**Where the next session should pick up.** The entry above this one lists two owner-side blockers;
+there is a third, and all three need the same string, which is sensitive in Vercel and therefore
+unreadable by anybody including the owner's own tooling. Turn Deployment Protection off, run the first
+`db:migrate` and `db:bootstrap` from the Neon dashboard's string, and set the `DATABASE_URL` GitHub
+secret so the `migrate` job can work. Then walk §5 on the production URL, reset the super-admin
+password, and give Preview its own Neon branch.
+
+**One process note.** Two sessions worked this repository at the same time with no knowledge of each
+other, and independently wrote the same fix; four pull requests landed on `main` while this branch was
+open. It cost two rebases and nearly cost a duplicated `DEPLOY.md`. If sessions are going to overlap,
+they need disjoint files — and the decision numbers are the sharpest edge: 074, 075 and 076 were all
+claimed within the same half hour.
