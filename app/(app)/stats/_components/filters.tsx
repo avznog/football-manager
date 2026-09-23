@@ -1,7 +1,7 @@
 /**
  * The competition filter and the sort control — both plain links.
  *
- * Deliberately not a client component. The filter is a *view of the URL*, so `?competition=cup` is
+ * Deliberately not a client component. The filter is a *view of the URL*, so `?competition=<id>` is
  * shareable, survives a reload, and works with no JavaScript at all: the same reasoning as the
  * coach's forms on `/equipe`. `SegmentedControl` would have needed a client parent and an
  * `onChange` handler to do less.
@@ -15,8 +15,7 @@
 import Link from "next/link";
 
 import { cn } from "@/components/ui/cn";
-import type { Competition } from "@/db/schema";
-import { COMPETITION_LABELS, COMPETITION_ORDER } from "@/lib/calendar/labels";
+import type { CompetitionOption } from "@/lib/competition/options";
 import type { PlayerSortKey } from "@/lib/stats/aggregate";
 
 /** The query keys `/stats` reads. Spelled once so the page and the links cannot drift. */
@@ -24,7 +23,11 @@ export const COMPETITION_PARAM = "competition";
 export const SORT_PARAM = "tri";
 
 export type StatsQuery = {
-  competition: Competition | null;
+  /**
+   * A row of the team's own `competitions` table (decision 107), by id and never by label: a coach
+   * who renames « Coupe » into « Coupe du Crédit Mutuel » must not break a bookmarked URL.
+   */
+  competitionId: string | null;
   sort: PlayerSortKey;
 };
 
@@ -34,7 +37,7 @@ export const DEFAULT_SORT: PlayerSortKey = "minutes";
 /** Builds `/stats?…`, omitting whatever is at its default so the clean URL stays clean. */
 export function statsHref(query: StatsQuery): string {
   const params = new URLSearchParams();
-  if (query.competition !== null) params.set(COMPETITION_PARAM, query.competition);
+  if (query.competitionId !== null) params.set(COMPETITION_PARAM, query.competitionId);
   if (query.sort !== DEFAULT_SORT) params.set(SORT_PARAM, query.sort);
   const search = params.toString();
   return search === "" ? "/stats" : `/stats?${search}`;
@@ -73,28 +76,38 @@ function Chip({
 }
 
 /**
- * « Toutes / Championnat / Coupe / Amical / Tournoi ».
+ * « Toutes » plus one chip per competition the team has actually played in — the coach's own words
+ * now, not four fixed ones (decision 107). `statsFilterOptions` owns which of them earn a chip.
  *
- * Scrolls sideways rather than wrapping: four chips and a « Toutes » do not fit on 320 px, and a
- * second line here would push the whole season below the fold.
+ * Scrolls sideways rather than wrapping: a « Toutes » and a handful of chips do not fit on 320 px,
+ * and a second line here would push the whole season below the fold. With a single competition there
+ * is nothing to choose between, so the row is not rendered at all.
  */
-export function CompetitionFilter({ query }: { query: StatsQuery }) {
+export function CompetitionFilter({
+  query,
+  competitions,
+}: {
+  query: StatsQuery;
+  competitions: readonly CompetitionOption[];
+}) {
+  if (competitions.length < 2) return null;
+
   return (
     <nav aria-label="Filtrer par compétition" className="-mx-4 overflow-x-auto px-4 pb-1">
       <div className="flex w-max gap-2">
         <Chip
-          href={statsHref({ ...query, competition: null })}
-          active={query.competition === null}
+          href={statsHref({ ...query, competitionId: null })}
+          active={query.competitionId === null}
         >
           Toutes
         </Chip>
-        {COMPETITION_ORDER.map((competition) => (
+        {competitions.map((competition) => (
           <Chip
-            key={competition}
-            href={statsHref({ ...query, competition })}
-            active={query.competition === competition}
+            key={competition.id}
+            href={statsHref({ ...query, competitionId: competition.id })}
+            active={query.competitionId === competition.id}
           >
-            {COMPETITION_LABELS[competition]}
+            {competition.labelFr}
           </Chip>
         ))}
       </div>

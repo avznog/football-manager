@@ -31,7 +31,7 @@ import "./load-env";
 import { eq } from "drizzle-orm";
 
 import { db } from "./client";
-import { seedReference } from "./seed-reference";
+import { seedMissingTeamCompetitions, seedReference } from "./seed-reference";
 import { users } from "./schema";
 import { hashPassword } from "../lib/auth/password";
 import { PASSWORD_MIN_LENGTH, usernameSchema } from "../lib/auth/validation";
@@ -70,6 +70,9 @@ async function main(): Promise<void> {
 
   console.log("Données de référence…");
   await seedReference();
+  // Not reference data — each team owns its own competitions (decision 107) — but the one thing a
+  // team cannot function without, so a team that somehow has none gets the four defaults back.
+  await seedMissingTeamCompetitions();
 
   const existing = await db.query.users.findFirst({
     where: eq(users.username, username),

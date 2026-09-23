@@ -11,7 +11,6 @@ import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
 import {
   attendanceLineFr,
   AVAILABILITY_LABELS,
-  COMPETITION_LABELS,
   matchNameFr,
   NOT_RECORDED_FR,
   resultLabel,
@@ -125,9 +124,8 @@ export function PastMatchResult({ match }: { match: CalendarMatch }) {
 
 /** « Championnat · à domicile, Stade des Tilleuls » — `venuePhraseFr` keeps the two together. */
 export function matchSubtitle(match: CalendarMatch): string {
-  return [COMPETITION_LABELS[match.competition], venuePhraseFr(match.isHome, match.venue)].join(
-    " · ",
-  );
+  // The label is the team's own row in `competitions` now (decision 107), not an enum value.
+  return [match.competitionLabel, venuePhraseFr(match.isHome, match.venue)].join(" · ");
 }
 
 /**

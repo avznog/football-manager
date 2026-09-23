@@ -25,6 +25,7 @@ import { cache } from "react";
 
 import { db } from "@/db/client";
 import {
+  competitions,
   formationSlots,
   formations,
   matchEvents,
@@ -37,7 +38,7 @@ import {
   trainings,
   users,
 } from "@/db/schema";
-import type { Competition, SquadRole } from "@/db/schema";
+import type { SquadRole } from "@/db/schema";
 import type { SlotInfo } from "@/lib/match/lineup";
 import { getMatchScores } from "@/lib/match/queries";
 import type { MatchEventRecord } from "@/lib/match/reducer";
@@ -62,8 +63,12 @@ import { type RatingAuthorRow, type VisibleRatingRow, ratingVisibility } from ".
 /* -------------------------------------------------------------------------- */
 
 export type StatsFilter = {
-  /** Null = every competition (`docs/PLAN.md`: stats filterable by competition). */
-  competition: Competition | null;
+  /**
+   * `competitions.id`, or null for every competition (`docs/PLAN.md`: stats filterable by
+   * competition). An id and not a word, since decision 107: the label is the coach's and may change
+   * under a bookmarked URL, the row it names does not.
+   */
+  competitionId: string | null;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -115,14 +120,14 @@ async function getFinishedMatches(
     kickoffAt: string;
     opponentName: string;
     isHome: boolean;
-    competition: Competition;
+    competitionLabel: string;
     periodsCount: number;
     periodMinutes: number;
   }>;
   liveCount: number;
 }> {
-  const competitionPredicate = filter.competition
-    ? eq(matches.competition, filter.competition)
+  const competitionPredicate = filter.competitionId
+    ? eq(matches.competitionId, filter.competitionId)
     : undefined;
 
   const rows = await db
@@ -131,11 +136,12 @@ async function getFinishedMatches(
       kickoffAt: matches.kickoffAt,
       opponentName: matches.opponentName,
       isHome: matches.isHome,
-      competition: matches.competition,
+      competitionLabel: competitions.labelFr,
       periodsCount: matches.periodsCount,
       periodMinutes: matches.periodMinutes,
     })
     .from(matches)
+    .innerJoin(competitions, eq(competitions.id, matches.competitionId))
     .where(and(eq(matches.teamId, teamId), eq(matches.status, "finished"), competitionPredicate))
     .orderBy(matches.kickoffAt);
 
@@ -288,7 +294,7 @@ async function getAttendanceMarks(
 
 export type SeasonStatsResult = SeasonStats & {
   /** Echo of what was asked for, so the screen never has to re-derive it. */
-  competition: Competition | null;
+  competitionId: string | null;
   /** Finished matches in the filter, including those with nothing logged. */
   matchesConsidered: number;
   /** Matches in progress, excluded on purpose. */
@@ -320,7 +326,7 @@ export const getSeasonStats = cache(
   async (
     teamId: string,
     viewerMemberId: string | null,
-    filter: StatsFilter = { competition: null },
+    filter: StatsFilter = { competitionId: null },
   ): Promise<SeasonStatsResult> => {
     const [{ rows: matchRows, liveCount }, members, attendance] = await Promise.all([
       getFinishedMatches(teamId, filter),
@@ -394,7 +400,7 @@ export const getSeasonStats = cache(
       kickoffAt: match.kickoffAt,
       opponentName: match.opponentName,
       isHome: match.isHome,
-      competition: match.competition,
+      competitionLabel: match.competitionLabel,
       // No entry in the scores map means not a single live event: nothing was ever recorded, which
       // is not the same fact as 0-0 (`aggregate.ts`, rule 7).
       score: scores.get(match.id) ?? null,
@@ -412,7 +418,7 @@ export const getSeasonStats = cache(
 
     return {
       ...season,
-      competition: filter.competition,
+      competitionId: filter.competitionId,
       matchesConsidered: matchRows.length,
       liveMatches: liveCount,
       markedSessions,
@@ -433,7 +439,7 @@ export async function getPlayerSeasonStats(
   teamId: string,
   viewerMemberId: string | null,
   teamMemberId: string,
-  filter: StatsFilter = { competition: null },
+  filter: StatsFilter = { competitionId: null },
 ): Promise<{ player: SeasonStats["players"][number] | null; season: SeasonStatsResult }> {
   const season = await getSeasonStats(teamId, viewerMemberId, filter);
   return {

@@ -44,7 +44,7 @@ export function PlayerList({
    * a training belongs to no competition. So the rows have to say which one is the exception
    * (decision 082).
    */
-  const filtered = query.competition !== null;
+  const filtered = query.competitionId !== null;
 
   return (
     <Card

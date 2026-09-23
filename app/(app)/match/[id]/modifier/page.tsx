@@ -18,6 +18,8 @@ import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { matchDeletionWarningFr } from "@/lib/calendar/deletion";
 import { toLocalInput } from "@/lib/calendar/time";
+import { competitionOptions } from "@/lib/competition/options";
+import { getTeamCompetitions } from "@/lib/competition/queries";
 import { deleteMatch } from "@/lib/match/actions";
 import { getMatch, getMatchDeletionHolds, hasMatchEvents } from "@/lib/match/queries";
 import { MatchForm } from "../../_components/match-form";
@@ -31,10 +33,15 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
   const match = await getMatch(team.id, id);
   if (!match) notFound();
 
-  const [logged, holds] = await Promise.all([
+  const [logged, holds, allCompetitions] = await Promise.all([
     hasMatchEvents(match.id),
     getMatchDeletionHolds(match.id),
+    getTeamCompetitions(team.id),
   ]);
+
+  // The competition this match is already filed under stays offered even once archived: saving the
+  // form would otherwise silently re-file last autumn's cup match under the championship.
+  const competitions = competitionOptions(allCompetitions, match.competitionId);
 
   return (
     <div className="space-y-4">
@@ -52,12 +59,13 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
         <MatchForm
           teamId={team.id}
           matchId={match.id}
+          competitions={competitions}
           defaults={{
             opponentName: match.opponentName,
             kickoffAt: toLocalInput(new Date(match.kickoffAt)),
             isHome: match.isHome,
             venue: match.venue ?? "",
-            competition: match.competition,
+            competitionId: match.competitionId,
             periodsCount: match.periodsCount,
             periodMinutes: match.periodMinutes,
           }}

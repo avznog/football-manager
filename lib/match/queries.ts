@@ -11,8 +11,8 @@ import "server-only";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { matchAvailability, matchEvents, matches } from "@/db/schema";
-import type { AvailabilityStatus, Competition, EntryMode, MatchStatus } from "@/db/schema";
+import { competitions, matchAvailability, matchEvents, matches } from "@/db/schema";
+import type { AvailabilityStatus, EntryMode, MatchStatus } from "@/db/schema";
 import type { MatchDeletionHolds } from "@/lib/calendar/deletion";
 
 export type MatchRow = {
@@ -23,7 +23,13 @@ export type MatchRow = {
   opponentName: string;
   isHome: boolean;
   venue: string | null;
-  competition: Competition;
+  /** `competitions.id` — what the match form posts back, and what the stats filter is keyed on. */
+  competitionId: string;
+  /**
+   * The word the coach typed for it (decision 107), read through the join rather than mapped from a
+   * fixed table of four: a rename on `/equipe` then reaches every screen at once.
+   */
+  competitionLabel: string;
   periodsCount: number;
   periodMinutes: number;
   status: MatchStatus;
@@ -48,7 +54,8 @@ const MATCH_COLUMNS = {
   opponentName: matches.opponentName,
   isHome: matches.isHome,
   venue: matches.venue,
-  competition: matches.competition,
+  competitionId: matches.competitionId,
+  competitionLabel: competitions.labelFr,
   periodsCount: matches.periodsCount,
   periodMinutes: matches.periodMinutes,
   status: matches.status,
@@ -63,7 +70,8 @@ function toMatchRow(row: {
   opponentName: string;
   isHome: boolean;
   venue: string | null;
-  competition: Competition;
+  competitionId: string;
+  competitionLabel: string;
   periodsCount: number;
   periodMinutes: number;
   status: MatchStatus;
@@ -78,6 +86,7 @@ export async function getTeamMatches(teamId: string): Promise<MatchRow[]> {
   const rows = await db
     .select(MATCH_COLUMNS)
     .from(matches)
+    .innerJoin(competitions, eq(competitions.id, matches.competitionId))
     .where(eq(matches.teamId, teamId))
     .orderBy(asc(matches.kickoffAt));
 
@@ -94,6 +103,7 @@ export async function getMatch(teamId: string, matchId: string): Promise<MatchRo
   const rows = await db
     .select(MATCH_COLUMNS)
     .from(matches)
+    .innerJoin(competitions, eq(competitions.id, matches.competitionId))
     .where(and(eq(matches.id, matchId), eq(matches.teamId, teamId)))
     .limit(1);
 

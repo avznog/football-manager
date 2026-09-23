@@ -12,9 +12,9 @@
  */
 
 import { EmptyState } from "@/components/ui/empty-state";
-import type { Competition } from "@/db/schema";
-import { COMPETITION_LABELS, COMPETITION_ORDER } from "@/lib/calendar/labels";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { competitionLabelOf, statsFilterOptions } from "@/lib/competition/options";
+import { getTeamCompetitions } from "@/lib/competition/queries";
 import { MIN_RATINGS, isPlayerSortKey, sortPlayers } from "@/lib/stats/aggregate";
 import { formatRating, matchCount, plural } from "@/lib/stats/format";
 import { getSeasonStats } from "@/lib/stats/queries";
@@ -34,30 +34,39 @@ import { TeamSummary } from "./_components/team-summary";
 
 export const metadata = { title: "Stats" };
 
-/** A hand-typed or stale query string must degrade to "everything", never to an error. */
-function parseCompetition(value: string | string[] | undefined): Competition | null {
+/**
+ * A hand-typed or stale query string must degrade to "everything", never to an error.
+ *
+ * Which now includes an id that named a competition somebody has since deleted or that belongs to
+ * another team: it is only kept if it is in this team's own list.
+ */
+function parseCompetitionId(
+  value: string | string[] | undefined,
+  competitions: readonly { id: string }[],
+): string | null {
   const first = Array.isArray(value) ? value[0] : value;
-  return COMPETITION_ORDER.find((competition) => competition === first) ?? null;
+  return competitions.find((competition) => competition.id === first)?.id ?? null;
 }
 
 export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
   const [{ team }, params] = await Promise.all([requireTeamContext(), searchParams]);
 
+  const competitions = statsFilterOptions(await getTeamCompetitions(team.id));
+
   const rawSort = params[SORT_PARAM];
   const sortValue = Array.isArray(rawSort) ? rawSort[0] : rawSort;
   const query: StatsQuery = {
-    competition: parseCompetition(params[COMPETITION_PARAM]),
+    competitionId: parseCompetitionId(params[COMPETITION_PARAM], competitions),
     sort: isPlayerSortKey(sortValue) ? sortValue : DEFAULT_SORT,
   };
 
   const stats = await getSeasonStats(team.id, team.membershipId, {
-    competition: query.competition,
+    competitionId: query.competitionId,
   });
 
-  const scopeLabel =
-    query.competition === null
-      ? "toutes compétitions"
-      : COMPETITION_LABELS[query.competition].toLocaleLowerCase("fr-FR");
+  // The coach's own word for it, lowercased into the sentence — « Saison en cours, championnat D3 ».
+  const filterLabel = competitionLabelOf(competitions, query.competitionId);
+  const scopeLabel = filterLabel?.toLocaleLowerCase("fr-FR") ?? "toutes compétitions";
 
   return (
     <div className="space-y-6">
@@ -69,7 +78,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
             {stats.matchesConsidered > 1 ? "s" : ""}
           </p>
         </div>
-        <CompetitionFilter query={query} />
+        <CompetitionFilter query={query} competitions={competitions} />
       </header>
 
       {/* Nothing at all: one honest empty state rather than eight cards full of dashes. */}
@@ -77,9 +86,9 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
         <EmptyState
           title="Pas encore de statistiques"
           description={
-            query.competition === null
+            filterLabel === null
               ? "Dès qu’un match sera terminé ou qu’une séance sera pointée, les buts, les minutes et les présences apparaîtront ici."
-              : `Aucun match terminé en ${COMPETITION_LABELS[query.competition].toLocaleLowerCase("fr-FR")}, et aucune note à afficher. Choisis « Toutes » pour voir la saison entière.`
+              : `Aucun match terminé en ${scopeLabel}, et aucune note à afficher. Choisis « Toutes » pour voir la saison entière.`
           }
         />
       ) : (
@@ -108,7 +117,7 @@ function SeasonCards({
         <EmptyState
           title="Aucun match terminé dans cette sélection"
           description={
-            query.competition === null
+            query.competitionId === null
               ? "Les statistiques de match arriveront après le premier coup de sifflet final."
               : "Change de compétition, ou choisis « Toutes » pour voir la saison entière."
           }
@@ -122,7 +131,7 @@ function SeasonCards({
         <Attendance
           players={stats.players}
           markedSessions={stats.markedSessions}
-          filtered={query.competition !== null}
+          filtered={query.competitionId !== null}
         />
       </>
     );
@@ -189,7 +198,7 @@ function SeasonCards({
         <Attendance
           players={stats.players}
           markedSessions={stats.markedSessions}
-          filtered={query.competition !== null}
+          filtered={query.competitionId !== null}
         />
       </div>
     </>

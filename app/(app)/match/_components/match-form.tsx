@@ -19,13 +19,9 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
-import type { Competition } from "@/db/schema";
-import {
-  COMPETITION_LABELS,
-  COMPETITION_ORDER,
-  matchLengthHintFr,
-  venueFieldHintFr,
-} from "@/lib/calendar/labels";
+import { matchLengthHintFr, venueFieldHintFr } from "@/lib/calendar/labels";
+import { noCompetitionFr } from "@/lib/competition/labels";
+import type { CompetitionOption } from "@/lib/competition/options";
 import { createMatch, updateMatch } from "@/lib/match/actions";
 
 export type MatchFormDefaults = {
@@ -34,7 +30,11 @@ export type MatchFormDefaults = {
   kickoffAt: string;
   isHome: boolean;
   venue: string;
-  competition: Competition;
+  /**
+   * The row of the team's own `competitions` table this match is filed under (decision 107), or
+   * null when the team has none — the form then says so instead of showing an empty dropdown.
+   */
+  competitionId: string | null;
   periodsCount: number;
   periodMinutes: number;
 };
@@ -44,9 +44,11 @@ export type MatchFormProps = {
   /** Present when editing. Absent means creating. */
   matchId?: string;
   defaults: MatchFormDefaults;
+  /** What the « Compétition » select may offer, already ordered by `competitionOptions`. */
+  competitions: readonly CompetitionOption[];
 };
 
-export function MatchForm({ teamId, matchId, defaults }: MatchFormProps) {
+export function MatchForm({ teamId, matchId, defaults, competitions }: MatchFormProps) {
   const editing = matchId !== undefined;
   const [state, action, pending] = useActionState(editing ? updateMatch : createMatch, undefined);
 
@@ -116,23 +118,33 @@ export function MatchForm({ teamId, matchId, defaults }: MatchFormProps) {
         />
       </div>
 
-      <Field htmlFor="competition" label="Compétition" error={state?.fieldErrors?.competition}>
-        {({ id, describedBy, invalid }) => (
-          <Select
-            id={id}
-            name="competition"
-            defaultValue={defaults.competition}
-            aria-describedby={describedBy}
-            invalid={invalid}
-          >
-            {COMPETITION_ORDER.map((competition) => (
-              <option key={competition} value={competition}>
-                {COMPETITION_LABELS[competition]}
-              </option>
-            ))}
-          </Select>
-        )}
-      </Field>
+      {competitions.length === 0 ? (
+        <p role="alert" className="text-sm text-ink-muted">
+          {noCompetitionFr()}
+        </p>
+      ) : (
+        <Field
+          htmlFor="competitionId"
+          label="Compétition"
+          error={state?.fieldErrors?.competitionId}
+        >
+          {({ id, describedBy, invalid }) => (
+            <Select
+              id={id}
+              name="competitionId"
+              defaultValue={defaults.competitionId ?? competitions[0]?.id}
+              aria-describedby={describedBy}
+              invalid={invalid}
+            >
+              {competitions.map((competition) => (
+                <option key={competition.id} value={competition.id}>
+                  {competition.labelFr}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      )}
 
       {/* The hint follows the side chosen above: a venue and a side that tell different stories is
           the one contradiction this pair can produce, and the form cannot check a free-text pitch
@@ -217,7 +229,15 @@ export function MatchForm({ teamId, matchId, defaults }: MatchFormProps) {
         </p>
       ) : null}
 
-      <Button type="submit" fullWidth size="lg" pending={pending}>
+      {/* Nothing to file the match under, so there is nothing to submit: the sentence above says
+          where to go, and a button that would only come back refused is worse than a disabled one. */}
+      <Button
+        type="submit"
+        fullWidth
+        size="lg"
+        pending={pending}
+        disabled={competitions.length === 0}
+      >
         {editing ? "Enregistrer" : "Créer le match"}
       </Button>
     </form>

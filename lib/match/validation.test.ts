@@ -13,6 +13,7 @@ import {
 } from "./validation";
 
 const TEAM_ID = "11111111-1111-4111-8111-111111111111";
+const COMPETITION_ID = "22222222-2222-4222-8222-222222222222";
 
 function form(overrides: Record<string, unknown> = {}) {
   return {
@@ -21,7 +22,7 @@ function form(overrides: Record<string, unknown> = {}) {
     kickoffAt: "2026-09-27T10:30",
     isHome: "home",
     venue: "Stade des Tilleuls",
-    competition: "league",
+    competitionId: COMPETITION_ID,
     periodsCount: "2",
     periodMinutes: "30",
     ...overrides,
@@ -141,7 +142,7 @@ describe("createMatchSchema", () => {
       kickoffAt: new Date("2026-09-27T08:30:00.000Z"),
       isHome: true,
       venue: "Stade des Tilleuls",
-      competition: "league",
+      competitionId: COMPETITION_ID,
       periodsCount: 2,
       periodMinutes: 30,
     });
@@ -161,21 +162,31 @@ describe("createMatchSchema", () => {
 
   it("reports every bad field at once, so the form can show them all", () => {
     const result = createMatchSchema.safeParse(
-      form({ opponentName: "", kickoffAt: "nope", competition: "amical" }),
+      form({ opponentName: "", kickoffAt: "nope", competitionId: "amical" }),
     );
     expect(result.success).toBe(false);
     if (!result.success) {
       const fields = result.error.issues.map((issue) => issue.path[0]);
       expect(fields).toContain("opponentName");
       expect(fields).toContain("kickoffAt");
-      expect(fields).toContain("competition");
+      expect(fields).toContain("competitionId");
     }
   });
 
-  it("takes the four competition types and nothing else", () => {
-    for (const competition of ["league", "cup", "friendly", "tournament"]) {
-      expect(createMatchSchema.safeParse(form({ competition })).success).toBe(true);
+  // Which competitions exist is no longer a fact about the schema: they are rows of the team's own
+  // table (decision 107), so all this can check is the shape. That the id belongs to *this* team is
+  // checked in `lib/match/actions.ts`, against the database, where the answer actually lives.
+  it("takes a competition id and refuses anything that is not one", () => {
+    expect(createMatchSchema.safeParse(form({ competitionId: COMPETITION_ID })).success).toBe(true);
+    expect(createMatchSchema.safeParse(form({ competitionId: "league" })).success).toBe(false);
+    expect(createMatchSchema.safeParse(form({ competitionId: undefined })).success).toBe(false);
+  });
+
+  it("speaks French about a missing competition", () => {
+    const result = createMatchSchema.safeParse(form({ competitionId: undefined }));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toContain("compétition");
     }
-    expect(createMatchSchema.safeParse(form({ competition: "playoff" })).success).toBe(false);
   });
 });

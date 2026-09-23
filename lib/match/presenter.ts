@@ -12,7 +12,7 @@
  * Nothing here touches the database, `Date.now()` or React — `presenter.test.ts` covers it.
  */
 
-import type { Competition, EntryMode, MatchStatus, SquadRole } from "@/db/schema";
+import type { EntryMode, MatchStatus, SquadRole } from "@/db/schema";
 import { scoreLineFr } from "@/lib/calendar/labels";
 import {
   MS_PER_MINUTE,
@@ -53,7 +53,9 @@ export type LiveMatchRow = {
   opponentName: string;
   isHome: boolean;
   venue: string | null;
-  competition: Competition;
+  competitionId: string;
+  /** The label the team gave it (decision 107), carried rather than looked up in a fixed map. */
+  competitionLabel: string;
   periodsCount: number;
   periodMinutes: number;
   status: MatchStatus;

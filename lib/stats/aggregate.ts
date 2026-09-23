@@ -46,7 +46,7 @@
  *    (`docs/DATA_MODEL.md`).
  */
 
-import type { Competition, SquadRole } from "@/db/schema";
+import type { SquadRole } from "@/db/schema";
 
 import type { MatchStatLine } from "./match-lines";
 
@@ -72,7 +72,8 @@ export type StatsMatch = {
   kickoffAt: string;
   opponentName: string;
   isHome: boolean;
-  competition: Competition;
+  /** The team's own label for the competition (decision 107). */
+  competitionLabel: string;
   /** Derived from the log (decision 003). Null when nothing was ever logged (rule 7). */
   score: MatchScore | null;
 };
@@ -171,7 +172,7 @@ export type FormEntry = {
   kickoffAt: string;
   opponentName: string;
   isHome: boolean;
-  competition: Competition;
+  competitionLabel: string;
   goalsFor: number;
   goalsAgainst: number;
   result: "win" | "draw" | "loss";
@@ -466,7 +467,7 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
       kickoffAt: match.kickoffAt,
       opponentName: match.opponentName,
       isHome: match.isHome,
-      competition: match.competition,
+      competitionLabel: match.competitionLabel,
       goalsFor: match.score.goalsFor,
       goalsAgainst: match.score.goalsAgainst,
       result: resultOf(match.score),

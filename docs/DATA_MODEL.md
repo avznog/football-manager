@@ -74,15 +74,40 @@ At most one `primary` per member. Set by the player on their profile by tapping 
 
 ## Calendar
 
+### `competitions`
+`id`, `team_id`, `label_fr`, `sort`, `archived_at`, `created_at`.
+`unique (team_id, label_fr)`, `index (team_id)`, `on delete cascade` from the team.
+
+**Each team owns its own list** (decision 107). It used to be a Postgres enum of four values, and a
+coach could not say that his team plays « Championnat D3 » and the « Coupe du Crédit Mutuel ». The
+four old words survive as the defaults every team is created with — `lib/competition/defaults.ts`,
+written by `createTeam`, by `db/bootstrap.ts` for a team that has none at all, by the demo seed and
+by the e2e fixture — and the coach renames, adds and retires them on `/equipe` (`competition:manage`,
+coach only).
+
+`sort` orders the match form's `<select>`: the league is 0, so a new match lands on it.
+
+`archived_at` is the alternative to deleting. An archived competition disappears from the match form
+and from nowhere else: its matches keep it, and `/stats` still offers it as a filter as long as it
+holds matches. It is the only way to retire « Coupe 2024 » without rewriting a season, which is why
+`matches.competition_id` may be `restrict` rather than something softer.
+
 ### `matches`
 `id`, `team_id`, `kickoff_at`, `opponent_name`, `is_home`, `venue`,
-`competition` (`league` | `cup` | `friendly` | `tournament`),
+`competition_id` → `competitions.id`, **`on delete restrict`**,
 `periods_count` (default 2), `period_minutes` (default 30),
 `status` (`scheduled` | `live` | `finished`), `operator_user_id`,
 `entry_mode` (`live` | `retro`), `created_by`, `created_at`.
 
 The score is **never stored here** — it is derived from `match_events` (decision 003), and frozen
 into `match_player_stats` at the final whistle.
+
+`competition_id` is `restrict` and not `set null`: which competition a match was played in is part of
+what happened, and a cascade that emptied it would silently rewrite the season of every screen that
+reads it. So deleting a competition is refused, by the database and — first, and counted — by the card
+on `/equipe`, which offers archiving instead (decisions 098 and 100). Every read carries the label
+alongside the id (`competitionLabel`), so a rename propagates to the calendar, the match pages and
+`/stats` with nothing to invalidate.
 
 ### `match_availability`
 `(match_id, team_member_id)` unique, `status` (`yes` | `no` | `maybe`), `note`, `updated_at`.

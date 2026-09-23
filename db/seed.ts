@@ -45,7 +45,9 @@ import { eq } from "drizzle-orm";
 import { db } from "./client";
 import { DEFAULT_FORMATION_LABEL, type PositionCode } from "./reference";
 import { seedReference } from "./seed-reference";
+import { defaultCompetitionRows } from "../lib/competition/defaults";
 import {
+  competitions,
   formationSlots,
   injuries,
   lineupSlots,
@@ -62,7 +64,6 @@ import {
   trainingAvailability,
   trainings,
   users,
-  type Competition,
   type MatchEventType,
 } from "./schema";
 import { hashPassword } from "../lib/auth/password";
@@ -207,6 +208,23 @@ async function seedDemo(): Promise<void> {
       secondaryColor: "#ffffff",
     })
     .returning({ id: teams.id });
+
+  /* ---- the team's competitions ----------------------------------------- */
+
+  // The four a new team starts with (decision 107), exactly as `createTeam` writes them. The demo
+  // season files its matches under them by **label**, so renaming one here renames it everywhere the
+  // season is read — which is the whole point of the table.
+  const competitionRows = await db
+    .insert(competitions)
+    .values(defaultCompetitionRows(team.id))
+    .returning({ id: competitions.id, labelFr: competitions.labelFr });
+
+  /** « Championnat » → its row id. Throws rather than silently file a match under the wrong one. */
+  const competitionId = (labelFr: string): string => {
+    const row = competitionRows.find((candidate) => candidate.labelFr === labelFr);
+    if (!row) throw new Error(`Compétition « ${labelFr} » absente des valeurs par défaut.`);
+    return row.id;
+  };
 
   /* ---- people ---------------------------------------------------------- */
 
@@ -430,7 +448,7 @@ async function seedDemo(): Promise<void> {
     opponentName: "FC Rivière",
     isHome: true,
     venue: "Stade municipal",
-    competition: "league",
+    competitionId: competitionId("Championnat"),
     entryMode: "retro",
     starters: [
       [SLOT.gb, "hugo"],
@@ -507,7 +525,7 @@ async function seedDemo(): Promise<void> {
     opponentName: "Union des Lavandières",
     isHome: true,
     venue: "Stade municipal",
-    competition: "league",
+    competitionId: competitionId("Championnat"),
     entryMode: "live",
     starters: [
       [SLOT.gb, "hugo"],
@@ -575,7 +593,7 @@ async function seedDemo(): Promise<void> {
     opponentName: "Olympique Vallée",
     isHome: false,
     venue: "Complexe des Tilleuls",
-    competition: "cup",
+    competitionId: competitionId("Coupe"),
     entryMode: "live",
     starters: [
       [SLOT.gb, "hugo"],
@@ -647,7 +665,7 @@ async function seedDemo(): Promise<void> {
     opponentName: "US des Chênes",
     isHome: true,
     venue: "Stade municipal",
-    competition: "friendly",
+    competitionId: competitionId("Amical"),
     entryMode: "live",
     starters: [
       [SLOT.gb, "mehdi"],
@@ -704,7 +722,7 @@ async function seedDemo(): Promise<void> {
     opponentName: "Stade de la Colline",
     isHome: false,
     venue: "Tournoi de la Colline",
-    competition: "tournament",
+    competitionId: competitionId("Tournoi"),
     entryMode: "live",
     starters: [
       [SLOT.gb, "hugo"],
@@ -775,7 +793,7 @@ async function seedDemo(): Promise<void> {
     opponentName: "FC des Deux-Ponts",
     isHome: false,
     venue: "Stade des Deux-Ponts",
-    competition: "league",
+    competitionId: competitionId("Championnat"),
     entryMode: "retro",
     starters: [
       [SLOT.gb, "hugo"],
@@ -821,7 +839,7 @@ async function seedDemo(): Promise<void> {
     opponentName: "CS Morvan",
     isHome: false,
     venue: "Stade du Morvan",
-    competition: "league",
+    competitionId: competitionId("Championnat"),
     entryMode: "live",
     starters: [
       [SLOT.gb, "hugo"],
@@ -897,7 +915,7 @@ async function seedDemo(): Promise<void> {
       opponentName: "Étoile du Parc",
       isHome: true,
       venue: "Stade municipal",
-      competition: "league",
+      competitionId: competitionId("Championnat"),
       status: "scheduled",
       createdBy: admin.id,
     })
@@ -977,7 +995,7 @@ async function seedDemo(): Promise<void> {
     opponentName: "AS Coteaux",
     isHome: false,
     venue: "Terrain des Coteaux",
-    competition: "friendly",
+    competitionId: competitionId("Amical"),
     status: "scheduled",
     createdBy: admin.id,
   });
@@ -1039,7 +1057,7 @@ type PlayedMatchSpec = {
   opponentName: string;
   isHome: boolean;
   venue: string;
-  competition: Competition;
+  competitionId: string;
   entryMode: "live" | "retro";
   starters: SlotPlan;
   substitutes: readonly string[];
@@ -1078,7 +1096,7 @@ async function seedPlayedMatch(spec: PlayedMatchSpec): Promise<void> {
       opponentName: spec.opponentName,
       isHome: spec.isHome,
       venue: spec.venue,
-      competition: spec.competition,
+      competitionId: spec.competitionId,
       periodMinutes: PERIOD_MINUTES,
       // A match with a log is left `live` and closed by the freeze path, exactly as game mode does
       // it. A match with no log has no final whistle to close it, so its status is the only thing

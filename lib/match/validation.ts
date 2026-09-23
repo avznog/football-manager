@@ -37,9 +37,14 @@ export const matchSideSchema = z
   .enum(["home", "away"], { message: "Précise si le match est à domicile ou à l’extérieur." })
   .transform((value) => value === "home");
 
-export const competitionSchema = z.enum(["league", "cup", "friendly", "tournament"], {
-  message: "Choisis un type de compétition.",
-});
+/**
+ * Which competition, as a row of the team's own list (decision 107) — it was one of four fixed enum
+ * values until the coach became the one who defines them.
+ *
+ * A uuid is all a pure schema can check. That the row belongs to *this* team is checked by the
+ * action, against the database, because nothing here can know.
+ */
+export const competitionIdSchema = z.uuid({ message: "Choisis une compétition." });
 
 /** An empty text field means "not filled in", which is a `null` column, not an empty string. */
 const optionalText = (max: number, tooLong: string) =>
@@ -70,7 +75,7 @@ const matchFields = {
   kickoffAt: kickoffSchema,
   isHome: matchSideSchema,
   venue: venueSchema,
-  competition: competitionSchema,
+  competitionId: competitionIdSchema,
   // 2×30 unless the form says otherwise (decision 009), so the fields can be left out entirely.
   periodsCount: periodsCountSchema.default(2),
   periodMinutes: periodMinutesSchema.default(30),
