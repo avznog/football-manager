@@ -15,6 +15,7 @@
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  appearancesLineFr,
   formatAttendance,
   formatMinutes,
   formatRating,
@@ -49,11 +50,9 @@ export async function PlayerStatsCard({
   }
 
   const { appearances, attendance, rating } = player;
-  const roles: string[] = [];
-  if (appearances.starter > 0) roles.push(`${appearances.starter} fois titulaire`);
-  if (appearances.substitute > 0) roles.push(`${appearances.substitute} fois remplaçant`);
-  if (appearances.supporter > 0) roles.push(`${appearances.supporter} fois supporter`);
-  if (appearances.goalkeeper > 0) roles.push(`${appearances.goalkeeper} fois gardien`);
+  // The card header already prints « 7 matchs sur la feuille » in full width, so the roles line does
+  // not repeat it. Same wording as `/stats`, from the same function.
+  const roles = appearancesLineFr(appearances);
 
   return (
     <Card
@@ -73,7 +72,7 @@ export async function PlayerStatsCard({
         <Figure
           label="Note"
           value={rating.count > 0 ? formatRating(rating.average) : null}
-          hint={rating.count > 0 ? `moyenne sur ${plural(rating.count, "note")}` : undefined}
+          hint={rating.count > 0 ? `sur ${plural(rating.count, "note")}` : undefined}
         />
         <Figure
           label="Présence"
@@ -82,7 +81,7 @@ export async function PlayerStatsCard({
               ? formatAttendance(attendance.present, attendance.marked, attendance.rate)
               : null
           }
-          hint="présences / séances pointées"
+          hint="séances pointées"
         />
       </FigureGrid>
 
@@ -93,13 +92,13 @@ export async function PlayerStatsCard({
           <Figure
             label="Sans encaisser"
             value={formatMinutes(player.gkCleanMinutes)}
-            hint="Minutes dans les buts avec la cage inviolée"
+            hint="dans les buts"
             tone="muted"
           />
         </FigureGrid>
       ) : null}
 
-      {roles.length > 0 ? <p className="mt-3 text-xs text-ink-muted">{roles.join(" · ")}</p> : null}
+      {roles !== null ? <p className="mt-3 text-xs text-ink-muted">{roles}</p> : null}
 
       {attendance.marked > 0 ? (
         <Note>

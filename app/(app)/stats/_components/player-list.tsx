@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import type { PlayerSeasonStats, PlayerSortKey } from "@/lib/stats/aggregate";
 import {
   NO_DATA_FR,
+  appearancesLineFr,
   formatAttendance,
   formatMinutes,
   formatRating,
@@ -110,7 +111,7 @@ function promoted(
       return player.rating.count > 0
         ? {
             value: formatRating(player.rating.average),
-            hint: `moyenne sur ${plural(player.rating.count, "note")}`,
+            hint: `sur ${plural(player.rating.count, "note")}`,
           }
         : { value: null };
     case "attendance":
@@ -121,7 +122,7 @@ function promoted(
               player.attendance.marked,
               player.attendance.rate,
             ),
-            hint: "présences / séances pointées",
+            hint: "séances pointées",
           }
         : { value: null };
   }
@@ -150,11 +151,10 @@ function PlayerRow({ player, sort }: { player: PlayerSeasonStats; sort: PlayerSo
       {player.hasData ? (
         <>
           <FigureGrid className="mt-2">
-            <Figure
-              label="Matchs"
-              value={played ? player.matchesPlayed : null}
-              hint={`${matchCount(player.appearances.selected)} sur la feuille`}
-            />
+            {/* The sheet total that reconciles this with « 7 fois titulaire » is on the appearances
+                line below, in full width: « 7 matchs sur la feuille » does not fit a 110 px column,
+                and it used to be a `title` nobody on a phone could read (decision 072). */}
+            <Figure label="Matchs" value={played ? player.matchesPlayed : null} />
             {show("minutes") ? (
               <Figure label="Minutes" value={played ? formatMinutes(player.minutes) : null} />
             ) : null}
@@ -167,9 +167,7 @@ function PlayerRow({ player, sort }: { player: PlayerSeasonStats; sort: PlayerSo
                 label="Note"
                 value={player.rating.count > 0 ? formatRating(player.rating.average) : null}
                 hint={
-                  player.rating.count > 0
-                    ? `moyenne sur ${plural(player.rating.count, "note")}`
-                    : undefined
+                  player.rating.count > 0 ? `sur ${plural(player.rating.count, "note")}` : undefined
                 }
               />
             ) : null}
@@ -185,7 +183,7 @@ function PlayerRow({ player, sort }: { player: PlayerSeasonStats; sort: PlayerSo
                       )
                     : null
                 }
-                hint="présences / séances pointées"
+                hint="séances pointées"
               />
             ) : null}
           </FigureGrid>
@@ -201,19 +199,21 @@ function PlayerRow({ player, sort }: { player: PlayerSeasonStats; sort: PlayerSo
 }
 
 /**
+ * « 6 matchs sur la feuille · 1 fois titulaire · 5 fois remplaçant ».
+ *
  * Titulaire / remplaçant / supporter come from the match sheet; gardien comes from the minutes
- * actually spent in goal, because it is not a sheet role (`aggregate.ts`, rule 4).
+ * actually spent in goal, because it is not a sheet role (`aggregate.ts`, rule 4). The sheet total
+ * leads the line here — it is what explains « MATCHS 6 » standing above « 7 fois titulaire », and it
+ * has nowhere else to go on this card (decision 072).
+ *
+ * The wording is `appearancesLineFr`'s, shared with the profile card so the two screens cannot
+ * disagree, and testable: this component is under `app/`, where Vitest does not look.
  */
 function Roles({ player }: { player: PlayerSeasonStats }) {
-  const { starter, substitute, supporter, goalkeeper } = player.appearances;
-  const parts: string[] = [];
-  if (starter > 0) parts.push(`${starter} titulaire`);
-  if (substitute > 0) parts.push(`${substitute} remplaçant`);
-  if (supporter > 0) parts.push(`${supporter} supporter`);
-  if (goalkeeper > 0) parts.push(`${goalkeeper} fois gardien`);
-  if (parts.length === 0) return null;
+  const line = appearancesLineFr(player.appearances, { withSheetTotal: true });
+  if (line === null) return null;
 
-  return <p className="mt-2 text-xs text-ink-muted">{parts.join(" · ")}</p>;
+  return <p className="mt-2 text-xs text-ink-muted">{line}</p>;
 }
 
 /** Only shown when there is something to show: a row of zeros is noise. */
