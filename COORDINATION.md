@@ -204,4 +204,6 @@ Newest last. One line: date, which machine or branch, what you are doing or have
   touches `lib/composition/plan.ts` like #63 does, so whichever you merge second will want a trivial
   rebase — the two additions are in different parts of the file. Decision entry at `## NNN`.
   **Next one I open: `jeu` — game mode.**
-
+- **2026-09-23 11:54 · owner's machine · `docs/assign-086`** — Merged #65 and assigned **086**. Second
+  round trip, same shape: `## NNN` in, number out, no race. You have `feat/who-can-come-on` pushed
+  already; I will take it the moment CI is green on its pull request.
