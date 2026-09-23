@@ -213,7 +213,24 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] `vercel link`, env vars, production deploy — `docs/DEPLOY.md` §4. The owner connected the
       repository and attached Neon through the marketplace; `DATABASE_URL` is set for production and
       preview, and production builds and deploys green since the fix above
-- [ ] **Blocked on the owner, two settings, both documented in `docs/DEPLOY.md` §4:**
+- [x] …and a test says so, which is the half decision 075 left open: `db/client.test.ts` imports the
+      module with `DATABASE_URL` empty and asserts the first query still throws, and that `sql` stays
+      both callable and indexable. The 868 tests that existed all ran with the variable set, so none
+      of them could have caught it
+- [x] Continuous delivery: the `migrate` job applies the committed SQL to Neon on pushes to `main`,
+      after typecheck · lint · Vitest · the browser run, with its own no-cancel concurrency group
+      (decision 078). Not in the Vercel build command and not ordered against Vercel's own build —
+      the decision says why, and names the migration that would force a rethink
+- [x] `SUPER_ADMIN_PASSWORD`, `SUPER_ADMIN_USERNAME` and `TEST_DATABASE_URL` removed from the Vercel
+      project, where the first attempt had left them. The first two are read only by `db/bootstrap.ts`
+      and `db/seed.ts`, from a command line; the third by nothing in the repository
+- [x] The whole stack runs in containers, as an option — `compose.yaml` brings up `postgres:17`
+      (named volume, `pg_isready` healthcheck, the credentials `.env.example` and CI already use)
+      and a multi-stage production image of the app, which waits for the database to be healthy and
+      for the migrations to have applied. Development is still `npm run dev` against the Homebrew
+      Postgres: decision 077 adds compose, it does not supersede 016. `output: "standalone"` is
+      gated on `NEXT_OUTPUT_STANDALONE` so Vercel builds unchanged
+- [ ] **Blocked on the owner, three things, all documented in `docs/DEPLOY.md`:**
       1. **Deployment Protection is on**, so the site answers every request with a `302` to
          `vercel.com/sso-api` — the squad joins with a code sent on WhatsApp and none of them has a
          Vercel account, so nobody can open the app. Settings → Deployment Protection → Vercel
@@ -222,11 +239,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
          super admin. Neither can be done from here: the marketplace integration stores its variables
          sensitive, so `vercel env pull` returns `DATABASE_URL=""` and the string has to come from the
          Neon dashboard. §2 and §3, one command each.
+      3. **The `DATABASE_URL` repository secret**, for the same reason and from the same string —
+         `gh secret set DATABASE_URL`. Without it the `migrate` job fails loudly on every push to
+         `main`, which is deliberate: a migration that silently did not happen is the worse failure.
+- [ ] Reset the super-admin password, which spent the first hour of the deployment sitting in the
+      Vercel environment where `docs/DEPLOY.md` says it must never be
 - [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6. Waits on the two above:
       a phone in daylight currently sees the Vercel login page
-- [x] The whole stack runs in containers, as an option — `compose.yaml` brings up `postgres:17`
-      (named volume, `pg_isready` healthcheck, the credentials `.env.example` and CI already use)
-      and a multi-stage production image of the app, which waits for the database to be healthy and
-      for the migrations to have applied. Development is still `npm run dev` against the Homebrew
-      Postgres: decision 077 adds compose, it does not supersede 016. `output: "standalone"` is
-      gated on `NEXT_OUTPUT_STANDALONE` so Vercel builds unchanged
+- [ ] Give Preview its own Neon branch. `DATABASE_URL` is set for Preview too and points at
+      production, so every pull request previews against the real season — behind Vercel
+      Authentication, which is what makes it tolerable rather than fine

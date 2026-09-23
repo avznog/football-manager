@@ -79,3 +79,42 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # Production migrations, applied from `main` only, and only once both jobs above have passed:
+  # the schema must never move ahead of a commit that cannot typecheck (decision 078).
+  #
+  # This does not order itself against Vercel, which starts building the same push immediately.
+  # See docs/DEPLOY.md §4 — the migrations are written to be safe against the previous version
+  # still serving traffic, and the window is seconds.
+  migrate:
+    name: production migrations
+    needs: [checks, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    # Deliberately *not* the workflow's cancel-in-progress group: a second push must never
+    # interrupt a migration that has already started applying SQL.
+    concurrency:
+      group: migrate-production
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # The committed SQL, exactly what the end-to-end job just ran against postgres:17 — never
+      # `db:push`, and `db:reset` refuses without ALLOW_REMOTE_RESET, which is set nowhere.
+      - name: apply committed migrations to Neon
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::The DATABASE_URL repository secret is not set, so the production" \
+                 "schema was not updated. Set it to the pooled Neon string — docs/DEPLOY.md §4."
+            exit 1
+          fi
+          npm run db:migrate

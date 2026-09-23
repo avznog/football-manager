@@ -1,17 +1,17 @@
 # Deploying
 
-Vercel for the application, Neon for the database. Two accounts, four commands, once.
+Vercel for the application, Neon for the database, and git between them: a push to `main` migrates
+the schema and deploys the code.
 
-Everything here has been run against an empty database on a developer machine; the only steps that
-have *not* been executed for real are the ones that need the owner's Neon and Vercel accounts, and
-they are marked. Follow it in order — step 4 is the one that is easy to skip and impossible to
-recover from without it.
+This has been done for real — a Neon project and a Vercel project both called `football-manager`,
+the latter under the `avznog-team` scope and connected to `avznog/football-manager` on GitHub. So
+what follows is both the record of how this instance was set up and the procedure for another one.
 
 ---
 
 ## 1. The database — Neon
 
-Interactive signup, so the owner does this.
+Interactive signup, so the owner does this. **Done** for the live instance.
 
 1. Create a project on [neon.tech](https://neon.tech). Region: **Frankfurt** or **Paris** — the
    team is French, and every request in this app reads the database, so a round trip across the
@@ -25,7 +25,18 @@ Interactive signup, so the owner does this.
 
 ## 2. Migrations
 
-From a machine with the repository, against the production database:
+**After the first one, CI does this.** The `migrate` job in `.github/workflows/ci.yml` applies the
+committed SQL to Neon on every push to `main`, once typecheck, lint, Vitest and the browser run have
+passed (decision 078). It needs one repository secret, set once — the Vercel copy of the string
+cannot be read back, so it has to be pasted here separately:
+
+```bash
+gh secret set DATABASE_URL --repo avznog/football-manager   # paste the pooled string at the prompt
+```
+
+The **first** migration, against a brand-new empty database, still comes from a shell: there is no
+schema for the application to serve against until it has run, so it happens before the first deploy
+rather than after a push, and it is worth watching.
 
 ```bash
 DATABASE_URL='postgres://…-pooler…/neondb?sslmode=require' npm run db:migrate
@@ -64,16 +75,35 @@ rewrite every team on the instance.
 
 ## 4. Vercel
 
-> Needs the owner's Vercel account. The CLI on this machine is authenticated as `avznog`.
+The project is `avznog-team/football-manager`, connected to `avznog/football-manager`. **Deploys come
+from git**: a push to `main` is a production deploy, a pull request is a preview. `vercel --prod` from
+a laptop still works and is the way to ship a commit that is not on `main`, but it should stay the
+exception — the point of decision 078 is that the schema and the code move on the same push.
+
+If it ever has to be re-linked:
 
 ```bash
-vercel link          # pick the scope, name the project football-manager
-vercel env add DATABASE_URL production      # paste the pooled Neon string
-vercel env add DATABASE_URL preview         # same, or a Neon branch
-vercel --prod
+vercel link --yes --project football-manager
+vercel git connect --yes
 ```
 
-Next.js is detected without configuration; there is no `vercel.json` and none is needed.
+Next.js is detected without configuration; there is no `vercel.json` and none is needed. The build
+command is the default `npm run build`, and it deliberately does not migrate — decision 078 says why.
+
+### The one variable, and the trap in it
+
+`DATABASE_URL`, the pooled Neon string, on Production and Preview, marked **sensitive**. Two
+consequences, and the second one cost three builds:
+
+- **Nothing can read it back** — not the dashboard, not `vercel env ls`, not `vercel env pull`, which
+  writes `[SENSITIVE]` where the value would be. That is the point of the setting. It is also why the
+  same string has to be pasted independently into the GitHub secret in §2, and why a session that
+  needs to run a migration has to ask for it rather than fetch it.
+- **A sensitive variable does not exist during the build.** Vercel exposes it at runtime only. The
+  first three deploys failed with `DATABASE_URL is not set` about a variable that was set, correctly,
+  for Production — because `db/client.ts` read it at module scope and `next build` imports every
+  route to collect page data. That is fixed at the root (decision 075) rather than by un-marking the
+  variable, which would have traded a permanently readable production password for nothing.
 
 **A green build does not mean `DATABASE_URL` is set.** The build deliberately does not need it
 (decision 075): the connection opens on the first query, not on import, so a deploy with no database
@@ -83,7 +113,21 @@ variable — the server log will say so in as many words.
 
 `SUPER_ADMIN_USERNAME` and `SUPER_ADMIN_PASSWORD` are **not** needed in Vercel. They are read by
 `db/bootstrap.ts` and `db/seed.ts`, both of which run from a command line, never from the
-application. Leaving a password in the deployment environment for no reason is how it leaks.
+application. Leaving a password in the deployment environment for no reason is how it leaks — and it
+happened here on the first attempt: both were set on the Vercel project, along with a
+`TEST_DATABASE_URL` that nothing in the repository reads at all. All three were removed. A password
+for the one account that can read and rewrite every team on the instance, once it has been somewhere
+it did not need to be, is reset rather than reasoned about: run `db:bootstrap` again with a new one.
+
+### Preview deployments share the production database
+
+`DATABASE_URL` is set for Preview too, pointing at the same Neon database as production. Every pull
+request therefore previews against the real season, and a Server Action tapped in a preview writes to
+it. What keeps this from being worse than it sounds is Vercel Authentication: an unauthenticated
+request to a preview URL answers `302` to `vercel.com/sso-api`, so the reachable set is the team
+scope, not the internet. It is still a loaded gun — the same hand that opens a preview to check a
+lineup editor is writing to the real season — so give Preview its own Neon branch before a second
+person is added to the scope.
 
 ### Turn Deployment Protection off
 
@@ -106,11 +150,12 @@ opened from this machine.
 
 ### If the database came from the Neon integration
 
-Attaching Neon through Vercel's marketplace, rather than `vercel env add` by hand, writes about
-fifteen variables prefixed `FOOTBALL_MANAGER_` (`…_DATABASE_URL`, `…_PGHOST`, `…_POSTGRES_URL`, …).
-**The application reads none of them.** It reads `DATABASE_URL` and nothing else, so that one still
-has to exist on its own — the integration creates it too, but check it is there and that it holds the
-*pooled* string.
+Attaching Neon through Vercel's marketplace, rather than `vercel env add` by hand, writes eighteen
+variables prefixed `FOOTBALL_MANAGER_` (`…_DATABASE_URL`, `…_PGHOST`, `…_POSTGRES_PRISMA_URL`, the
+unpooled and non-pooling variants, …). **The application reads none of them.** It reads
+`DATABASE_URL` and nothing else, so that one still has to exist on its own — the integration creates
+it too, but check it is there and that it holds the *pooled* string. Do not be tempted to make the app
+read the prefixed one instead: that ties this code to one integration's naming for no gain.
 
 Their values are stored sensitive, which has one consequence worth knowing before you go looking for
 it: `vercel env pull` writes them back as `DATABASE_URL=""`. Vercel will not hand a sensitive value
@@ -144,13 +189,14 @@ test, which is why this step is in the definition of done rather than in a wish 
 
 ## Upgrading later
 
-```bash
-DATABASE_URL='…' npm run db:migrate    # if the release contains a migration
-vercel --prod
-```
+Squash-merge the pull request. That is the whole procedure: CI typechecks, lints, runs Vitest and the
+browser suite, then applies any new migration to Neon, while Vercel builds and promotes the same
+commit. Nothing to run by hand.
 
-Migrations run before the deploy, and they are written to be safe against the previous version still
-serving traffic for a few seconds.
+The two are not ordered against each other, so for a few seconds the new code may be serving against
+the old schema. Migrations are written to be safe in that direction. One that cannot be — a dropped
+column, a narrowed type — is the case to take out of this flow and do by hand, with the reasoning
+written down.
 
 ## Running the whole stack locally with Docker — optional
 
@@ -195,7 +241,8 @@ Notes worth having before something surprises you:
 
 | Variable | Where | Why |
 |---|---|---|
-| `DATABASE_URL` | Vercel (production + preview), and the shell for `db:*` scripts | The only variable the application itself needs. |
+| `DATABASE_URL` | Vercel production + preview (sensitive), the `DATABASE_URL` GitHub secret, and the shell for `db:*` scripts | The only variable the application itself needs. Unreadable once set in Vercel, so each place gets its own paste. |
 | `SUPER_ADMIN_USERNAME` | command line, once | The first account, in `db:bootstrap`. |
-| `SUPER_ADMIN_PASSWORD` | command line, once | Its password. Never stored in Vercel. |
+| `SUPER_ADMIN_PASSWORD` | command line, once | Its password. Never in Vercel, never in a GitHub secret. |
 | `ALLOW_REMOTE_RESET` | nowhere | Exists so `db:reset` can refuse. Do not set it in production. |
+| `FOOTBALL_MANAGER_*` | Vercel, written by Neon's integration | Read by nothing in this repository. Ignore them. |

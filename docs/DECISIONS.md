@@ -1646,3 +1646,33 @@ section marked optional. Two ways to get a database now exist, which is a docume
 paid by that section saying plainly which one is the default. CI is unchanged: it keeps using the
 service-container form rather than building an image, because building one would add minutes to
 every push to prove something the compose build already proves locally.
+
+## 078 — Migrations are applied by CI on `main`, not by hand before a deploy
+**2026-09-23** · accepted · supersedes the manual step in `docs/DEPLOY.md` §2
+
+`DEPLOY.md` described `db:migrate` as a command the owner runs from a shell before each production
+deploy. That was written before the Vercel project existed. Now that it does, and is connected to
+GitHub, a push to `main` deploys on its own — so the manual step is one a human is invited to skip,
+and the failure it produces is new code against an old schema, which is the dangerous direction.
+
+The `migrate` job in `.github/workflows/ci.yml` runs on pushes to `main` only, `needs` both existing
+jobs, and applies the committed SQL that the end-to-end job has just applied to a `postgres:17`
+service two jobs earlier. It has its own `concurrency` group with `cancel-in-progress: false`: the
+workflow's own group cancels superseded runs, which is right for a test run and wrong for a migration
+that is halfway through applying SQL. It fails loudly when the `DATABASE_URL` secret is absent,
+rather than skipping — a migration that silently did not happen is the thing being prevented.
+
+**It is not in the Vercel build command** (`db:migrate && npm run build`), which is where this
+usually goes, for two reasons. It would restore a build-time dependency on `DATABASE_URL`, which
+decision 075 exists to remove — and on Vercel that variable is sensitive, so it is not available
+during a build at all. And every preview build would migrate whatever database it points at, which
+today is the production one.
+
+**It is not ordered against Vercel**, which starts building the same push immediately: for a few
+seconds the new code can be serving against the old schema. Making it deterministic means taking
+production deploys away from the git integration and issuing them from the workflow with a
+`VERCEL_TOKEN` after the migration. Rejected for now — that is a long-lived deployment credential in
+a repository secret, against a window of seconds, for a team of fourteen people who are not watching.
+The migrations in `db/migrations/` are all additive, which is what makes the window survivable. The
+first migration that cannot be — a dropped column, a narrowed type — is the trigger to revisit this,
+and `DEPLOY.md` says to take that one out of the flow and do it by hand.
