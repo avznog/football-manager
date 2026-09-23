@@ -45,7 +45,9 @@ export function ConfirmSheet({
       description={description}
       dismissible={false}
       footer={
-        <div className="flex gap-2">
+        // Grid, not flex: `Button` is `shrink-0`, so two `w-full` buttons in a flex row overflow a
+        // 390 px viewport and the confirm button is clipped out of reach.
+        <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" fullWidth onClick={onClose}>
             {cancelLabel}
           </Button>

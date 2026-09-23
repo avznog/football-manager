@@ -10,6 +10,7 @@ import {
   OptionRow,
   PlayerPicker,
   SlotPicker,
+  TerrainSheet,
   type ActionChoice,
   type ComposerFormation,
   type SlotChoice,
@@ -40,6 +41,7 @@ import {
   type PlayerOption,
   type TimelineLine,
 } from "@/lib/match/presenter";
+import { terrainPayload, type SlotAssignment, type TerrainOrigin } from "@/lib/match/terrain";
 import { EventTimeline } from "./event-timeline";
 import { LineupPrompt } from "./lineup-prompt";
 import { Scoreboard } from "./scoreboard";
@@ -62,7 +64,20 @@ type Flow =
   | { step: "sub-in"; outId: string }
   | { step: "move-player" }
   | { step: "move-slot"; memberId: string }
-  | { step: "composer" }
+  /**
+   * TERRAIN: several changes arranged on the pitch, one confirmation. `origin` says what the
+   * arrangement started from — the pitch, or a planned composition the coach chose to adjust — and
+   * therefore which `lineupId` the resulting event carries.
+   */
+  | {
+      step: "terrain";
+      origin: TerrainOrigin;
+      initial: readonly SlotAssignment[];
+      /** The shape to draw: the plan's own formation, or the one being played. */
+      formationId: string | null;
+    }
+  /** `initial` is set when TERRAIN hands its arrangement over to the list. */
+  | { step: "composer"; initial?: readonly SlotAssignment[] }
   | { step: "whistle" }
   | { step: "void"; line: TimelineLine };
 
@@ -166,6 +181,24 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     [state, live.slots, players],
   );
   const available = useMemo(() => availableOptions(state, live.players), [state, live.players]);
+
+  /** The pitch as slot→member pairs: the « from » side of any composition diff. */
+  const onPitchAssignments = useMemo<SlotAssignment[]>(
+    () =>
+      state.onPitch
+        .filter((entry) => entry.slotId)
+        .map((entry) => ({ slotId: entry.slotId as string, memberId: entry.memberId })),
+    [state.onPitch],
+  );
+
+  /** Who has already come off: TERRAIN warns before sending one of them back on. */
+  const leftPitchMemberIds = useMemo(
+    () =>
+      state.players
+        .filter((player) => !player.onPitch && player.playedMs > 0)
+        .map((player) => player.memberId),
+    [state.players],
+  );
 
   const currentFormationId = useMemo(() => {
     for (const entry of state.onPitch) {
@@ -366,6 +399,19 @@ export function GameMode({ live, canOperate }: GameModeProps) {
               { atMs: Date.now() },
             )
           }
+          onAdjust={
+            canOperate && !state.finished
+              ? () =>
+                  openFlow({
+                    step: "terrain",
+                    origin: { kind: "plan", lineupId: prompt.lineupId, title: prompt.title },
+                    initial: prompt.slots,
+                    formationId:
+                      live.lineups.find((lineup) => lineup.id === prompt.lineupId)?.formationId ??
+                      currentFormationId,
+                  })
+              : null
+          }
           onLater={() => setPostponed((current) => [...current, prompt.lineupId])}
         />
       ) : null}
@@ -383,9 +429,29 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         description={`${state.onPitch.length} joueur${state.onPitch.length > 1 ? "s" : ""} en jeu`}
         action={
           canOperate && !state.finished ? (
-            <Button variant="secondary" size="sm" onClick={() => openFlow({ step: "composer" })}>
-              Composition
-            </Button>
+            // With nobody on the pitch there is nothing to rearrange: the fastest way in is the list
+            // of seven dropdowns. Once a team is playing, the same button opens TERRAIN, where
+            // several changes are arranged at once and confirmed together (`docs/PLAN.md`, screen 5).
+            state.onPitch.length === 0 ? (
+              <Button variant="secondary" size="sm" onClick={() => openFlow({ step: "composer" })}>
+                Composition
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  openFlow({
+                    step: "terrain",
+                    origin: { kind: "pitch" },
+                    initial: onPitchAssignments,
+                    formationId: currentFormationId,
+                  })
+                }
+              >
+                TERRAIN
+              </Button>
+            )
           ) : null
         }
       >
@@ -571,6 +637,33 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         />
       ) : null}
 
+      {flow?.step === "terrain" ? (
+        <TerrainSheet
+          open
+          onClose={closeFlow}
+          title={flow.origin.kind === "plan" ? flow.origin.title : "Terrain"}
+          stampLabel={stampLabel}
+          kit={live.kit}
+          slots={live.slots}
+          players={players}
+          formationId={flow.formationId}
+          base={onPitchAssignments}
+          initialAssignments={flow.initial}
+          candidates={[...onPitch, ...available]}
+          leftPitchMemberIds={leftPitchMemberIds}
+          onConfirm={(assignments) =>
+            finish(
+              "LINEUP_APPLIED",
+              terrainPayload(assignments, { slots: live.slots, origin: flow.origin }),
+            )
+          }
+          // The list is one tap away for a coach who cannot drag reliably — gloves, rain, a shaky
+          // hand. `setFlow`, not `openFlow`: the action keeps the minute of the tap that opened
+          // TERRAIN (decision 031).
+          onUseList={(assignments) => setFlow({ step: "composer", initial: assignments })}
+        />
+      ) : null}
+
       {flow?.step === "composer" ? (
         <LineupComposer
           open
@@ -580,9 +673,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           formations={formations}
           initialFormationId={currentFormationId}
           options={[...onPitch, ...available]}
-          initialAssignments={state.onPitch
-            .filter((entry) => entry.slotId)
-            .map((entry) => ({ slotId: entry.slotId as string, memberId: entry.memberId }))}
+          initialAssignments={flow.initial ?? onPitchAssignments}
           confirmLabel="Valider"
           onConfirm={(assignments) => finish("LINEUP_APPLIED", { lineupId: null, slots: assignments })}
         />
@@ -666,7 +757,9 @@ function ActionBar({
 }: ActionBarProps) {
   return (
     <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] z-30 -mx-4 space-y-2 border-t border-border/60 bg-canvas/95 px-4 pt-2 pb-2 backdrop-blur md:static md:mx-0 md:rounded-2xl md:border md:px-4 md:py-3">
-      <div className="flex gap-2">
+      {/* Grid, not flex: `Button` is `shrink-0`, so a `w-full` clock button next to « Pause » pushes
+          « Pause » off the right edge of a 390 px screen. */}
+      <div className={onPause ? "grid grid-cols-[1fr_auto] gap-2" : "grid gap-2"}>
         <Button
           variant={clockTone}
           size="lg"

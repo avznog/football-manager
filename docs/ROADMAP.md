@@ -51,7 +51,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Event ingestion API, idempotent on `client_event_id`
 - [x] `lib/match/outbox.ts` — IndexedDB queue with retry and pending badge
 - [x] Game mode screen: clock, pitch, bench, ACTION sheet
-- [ ] TERRAIN fast-change inside game mode, composing M3's drag editor
+- [x] TERRAIN fast-change inside game mode (`lib/match/terrain.ts`,
+      `components/action-sheet/terrain-sheet.tsx`): drag, tap-then-tap or keyboard, one
+      `LINEUP_APPLIED` per confirmation, and « Ajuster sur le terrain » on the planned-composition
+      prompt — see decision 045, which amends 032
 - [x] Planned composition prompts, pre-filled and confirmed
 - [x] Event timeline with per-event "annuler" (VOID)
 - [x] Final whistle → freeze `match_player_stats`

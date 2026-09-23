@@ -55,7 +55,12 @@ export function buttonClassName({
     BASE,
     VARIANTS[variant],
     iconOnly ? ICON_SIZES[size] : SIZES[size],
-    fullWidth && "w-full",
+    // `min-w-0 shrink` undoes `BASE`'s `shrink-0` for this one case, and it is not cosmetic: two
+    // `fullWidth` buttons in a `flex` row each ask for 100% of it, and a flex item that refuses to
+    // shrink is a « Valider » clipped off the right of a 390 px screen — measured at `left: 382` on
+    // the composer sheet. `shrink-0` still protects every other button from being squeezed below its
+    // label; a button that has just been told to fill its container cannot also refuse to fit in it.
+    fullWidth && "w-full min-w-0 shrink",
     className,
   );
 }

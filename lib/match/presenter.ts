@@ -602,10 +602,29 @@ function describeActorsFr(
     if (!out && !into) return null;
     return `${out ?? "?"} → ${into ?? "?"}`;
   }
+  if (type === "LINEUP_APPLIED") {
+    // A composition is the one event that is about several people at once — a TERRAIN change can be
+    // two substitutions and a move. Falling through to the single-actor case below would print one
+    // arbitrary name and hide the rest, which is exactly what the coach would check the log for.
+    const all = (role: string) =>
+      actors.filter((actor) => actor.role === role).map((actor) => players.nameOf(actor.memberId));
+    const parts = [
+      labelledFr("Sort", "Sortent", all("out")),
+      labelledFr("Entre", "Entrent", all("in")),
+      labelledFr("Change de poste", "Changent de poste", all("moved")),
+    ].filter((part): part is string => part !== null);
+    return parts.length > 0 ? parts.join(" · ") : null;
+  }
 
   const single =
     find("scorer") ?? find("penalty") ?? find("own-goal") ?? find("moved") ?? find("foul") ?? find("injured");
   return single ? players.nameOf(single.memberId) : null;
+}
+
+/** « Entre : Yanis », « Entrent : Yanis, Momo » — null for an empty list, so it disappears. */
+function labelledFr(singular: string, plural: string, names: readonly string[]): string | null {
+  if (names.length === 0) return null;
+  return `${names.length > 1 ? plural : singular} : ${names.join(", ")}`;
 }
 
 /* -------------------------------------------------------------------------- */

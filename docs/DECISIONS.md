@@ -752,3 +752,44 @@ keeps the two apart: `typecheck · lint · vitest` on one job, and the browser r
 Postgres, the committed migrations and a production build — on another, so a browser flake can never
 block the fast checks. `npm run test:e2e` locally reuses a dev server if one is up; CI overrides the
 command with `next start` on a built app via `E2E_WEB_SERVER`.
+
+## 045 — TERRAIN is the one place in game mode that drags, because the gesture writes nothing
+**2026-09-23** · accepted · amends 032
+
+Decision 032 stands for every action in game mode except one. TERRAIN opens a full-pitch editor where
+the coach rearranges as many players as he likes by dragging them, and **nothing is written until he
+taps « Valider »**. Every gesture has a tap-then-tap equivalent and a keyboard equivalent; a drop on
+empty grass is a deliberate no-op; taking a player off is a labelled button, never a gesture. One tap
+on « Composer par liste » reaches the list composer for a coach who cannot drag.
+
+**Why.** 032 objects to a mis-drag at 78′ that silently appends an event, and it is right. TERRAIN does
+not have that failure mode: the drag arranges a proposal, the confirmation writes it, and the two are
+separated by a sheet that cannot be dismissed by Escape or by a tap on the scrim. And the thing TERRAIN
+exists for cannot be expressed in lists without paying three times: swapping two players and moving a
+third was three flows and three confirmations, which is three chances to be interrupted halfway and
+leave the pitch in a state the coach never intended.
+
+**Consequences.** The gesture code is duplicated between the composition editor and TERRAIN (~80 lines)
+until a `usePitchDrag` hook is extracted into `components/pitch/`. A single substitution keeps its list
+flow: TERRAIN is for the deliberate multi-change, not the routine one. The list composer stays the
+guaranteed path and must keep working for anyone who cannot drag. The planned-composition prompt gains
+a third answer, « Ajuster sur le terrain » — invariant 3 is untouched, since it pre-fills and waits
+exactly as « Appliquer » does.
+
+## 046 — One confirmation in TERRAIN is one `LINEUP_APPLIED`, not a sequence
+**2026-09-23** · accepted
+
+A TERRAIN reshuffle that takes two players off, brings two on and moves a third appends **one** event:
+a `LINEUP_APPLIED` carrying the resulting seven, with no `lineupId` (it was nobody's plan). The reducer
+derives the ordered departures, arrivals and position changes from it with `diffLineups`, as it already
+did for the ad-hoc composer.
+
+**Why.** Invariant 6 is keyed on `client_event_id`: one id per confirmation makes a retry trivially
+idempotent, where a sequence of five events flushed by an outbox over a bad 4G bar can land *partly* —
+and half a reshuffle is a pitch with eight players or no goalkeeper, which is precisely the state
+`checkPitch` exists to forbid. One event also means one `VOID` restores exactly the pre-TERRAIN pitch,
+instead of five annulments that must be undone in the right order.
+
+**Consequences.** `describeActorsFr` needed a `LINEUP_APPLIED` branch: the single-actor fallback printed
+one arbitrary name, so the timeline hid two thirds of what the coach would open it to check. It now
+reads « Sortent : Karim, Ali · Entrent : Momo, Yanis · Change de poste : Léo ».

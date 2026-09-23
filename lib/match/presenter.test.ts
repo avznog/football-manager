@@ -446,6 +446,46 @@ describe("the timeline", () => {
     expect(lines.find((line) => line.clientEventId === "c4")?.voidsEventId).toBe("e3");
   });
 
+  it("reads out every change of a composition, not one arbitrary name", () => {
+    // A TERRAIN change: Léo → Yanis, Julien → Momo, and Karim pushed up front. All of it is one
+    // event, so the one line has to carry all of it.
+    const terrain = [
+      { slotId: SLOT.gb, memberId: "hugo" },
+      { slotId: SLOT.dg, memberId: "samir" },
+      { slotId: SLOT.dc, memberId: "thomas" },
+      { slotId: SLOT.dd, memberId: "nico" },
+      { slotId: SLOT.mc1, memberId: "yanis" },
+      { slotId: SLOT.mc2, memberId: "momo" },
+      { slotId: SLOT.at, memberId: "karim" },
+    ];
+    const events = log([
+      ...KICKED_OFF,
+      { type: "LINEUP_APPLIED", min: 40, period: 2, payload: lineupPayload(terrain) },
+    ]);
+    const state = reduceLive(live(events), [], T0 + 45 * MIN);
+
+    expect(timelineLines(state, index)[0]).toMatchObject({
+      title: "Composition appliquée",
+      detail: "Sortent : Léo, Julien · Entrent : Yanis, Momo · Change de poste : Karim",
+    });
+  });
+
+  it("phrases a one-player composition change in the singular", () => {
+    const sixPlusOne = [...STARTING_SEVEN.filter((entry) => entry.memberId !== "julien")];
+    const events = log([
+      ...KICKED_OFF,
+      {
+        type: "LINEUP_APPLIED",
+        min: 40,
+        period: 2,
+        payload: lineupPayload([...sixPlusOne, { slotId: SLOT.at, memberId: "momo" }]),
+      },
+    ]);
+    const state = reduceLive(live(events), [], T0 + 45 * MIN);
+
+    expect(timelineLines(state, index)[0].detail).toBe("Sort : Julien · Entre : Momo");
+  });
+
   it("names an unknown player rather than printing an id at the coach", () => {
     const orphan = log([...KICKED_OFF, { type: "FOUL", min: 14, payload: { memberId: "ghost" } }]);
     const state = reduceLive(live(orphan), [], T0 + 20 * MIN);
