@@ -1423,6 +1423,18 @@ share no memory, and "remember to tag after merging" fails invisibly — nothing
 simply no tag, and nobody notices for a milestone. `CLAUDE.md` now says the rule *and* says never to
 tag by hand, because a tag off that path is a claim about a version nothing checked.
 
+**The rule was proved, not assumed**, and by the branch that introduced it. Two things were genuinely
+unknown: whether Vercel reads `vercel.json` from the pushed commit or only from the production branch —
+if the latter, the rule would do nothing until it merged — and whether `**` really matches a branch name
+containing a `/`. Pushing `feat/deploy-only-main` answered both: **zero** deployments for it, while a
+third session's `feat/rating-deadline` collected five previews in the same twenty minutes. So the file
+takes effect on the commit that adds it, and the slash is crossed.
+
+That third session is the other half of what this found. `feat/rating-deadline` (#53) was being pushed
+throughout, by a session this one never saw in any agent listing, and it accounts for five of the nine
+preview deployments. Its pull request will stop getting previews when this merges — worth knowing
+rather than discovering.
+
 Three claims in `DEPLOY.md` were false once previews were gone and are fixed: §4's « a pull request is
 a preview », the note that « there is no `vercel.json` and none is needed », and §6's instruction to
 open *the preview* on a phone.
