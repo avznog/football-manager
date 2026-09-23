@@ -2838,3 +2838,33 @@ its output no longer depends on when it is called, so the tests say what they me
 phone set to English. `toLocalInput` / `fromLocalInput` stay ISO because that is the control's wire
 format (101 was right about that). Replacing the native control with our own is a real change with a
 real cost — offered to the owner, not taken.
+
+## 110 — A beta is a pre-release, and `1.0.0-beta.1` is the first one
+
+**2026-09-23** · accepted · extends decisions 081 and 108
+
+The owner asked for a beta release and a tag. Both already have a path — `package.json` holds the
+version, CI cuts the tag (081) and publishes the release (108) — so the only thing missing was what a
+beta *is* in that pipeline.
+
+**Decision.** A beta is an ordinary version bump whose string carries a semver pre-release suffix:
+`1.0.0-beta.1`. Nothing else changes. It goes through a pull request like any other bump, CI tags
+`v1.0.0-beta.1` once the checks and the migration pass, and the release step publishes it with
+`--prerelease` — decided by the presence of a hyphen in the version, because that is exactly what
+semver says a pre-release looks like, and it means no second switch to keep in agreement with the
+first.
+
+**Why `--prerelease` matters.** GitHub moves its « Latest » badge to the newest non-pre-release. A beta
+published as a normal release would take that badge and tell anyone opening the repository that the
+beta is the current version of the app. The badge is the only part of a release page most people read.
+
+**Why `1.0.0-beta.1` and not `0.3.0-beta.1`.** The season loop is complete: calendar, availability,
+match sheet, compositions, live match, statistics, ratings, training attendance, deployment. What is
+left before this can be called finished is not a feature but a verification — `docs/DEPLOY.md` §6, the
+app in a coach's hand at the pitch, outside, in daylight. That is precisely what a beta is for, so the
+number says so: the next version after the phone test passes is `1.0.0`.
+
+**What a beta does *not* change.** It deploys exactly like everything else, because only `main` deploys
+(080) and this is on `main`. There is no separate beta channel, no preview environment for it, and no
+hand-cut tag — a tag nothing verified is still forbidden (081).
+

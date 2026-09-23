@@ -2324,3 +2324,19 @@ editor the goalkeeper's post sits under the sticky bench dock at the opening scr
 `MM/DD/YYYY` — no formatter of ours reaches it, and replacing the native control is a real change.
 
 Version 0.2.1, so CI cuts `v0.2.1` and, since decision 108, publishes its release.
+
+`1.0.0-beta.1`, asked for by the owner. The version string is the whole change: CI tags it and
+publishes it, and the release step now passes `--prerelease` when the version has a hyphen in it, so
+GitHub's « Latest » badge stays on the last stable version instead of moving to a beta (decision 110).
+Why 1.0.0 rather than 0.3.0: what is left before this app is finished is not a feature but the
+verification in `docs/DEPLOY.md` §6 — the app in a coach's hand at the pitch, outside, in daylight.
+
+Also fixed along the way, in the owner's local stack rather than in the repository: the Docker `app`
+image held a production build from before the competitions migration, so once the database reached
+`0003` every query asking for `matches.competition` failed with `42703` and the browser showed the
+generic React #441 with a digest. `docker compose up -d --build app` and it was clean. Worth knowing
+because the image bakes a build: after pulling a migration, rebuild, or the code runs behind its own
+schema. The seed also needed unpicking — a first run had died on the missing table *after* inserting
+the demo team, and the idempotence guard then skipped the whole demo season, leaving one team and zero
+users. Deleting that orphan row was enough; `db:reset` was not needed and was not used.
+
