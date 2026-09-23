@@ -1804,3 +1804,54 @@ purpose; only its hint was wrong.
 969 tests, seventeen new across `lib/stats/ratings.test.ts`, `lib/stats/format.test.ts` and the new
 `lib/player/labels.test.ts`. Both themes at 390 px, as `karim` looking at Ali and at the non-playing
 coach, and as `ali` looking at himself. `npm run test:e2e` green in 27 s.
+
+### « AS Dimanche · joueur », above « Tu fais partie de l'encadrement »
+
+Eleventh and last screen of the `audit/` read-through, `/moi`. The four captures look clean and the
+whole defect is in a ternary:
+
+```tsx
+{team.role === "coach" ? <Badge variant="accent">coach</Badge> : <Badge>joueur</Badge>}
+```
+
+`team_members` says what a member is in two columns — `role` and `is_player`, independent since
+decision 005 because the coach of an amateur side usually plays — and this reads one of them. Two of
+the four combinations are therefore mislabelled, and the interesting one is not exotic: `createTeam`
+inserts the founder of every team as `role = 'coach'`, `is_player = false`. One tap on « Retirer
+coach » makes them `role = 'player'`, `is_player = false`, because `setMemberRole` writes `role` and
+leaves the other column alone on purpose — and `/moi` then badges them « joueur » **directly above its
+own** « Tu fais partie de l'encadrement : pas de fiche joueur ». I reproduced it against the demo
+team, whose `admin` is that row, with one `update` and put the row back afterwards.
+
+`ActiveTeam.role` is also `| null`, for a super admin pinned by the cookie to a team he is not a
+member of. The ternary called him « joueur » too.
+
+The fix is not new code so much as a comment finally being obeyed. `/joueur/[id]` has done this
+correctly since M1:
+
+> Not simply « Coach » or « Joueur »: demoting a member of the encadrement would otherwise label them
+> « Joueur » next to their own « encadrement » badge.
+
+That comment describes, exactly, the bug that was still live one tab away. `memberBadgesFr` in the new
+`lib/team/membership.ts` is that comment made reusable, and in `lib/` it is testable — which is why
+the profile's version has never failed and `/moi`'s never fired.
+
+Two more on the same card stack. « Mon profil de joueur » headed the card whose only sentence says you
+have none; it is « Tu n'as pas de fiche joueur » now, and the sentence under it stopped repeating the
+three words the heading had just used. And that sentence said « Tu fais partie de l'encadrement » to
+both readers `getPlayerProfile` returns null for, which is true of one: the non-member is told
+« Tu n'es pas membre de cette équipe : tu la consultes en tant qu'administrateur. »
+
+988 tests, thirteen new. Walked at 390 px in both themes as `admin` (`role=coach`,
+`is_player=false` → « coach · encadrement ») and as `karim` (« coach · joueur », where the screen used
+to show « coach » alone and his own fiche shows both), plus the demoted row and back. `npm run
+test:e2e` green in 28 s.
+
+**That is the last capture in `audit/`.** Every one of the twenty-three screens `npm run audit:screens`
+walks has now been read by eye against its source and its data, and what the exercise caught, over
+eleven slices, was never a crash and never a layout break: it was twenty-odd sentences that were false,
+and not one of them failed a test. The common cause is mechanical rather than careless — French copy
+inlined in a Server Component is copy `vitest.config.ts` cannot see, because it collects `lib/**` and
+nothing under `app/`. Every fix in this run consisted of moving a sentence into a `…Fr()` function and
+only then discovering what it said. The cheapest future guard is the same one: a claim belongs in
+`lib/`.

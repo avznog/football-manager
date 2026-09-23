@@ -2157,3 +2157,49 @@ subject of a screen is the subject of every sentence on it.** A number that is t
 of the typical member, has to be either recomputed for this member or moved to a screen whose subject
 it is. All four sentences above were inlined in Server Components, where `vitest.config.ts` collects
 nothing, which is why none of them failed a test for four milestones.
+
+## NNN — What a member *is* comes from two columns, and never from one
+**2026-09-23** · accepted
+
+`team_members` says what somebody is twice, on purpose. `role` decides who administers the team;
+`is_player` decides who turns out on a Sunday. They are independent — decision 005 is the one that
+made them so, because the coach of an amateur side usually plays — and the four combinations are all
+real:
+
+| `role` | `is_player` | who that is |
+|---|---|---|
+| `coach` | true | Karim: the playing coach, the ordinary case in a 7-a-side team |
+| `coach` | false | **the founder of every team**: `createTeam` inserts exactly this |
+| `player` | true | everybody else |
+| `player` | false | a member of the encadrement who is not a coach |
+
+`/moi` derived its « Mon équipe » badge from `role` alone: `team.role === "coach" ? coach : joueur`.
+That is wrong for two of the four rows and for a fifth reader the type allows:
+
+- The founder demoted. `setMemberRole` writes `role` and deliberately leaves `is_player` alone, so
+  one tap on « Retirer coach » turns row two into row four — and `/moi` then badged them « joueur »
+  **directly above its own** « Tu fais partie de l'encadrement : pas de fiche joueur ». Two sentences
+  contradicting each other inside 200 px, on the screen a coach opens about himself, two taps from the
+  state every new deployment starts in. Reproduced against the demo team, whose `admin` is row two.
+- `ActiveTeam.role` is `"coach" | "player" | null`, and null is a super admin pinned to a team he is
+  not a member of (`getActiveTeam` has that branch and a comment on it). The ternary called him a
+  « joueur » of a squad that holds no row for him at all.
+
+`/joueur/[id]` has derived the same label from both columns since M1, inline, under this comment:
+« Not simply « Coach » or « Joueur »: demoting a member of the encadrement would otherwise label them
+« Joueur » next to their own « encadrement » badge. » The comment was right and stayed on one screen.
+`memberBadgesFr` in `lib/team/membership.ts` is that comment made reusable — coach first and the only
+accent, then « joueur » or « encadrement », and « non membre » alone when there is no membership — and
+being in `lib/` it is finally testable, which is the whole reason the defect survived four milestones
+on the other screen.
+
+Two consequences on the same card stack, both the heading rule of decision 087 again. « Mon profil de
+joueur » headed a card whose only line says you have no fiche joueur; it is now « Tu n'as pas de fiche
+joueur », and the line below it no longer repeats those three words. And that line said « Tu fais
+partie de l'encadrement » to both readers `profile` comes back null for, which is true of one of them:
+the non-member reads « Tu n'es pas membre de cette équipe : tu la consultes en tant
+qu'administrateur. »
+
+The rule, and it is the reason to write this down rather than just fix it: **when the database needs
+two columns to say what something is, so does the sentence.** A label derived from one of them is not
+a simplification, it is a claim about the other one.

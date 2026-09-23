@@ -8,6 +8,11 @@ import { requireTeamContext, requireUser } from "@/lib/auth/dal";
 import { injuryStatus, injurySummaryFr, parisDate } from "@/lib/player/injury";
 import { positionsSummaryFr } from "@/lib/player/positions";
 import { getPlayerProfile } from "@/lib/player/queries";
+import {
+  memberBadgesFr,
+  myPlayerCardTitleFr,
+  noPlayerProfileReasonFr,
+} from "@/lib/team/membership";
 import { getUserTeams } from "@/lib/team/queries";
 import { InjuryDeclareForm } from "../joueur/_components/injury-declare-form";
 
@@ -38,13 +43,16 @@ export default async function MePage() {
       </header>
 
       <Card title="Mon équipe">
-        <p className="text-sm text-ink">
-          {team.name}{" "}
-          {team.role === "coach" ? (
-            <Badge variant="accent">coach</Badge>
-          ) : (
-            <Badge variant="neutral">joueur</Badge>
-          )}
+        <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink">
+          {team.name}
+          {/* Not a ternary on `role`: that badged the founder of a team « joueur » the moment
+              somebody demoted him, right above this page's own « Tu fais partie de l'encadrement ».
+              Same badges as the profile header, from the same function (decision NNN). */}
+          {memberBadgesFr(team.role, team.isPlayer).map((badge) => (
+            <Badge key={badge.labelFr} variant={badge.variant}>
+              {badge.labelFr}
+            </Badge>
+          ))}
         </p>
 
         {/* Several teams is the rare case, so the switcher only appears when it is useful. */}
@@ -79,7 +87,7 @@ export default async function MePage() {
       </Card>
 
       <Card
-        title="Mon profil de joueur"
+        title={myPlayerCardTitleFr(profile !== null)}
         description={profile ? positionsSummaryFr(profile.positions) : undefined}
       >
         {profile ? (
@@ -122,8 +130,7 @@ export default async function MePage() {
           </div>
         ) : (
           <p className="text-sm text-ink-muted">
-            Tu fais partie de l’encadrement&nbsp;: pas de fiche joueur, donc pas de postes ni de
-            blessures à renseigner.
+            {noPlayerProfileReasonFr(team.membershipId !== null)}
           </p>
         )}
       </Card>
