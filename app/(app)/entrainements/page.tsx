@@ -12,8 +12,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { getCalendar } from "@/lib/calendar/queries";
-import { daysFromNow } from "@/lib/calendar/time";
-import { splitTimeline, type CalendarTraining } from "@/lib/calendar/timeline";
+import {
+  attendanceIsOpen,
+  splitTimeline,
+  type CalendarTraining,
+} from "@/lib/calendar/timeline";
 import { getSquad } from "@/lib/team/queries";
 import { getTrainingAnswers, getTrainingAttendance } from "@/lib/training/queries";
 import { EventRow } from "../calendrier/_components/event-row";
@@ -33,8 +36,13 @@ export default async function TrainingsPage() {
   const { next, upcoming, past } = splitTimeline(trainings, now);
 
   const isCoach = can(actor, "training:markAttendance", { teamId: team.id });
-  // The list is offered for the session of the day — before it, during it, and in the hour after.
-  const marking = isCoach && next !== null && daysFromNow(new Date(next.startsAt), now) === 0;
+  // The list is offered from half an hour before the session onwards — the same rule the session's
+  // own page and `markTrainingAttendance` use, so the three cannot disagree. It used to be « the
+  // session of the day », which put « Tout le monde est là » on this page at 08:00 for a séance at
+  // 19:00; now that the action refuses to write before the window opens, that same card would have
+  // been a button doing nothing at all, which is worse than the untruth it replaced (decision 099).
+  // `next` is never a past event, so nothing bounds the far end but `splitTimeline`.
+  const marking = isCoach && next !== null && attendanceIsOpen(new Date(next.startsAt), now);
 
   return (
     <div className="space-y-6">
