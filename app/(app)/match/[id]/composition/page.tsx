@@ -30,6 +30,7 @@ import {
   deduceChanges,
   findPlanIssues,
   nameOfMembers,
+  newPlanPromptFr,
   planInForceBefore,
   planMinuteBadgeFr,
   planTitleFr,
@@ -71,6 +72,9 @@ export default async function CompositionsPage({
   const selectable = counts.starters + counts.substitutes;
   const totalMinutes = match.periodsCount * match.periodMinutes;
   const nextMinute = suggestNextMinute(plans, totalMinutes);
+  // The editor now opens on the team in force at that minute rather than on an empty pitch
+  // (decision 106), which is worth saying *before* the coach taps: it changes what he expects to do.
+  const newPlanPrompt = newPlanPromptFr(totalMinutes);
   const savedId = typeof query.enregistre === "string" ? query.enregistre : null;
   // The whole screen used to be written for a match still to be played: it offered « Planifier un
   // changement » under a match won three days earlier, and `saveLineup` accepted it (decision NNN).
@@ -237,8 +241,8 @@ export default async function CompositionsPage({
 
           {plans.length > 0 && screen.editable ? (
             <Card
-              title="Planifier un changement"
-              description={`Une composition « à partir de la minute X ». Le match dure ${totalMinutes} minutes.`}
+              title={newPlanPrompt.title}
+              description={newPlanPrompt.description}
             >
               <ButtonLink href={`/match/${match.id}/composition/nouvelle?minute=${nextMinute}`}>
                 Nouvelle composition

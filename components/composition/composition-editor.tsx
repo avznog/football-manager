@@ -102,6 +102,7 @@ import {
 } from "@/lib/composition/hints";
 import {
   deduceChanges,
+  editorSaveStateFr,
   findPlanIssues,
   nameOfMembers,
   ordinalFr,
@@ -161,8 +162,17 @@ export type CompositionEditorProps = {
   formations: readonly EditorFormation[];
   /** Which formation to start from. */
   formationId: string;
-  /** The saved assignments, keyed on `formation_slots.id`. Empty for a new composition. */
+  /**
+   * What the pitch opens with, keyed on `formation_slots.id`: the saved assignments when modifying,
+   * and — for a new composition — the team in force at that minute, copied by
+   * `lib/composition/prefill.ts` so the coach only moves what changes.
+   */
   assignments: readonly SlotAssignment[];
+  /**
+   * Why the pitch is not empty, when it was pre-filled: where the seven come from, and that nothing
+   * is saved yet. Derived by `prefillNoticeFr`, never written here (decision 097). Empty otherwise.
+   */
+  prefillNoticeFr?: readonly string[];
   fromMinute: number;
   /**
    * Every *other* composition of the match. Used to deduce the changes this one implies and to
@@ -505,6 +515,20 @@ export function CompositionEditor(props: CompositionEditorProps) {
         />
       ))}
 
+      {/* --- why the pitch is not empty ---
+          Only while the pre-fill is untouched: once the coach has moved somebody, « déplace seulement
+          ce qui change » is advice about a state that has passed, and « Changements déduits » below
+          says what he has done instead. */}
+      {!dirty && (props.prefillNoticeFr ?? []).length > 0 ? (
+        <div className="space-y-1 rounded-2xl bg-surface-2 p-3">
+          {(props.prefillNoticeFr ?? []).map((line) => (
+            <p key={line} className="text-sm text-ink-muted">
+              {line}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
       {/* --- formation and minute --- */}
       <Card
         title={planTitleFr({ fromMinute, isInitial: fromMinute === 0 })}
@@ -720,8 +744,15 @@ export function CompositionEditor(props: CompositionEditorProps) {
           <p className="min-w-0 flex-1 text-xs leading-snug text-ink-muted">
             {benchHintFr({ mode, benchCount: bench.length, freeSlots })}
           </p>
-          <p aria-live="polite" className="shrink-0 text-xs font-medium text-ink-subtle">
-            {dirty ? "Non enregistré" : "À jour"}
+          {/* `editorSaveStateFr`, not a ternary on `dirty`: a composition being created has never
+              been saved whether or not it has been touched, and it now opens with seven pre-filled
+              discs that look exactly like a plan (decision 106). Allowed to wrap — the sentence is
+              longer than « À jour. » and the dock has a couple of lines to give. */}
+          <p
+            aria-live="polite"
+            className="max-w-[9rem] shrink-0 text-right text-xs font-medium text-ink-subtle"
+          >
+            {editorSaveStateFr({ isNew: props.lineupId === null, dirty })}
           </p>
         </div>
 

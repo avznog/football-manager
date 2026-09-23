@@ -125,6 +125,36 @@ export function planMinuteBadgeFr(lineup: { fromMinute: number }): string {
   return `${lineup.fromMinute}'`;
 }
 
+/**
+ * What the editor's footer says about the state of the form.
+ *
+ * « À jour. » is only true of something that has been saved. A composition being *created* has
+ * nothing to be up to date with, and it said « À jour. » under seven discs the moment they were
+ * pre-filled (`lib/composition/prefill.ts`) — a screen claiming a plan the coach had not yet asked
+ * for, which is decision 097's class of defect exactly. Being new outranks being dirty: nothing is
+ * recorded either way.
+ */
+export function editorSaveStateFr(input: { isNew: boolean; dirty: boolean }): string {
+  if (input.isNew) return "Rien n’est encore enregistré.";
+  return input.dirty ? "Modifications non enregistrées." : "À jour.";
+}
+
+/**
+ * The card at the foot of the compositions list, which offers the next plan.
+ *
+ * It used to promise a blank pitch by omission. Now that the editor opens with the team in force at
+ * that minute, the card says so: a coach who reads « Nouvelle composition » and expects to place
+ * seven players will not otherwise discover that he only has to move one.
+ */
+export function newPlanPromptFr(totalMinutes: number): { title: string; description: string } {
+  return {
+    title: "Planifier un changement",
+    description:
+      "Une composition « à partir de la minute X ». L’équipe déjà en place à cette minute est " +
+      `reprise : tu ne déplaces que ce qui change. Le match dure ${totalMinutes} minutes.`,
+  };
+}
+
 /** What the match sheet calls each role. `null` is a real answer: « hors feuille ». */
 export const SQUAD_ROLE_LABELS: Record<SquadRole, string> = {
   starter: "Titulaire",

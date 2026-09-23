@@ -22,10 +22,12 @@ import { capitalizeFirst } from "@/lib/calendar/time";
 import {
   appliedNoticeFr,
   lineupsFrozenFr,
+  nameOfMembers,
   planTitleFr,
   sortPlans,
   suggestNextMinute,
 } from "@/lib/composition/plan";
+import { prefillFromPlans, prefillNoticeFr } from "@/lib/composition/prefill";
 import { getCompositionMembers, getMatchLineups, toPlannedLineup } from "@/lib/composition/queries";
 import { getFormations } from "@/lib/formation/queries";
 import type { MatchRow } from "@/lib/match/queries";
@@ -141,8 +143,29 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
     );
   }
 
+  /*
+   * A new composition opens with the team already on the pitch at that minute — the coach came to
+   * make one substitution, not to place seven players again (decision 106). It is the *editor's*
+   * initial state and nothing else: no row is written, the form is still submitted by hand, and
+   * `saveLineup` is unchanged, so invariant 3 holds exactly as before.
+   *
+   * `planInForceBefore` inside `prefillFromPlans` is the same function that chooses which two teams
+   * the « Changements déduits » card compares, so what the pitch opens with and what the diff is
+   * measured against cannot disagree: the changes are empty until the coach moves somebody.
+   */
+  const prefill =
+    lineupId === null
+      ? prefillFromPlans({
+          plans,
+          minute: fromMinute,
+          placeableMemberIds: selectable.map((member) => member.membershipId),
+          formationIds: formations.map((formation) => formation.id),
+        })
+      : null;
+
   const formationId =
     target?.formationId ??
+    prefill?.formationId ??
     (formations.find((formation) => formation.isBuiltin && formation.label === DEFAULT_LABEL)?.id ??
       formations[0].id);
 
@@ -164,7 +187,8 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
         members={editorMembers}
         formations={formations}
         formationId={formationId}
-        assignments={target?.assignments ?? []}
+        assignments={target?.assignments ?? prefill?.assignments ?? []}
+        prefillNoticeFr={prefill ? prefillNoticeFr(prefill, nameOfMembers(members)) : []}
         fromMinute={fromMinute}
         otherPlans={otherPlans}
       totalMinutes={match.periodsCount * match.periodMinutes}

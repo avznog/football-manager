@@ -2691,3 +2691,41 @@ la 30ᵉ minute ».
 The sentences are derived in `lib/composition/hints.ts` (decision 097), including the branch the old
 screen did not have: a bench with nobody on it used to print « Appuie sur un joueur puis sur un poste »
 regardless.
+
+## 106 — A new composition opens with the team already on the pitch
+
+**2026-09-23** · accepted
+
+Creating a composition « à partir de la 10ᵉ minute » opened an empty pitch, so a coach who wanted one
+substitution placed seven players. The owner's note stopped mid-sentence — « quand on crée une
+deuxième composition (par exemple pour la 10e minute), il faudrait qu… » — and he chose the obvious
+ending: **the editor opens pre-filled with the composition in force at that minute, and the coach
+moves only what changes.**
+
+« In force at that minute » is the composition with the greatest `from_minute` **strictly below** the
+new one, which is emphatically not « the last one created »: a coach who has planned the 20th and then
+adds the 10th inherits the starting seven. That rule already existed as `planInForceBefore` — it is
+what chooses the team « Changements déduits » compares against — and `lib/composition/prefill.ts`
+reuses it rather than growing a second notion of the same thing. Had it reimplemented it, the pitch
+would have opened with one team and been measured against another.
+
+The formation is inherited with the players, otherwise seven players would land in slots that do not
+exist; changing it afterwards remaps the placement slot by slot, as it already did (the keeper stays
+the keeper). A player inherited from the 0th minute who has since left the match sheet, or the team,
+is **not** placed: his post stays open, the save stays blocked on « Il reste un poste à pourvoir », and
+the notice names him. An applied composition is a legitimate source — at the 25th minute of a live
+match it is the team on the pitch — and copying it is a read.
+
+**This applies nothing** (invariant 3). `prefillFromPlans` is a pure function over rows the page has
+already read, and it returns the editor's initial state; `saveLineup` is unchanged and the only path
+to a row is still the coach's submit. Opening the editor and leaving still leaves nothing behind.
+
+Which is exactly what the screen now has to say, because seven pre-filled discs look precisely like a
+plan that exists. The footer said « À jour. » about a composition that had never been written —
+decision 097's defect once more, in the sentence a coach glances at to decide whether he can leave. So
+`editorSaveStateFr` answers « Rien n'est encore enregistré. » for anything new, dirty or not, and
+`prefillNoticeFr` states the provenance above the form: « Équipe reprise de la composition
+« composition de départ » : déplace seulement ce qui change. Rien n'est enregistré avant que tu
+valides. » It goes away the moment he moves somebody, because from then on « Changements déduits »
+says what he has done — one line, « Léo → Yanis », where an empty pitch used to print seven departures
+for a coach who had touched nobody.

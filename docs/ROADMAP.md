@@ -186,6 +186,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       turf is capped at 280 px wide (410 px tall — still wide enough that two 48 px discs cannot touch,
       which happens below 266 px), and the bench, the blocking errors and the confirm button are one
       sticky dock above the tab bar, where the save bar used to sit *under* it (decision 105)
+- [x] …and a new composition opens with the team already on the pitch. Creating one « à partir de la
+      10ᵉ minute » opened an empty pitch, so a coach who wanted one substitution placed seven players.
+      The pre-fill is the composition **in force at that minute** — `planInForceBefore`, the same
+      function that chooses what « Changements déduits » compares against, so the pitch and the card
+      cannot disagree — and an inherited player who has left the sheet is not placed, his post stays
+      open and the notice names him. Nothing is written until the coach submits, which the footer now
+      says: « Rien n'est encore enregistré. » (decision 106)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses
