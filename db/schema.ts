@@ -130,6 +130,18 @@ export const teamMembers = pgTable(
     /** A coach with `isPlayer` gets both permission sets (a player-coach). */
     isPlayer: boolean().notNull().default(true),
     jerseyNumber: smallint(),
+    /**
+     * The flocage: what is printed on the back of the shirt, above the number. Often not a name at
+     * all — « MOMO », « BENJI », « PROFESSOR ».
+     *
+     * Free text rather than a copy of `users.display_name`, because it is neither: the same man is
+     * « Mohammed Diarra » on his account and « MOMO » on his back. Capped at 12 characters, and the
+     * cap is the shirt rather than the database: a 7-a-side kit prints the flocage across the width
+     * of the back, and past a dozen characters the printer either shrinks it to nothing or refuses.
+     * The check also rejects the empty string, so « no flocage » has exactly one representation —
+     * `null` — and no screen has to tell `''` and `null` apart.
+     */
+    shirtName: text(),
     joinedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     /** Set when someone leaves: history is kept, but they disappear from selection lists. */
     leftAt: timestamp({ withTimezone: true }),
@@ -138,6 +150,10 @@ export const teamMembers = pgTable(
     index("team_members_team_idx").on(t.teamId),
     index("team_members_user_idx").on(t.userId),
     check("team_members_jersey_range", sql`${t.jerseyNumber} is null or ${t.jerseyNumber} between 1 and 99`),
+    check(
+      "team_members_shirt_name_length",
+      sql`${t.shirtName} is null or char_length(${t.shirtName}) between 1 and 12`,
+    ),
   ],
 );
 

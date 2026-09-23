@@ -60,14 +60,23 @@ describe("can — players", () => {
   it("may act on themselves", () => {
     expect(can(player, "availability:declare", { teamId: TEAM })).toBe(true);
     expect(can(player, "profile:editPositions", { teamId: TEAM })).toBe(true);
+    expect(can(player, "profile:editShirtName", { teamId: TEAM })).toBe(true);
     expect(can(player, "injury:declare", { teamId: TEAM })).toBe(true);
     expect(can(player, "rating:submit", { teamId: TEAM })).toBe(true);
+  });
+
+  it("owns the name on their shirt but not the number on it", () => {
+    // The flocage is the player's; the number has to agree with twelve other numbers, so it stays
+    // the coach's `member:update`.
+    expect(can(player, "profile:editShirtName", { teamId: TEAM })).toBe(true);
+    expect(can(player, "member:update", { teamId: TEAM, targetMemberId: "m-player" })).toBe(false);
   });
 
   it("may not act on somebody else", () => {
     const other = { teamId: TEAM, targetMemberId: "m-someone-else" };
     expect(can(player, "availability:declare", other)).toBe(false);
     expect(can(player, "profile:editPositions", other)).toBe(false);
+    expect(can(player, "profile:editShirtName", other)).toBe(false);
     expect(can(player, "injury:declare", other)).toBe(false);
     expect(can(player, "rating:submit", other)).toBe(false);
   });
@@ -112,6 +121,9 @@ describe("can — coaches", () => {
     expect(can(coach, "availability:declare", { teamId: TEAM })).toBe(false);
     expect(can(coach, "rating:submit", { teamId: TEAM })).toBe(false);
     expect(can(coach, "profile:editPositions", { teamId: TEAM })).toBe(false);
+    // Not a maillot, so not a flocage. He still reaches a player's through `member:update`.
+    expect(can(coach, "profile:editShirtName", { teamId: TEAM })).toBe(false);
+    expect(can(coach, "member:update", { teamId: TEAM, targetMemberId: "m-player" })).toBe(true);
   });
 });
 

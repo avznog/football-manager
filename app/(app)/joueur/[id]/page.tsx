@@ -23,9 +23,11 @@ import { formatDateFr, injuryStatus, parisDate } from "@/lib/player/injury";
 import { noPlayerSheetTitleFr, removeMemberCardFr } from "@/lib/player/labels";
 import { positionsSignature } from "@/lib/player/positions";
 import { getPlayerProfile } from "@/lib/player/queries";
+import { shirtNameValueFr } from "@/lib/player/shirt";
 import { removeMember, setMemberRole } from "@/lib/team/actions";
 import { InjuriesCard } from "../_components/injuries-card";
 import { JerseyForm } from "../_components/jersey-form";
+import { ShirtNameForm } from "../_components/shirt-name-form";
 import { PositionsEditor } from "../_components/positions-editor";
 import { PlayerStatsCard } from "../_components/stats-card";
 
@@ -48,6 +50,10 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
   const canEditPositions =
     can(actor, "profile:editPositions", context) || can(actor, "member:update", context);
   const canEditJersey = can(actor, "member:update", context);
+  // The flocage is not the number: « MOMO » agrees with nothing and nobody, so the player owns his
+  // own, and the coach may still type one for a teammate. Same shape as the positions above.
+  const canEditShirtName =
+    can(actor, "profile:editShirtName", context) || can(actor, "member:update", context);
   const canManageInjuries = can(actor, "injury:declare", context);
   // The two squad-administration controls. They used to sit on every row of `/equipe`, where
   // « Nommer coach » + « Retirer » took 200 px of a 390 px row and pushed the names to « Tho… ».
@@ -112,26 +118,49 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
       ) : null}
 
       <Card title="Fiche">
-        {canEditJersey ? (
-          <JerseyForm
-            teamId={team.id}
-            memberId={profile.membershipId}
-            jerseyNumber={profile.jerseyNumber}
-            isPlayer={profile.isPlayer}
-          />
-        ) : (
-          <p className="text-sm text-ink">
-            Numéro de maillot&nbsp;:{" "}
-            <strong className="font-mono tabular-nums">
-              {profile.jerseyNumber ?? "non attribué"}
-            </strong>
-            {isSelf ? (
-              <span className="block text-sm text-ink-muted">
-                Les numéros sont attribués par le coach&nbsp;: demande-lui si tu veux changer.
-              </span>
-            ) : null}
-          </p>
-        )}
+        {/* The maillot, as two fields and two permissions: the coach hands out the number, which has
+            to be unique in the squad, and the flocage belongs to the man whose back it is printed on
+            (decision 104). Hence two forms rather than one — whoever may change only one of them
+            sees the other as a sentence. */}
+        <div className="space-y-4">
+          {canEditJersey ? (
+            <JerseyForm
+              teamId={team.id}
+              memberId={profile.membershipId}
+              jerseyNumber={profile.jerseyNumber}
+              isPlayer={profile.isPlayer}
+            />
+          ) : (
+            <p className="text-sm text-ink">
+              Numéro de maillot&nbsp;:{" "}
+              <strong className="font-mono tabular-nums">
+                {profile.jerseyNumber ?? "non attribué"}
+              </strong>
+              {isSelf ? (
+                <span className="block text-sm text-ink-muted">
+                  Les numéros sont attribués par le coach&nbsp;: demande-lui si tu veux changer.
+                </span>
+              ) : null}
+            </p>
+          )}
+
+          {canEditShirtName ? (
+            <ShirtNameForm
+              teamId={team.id}
+              memberId={profile.membershipId}
+              shirtName={profile.shirtName}
+              isPlayer={profile.isPlayer}
+              isSelf={isSelf}
+            />
+          ) : (
+            /* « aucun », never a dash: most members have no flocage and that is not a gap in the
+               data. The value is uppercased for display only — `shirtNameValueFr`. */
+            <p className="text-sm text-ink">
+              Nom sur le maillot&nbsp;:{" "}
+              <strong className="font-mono">{shirtNameValueFr(profile.shirtName)}</strong>
+            </p>
+          )}
+        </div>
 
         <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-2">

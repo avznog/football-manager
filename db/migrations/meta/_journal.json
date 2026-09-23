@@ -15,6 +15,13 @@
       "when": 1790120451936,
       "tag": "0001_young_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790167155861,
+      "tag": "0002_daily_sharon_carter",
+      "breakpoints": true
     }
   ]
 }
