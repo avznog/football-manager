@@ -93,6 +93,13 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       page and the calendar row agree about it — and the page says why the denominator can be larger
       than the list under it. The availability list moves below the présences once the session is over,
       and disappears when nobody had answered at all (decision 069)
+- [x] A session nobody pointed says so, instead of nothing. On a list row « Présences pas encore
+      pointées », so it cannot be mistaken for the 12 September session where everybody was absent;
+      and on its own page, where a player used to get a date, a venue and eleven hundred pixels of
+      blank, the sentence that matters — it counts in nobody's attendance rate (decision 076)
+- [x] …and the audit looks at a past session at all now. It picked its training with
+      `order by starts_at desc`, so it always visited the one still to come: `PresenceSummary`,
+      `departedMarksNoteFr` and the blank page had never been screenshotted. 100 visits, not 92
 
 ## M3 — Compositions
 - [x] `positions` reference data + built-in 7-a-side formation templates (`db/reference.ts`)

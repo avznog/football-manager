@@ -38,7 +38,9 @@ export function EventRow({ event, variant }: EventRowProps) {
     : `/entrainements/${event.id}`;
   const title = isMatch ? matchTitle(event) : "Entraînement";
   const subtitle = isMatch ? matchSubtitle(event) : trainingSubtitle(event);
-  const attendance = !isMatch ? attendanceSummary(event) : null;
+  // The variant is what tells a session with nothing pointed apart from a session nobody has pointed
+  // *yet*: before the evening there is nothing to report, afterwards the silence is the report.
+  const attendance = !isMatch ? attendanceSummary(event, variant) : null;
 
   return (
     <li>

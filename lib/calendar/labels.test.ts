@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   attendanceCountFr,
+  attendanceLineFr,
   availabilityCountFr,
   availabilitySubtitleFr,
   departedMarksNoteFr,
@@ -11,6 +12,7 @@ import {
   resultLabel,
   resultLetter,
   scoreLineFr,
+  unmarkedSessionNoteFr,
 } from "./labels";
 
 describe("entryModeBadgeFr", () => {
@@ -80,6 +82,45 @@ describe("attendanceCountFr", () => {
   it("keeps both halves singular when both are one", () => {
     expect(attendanceCountFr(1, 1)).toBe("1 présent sur 1 pointé");
     expect(attendanceCountFr(0, 13)).toBe("0 présent sur 13 pointés");
+  });
+});
+
+describe("attendanceLineFr", () => {
+  it("prints the count whenever anybody was pointed", () => {
+    expect(attendanceLineFr(11, 14, { isPast: true })).toBe("11 présents sur 14 pointés");
+    expect(attendanceLineFr(0, 13, { isPast: true })).toBe("0 présent sur 13 pointés");
+  });
+
+  /**
+   * The demo season's 19 September session: over, and not one row in `training_attendance`. The row
+   * used to print nothing, which is indistinguishable from a session where everybody was absent —
+   * and those two are counted differently (decision 020). Silence was also the whole of what a
+   * player saw on that session's page.
+   */
+  it("says so when a session that is over was never pointed", () => {
+    expect(attendanceLineFr(0, 0, { isPast: true })).toBe("Présences pas encore pointées");
+  });
+
+  /** Nothing has happened yet, so there is nothing to report. */
+  it("says nothing about a session still to come", () => {
+    expect(attendanceLineFr(0, 0, { isPast: false })).toBeNull();
+  });
+
+  /** « 0 présent sur 13 pointés » is a statement; « pas encore pointées » is the absence of one. */
+  it("never confuses nobody-came with nobody-ticked", () => {
+    expect(attendanceLineFr(0, 13, { isPast: true })).not.toBe(
+      attendanceLineFr(0, 0, { isPast: true }),
+    );
+  });
+});
+
+describe("unmarkedSessionNoteFr", () => {
+  /**
+   * Its second sentence is the reason it exists: a player who trained that evening must not be left
+   * wondering whether the app has him down as absent.
+   */
+  it("says the session counts in no attendance rate", () => {
+    expect(unmarkedSessionNoteFr).toContain("aucun taux de présence");
   });
 });
 

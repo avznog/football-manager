@@ -14,7 +14,11 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { attendanceCountFr, departedMarksNoteFr } from "@/lib/calendar/labels";
+import {
+  attendanceCountFr,
+  departedMarksNoteFr,
+  unmarkedSessionNoteFr,
+} from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
 import {
   buildReminderMessage,
@@ -139,7 +143,7 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
           marks={marks}
         />
       ) : (
-        <PresenceSummary marks={marks} squadSize={players.length} />
+        <PresenceSummary marks={marks} squadSize={players.length} over={over} />
       )}
 
       {over ? (
@@ -150,7 +154,14 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
 }
 
 /**
- * What a player sees instead of the marking list: the count, once the coach has pointed.
+ * What a player sees instead of the marking list: the count, once the coach has pointed — and, on a
+ * session that is over and was never pointed, the fact that it was not.
+ *
+ * That last case used to render `null`, and nothing else on the page had anything to say about a past
+ * session either: the availability grid is hidden when nobody answered (decision 069), so a player
+ * opening the demo season's 19 September session got a date, a venue, and eleven hundred pixels of
+ * blank. The audit passed it — an `h1`, no console error, nothing outside the viewport — which is
+ * exactly the family of defect that script says it cannot catch (decision 076).
  *
  * The same sentence as the coach's card, from the same map, deliberately. It used to count the
  * présents out of the **squad** — « 11 présents sur 13 joueurs », where the calendar row for that
@@ -162,11 +173,23 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
 function PresenceSummary({
   marks,
   squadSize,
+  over,
 }: {
   marks: ReadonlyMap<string, boolean>;
   squadSize: number;
+  over: boolean;
 }) {
-  if (marks.size === 0) return null;
+  if (marks.size === 0) {
+    // Before the session there is genuinely nothing to report; the coach has not failed to do
+    // anything yet.
+    if (!over) return null;
+    return (
+      <Card title="Présences">
+        <p className="text-sm text-ink-muted">{unmarkedSessionNoteFr}</p>
+      </Card>
+    );
+  }
+
   const present = [...marks.values()].filter(Boolean).length;
   // A player knows how many they are, so « sur 14 pointés » in a squad of thirteen needs the same
   // explanation the coach's card gives. There is no list here to compare against, so the count is

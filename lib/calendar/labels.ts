@@ -129,6 +129,39 @@ export function attendanceCountFr(present: number, marked: number): string {
 }
 
 /**
+ * The présences of one session, on a list row — or the fact that there are none.
+ *
+ * `null` for a session still to come: nothing has happened, so there is nothing to say. But a
+ * session that is **over** and was never pointed is a fact of its own, and the row used to print
+ * nothing for it, which is how a player ended up scrolling a past session that shows a date, a
+ * venue and silence. Silence is not the same statement as « 0 présent sur 13 pointés » — one says
+ * the pitch was unplayable and nobody trained, the other says the coach never ticked the list — and
+ * the list has room to say which (decision 076).
+ *
+ * « pas encore », because it stays true: a coach can point a session weeks later, and the card on
+ * the session's own page offers exactly that.
+ */
+export function attendanceLineFr(
+  present: number,
+  marked: number,
+  options: { isPast: boolean },
+): string | null {
+  if (marked > 0) return attendanceCountFr(present, marked);
+  return options.isPast ? "Présences pas encore pointées" : null;
+}
+
+/**
+ * What a player reads on a past session nobody pointed, where the whole page was otherwise empty.
+ *
+ * The second sentence is the one worth printing. « Personne n'a été pointé » on its own invites the
+ * reading that everybody was absent — which is a real state the demo season also contains, and the
+ * two are counted differently: an unpointed session is in nobody's denominator at all (decision 020).
+ * A player who trained that evening should not have to wonder whether the app has him down as absent.
+ */
+export const unmarkedSessionNoteFr =
+  "Aucune présence n’a été pointée pour cette séance. Elle ne compte donc dans aucun taux de présence.";
+
+/**
  * Why « sur 14 pointés » can sit above a list of thirteen names.
  *
  * The attendance of a session is a fact about that evening and does not change when somebody leaves

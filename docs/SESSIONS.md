@@ -1157,3 +1157,37 @@ absorb.
 `docs/ROADMAP.md`'s deployment section is honest about it now — `vercel link`, the variables and the
 production deploy are done; what is left is two owner-side steps, each one command or three clicks,
 each written down.
+
+## The session that said nothing
+
+Reading the `joueur`-role audit captures screen by screen, `/entrainements` had three past sessions
+and only two of them said anything about présences. The silent one was 19 September, and the seed
+comment next to it explains why it exists: it is the session **nobody pointed**, deliberately
+different from 12 September where the pitch was unplayable and thirteen rows say `present = false`.
+
+So the list was giving one word to « everybody was absent » and no word at all to « the coach never
+ticked the list », and those are counted differently — decision 020 exists to keep them apart.
+Following it to the session's own page turned up the real defect: as a player, 19 September is a
+date, a time, a venue, and eleven hundred pixels of blank. `PresenceSummary` returns `null` with no
+marks, and the availability grid is hidden when nobody answered (decision 069), so between the two
+the page said nothing whatever about an evening that had happened.
+
+Fixed in three places and all of it in `lib` so Vitest holds it: `attendanceLineFr` for the row
+(« Présences pas encore pointées », and still nothing before the session — the coach has not failed
+to do anything yet, which is why it takes `isPast` rather than inferring it from the counts), and
+`unmarkedSessionNoteFr` for the page. That second sentence is the one worth having: « Elle ne compte
+donc dans aucun taux de présence. » Without it, « aucune présence pointée » invites the reading that
+everybody was marked absent, and a player who trained that Saturday should not have to wonder.
+
+**The audit had never visited a past session.** `scripts/audit-screens.ts` picked its training with
+`order by starts_at desc limit 1`, so it always got the one still to come — which means the coach's
+`PresenceSummary`, `departedMarksNoteFr` and this blank page had not been screenshotted once. Two
+targets now, a past session that was pointed and a past session that was not; 100 visits instead of
+92. That is the part most likely to pay again.
+
+The seed comment claimed the two sessions « look identical in the list; only the stats can tell them
+apart ». They do not any more, so it says what is true now instead.
+
+Fourth time worth writing down: the blank screen passed every mechanical check the audit makes — an
+`h1`, no console error, nothing outside the viewport, no English. Both themes looked at, at 390 px.
+873 unit tests, e2e 3 passed in 27.0s.
