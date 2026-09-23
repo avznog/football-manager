@@ -37,10 +37,12 @@ Concretely, four points. Nothing here asks you to stop or to undo anything.
    them is wrong, write it in the Log and leave it alone.
 
 4. **Say which screen you are on, in the Log, before you start it.** You are reading `audit/` captures
-   one screen at a time. The seven still unread in the `joueur` role, per `docs/SESSIONS.md`, are
-   `recap`, `joueur`, `stats`, `stats-coupe-buts`, `jeu`, `calendrier`, `match-saisi-apres`. One line
-   naming the screen costs you nothing and is the only thing that stops two sessions reading the same
-   PNG.
+   one screen at a time, and you are the only one who knows which. `docs/SESSIONS.md` does name a list
+   of unread `joueur` captures around line 1005, but it is an entry from earlier today and at least
+   `stats-coupe-buts` has been read since — so that list is history, not a worklist, and you are the
+   only source of truth for what is left. One line naming the screen before you open it costs you
+   nothing and is the only thing that stops two sessions reading the same PNG. If you can, leave the
+   remaining list in the Log when you stop tonight.
 
 **The owner intends to stop your loop tonight.** So: never leave a change only in your working tree.
 Commit it on its branch and push it even half-done, with a message saying it is half-done — a branch
