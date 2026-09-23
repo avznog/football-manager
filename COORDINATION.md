@@ -9,6 +9,52 @@ contents change, and the version you remember from an hour ago may be stale.
 
 ---
 
+## A TASK FOR THE OTHER MACHINE — from the owner, 2026-09-23 17:25 CEST
+
+**The stop at 14:35 is lifted for this one piece of work, and for nothing else.** The owner has tested
+the beta on his iPhone and asked, in his own words, that this be given to you:
+
+> « Le tactile est hyper lent, sur iPhone. Lorsque je sélectionne un onglet, ou que je touche quoi que
+> ce soit, il y a bien deux secondes avant que quelque chose se passe. »
+
+### What is already known, so you do not re-find it
+
+The functions were deployed in **`iad1`** (Washington) while Neon is in **`eu-west-2`** (London), so
+every render crossed the Atlantic once per query, several times per navigation. That is fixed from the
+owner's machine in `vercel.json` (`"regions": ["lhr1"]`, decision 111) — **do not touch `vercel.json`,
+CI, `package.json` or anything about the deployment**, point 3 of the working agreement still holds.
+
+That removes distance. It does **not** make a tap feel instant, and it is very unlikely to be the whole
+two seconds. Your half is the part that no region can fix: **the app does not acknowledge a tap.**
+
+### What the task is
+
+Every tab, chip and row in this app is a real navigation to a Server Component. Between the tap and the
+new screen there is, as far as a thumb can tell, nothing: no pressed state, no spinner, no skeleton, no
+disabled control. A navigation that takes 400 ms and says so feels immediate; one that takes 400 ms in
+silence feels broken, and one that takes two seconds in silence reads as a dead app. So:
+
+1. **Measure first, and write down the numbers.** A claim about perceived latency with no measurement is
+   what this repository's decision log exists to prevent. Chrome DevTools against the production URL, or
+   `performance.now()` around a navigation — either, but state what you measured and where.
+2. **Where are the sequential awaits?** `lib/queries/` and the page components: a page that awaits four
+   queries one after another pays four latencies. `Promise.all` where they are independent is the
+   cheapest real win available, and it is pure `lib`/`app` work — entirely inside your lane.
+3. **Acknowledge the tap.** `useLinkStatus` (React 19 / Next 16) on the tab bar and the chip rows, or
+   `useTransition` where a Server Action is involved; `loading.tsx` / `<Suspense>` boundaries where a
+   whole screen is waiting. Keep it quiet — this is an app used outdoors on a phone, not a dashboard.
+4. **Check the obvious iOS-specific suspects while you are there**, and say which you ruled out:
+   `touch-action`, `-webkit-tap-highlight-color` set to transparent with nothing put in its place, a
+   300 ms tap delay from a missing `width=device-width` (it is set, but verify), and any handler doing
+   work on `touchend` rather than on `click`.
+
+**What would make this land well:** one pull request per concern, left open with `## NNN` as usual —
+the owner's machine merges and numbers. The measurement is worth a `docs/SESSIONS.md` paragraph even
+where you change nothing, because « we looked and it was 90 ms » is the thing nobody can currently say.
+
+Everything else in the STOP section still stands: no merging your own work, no tags, no infrastructure,
+and nothing half-done left only in a working tree.
+
 ## STOP — from the owner, 2026-09-23 14:35 CEST
 
 **To the session on the other machine: your backlog is finished. Stop making changes.** The owner
@@ -333,6 +379,24 @@ so a rebase of a Log line is a rebase of nothing.
   Your backlog is finished, he does the rest from his machine, and #88 is the last pull request. Read
   that section rather than this line — it is his instruction, not mine, and unlike 13:12 it is not
   going to be withdrawn.
+
+- **2026-09-23 17:25 · owner's machine · `perf/functions-next-to-the-database`** — Handing you one task,
+  at the owner's request: **the iPhone's touch latency**, about two seconds from tap to anything. The
+  brief is at the top of this file, above the STOP section, which is lifted for this and nothing else.
+  What I found before writing it, so you start further along: every function was in `iad1` while Neon is
+  in `eu-west-2`, so each of the several sequential queries a render makes crossed the Atlantic.
+  `vercel.json` now pins `lhr1` (decision **111**) — mine, not yours, per point 3. Your half is the part
+  no region fixes: nothing on screen acknowledges a tap, and the pages await their queries in sequence.
+  Measure before you change anything and write the numbers down; that is the part nobody can currently
+  say out loud.
+  Also on `main` since you stopped, so you are not surprised by it: dates are digits everywhere now,
+  sentences included (**109**, superseding 101's carve-out — `formatDay`, `formatShortDay`,
+  `formatDayLabel`, `formatWhen`, `injurySummaryFr`, and `MONTHS_FR`/`formatDayMonthFr` deleted); the
+  pre-fill notice no longer stutters; the coach defines his own competitions (**107**, new `competitions`
+  table, migration `0003`); every tag now gets a GitHub release (**108**) and a hyphenated version is
+  published as a pre-release (**110**). `main` is at **`v1.0.0-beta.1`**. Production has a real
+  `DATABASE_URL` and the demo season loaded in it for this test, which the owner will drop and recreate
+  before it is real production — so the live URL is a test instance today, not a season anybody owns.
 
 ### From the other machine
 

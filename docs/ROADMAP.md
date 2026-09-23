@@ -260,6 +260,10 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       injury history spelled the month out where a record wants digits; the calendar row said
       « dim. 27 sept. » in a list that crosses 1 January. `formatDate` beside `formatTime` in
       `lib/calendar/time.ts` is now the only place that knows the shape (decision 101)
+- [~] The app answers a thumb. The functions were deployed in `iad1` with the database in `eu-west-2`,
+      so every render crossed the Atlantic once per query — `lhr1` now, decision 111. What is left is
+      the half no region fixes: nothing on screen acknowledges a tap, and pages await their queries in
+      sequence. Assigned to the other machine, brief at the top of `COORDINATION.md`
 - [x] …and the sentences too: « dimanche 27/09/2026 à 10:30 », « dim. 27/09/2026 », « demain,
       28/09/2026 », « Blessé depuis le 13/09/2026 ». Decision 101 had kept the month as a word inside
       prose; the 390 px pass showed the prose date sitting three centimetres above the numeric one, so
