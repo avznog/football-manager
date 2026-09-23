@@ -1368,3 +1368,27 @@ bare dash abbreviates nothing.
 fingers cannot tell whether he forgot somebody or the app did. It ends « · 2 hors feuille » now, and
 the line adds up. Not on an untouched sheet, though: « 13 hors feuille » would be the same lie in
 another font, and « Feuille de match vide » is already both shorter and true.
+
+## 068 — After the kick-off, the availability list is history and goes last
+**2026-09-23** · accepted
+
+On a played match, the first card under the score was « Disponibilités »: the whole squad, grouped by
+what each player had answered *before* a match that finished three days earlier. Thirteen names, some
+seven hundred pixels of them, above « Après le match » — which holds the only thing a player still has
+to do, and the only one with a deadline, since the rating window shuts at the next kick-off
+(decision 007). The page led with something nobody can change and buried the thing that expires.
+
+So the card is rendered in one of two places depending on `match.status`. Before the kick-off it leads,
+because « qui est dispo » *is* the question of the day. Afterwards it goes last, below « Après le
+match », the retro-entry card and « Mode match », and it is passed `past` — which changes its
+description to « Avant le match · 13 réponses sur 13 joueurs » so it stops reading as a question that
+is still open.
+
+It is not removed. Who had said what is part of the record of the afternoon: Mehdi's
+« En déplacement ce week-end. » is why he is not in the log, and deleting that would make the squad
+list of a played match harder to read, not easier.
+
+`availabilityCountFr` in `lib/calendar/labels.ts` now builds the count, next to `attendanceCountFr` and
+for the same reason: the denominator is named — « sur 13 joueurs », the squad the question went to —
+and the plurals are pinned by a test instead of living in a template inside a component vitest cannot
+reach.

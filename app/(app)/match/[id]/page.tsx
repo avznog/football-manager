@@ -183,7 +183,13 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         </Card>
       ) : null}
 
-      <AvailabilityGrid tally={tally} notes={notes} selfMembershipId={team.membershipId} />
+      {/* Before the kick-off this is the question of the day, so it leads. Afterwards it is a record
+          of something nobody can change, and it was pushing « Après le match » — the one thing a
+          player still has to do, and the one that expires at the next kick-off (decision 007) —
+          nine hundred pixels down a phone. It moves to the bottom, below. */}
+      {match.status === "scheduled" ? (
+        <AvailabilityGrid tally={tally} notes={notes} selfMembershipId={team.membershipId} />
+      ) : null}
 
       {/* Nothing left to chase once the match has kicked off. */}
       {isCoach && match.status === "scheduled" ? (
@@ -278,6 +284,13 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
             </ButtonLink>
           </div>
         </Card>
+      )}
+
+      {/* Last, once the match has started: who had said what is worth keeping — Mehdi's « en
+          déplacement ce week-end » is why he is not in the log — but it is history, and `past` is
+          what stops the card asking a question that closed at the kick-off. */}
+      {match.status === "scheduled" ? null : (
+        <AvailabilityGrid tally={tally} notes={notes} selfMembershipId={team.membershipId} past />
       )}
     </div>
   );

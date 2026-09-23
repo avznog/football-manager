@@ -128,6 +128,17 @@ export function attendanceCountFr(present: number, marked: number): string {
   return `${pluralize(present, "présent")} sur ${pluralize(marked, "pointé")}`;
 }
 
+/**
+ * « 13 réponses sur 13 joueurs » — how far round the squad the question has got.
+ *
+ * The denominator is named for the same reason it is on `attendanceCountFr`: « 11 sur 13 » alone
+ * leaves a coach guessing what the 13 counts. Here it is the players the question was put to, which
+ * is the squad, and not the size of the match sheet.
+ */
+export function availabilityCountFr(answered: number, total: number): string {
+  return `${pluralize(answered, "réponse")} sur ${pluralize(total, "joueur")}`;
+}
+
 /** A plural `s` only when it is needed: `pluralize(1, "joueur")` → « 1 joueur ». */
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count > 1 ? plural : singular}`;

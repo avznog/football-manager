@@ -950,3 +950,19 @@ must never be stored in Vercel, `ALLOW_REMOTE_RESET` must never be set in produc
 check on a real iPhone and Android. Everything else in the backlog is merged. The audit screenshots
 still worth a fresh pair of eyes are the `joueur`-role variants of `notation`, `recap` and
 `entrainement` — they have been walked mechanically but not read line by line.
+
+## Reading the player's screens, not the coach's
+
+The `joueur`-role screenshots had never been read line by line — only walked mechanically — and they
+held one real defect. On a played match, a player's page opened with « Disponibilités »: thirteen
+names, grouped by what each had answered before a match that was over. « Après le match », holding the
+only action a player still has and the only one with a deadline — the rating window closes at the next
+kick-off — sat nine hundred pixels below it.
+
+The card now renders in one of two places depending on `match.status`: first when the question is still
+open, last once it is not, where it is labelled « Avant le match · 13 réponses sur 13 joueurs » so it
+reads as a record rather than a question (decision 068). `availabilityCountFr` joins
+`attendanceCountFr` in `lib/calendar/labels.ts`, so the plurals are pinned by a test rather than living
+in a template a component test cannot reach.
+
+854 unit tests, 3 e2e specs, `audit:screens` clean on 92 visits, both themes at 390 px.

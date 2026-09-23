@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   attendanceCountFr,
+  availabilityCountFr,
   entryModeBadgeFr,
   matchLengthHintFr,
   periodsLabel,
@@ -111,5 +112,19 @@ describe("matchLengthHintFr", () => {
     expect(matchLengthHintFr(Number.NaN, 30)).toBeNull();
     expect(matchLengthHintFr(2, Number.NaN)).toBeNull();
     expect(matchLengthHintFr(2.5, 30)).toBeNull();
+  });
+});
+
+describe("availabilityCountFr", () => {
+  /** The denominator is the squad the question went to — named, for the same reason it is on
+   * `attendanceCountFr`: « 11 sur 13 » alone leaves the reader guessing what the 13 counts. */
+  it("names what the denominator counts", () => {
+    expect(availabilityCountFr(11, 13)).toBe("11 réponses sur 13 joueurs");
+  });
+
+  it("keeps « réponse » singular at one, and at zero", () => {
+    expect(availabilityCountFr(1, 13)).toBe("1 réponse sur 13 joueurs");
+    expect(availabilityCountFr(0, 13)).toBe("0 réponse sur 13 joueurs");
+    expect(availabilityCountFr(1, 1)).toBe("1 réponse sur 1 joueur");
   });
 });
