@@ -2293,7 +2293,7 @@ can count has to be counted over the same set the reader is counting.** « Hors 
 complement of the sheet within the membership, it is the complement within the players — and when a
 sentence and a subtraction disagree about who is in the set, it is the subtraction that is lying.
 
-## NNN — A test on a pure function proves nothing about a screen that never calls it
+## 097 — A test on a pure function proves nothing about a screen that never calls it
 
 **2026-09-23.** Decision 085 stopped the compositions screen offering to plan the 30ᵉ minute of a match
 played a fortnight ago. It derived `compositionsScreenFr` from the match's status and entry mode, wrote

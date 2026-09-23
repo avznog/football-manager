@@ -1939,7 +1939,7 @@ hands every caller `isPlayer` on the row, so the two defective call sites had th
 to suspect they needed it. `isSheetCandidate` in `lib/composition/plan.ts` is that inline predicate
 given a name, and `countSquadRoles` now applies it to its own input instead of trusting its caller.
 `SheetMember` carries `isPlayer` so the sheet screen can go through the same function it used to
-open-code. Decision NNN; the rule is decision 094's, applied to a subtraction instead of a label.
+open-code. Decision 096; the rule is decision 094's, applied to a subtraction instead of a label.
 
 Worth recording for whoever audits next: `squadSummaryFr`'s doc comment has said « a thirteen-player
 squad … leaves **two** players unaccounted for » since it was written. The prose was right and the code
@@ -1974,7 +1974,7 @@ screen was wrong, and nothing in the repository could say so**, because Vitest c
 
 That is the second time in one afternoon: the « hors feuille » count shipped wrong under a doc comment
 that described the correct behaviour. A doc comment is not a test, and now: a test on a pure function is
-not a test of the screen. Only the call is. Decision NNN.
+not a test of the screen. Only the call is. Decision 097.
 
 So besides the card calling `compositionsScreenFr`, there is `lib/composition/copy.test.ts` — not a unit
 test. It reads the source of `app/`, `components/` and `lib/` and asserts the five status-dependent
