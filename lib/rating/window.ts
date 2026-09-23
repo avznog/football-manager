@@ -67,7 +67,7 @@ export function ratingWindow(input: RatingWindowInput): RatingWindow {
 
 /**
  * The deadline, in words, for a player who still owes notes — « À finir avant le coup d’envoi du
- * match suivant, dimanche 27 septembre à 10:30 : … ».
+ * match suivant, dimanche 27/09/2026 à 10:30 : … ».
  *
  * `closesAtMs` was computed by `ratingWindow` from the first day and read by nobody for six
  * milestones: three screens promised « tu verras les notes des autres quand tu auras fini » and not

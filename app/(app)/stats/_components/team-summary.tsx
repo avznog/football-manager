@@ -109,7 +109,7 @@ function LiveNote({ count }: { count: number }) {
   );
 }
 
-/** « Défaite 0 – 2 à CS Morvan, dim. 14 sept. » — the whole of one badge, for both readers of it. */
+/** « Défaite 0 – 2 à CS Morvan, dim. 14/09/2026 » — the whole of one badge, for both readers of it. */
 function labelOf(entry: FormEntry): string {
   return formEntryLabelFr({
     result: entry.result,

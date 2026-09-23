@@ -96,7 +96,7 @@ export function resultLabelOf(result: "win" | "draw" | "loss"): string {
 }
 
 /**
- * One badge of the form guide, spelled out: « Victoire 3 – 1 contre Étoile du Parc, dim. 14 sept. ».
+ * One badge of the form guide, spelled out: « Victoire 3 – 1 contre Étoile du Parc, dim. 14/09/2026 ».
  *
  * A `V` and a scoreline is all the guide has room to print, so this is what the badge is *called* —
  * the announced name of the row, and the tooltip, which under decision 072 may only ever duplicate

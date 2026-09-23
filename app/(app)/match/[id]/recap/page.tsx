@@ -56,7 +56,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
   if (match.status === "scheduled") {
     return (
       <div className="space-y-6">
-        <RecapHeader match={match} kickoff={kickoff} now={now} recorded={false} />
+        <RecapHeader match={match} kickoff={kickoff} recorded={false} />
         <EmptyState
           title="Ce match n’a pas encore été joué"
           description="Le résumé apparaîtra ici quand le match aura été suivi et terminé."
@@ -89,7 +89,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
 
   return (
     <div className="space-y-6">
-      <RecapHeader match={match} kickoff={kickoff} now={now} recorded={recap.recorded} />
+      <RecapHeader match={match} kickoff={kickoff} recorded={recap.recorded} />
 
       <Scoreboard
         recap={recap}
@@ -159,12 +159,10 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
 function RecapHeader({
   match,
   kickoff,
-  now,
   recorded,
 }: {
   match: MatchRow;
   kickoff: Date;
-  now: Date;
   /** Whether there is a log at all: an empty one is not a log that was « saisi après le match ». */
   recorded: boolean;
 }) {
@@ -194,7 +192,7 @@ function RecapHeader({
       </h1>
 
       <p className="text-sm text-ink-muted">
-        {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)}
+        {capitalizeFirst(formatDay(kickoff))} à {formatTime(kickoff)}
         {match.venue ? ` · ${match.venue}` : ""}
       </p>
     </header>

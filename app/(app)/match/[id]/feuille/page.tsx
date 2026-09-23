@@ -75,7 +75,6 @@ export default async function MatchSheetPage({
     }));
 
   const kickoff = new Date(match.kickoffAt);
-  const now = new Date();
 
   // « Et maintenant ? » used to say « Le groupe est fait » on a sheet nobody had touched, and told
   // the coach to place seven players on a match played a fortnight ago (decision 084).
@@ -103,7 +102,7 @@ export default async function MatchSheetPage({
             `venuePhraseFr` leads with the side, which stays true even when the pitch is unnamed. The
             opponent is the link above, so the line does not name him twice. */}
         <p className="text-sm text-ink-muted">
-          {capitalizeFirst(formatDay(kickoff, now))} à {formatTime(kickoff)} ·{" "}
+          {capitalizeFirst(formatDay(kickoff))} à {formatTime(kickoff)} ·{" "}
           {venuePhraseFr(match.isHome, match.venue)}
         </p>
       </header>

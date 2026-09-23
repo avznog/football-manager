@@ -354,7 +354,7 @@ export function reminderCardFr(pending: number): { titleFr: string; descriptionF
 export function buildReminderMessage(input: {
   /** e.g. « Étoile du Parc (championnat) » or « Entraînement ». */
   title: string;
-  /** e.g. « dimanche 27 septembre à 10:30 ». */
+  /** e.g. « dimanche 27/09/2026 à 10:30 ». */
   when: string;
   pending: readonly Responder[];
 }): string {

@@ -134,21 +134,6 @@ export function injuryStatus(injuries: readonly InjuryRecord[], today: string): 
   };
 }
 
-const MONTHS_FR = [
-  "janvier",
-  "février",
-  "mars",
-  "avril",
-  "mai",
-  "juin",
-  "juillet",
-  "août",
-  "septembre",
-  "octobre",
-  "novembre",
-  "décembre",
-];
-
 /**
  * « 13/09/2026 » — the French numeric date, for the dates that are read off a list or a record
  * rather than read as a sentence: the injury history, « Arrivé le ». Same shape as
@@ -162,15 +147,6 @@ export function formatDateFr(value: string): string {
   return `${day}/${month}/${year}`;
 }
 
-/** « 13 septembre » — the year is noise inside the current season. */
-export function formatDayMonthFr(value: string): string {
-  const match = ISO_DATE.exec(value);
-  if (!match) return value;
-  const [, , month, day] = match;
-  const dayNumber = Number(day);
-  return `${dayNumber === 1 ? "1er" : dayNumber} ${MONTHS_FR[Number(month) - 1]}`;
-}
-
 /** « depuis 3 jours », « aujourd’hui », « dans 12 jours »… for a relative day count. */
 export function formatDayCountFr(days: number): string {
   if (days === 0) return "aujourd’hui";
@@ -180,19 +156,23 @@ export function formatDayCountFr(days: number): string {
 }
 
 /**
- * One line summarising an ongoing injury: « Blessé depuis le 13 septembre, retour prévu le
- * 3 octobre (dans 11 jours). »
+ * One line summarising an ongoing injury: « Blessé depuis le 13/09/2026, retour prévu le
+ * 03/10/2026 (dans 11 jours). »
+ *
+ * Digits, like every other date in the app (decision 109). It used to say « depuis le 13
+ * septembre » on the grounds that a sentence reads better with the month as a word — and it does,
+ * right up to the point where the reader has to compare it with the numeric date two lines above it.
  */
 export function injurySummaryFr(injuries: readonly InjuryRecord[], today: string): string {
   const status = injuryStatus(injuries, today);
   if (!status.injured) return "Aucune blessure en cours.";
 
-  const since = `Blessé depuis le ${formatDayMonthFr(status.injury.startedOn)}`;
+  const since = `Blessé depuis le ${formatDateFr(status.injury.startedOn)}`;
   if (status.injury.expectedReturnOn === null) {
     return `${since}, retour non estimé.`;
   }
 
-  const returnOn = formatDayMonthFr(status.injury.expectedReturnOn);
+  const returnOn = formatDateFr(status.injury.expectedReturnOn);
   if (status.overdue) {
     return `${since}, retour prévu le ${returnOn} — la date est passée.`;
   }

@@ -160,26 +160,9 @@ export function daysFromNow(instant: Date, now: Date): number {
 /* French formatting                                                          */
 /* -------------------------------------------------------------------------- */
 
-const DAY_FORMAT = new Intl.DateTimeFormat("fr-FR", {
+const WEEKDAY_FORMAT = new Intl.DateTimeFormat("fr-FR", {
   timeZone: TIME_ZONE,
   weekday: "long",
-  day: "numeric",
-  month: "long",
-});
-
-const DAY_WITH_YEAR_FORMAT = new Intl.DateTimeFormat("fr-FR", {
-  timeZone: TIME_ZONE,
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
-
-const SHORT_DAY_FORMAT = new Intl.DateTimeFormat("fr-FR", {
-  timeZone: TIME_ZONE,
-  weekday: "short",
-  day: "numeric",
-  month: "short",
 });
 
 /**
@@ -216,15 +199,25 @@ const TIME_FORMAT = new Intl.DateTimeFormat("fr-FR", {
 
 const RELATIVE_FORMAT = new Intl.RelativeTimeFormat("fr-FR", { numeric: "auto" });
 
-/** `"dimanche 27 septembre"`, or with the year when it is not the current one. */
-export function formatDay(instant: Date, now?: Date): string {
-  const sameYear = now ? zonedParts(instant).year === zonedParts(now).year : true;
-  return (sameYear ? DAY_FORMAT : DAY_WITH_YEAR_FORMAT).format(instant);
+/**
+ * `"dimanche 27/09/2026"` — the weekday in words, the date in digits, always with the year.
+ *
+ * The two halves earn their place separately. The **weekday** is the half a footballer reads: a
+ * Sunday is a match and a Tuesday is training, and no digit says that. The **date** is digits
+ * because that is what a date looks like in French (decision 101), and it carries the year
+ * unconditionally — a season crosses 1 January, and « 27 septembre » in a heading is a day the
+ * reader cannot place without knowing which season he is looking at. Nothing here spells a month
+ * any more: the owner asked for `DD/MM/YYYY` and meant everywhere, prose included.
+ *
+ * Built from `formatDate`, so there is exactly one definition of the numeric shape in this file.
+ */
+export function formatDay(instant: Date): string {
+  return `${WEEKDAY_FORMAT.format(instant)} ${formatDate(instant)}`;
 }
 
-/** `"dim. 27 sept."` — for dense rows where the full weekday would wrap. */
+/** `"dim. 27/09/2026"` — for dense rows where the full weekday would wrap. */
 export function formatShortDay(instant: Date): string {
-  return SHORT_DAY_FORMAT.format(instant);
+  return `${formatShortWeekday(instant)} ${formatDate(instant)}`;
 }
 
 /** `"dim."` — the weekday alone, above a numeric date in a dense column. */
@@ -246,13 +239,18 @@ export function formatTime(instant: Date): string {
 }
 
 /**
- * `"aujourd’hui"`, `"demain"`, `"hier"`, else the full date. Only the three neighbouring days
- * get a relative label: "dans 5 jours" reads as vaguer than "vendredi 2 octobre".
+ * `"aujourd’hui, 27/09/2026"`, `"demain, 28/09/2026"`, `"hier, 26/09/2026"`, else `formatDay`.
+ *
+ * Only the three neighbouring days get a relative word: "dans 5 jours" reads as vaguer than
+ * "vendredi 02/10/2026". The word never stands alone, though. The pinned card on `/calendrier`
+ * used to read « Demain à 15:00 » and name no day at all, so a page left open overnight, or a
+ * screenshot sent to a teammate, said something false with nothing in it to catch the error. The
+ * relative word is the convenience; the digits are the fact.
  */
 export function formatDayLabel(instant: Date, now: Date): string {
   const diff = daysFromNow(instant, now);
-  if (Math.abs(diff) <= 1) return RELATIVE_FORMAT.format(diff, "day");
-  return formatDay(instant, now);
+  if (Math.abs(diff) <= 1) return `${RELATIVE_FORMAT.format(diff, "day")}, ${formatDate(instant)}`;
+  return formatDay(instant);
 }
 
 /**
@@ -265,7 +263,7 @@ export function formatRelativeDays(instant: Date, now: Date): string {
   return RELATIVE_FORMAT.format(Math.round(diff / 7), "week");
 }
 
-/** `"Aujourd’hui à 10:30"`, `"dimanche 27 septembre à 10:30"`. */
+/** `"aujourd’hui, 27/09/2026 à 10:30"`, `"dimanche 27/09/2026 à 10:30"`. */
 export function formatWhen(instant: Date, now: Date): string {
   return `${formatDayLabel(instant, now)} à ${formatTime(instant)}`;
 }

@@ -5,7 +5,6 @@ import {
   daysBetween,
   formatDateFr,
   formatDayCountFr,
-  formatDayMonthFr,
   injuryStatus,
   injurySummaryFr,
   isFutureDate,
@@ -163,11 +162,6 @@ describe("French formatting", () => {
     expect(formatDateFr("2027-01-09")).toBe("09/01/2027");
   });
 
-  it("drops the year inside a season", () => {
-    expect(formatDayMonthFr("2026-02-13")).toBe("13 février");
-    expect(formatDayMonthFr("2026-12-01")).toBe("1er décembre");
-  });
-
   it("returns the raw value rather than throwing on nonsense", () => {
     expect(formatDateFr("hier")).toBe("hier");
   });
@@ -188,7 +182,7 @@ describe("injurySummaryFr", () => {
         [injury({ id: "a", startedOn: "2026-09-13", expectedReturnOn: "2026-10-03" })],
         "2026-09-22",
       ),
-    ).toBe("Blessé depuis le 13 septembre, retour prévu le 3 octobre (dans 11 jours).");
+    ).toBe("Blessé depuis le 13/09/2026, retour prévu le 03/10/2026 (dans 11 jours).");
   });
 
   it("says the return date has passed", () => {
@@ -197,12 +191,12 @@ describe("injurySummaryFr", () => {
         [injury({ id: "a", startedOn: "2026-08-01", expectedReturnOn: "2026-09-01" })],
         "2026-09-22",
       ),
-    ).toBe("Blessé depuis le 1er août, retour prévu le 1er septembre — la date est passée.");
+    ).toBe("Blessé depuis le 01/08/2026, retour prévu le 01/09/2026 — la date est passée.");
   });
 
   it("admits when no return was estimated", () => {
     expect(injurySummaryFr([injury({ id: "a", startedOn: "2026-09-20" })], "2026-09-22")).toBe(
-      "Blessé depuis le 20 septembre, retour non estimé.",
+      "Blessé depuis le 20/09/2026, retour non estimé.",
     );
   });
 

@@ -50,7 +50,7 @@ export function EventRow({ event, variant }: EventRowProps) {
       >
         {/*
           The weekday, then the date in digits, then the kick-off. Three short lines rather than
-          « dim. 27 sept. », because this list spans a season that crosses a new year and a row
+          « dim. 27/09/2026 », because this list spans a season that crosses a new year and a row
           with no year on it cannot say which 27 September it means.
         */}
         <span className="w-20 shrink-0 text-xs leading-tight text-ink-subtle">

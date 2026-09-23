@@ -100,9 +100,9 @@ describe("formEntryLabelFr", () => {
         result: "loss",
         scoreFr: "0 – 2",
         fixtureFr: "à CS Morvan",
-        dayFr: "dim. 14 sept.",
+        dayFr: "dim. 14/09/2026",
       }),
-    ).toBe("Défaite 0 – 2 à CS Morvan, dim. 14 sept.");
+    ).toBe("Défaite 0 – 2 à CS Morvan, dim. 14/09/2026");
   });
 });
 

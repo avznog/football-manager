@@ -97,7 +97,7 @@ export default async function TrainingPage({ params }: PageProps<"/entrainements
         </Link>
 
         <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink">
-          {capitalizeFirst(formatDay(startsAt, now))}
+          {capitalizeFirst(formatDay(startsAt))}
         </h1>
 
         <p className="text-sm text-ink-muted">
