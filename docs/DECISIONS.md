@@ -662,3 +662,44 @@ attendance rate change as people leave.
 
 **Consequences.** Same reasoning as the season scorer table keeping a departed scorer: `lib/stats/`
 deliberately reads every membership, including those with `left_at` set.
+
+## 041 — A match with an empty log reads « ? – ? », never « 0 – 0 »
+**2026-09-23** · accepted
+
+The recap has three states, and the row's `status` is what tells them apart:
+
+| State | Score | Badge | Rest of the screen |
+|---|---|---|---|
+| `live` | the running score | « en cours » | timeline as it grows |
+| `finished`, log non-empty | the score | the result, in words | everything |
+| `finished`, log empty | « ? – ? » | « rien saisi » | no minutes table |
+
+`MatchRecap.recorded` (« the log holds at least one event ») carries the distinction out of
+`lib/rating/recap.ts`, and `Scoreboard` takes the `status` as a prop because the reducer cannot know
+a match is over when no final whistle was ever logged.
+
+**Why.** « 0 – 0 » is a result; an empty log is an absence of information, and the two must not look
+alike (this is rule 7 of `lib/stats/aggregate.ts`, which already counts such a match apart, applied to
+the screen). The old recap printed « 0 – 0 » under a red « en cours » badge for a match played weeks
+earlier — wrong twice over, and exactly the kind of thing a coach would have reported as "the app lost
+my match".
+
+**Consequences.** The minutes table is hidden rather than listing every man on the sheet as « non
+entré » at 0’: on an unrecorded match that is not « he did not come on » but « nobody knows », and the
+scoreboard has already said so. Once M7's retro-entry lands, this state is the one that offers it.
+
+## 042 — The recap states a gap rather than leaving a blank
+**2026-09-23** · accepted
+
+Three places where the honest answer is "we do not know", each of which now says so in French rather
+than rendering something that reads as a bug:
+
+- a goal with no scorer (decision 036) shows « But 14’ · buteur non renseigné »;
+- a supporter on the sheet is told « Tu étais supporter sur ce match », not « Tu n'étais pas sur la
+  feuille de match » — the false sentence decision 039 flagged;
+- a supporter in the minutes table is badged « supporter », not « non entré », and sorts below the
+  unused substitutes: one was an option the coach did not use, the other was never an option.
+
+**Why.** Every one of these was found by reading the demo season the fixtures of decision 037 now
+build. A blank field makes the reader doubt the whole screen; a stated gap makes them doubt only the
+gap, which is the truth.

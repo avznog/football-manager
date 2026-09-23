@@ -28,8 +28,13 @@
  * One thing the reducer cannot give us: a **voided** event carries no actors (it never reaches the
  * payload-reading branch), so an annulled goal shows as « But 27’ — annulé » with no name. That is
  * both unavoidable here and defensible: a goal that was not a goal has no scorer.
+ *
+ * A goal that *was* a goal but whose scorer nobody could name is a different case (decision 036) and
+ * says so: « But 27’ · buteur non renseigné ». A bare « But » reads as a bug in the app rather than
+ * as a gap in what was recorded on the touchline.
  */
 
+import type { SquadRole } from "@/db/schema";
 import { pluralize, resultLabel } from "@/lib/calendar/labels";
 import { VOIDED_SUFFIX_FR } from "@/lib/match/events";
 import type { MatchState, PlayerMatchState, TimelineEntry } from "@/lib/match/reducer";
@@ -90,6 +95,12 @@ export type RecapPlayerLine = {
   memberId: string;
   name: string;
   jerseyNumber: number | null;
+  /**
+   * How he was listed on the match sheet. Kept so the minutes table can tell a supporter — who was
+   * never going to come on — apart from a substitute who stayed on the bench: both show 0’, and
+   * calling the supporter « non entré » reads as a reproach he does not deserve.
+   */
+  squadRole: SquadRole | null;
   minutes: number;
   goals: number;
   assists: number;
@@ -109,6 +120,12 @@ export type MatchRecap = {
   goalsAgainst: number;
   /** « 3 - 2 », from our point of view. */
   scoreLabel: string;
+  /**
+   * At least one event was logged. A match can be over with an empty log — nobody opened game mode,
+   * nobody backfilled it — and « 0 – 0 » would then be a lie, not a scoreline (decision 013, and
+   * rule 7 of `lib/stats/aggregate.ts`, which already counts such a match apart).
+   */
+  recorded: boolean;
   finished: boolean;
   result: "win" | "draw" | "loss" | null;
   /** « Victoire » / « Match nul » / « Défaite », or null before the final whistle. */
@@ -146,6 +163,9 @@ export function buildRecap(
     goalsFor: state.goalsFor,
     goalsAgainst: state.goalsAgainst,
     scoreLabel: state.scoreLabel,
+    // The whole log, not the filtered timeline: a match whose only event is a kick-off *was*
+    // followed, even though the recap shows that kick-off and nothing else.
+    recorded: state.timeline.length > 0,
     finished: state.finished,
     result: state.result,
     resultLabel: state.finished ? resultLabel(state.goalsFor, state.goalsAgainst) : null,
@@ -241,13 +261,28 @@ export function buildTimeline(
       eventId: entry.eventId,
       minuteLabel: entry.minuteLabel,
       label: entry.voided ? `${entry.labelFr} — ${VOIDED_SUFFIX_FR}` : entry.labelFr,
-      detail: describeActors(entry, nameOf),
+      detail: describeActors(entry, nameOf) ?? missingScorerNote(entry),
       voided: entry.voided,
       scoreAfter: entry.scoreAfter
         ? `${entry.scoreAfter.goalsFor} - ${entry.scoreAfter.goalsAgainst}`
         : null,
       tone: toneOf(entry),
     }));
+}
+
+/** Types of our goals: the ones where a missing name is worth stating rather than leaving blank. */
+const SCORING_EVENT_TYPES = new Set(["GOAL_FOR", "PENALTY_SCORED"]);
+
+/**
+ * « buteur non renseigné », for a goal of ours that names nobody.
+ *
+ * Decision 036 allows it: in a 7-a-side game nobody always sees who touched it last, and refusing the
+ * goal or inventing a scorer would both be worse. A **voided** goal gets nothing — it carries no
+ * actors by construction, and « annulé · buteur non renseigné » would be noise.
+ */
+function missingScorerNote(entry: TimelineEntry): string | null {
+  if (entry.voided || !SCORING_EVENT_TYPES.has(entry.type)) return null;
+  return "buteur non renseigné";
 }
 
 function toneOf(entry: TimelineEntry): RecapTimelineTone {
@@ -310,6 +345,7 @@ export function buildPlayerLines(
         memberId: player.memberId,
         name: member?.displayName ?? unknownName,
         jerseyNumber: member?.jerseyNumber ?? null,
+        squadRole: player.squadRole,
         minutes: player.minutes,
         goals: player.goals,
         assists: player.assists,
@@ -325,6 +361,9 @@ export function buildPlayerLines(
     .sort(
       (a, b) =>
         Number(b.playedMatch) - Number(a.playedMatch) ||
+        // Among those who never came on, the bench first and the supporters last: one was an option
+        // the coach did not use, the other was never an option.
+        Number(a.squadRole === "supporter") - Number(b.squadRole === "supporter") ||
         b.minutes - a.minutes ||
         b.goals - a.goals ||
         a.name.localeCompare(b.name, "fr"),

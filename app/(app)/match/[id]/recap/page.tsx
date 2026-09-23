@@ -89,7 +89,12 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
     <div className="space-y-6">
       <RecapHeader match={match} kickoff={kickoff} now={now} />
 
-      <Scoreboard recap={recap} opponentName={match.opponentName} isHome={match.isHome} />
+      <Scoreboard
+        recap={recap}
+        opponentName={match.opponentName}
+        isHome={match.isHome}
+        status={match.status}
+      />
 
       {/* The prompt of screen 6: the recap asks for the notes, it does not wait to be found. */}
       {canStillRate && gated ? (
@@ -116,7 +121,10 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
         <RatingsPanel results={results} matchId={match.id} canStillRate={canStillRate} />
       ) : null}
 
-      <MinutesTable players={recap.players} />
+      {/* With an empty log every man on the sheet would be listed « non entré » at 0’, which is not
+          « il n'est pas entré » but « on ne sait pas » — the scoreboard has already said so, and the
+          timeline below says it again. Nine false lines would be the third telling, and a wrong one. */}
+      {recap.recorded ? <MinutesTable players={recap.players} /> : null}
 
       <TimelineList entries={recap.timeline} />
     </div>

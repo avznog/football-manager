@@ -320,3 +320,82 @@ describe("buildRecap — minutes played", () => {
     expect(recapOf(FULL_MATCH, []).players[0]?.name).toBe(UNKNOWN_MEMBER_NAME);
   });
 });
+
+describe("buildRecap — a match that was never recorded", () => {
+  it("says the log is empty rather than pretending it finished 0-0", () => {
+    // Decision 038: a match can be closed with nothing in its log — nobody opened game mode and
+    // nobody backfilled it. `recorded` is what lets the recap say so instead of printing a score
+    // that never happened.
+    const recap = recapOf([]);
+
+    expect(recap.recorded).toBe(false);
+    expect(recap.goalsFor).toBe(0);
+    expect(recap.goalsAgainst).toBe(0);
+    // The reducer cannot know the match is over: no final whistle was ever logged. The row's
+    // `status` is what tells the screen, which is why `Scoreboard` takes it as a prop.
+    expect(recap.finished).toBe(false);
+    expect(recap.resultLabel).toBeNull();
+    expect(recap.timeline).toEqual([]);
+  });
+
+  it("is recorded as soon as anything at all was logged", () => {
+    expect(recapOf(log([{ type: "KICKOFF", min: 0, period: 1 }])).recorded).toBe(true);
+    expect(recapOf(FULL_MATCH).recorded).toBe(true);
+  });
+});
+
+describe("buildRecap — a goal nobody could attribute", () => {
+  const events = log([
+    { type: "KICKOFF", min: 0, period: 1 },
+    { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTERS) },
+    { type: "GOAL_FOR", min: 14 },
+    { type: "FINAL_WHISTLE", min: 60, period: 2 },
+  ]);
+
+  it("counts in the score and says the scorer is missing", () => {
+    // Decision 036: in a 7-a-side game nobody always sees who touched it last, so a goal may carry
+    // no scorer. It still counts — and the timeline states the gap rather than showing a bare « But ».
+    const recap = recapOf(events);
+
+    expect(recap.goalsFor).toBe(1);
+    expect(recap.scorers).toEqual([]);
+    expect(recap.timeline.find((entry) => entry.minuteLabel === "14’")).toMatchObject({
+      label: "But",
+      detail: "buteur non renseigné",
+      scoreAfter: "1 - 0",
+      tone: "for",
+    });
+  });
+
+  it("says nothing of the sort about a goal conceded, which never has a scorer of ours", () => {
+    const conceded = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "GOAL_AGAINST", min: 8 },
+    ]);
+    expect(recapOf(conceded).timeline.at(-1)).toMatchObject({
+      label: "But encaissé",
+      detail: null,
+    });
+  });
+});
+
+describe("buildRecap — the supporter on the sheet", () => {
+  const squad = [...SQUAD, { teamMemberId: "gerard", role: "supporter" as const }];
+  const members = [...MEMBERS, { memberId: "gerard", displayName: "Gérard Simon", jerseyNumber: null }];
+  const recap = buildRecap(reduceMatch(FULL_MATCH, [], { slots: SLOTS, squad }), members);
+  const lineOf = (memberId: string) =>
+    recap.players.find((player) => player.memberId === memberId);
+
+  it("carries the role of the sheet, so 0’ can be explained", () => {
+    // Both were on the sheet and neither played: one was an option the coach did not use, the other
+    // was never an option. « non entré » is only true of the first (decision 039).
+    expect(lineOf("gerard")).toMatchObject({ squadRole: "supporter", minutes: 0, playedMatch: false });
+    expect(lineOf("ali")).toMatchObject({ squadRole: "substitute", minutes: 0, playedMatch: false });
+    expect(lineOf("hugo")?.squadRole).toBe("starter");
+  });
+
+  it("sinks below the unused substitutes, who were closer to playing", () => {
+    const tail = recap.players.slice(-2).map((player) => player.memberId);
+    expect(tail).toEqual(["ali", "gerard"]);
+  });
+});

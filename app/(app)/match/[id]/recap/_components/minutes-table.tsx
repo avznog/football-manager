@@ -46,7 +46,13 @@ export function MinutesTable({ players }: { players: readonly RecapPlayerLine[] 
                     ) : null}
                     <span className="truncate font-medium text-ink">{player.name}</span>
                     {player.wasGoalkeeper ? <Badge variant="neutral">GB</Badge> : null}
-                    {!player.playedMatch ? <Badge variant="neutral">non entré</Badge> : null}
+                    {/* A supporter was on the sheet without being an option: « non entré » would
+                        read as a choice the coach made about him. */}
+                    {!player.playedMatch ? (
+                      <Badge variant="neutral">
+                        {player.squadRole === "supporter" ? "supporter" : "non entré"}
+                      </Badge>
+                    ) : null}
                   </span>
                   {player.wasGoalkeeper && player.gkCleanMinutes > 0 ? (
                     <span className="mt-0.5 block text-xs text-ink-subtle">
