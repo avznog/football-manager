@@ -12,6 +12,14 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       built-in « This page could not be found. », in English, in a French app; there was no error
       boundary of any kind, so one failing query took the whole screen. All five walked at 390 px
       in both themes against a production build
+- [x] `npm run audit:screens` — 23 screens of the demo season walked at 390 px in both themes, as a
+      coach and as a non-coach player, screenshotted, with the mechanical defects failing the command:
+      a console error, a box outside the viewport no scroll container owns, an English framework
+      string, a screen open to somebody it is not for, a page with no level-one heading (decision 059)
+- [x] The three defects its first pass found: « Appliquer » offered to a member who may not operate
+      the match (the server answered 403), « ne change rien sur le terrain » printed over a starting
+      seven about to walk onto an empty pitch, and two screens with no `h1` at all — game mode, and
+      the composition editor in each of its four dead ends (decision 060)
 - [x] Local Postgres via Homebrew (`npm run db:start`), Drizzle config, `DATABASE_URL` only
       — Docker was abandoned, see decision 016
 - [x] Full schema in `db/schema.ts` + first migration committed

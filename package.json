@@ -14,6 +14,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
     "test:e2e:install": "playwright install --with-deps chromium",
+    "audit:screens": "tsx --conditions=react-server scripts/audit-screens.ts",
     "db:start": "brew services start postgresql@17",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx db/migrate.ts",

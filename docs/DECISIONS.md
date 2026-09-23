@@ -1119,3 +1119,60 @@ test; both were visible immediately at 390 px.
   78′ is survivable: the outbox writes to IndexedDB *before* it POSTs, and `reset()` remounts, which
   calls `outbox.hydrate()`. The generic boundary says no such thing, because it also catches a render
   that failed just after a Server Action, and whether *that* landed is exactly what is not known.
+
+## 059 — `npm run audit:screens`: the 390 px walk, done by a machine
+
+**Decision.** A script, `scripts/audit-screens.ts`, logs in as a coach and as a non-coach player,
+walks 23 screens of the demo season at 390 px in both themes, screenshots each one to `audit/`
+(gitignored), and fails on the defects that are mechanical.
+
+**Why.** `CLAUDE.md` says walking the season is the cheapest review tool in the repo, and every defect
+found in waves 3 and 4 proves it: each was a screen stating something untrue, and **not one failed a
+test**. But the walk itself was being done by hand, which means it was being done rarely. So: the
+looking stays human — a screenshot is the only thing that catches « 0 – 0 » on a match nobody
+recorded — and the questions a DOM can answer are asked by the script:
+
+- anything the console says, minus a two-entry allow-list where each entry carries the reason it is
+  benign (a 404 document logging its own status; React reporting the root layout's theme `<script>`,
+  which has already run from the SSR'd HTML and must not run twice);
+- a page that scrolls sideways, or a box outside the viewport that **no scroll container owns** — the
+  first version reported `/stats`' deliberate `overflow-x-auto` filter strip and had to be taught;
+- an English framework string, in an app whose first rule is that the UI is French (decision 058);
+- a screen reachable by somebody it is not for, or answering 404 to somebody it is for;
+- a page with no level-one heading.
+
+**Not part of `npm run test:e2e`.** That suite owns a run-scoped fixture team and never touches the
+demo season (decision 044); this needs a *full* season to have anything to look at.
+
+**The ids are discovered, never written down.** The first version hardcoded the demo match ids.
+`npm run db:reset` regenerates them, so the next run walked thirteen 404s and reported a clean sweep.
+Everything is now read out of Postgres, and the script refuses to run rather than guess — a review
+tool that can pass by looking at nothing is worse than no review tool.
+
+## 060 — What the first run of the audit found, and why each was a real defect
+
+Three findings on its first honest pass, all of the same family: a screen saying something that is
+not so.
+
+- **A member who may not operate the match was offered « Appliquer ».** The planned-composition card
+  is deliberately shown to everyone — following the plan from the touchline is the point — but only
+  `onAdjust` was gated on `canOperate`. Tapping the other button produced a `LINEUP_APPLIED` the route
+  handler answered 403 to, so the invitation itself was the bug. `onApply` is now `null` for them and
+  the card's one remaining button is « Masquer », not « Plus tard »: « plus tard » would promise them
+  something they will not be doing, and the description says the wait is on *the operator's*
+  confirmation, not theirs.
+- **« Cette composition ne change rien sur le terrain » over a starting seven.** This is the old
+  « 7 changements » lie (decision 031) fixed in one direction and reappearing in the other: the
+  starting composition has an empty `changes` list on purpose, because seven arrivals are a team sheet
+  and not seven substitutions — but an *empty diff* means the same thing, and the card could not tell
+  them apart. `pendingLineupChangesFr` in `lib/match/presenter.ts` now does, and says « 7 joueurs
+  entrent en jeu. » for the one and « ne change rien » only for the other. It is a function in `lib/`
+  rather than a condition in the component because Vitest runs in `node` and cannot reach the
+  component — the copy has to live where a test can read it.
+- **Two screens had no `h1` at all**: game mode, and the composition editor in each of its four dead
+  ends. The second was the worse one — a bare centred panel reading « Cette composition a été
+  appliquée » about no match in particular. The editor now renders its header in every state, so the
+  page always says which composition of which match, and the panel says only what is wrong with it.
+  Game mode gets an `sr-only` heading: every pixel above the pitch is the clock and the score on
+  purpose, and a title bar would push the ACTION button down the screen, but a page still needs a
+  name. The audit checks for this now, so the class cannot come back.
