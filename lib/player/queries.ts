@@ -17,6 +17,8 @@ import { isPositionCode } from "@/db/reference";
 import { injuries, playerPositions, teamMembers, users } from "@/db/schema";
 import type { TeamRole } from "@/db/schema";
 import type { PositionPreference } from "@/lib/pitch/preferences";
+import { wouldLeaveNoCoach } from "@/lib/team/coaches";
+import { getActiveCoachIds } from "@/lib/team/queries";
 import { type InjuryRecord, parisDate, sortInjuries } from "./injury";
 import { type PreferredPosition, sortPreferredPositions } from "./positions";
 import { isUuid } from "./validation";
@@ -36,6 +38,12 @@ export type PlayerProfile = {
   positions: PreferredPosition[];
   /** Ongoing first, then most recently started. */
   injuries: InjuryRecord[];
+  /**
+   * Their coach role is the team's last, so `setMemberRole` and `removeMember` will both refuse to
+   * touch it. The profile is where those two forms live, and a button that silently does nothing is
+   * worse than no button — so the page says why instead of offering the taps.
+   */
+  isLastCoach: boolean;
 };
 
 /**
@@ -75,9 +83,10 @@ export const getPlayerProfile = cache(
     if (member.length === 0) return null;
     const row = member[0];
 
-    const [positions, history] = await Promise.all([
+    const [positions, history, coachIds] = await Promise.all([
       getPreferredPositions(membershipId),
       getInjuries(membershipId),
+      getActiveCoachIds(teamId),
     ]);
 
     return {
@@ -91,6 +100,7 @@ export const getPlayerProfile = cache(
       joinedOn: parisDate(row.joinedAt),
       positions,
       injuries: history,
+      isLastCoach: wouldLeaveNoCoach(coachIds, membershipId),
     };
   },
 );

@@ -102,6 +102,28 @@ export async function getSquad(teamId: string): Promise<SquadMember[]> {
   }));
 }
 
+/**
+ * The membership ids of the team's coaches who have not left.
+ *
+ * Feeds `wouldLeaveNoCoach` — the rule that a team keeps at least one coach. A handful of rows, and
+ * asked for by two Server Actions and the player profile, so it is its own narrow query rather than
+ * a `getSquad` the callers would filter three different ways.
+ */
+export async function getActiveCoachIds(teamId: string): Promise<string[]> {
+  const rows = await db
+    .select({ id: teamMembers.id })
+    .from(teamMembers)
+    .where(
+      and(
+        eq(teamMembers.teamId, teamId),
+        eq(teamMembers.role, "coach"),
+        isNull(teamMembers.leftAt),
+      ),
+    );
+
+  return rows.map((row) => row.id);
+}
+
 export type ActiveInvite = {
   id: string;
   code: string;

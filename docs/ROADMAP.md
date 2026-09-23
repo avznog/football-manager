@@ -32,6 +32,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Invite management and coach appointment UI
 - [x] The team's last coach is told why he cannot be demoted or removed, instead of being offered
       two buttons the server refuses in silence — and the squad row wraps so his name still fits
+- [x] …and then the two controls left the list for the member's own page, which is what the
+      wrapping was paying for: a coach's squad was two lines per player, twice the scroll of
+      everyone else's, for two buttons he presses twice a season. The row is one line again and the
+      whole of it is the link. « A team keeps one coach » is now one tested function,
+      `wouldLeaveNoCoach` in `lib/team/coaches.ts`, instead of three copies that had to agree
 
 ## M2 — Calendar
 - [x] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)

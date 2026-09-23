@@ -18,14 +18,6 @@ export default async function TeamPage() {
   const players = squad.filter((member) => member.isPlayer);
   const staff = squad.filter((member) => !member.isPlayer);
 
-  /**
-   * A team must always keep one coach, and `setMemberRole` / `removeMember` enforce it by refusing.
-   * Counted here so the row can say so instead of offering a button that does nothing — `getSquad`
-   * already excludes anybody who has left, which is the condition those actions check too.
-   */
-  const coaches = squad.filter((member) => member.role === "coach");
-  const lastCoachId = coaches.length === 1 ? coaches[0].membershipId : null;
-
   return (
     <div className="space-y-6">
       <header className="flex items-baseline justify-between gap-3">
@@ -35,7 +27,17 @@ export default async function TeamPage() {
         </p>
       </header>
 
-      <Card title="Effectif" flush>
+      {/* The description is the signpost: a coach used to have « Nommer coach » and « Retirer » on
+          every row, and they now live on the member's own page. */}
+      <Card
+        title="Effectif"
+        description={
+          team.isCoach
+            ? "Touche un joueur pour son numéro, ses postes, son rôle et ses blessures."
+            : undefined
+        }
+        flush
+      >
         {players.length === 0 ? (
           /* The state a brand-new team is in, and therefore the first thing the owner of a fresh
              instance sees. An empty bordered box says nothing; this says what to do next. */
@@ -47,13 +49,7 @@ export default async function TeamPage() {
         ) : (
           <ul className="divide-y divide-border/60">
             {players.map((member) => (
-              <MemberRow
-                key={member.membershipId}
-                member={member}
-                teamId={team.id}
-                canManage={team.isCoach}
-                isLastCoach={member.membershipId === lastCoachId}
-              />
+              <MemberRow key={member.membershipId} member={member} />
             ))}
           </ul>
         )}
@@ -63,13 +59,7 @@ export default async function TeamPage() {
         <Card title="Encadrement" flush>
           <ul className="divide-y divide-border/60">
             {staff.map((member) => (
-              <MemberRow
-                key={member.membershipId}
-                member={member}
-                teamId={team.id}
-                canManage={team.isCoach}
-                isLastCoach={member.membershipId === lastCoachId}
-              />
+              <MemberRow key={member.membershipId} member={member} />
             ))}
           </ul>
         </Card>
