@@ -144,6 +144,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] The composition editor deduces nothing while the pitch is unfinished. It opened on an empty one
       and reported seven departures under « Changements déduits »; `deduceChanges` now counts the slots
       nobody is standing in and the card says what is still missing (decision 086)
+- [x] « Hors feuille » counts players. The match page and the compositions header both said « 3 hors
+      feuille » on a thirteen-player squad with eleven on the sheet — fourteen in total, one tap from a
+      sheet screen that said « 2 » — because they counted the non-playing coach `createTeam` inserts on
+      every new team. `isSheetCandidate` is the filter that existed inline in one page, named, and
+      `countSquadRoles` applies it to its own input (decision NNN)
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses

@@ -9,6 +9,7 @@ import {
   blockingIssues,
   compositionsScreenFr,
   countSquadRoles,
+  isSheetCandidate,
   deduceChanges,
   draftChangesPendingFr,
   findPlanIssues,
@@ -348,11 +349,11 @@ describe("nameOfMembers", () => {
 
 describe("the match sheet in words", () => {
   const sheet = [
-    { squadRole: "starter" as const },
-    { squadRole: "starter" as const },
-    { squadRole: "substitute" as const },
-    { squadRole: "supporter" as const },
-    { squadRole: null },
+    { isPlayer: true, squadRole: "starter" as const },
+    { isPlayer: true, squadRole: "starter" as const },
+    { isPlayer: true, squadRole: "substitute" as const },
+    { isPlayer: true, squadRole: "supporter" as const },
+    { isPlayer: true, squadRole: null },
   ];
 
   it("counts each role, including who was not retained", () => {
@@ -375,6 +376,62 @@ describe("the match sheet in words", () => {
     );
   });
 
+  /**
+   * The demo season, exactly: thirteen players, eleven of them on the sheet against Étoile du Parc,
+   * and a fourteenth member — the club's second coach — who has never played a minute. The match page
+   * said « 3 hors feuille », the sheet one tap away said « 2 », and only one of them can be true.
+   */
+  it("does not count a coach who never plays as a player left out", () => {
+    const squad = [
+      ...Array.from({ length: 7 }, () => ({ isPlayer: true, squadRole: "starter" as const })),
+      ...Array.from({ length: 3 }, () => ({ isPlayer: true, squadRole: "substitute" as const })),
+      { isPlayer: true, squadRole: "supporter" as const },
+      { isPlayer: true, squadRole: null },
+      { isPlayer: true, squadRole: null },
+      { isPlayer: false, squadRole: null },
+    ];
+
+    expect(countSquadRoles(squad).unselected).toBe(2);
+    expect(squadSummaryFr(countSquadRoles(squad))).toBe(
+      "7 titulaires · 3 remplaçants · 1 supporter · 2 hors feuille",
+    );
+  });
+
+  /** The line has to add up against the squad the reader can count, non-players excluded. */
+  it("accounts for every player and nobody else", () => {
+    const squad = [
+      { isPlayer: true, squadRole: "starter" as const },
+      { isPlayer: true, squadRole: null },
+      { isPlayer: false, squadRole: null },
+      { isPlayer: false, squadRole: null },
+    ];
+    const counts = countSquadRoles(squad);
+    const total = counts.starters + counts.substitutes + counts.supporters + counts.unselected;
+
+    expect(total).toBe(squad.filter((member) => member.isPlayer).length);
+  });
+
+  /**
+   * The one case that keeps a non-player in the count: a coach the coach did put on the sheet. Hiding
+   * him would leave the only screen that can take him back off unable to show him.
+   */
+  it("keeps a non-player who is on the sheet", () => {
+    const squad = [
+      { isPlayer: true, squadRole: "starter" as const },
+      { isPlayer: false, squadRole: "supporter" as const },
+    ];
+
+    expect(countSquadRoles(squad)).toEqual({
+      starters: 1,
+      substitutes: 0,
+      supporters: 1,
+      unselected: 0,
+    });
+    expect(isSheetCandidate({ isPlayer: false, squadRole: "supporter" })).toBe(true);
+    expect(isSheetCandidate({ isPlayer: false, squadRole: null })).toBe(false);
+    expect(isSheetCandidate({ isPlayer: true, squadRole: null })).toBe(true);
+  });
+
   it("leaves out the roles nobody has", () => {
     expect(squadSummaryFr({ starters: 1, substitutes: 0, supporters: 0, unselected: 0 })).toBe(
       "1 titulaire",
@@ -390,7 +447,9 @@ describe("the match sheet in words", () => {
    * when there is nothing else on the line.
    */
   it("says so when nothing has been decided", () => {
-    expect(squadSummaryFr(countSquadRoles([{ squadRole: null }]))).toBe("Feuille de match vide");
+    expect(squadSummaryFr(countSquadRoles([{ isPlayer: true, squadRole: null }]))).toBe(
+      "Feuille de match vide",
+    );
     expect(squadSummaryFr({ starters: 0, substitutes: 0, supporters: 0, unselected: 13 })).toBe(
       "Feuille de match vide",
     );
