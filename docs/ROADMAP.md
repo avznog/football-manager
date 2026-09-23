@@ -15,7 +15,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] "No team" layout guard (`app/(app)/layout.tsx` + optimistic `proxy.ts`)
 - [x] `db/seed.ts` — reference data (prod-safe) + a demo season of 13 players, 4 matches,
       3 trainings, an event log with a voided goal, ratings
-- [ ] Playwright end-to-end happy path — deferred to its own slice
+- [x] Playwright end-to-end happy path (`e2e/happy-path.spec.ts`, `npm run test:e2e`) — the whole
+      PLAN scenario driven through the UI on a 390×844 viewport, with a run-scoped fixture team
+      instead of the demo season (decision 044), plus CI in `.github/workflows/ci.yml`
 
 ## M1 — Squad & profiles
 - [x] Squad list with jersey numbers, injury badges and preferred positions, each row linking
