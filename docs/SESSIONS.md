@@ -233,3 +233,73 @@ written; their work is not in `main` yet.
 **Next:** land the three agents still running (M7, TERRAIN, Playwright), each with its own PR after an
 isolated worktree verification, then `db:reset` and re-walk the season. Deployment is still blocked on
 a Neon `DATABASE_URL` from the owner; the Vercel CLI is authenticated as `avznog`.
+
+## 2026-09-23 — wave 4, part 2: M7, TERRAIN, and the browser that finally runs the season
+
+The three agents left running at the end of part 1 all landed. **Every milestone M0–M7 is now
+ticked**; the only unticked lines in `docs/ROADMAP.md` are the deployment ones, still blocked on a
+Neon `DATABASE_URL` from the owner.
+
+### Shipped
+
+- **#19 — the end-to-end happy path** (`e2e/happy-path.spec.ts`). The whole PLAN scenario driven
+  through the UI on a 390×844 viewport: the coach creates a match, two players answer for themselves,
+  the sheet is picked, two compositions are drawn, both halves are played, two players rate the squad,
+  the recap crowns a man of the match. Real logins, no forged cookie. The assertions that justify it
+  are minutes played after the whistle, the second-half clock reading `30:00`, and **invariant 3
+  twice** — the pitch empty while a composition sits there as a proposal, and the replaced midfielder
+  still on at the 30th minute with the plan on screen. The suite provisions its own team rather than
+  reading `db/seed.ts` (decision 044), and `.github/workflows/ci.yml` now runs both gates on every
+  push. Decision 043 is the one to remember: `127.0.0.1` silently disables hydration in `next dev`.
+- **#20 — TERRAIN** (`lib/match/terrain.ts`, 39 tests). One sheet to rearrange the whole pitch, one
+  `LINEUP_APPLIED` per confirmation (decision 046). Decision 045 amends 032: drag is allowed here and
+  only here, because the gesture writes nothing. The planned-composition prompt gained « Ajuster sur
+  le terrain », which pre-fills and waits exactly as « Appliquer » does.
+- **#21 — M7, retro-entry and amendments** (`lib/retro/`, 52 tests). A match typed up afterwards is an
+  ordinary event log (decision 047); minutes are optional and stamped where they cannot contradict the
+  log (decision 048); a correction is a `VOID` plus a replacement carrying its target's minute, and
+  the frame of the log cannot be annulled at all (decision 049). `amendMatchEvents` shares the single
+  insert path with `appendMatchEvents` and re-freezes `match_player_stats`.
+
+### Worth knowing before the next session
+
+1. **The end-to-end suite is now the cheapest honest check in the repo**, and it has already earned
+   it: it passed on every one of the three merges, including the two that changed game mode. Run
+   `npm run test:e2e` before believing anything about the match flow. It reuses a dev server if one is
+   up, so it costs about 25 seconds.
+2. **CI exists, and it caught up with the definition of done.** Both jobs passed first time on all
+   three PRs, and the e2e job builds the app — so `npm run build` is covered on every PR now.
+3. **Verifying a slice while other agents write the same tree**: stage only that slice's paths,
+   `git commit-tree` a snapshot, `git worktree add` it detached, hardlink `node_modules` with
+   `cp -al`, copy `.env.local`. That is what made three independent PRs possible out of one working
+   tree, and each one's gates are therefore about that slice alone.
+4. **Reading a screen is still what finds the lies.** Three more this wave, all found by screenshotting
+   at 390 px rather than by a failing test: « 7 changements » for the starting seven (seven
+   substitutions in the first second — the same lie the recap already refuses about a `LINEUP_APPLIED`
+   at 0′), « un match 0-0 sans carton » naming a thing this app deliberately never records, and
+   « saisi après le match » badged on a match whose log was still empty, on the page where it was
+   about to be entered.
+5. **A real mobile bug came out of it too.** `Button` carried `shrink-0`, so the repo-wide idiom of two
+   `fullWidth` buttons in a `flex` row overflowed a 390 px viewport — measured `scrollWidth 740` with
+   the confirm button at `left: 382`, off-screen and unreachable with a thumb, on a sheet that had
+   been in `main` for two waves. `fullWidth` now carries `min-w-0 shrink`.
+6. **The demo season is back to exactly what `db/seed.ts` describes** (`npm run db:reset` after the
+   by-hand retro entry), so the unrecorded-recap state part 1 could not screenshot is now verified in
+   both themes — and so is what the entry form makes of it: « 1 – 2 · Victoire », 60′ each for seven
+   starters, Hugo « 30′ sans encaisser », and « But · buteur non renseigné » in the timeline.
+
+### Debt named, not paid
+
+- ~80 lines of pointer-drag handling are duplicated between the composition editor and TERRAIN; the
+  fix is a `usePitchDrag` hook in `components/pitch/` (named in decision 045).
+- `describeLineupDiffFr` in `lib/match/lineup.ts` prints nothing for an unpaired arrival or departure.
+  `terrainChangesFr` works around it; the shared helper is still wrong for other callers.
+- `lib/match/queries.ts` does not expose `matches.entry_mode`, so `lib/retro/queries.ts` pays an extra
+  `select`; `db/schema.ts` exports no `EntryMode` alias.
+- A retro entry does not rewrite `match_squad` roles, so a listed substitute who actually started keeps
+  `squad_role = 'substitute'`. Game mode behaves identically and no count is wrong, but whether the
+  sheet should follow the log is one decision to take for both paths.
+
+**Next:** deployment, and nothing else — `vercel link`, the environment variables, a production deploy
+and a run through a real match on an iPhone and an Android in daylight. It needs a Neon
+`DATABASE_URL` from the owner (interactive signup); the Vercel CLI is authenticated as `avznog`.
