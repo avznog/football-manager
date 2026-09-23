@@ -1,0 +1,88 @@
+# An optional, self-contained way to run the whole stack: Postgres 17 and the built app.
+#
+# It does not replace `npm run dev` against the Homebrew Postgres — that is still the documented
+# development loop (decisions 016 and 077). Use this when you want the app running the way it runs
+# in production, or on a machine with no Homebrew.
+#
+#   docker compose up -d db        # Postgres only, for `npm run dev` on the host
+#   docker compose run --rm migrate
+#   docker compose up --build app  # the production image on http://localhost:3000
+#
+# The credentials are the ones CI and `.env.example` already use, so nothing else has to change.
+
+name: football-manager
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: football
+      POSTGRES_PASSWORD: football
+      POSTGRES_DB: football_manager
+    ports:
+      # Published so `npm run dev`, `db:studio` and the Playwright suite on the host can reach it.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # Without a healthcheck the first migration races the server's own start-up, exactly as in
+      # `.github/workflows/ci.yml`. `-d`/`-U` so it probes the real database, not the default one.
+      test: ["CMD-SHELL", "pg_isready -U football -d football_manager"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # One-shot: applies the committed migrations, never `db:push`. Run it before `app`, and again
+  # after pulling a schema change.
+  migrate:
+    build:
+      context: .
+      target: tools
+    environment:
+      DATABASE_URL: postgres://football:football@db:5432/football_manager
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    command: ["npm", "run", "db:migrate"]
+
+  # Reference data and the one super admin, for an empty database — docs/DEPLOY.md §3.
+  # Not started by `up`: `docker compose run --rm bootstrap`.
+  bootstrap:
+    profiles: ["setup"]
+    build:
+      context: .
+      target: tools
+    environment:
+      DATABASE_URL: postgres://football:football@db:5432/football_manager
+      SUPER_ADMIN_USERNAME: ${SUPER_ADMIN_USERNAME:-admin}
+      # Left empty rather than defaulted, and rather than `:?` — a required-variable check here
+      # would make plain `docker compose up` fail for a service it does not even start. The script
+      # itself refuses an absent, short or demo password (decision 052).
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    command: ["npm", "run", "db:bootstrap"]
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://football:football@db:5432/football_manager
+      NODE_ENV: production
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:

@@ -1600,3 +1600,49 @@ Worth naming, because it is the fourth time: **the blank screen passed every mec
 `h1`, no console error, nothing outside the viewport, no English. The script says in its own output
 that what it cannot catch is a screen stating something untrue — and a screen saying nothing about
 something that happened is a member of that family, not an exception to it.
+
+## 077 — Docker Compose is an additional way to run the stack, not the development loop
+**2026-09-23** · accepted
+
+`compose.yaml`, `Dockerfile` and `.dockerignore` bring up Postgres 17 and a production build of the
+app with one command. Decision 016 still stands: **development is `npm run dev` against the Homebrew
+`postgresql@17` service**, and nothing in the repository now requires Docker.
+
+**Why not supersede 016.** 016 chose Homebrew for a reason that has not changed — the owner's machine
+had no Docker daemon, and a Homebrew service needs none, starts at boot and survives a reboot. The
+development loop that decision produced is fast and it works. Replacing it would trade a working
+setup for a container rebuild on every dependency change, and would make Docker a precondition for
+contributing.
+
+**Why add compose anyway.** Three gaps Homebrew does not cover. A production build behaves
+differently from `next dev` — standalone output, `NODE_ENV=production`, no HMR — and the only way to
+see that before Vercel does was `npm run build && npm run start`, which still needs the host set up.
+A machine without Homebrew (Linux, CI-like, a second laptop) had no documented path to a database at
+all — `npm run db:start` is `brew services`, so it is macOS-only, and on Linux `npm run docker:db` is
+now the equivalent. And CI runs against a `postgres:17` service image, so a container is the closest local
+reproduction of the environment the e2e job fails in.
+
+**How it is arranged.**
+
+- Four services. `db` is `postgres:17` with the same credentials as `.env.example` and CI, a named
+  volume, a `pg_isready -U football -d football_manager` healthcheck and a published port so the
+  host's `npm run dev` can use it on its own. `migrate` is a one-shot that applies the committed
+  migrations — never `db:push`. `bootstrap` is behind a `setup` profile, for an empty database.
+  `app` is the production image, and it depends on `db` being healthy *and* `migrate` having exited
+  successfully, so no request can reach a schemaless database.
+- `output: "standalone"` in `next.config.ts` is **opt-in**, gated on `NEXT_OUTPUT_STANDALONE`, which
+  only the Docker build sets. Vercel does its own tracing and builds exactly as it did before; a
+  config change that silently altered the deployed artefact would have been a poor trade for a
+  convenience.
+- The image is `node:22-bookworm-slim`, not Alpine. `@node-rs/argon2` ships prebuilt glibc binaries
+  and musl would send it to a source build.
+- The Dockerfile carries a `tools` stage — dependencies plus the source tree, no build — because the
+  standalone runner has neither `npm` nor `tsx`, so `db:migrate` and `db:bootstrap` cannot run in it.
+- No `DATABASE_URL` at build time, per decision 075: a build must not need a database.
+
+**Consequences.** The compose credentials are development credentials and the file is not a
+deployment target — Vercel plus Neon remains the deployment, and `docs/DEPLOY.md` keeps compose in a
+section marked optional. Two ways to get a database now exist, which is a documentation cost; it is
+paid by that section saying plainly which one is the default. CI is unchanged: it keeps using the
+service-container form rather than building an image, because building one would add minutes to
+every push to prove something the compose build already proves locally.

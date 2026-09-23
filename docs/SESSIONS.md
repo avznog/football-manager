@@ -1191,3 +1191,53 @@ apart ». They do not any more, so it says what is true now instead.
 Fourth time worth writing down: the blank screen passed every mechanical check the audit makes — an
 `h1`, no console error, nothing outside the viewport, no English. Both themes looked at, at 390 px.
 873 unit tests, e2e 3 passed in 27.0s.
+
+---
+
+## A second way to get a database
+
+**2026-09-23** · `compose.yaml`, `Dockerfile`, `.dockerignore`, `next.config.ts`, `package.json`, docs
+
+The stack runs in containers now — `postgres:17` and a production build of the app, one command —
+and decision 016 is untouched. That was the whole question worth deciding. 016 chose Homebrew
+Postgres because the owner's machine had no Docker daemon and a Homebrew service needs none; that is
+still true and the development loop it produced still works, so compose is framed as **an addition**
+and `docs/DEPLOY.md` puts it in a section marked optional, after the Vercel and Neon runbook.
+Decision 077 has the reasoning, including why the three gaps it closes — seeing a production build
+before Vercel does, a machine with no Homebrew, reproducing CI's `postgres:17` — are worth a second
+documented path.
+
+Four services. `db` mirrors the CI service container down to the credentials, with a named volume, a
+`pg_isready -U football -d football_manager` healthcheck and a published port so `npm run dev` on the
+host can use it alone. `migrate` is one-shot and applies the committed SQL, never `db:push`.
+`bootstrap` sits behind a `setup` profile. `app` depends on `db` being healthy *and* on `migrate`
+exiting successfully, which is what makes a schemaless first request impossible.
+
+Two choices that could have gone wrong quietly:
+
+- `output: "standalone"` is gated on `NEXT_OUTPUT_STANDALONE`, set only by the Docker build. Turning
+  it on unconditionally would have changed the artefact Vercel deploys in order to make a container
+  smaller — a bad trade for a convenience, and invisible until a deploy misbehaved.
+- The base is `node:22-bookworm-slim`, not Alpine: `@node-rs/argon2` ships prebuilt glibc binaries
+  and musl would send it to a source build.
+- `bootstrap`'s `SUPER_ADMIN_PASSWORD` defaults to empty instead of using compose's `:?` required
+  form. `:?` is interpolated for the whole file, so it made plain `docker compose config` and
+  `docker compose up` fail over a service they never start. Caught by running it.
+
+Also worth knowing: the runner stage has neither `npm` nor `tsx`, so the db scripts cannot live in
+it. That is why the Dockerfile has a `tools` stage — dependencies plus source, no build — which both
+`migrate` and `bootstrap` target.
+
+Verified, not assumed:
+
+- `npm run typecheck`, `npm run lint`, `npm test` — 43 files, 868 tests passed
+- `docker compose config -q` clean, and `docker compose build` green for both images
+- `docker compose up -d app` walked the real dependency chain: db started → healthy → `migrate`
+  ran (« migrations applied ») → exited 0 → app started, « Ready » on 3000
+- `curl /` → 307 to `/connexion`, and `/connexion` → 200 with « Nom d'utilisateur » in the HTML.
+  A real production image talking to a real migrated Postgres, not a build that merely compiled
+- `docker compose down -v` removes the volume, so the next run starts empty
+
+`npm run docker:db` / `docker:up` / `docker:down` / `docker:reset` / `docker:logs` wrap the commands
+anybody would otherwise have to remember. CI is deliberately unchanged: building an image on every
+push would add minutes to prove what the local build already proves.
