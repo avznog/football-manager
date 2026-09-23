@@ -2868,3 +2868,35 @@ number says so: the next version after the phone test passes is `1.0.0`.
 (080) and this is on `main`. There is no separate beta channel, no preview environment for it, and no
 hand-cut tag — a tag nothing verified is still forbidden (081).
 
+## 111 — The functions run where the database is
+
+**2026-09-23** · accepted
+
+The owner tested the beta on an iPhone and reported « le tactile est hyper lent » — around two
+seconds between a tap on a tab and anything happening. Before touching a line of client code, the
+deployment was inspected: every serverless function was running in **`iad1`** (Washington), Vercel's
+default, while the Neon project is in **`eu-west-2`** (London).
+
+**Why that produces exactly this symptom.** Every tab on this app is a real navigation to a Server
+Component, and every one of those makes several *sequential* queries — `getActiveTeam`, then the
+members, then the matches, then the counts. Each query is a separate round trip from the function to
+the database, and from Washington to London that is ~80 ms each, before the phone's own leg from
+France to Washington (~100 ms each way) is counted. Five sequential queries is half a second of pure
+distance; eight is most of a second; add TLS, the pooler and the RSC payload and two seconds is not
+surprising. Nothing in the code was slow — the bytes were being posted across an ocean twice.
+
+**Decision.** `vercel.json` pins `"regions": ["lhr1"]`, the same city as the database. Compute goes to
+the data, not the reverse: the phone makes *one* round trip per interaction, the function makes
+*several* per render, so the leg worth shortening is the function's. London rather than Paris for the
+same reason — `lhr1` is metres from `eu-west-2`, and the extra ~10 ms from France is paid once.
+
+**What this is not.** It is not a fix for the app doing sequential queries where it could do parallel
+ones, and it is not a substitute for telling the reader a tap was received. Both are real and both are
+separately worth doing — the second is what actually makes an app feel instant, because a tap that
+paints in 80 ms feels immediate while a tap that paints in 400 ms with no acknowledgement feels
+broken. This entry only removes the ocean.
+
+**How to check it, since a decision that cannot be verified is a claim.** `vercel inspect <url>` lists
+every function with its region in brackets; before this it read `[iad1]` five times. The honest
+measurement is the phone itself, which is where the report came from.
+

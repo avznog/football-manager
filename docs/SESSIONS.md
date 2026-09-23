@@ -2340,3 +2340,19 @@ schema. The seed also needed unpicking — a first run had died on the missing t
 the demo team, and the idempotence guard then skipped the whole demo season, leaving one team and zero
 users. Deleting that orphan row was enough; `db:reset` was not needed and was not used.
 
+The beta on a real iPhone: « le tactile est hyper lent », about two seconds from a tap to anything.
+The first thing inspected was the deployment rather than the code, and it was worth it — every function
+was running in `iad1` while Neon is in `eu-west-2`, so each of the several sequential queries a render
+makes crossed the Atlantic and back. `vercel.json` pins `lhr1` now, the same city as the database
+(decision 111). That removes distance and nothing else: the app still acknowledges a tap with nothing at
+all, and the pages still await their queries in sequence. Both were handed to the session on the other
+machine, whose stop is lifted for this one task — the brief is at the top of `COORDINATION.md` and asks
+for measurements before changes.
+
+Production also needed two things fixed to be testable at all. The Vercel `DATABASE_URL` existed with
+an **empty value** — the Neon marketplace integration creates the names, prefixed ones included, but the
+plain variable the app reads had nothing in it, so every Server Action returned 500 and the browser
+showed React #441 with a digest. Set for Production and verified by pulling it back. And the production
+alias was four commits behind `main` despite green Vercel statuses on each, so `main` was deployed from
+the CLI. The demo season is loaded in the Neon database at the owner's explicit request, for this test
+only; he will drop the database and recreate it before it is real production.
