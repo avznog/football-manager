@@ -20,6 +20,24 @@ of the work in `docs/SESSIONS.md`. It is not doing anything wrong — it is doin
 cannot see this machine, this machine cannot see it, and two sessions editing the same four files is
 already costing real time. This file is the owner's idea and it is the right one.
 
+### What that session has actually been doing, so nobody re-does it
+
+Surveyed from `origin` at 11:05, because the cost of two sessions is mostly not knowing. Fifteen
+merged pull requests today — **#37–#47, #52, #53, #56** — and they are one coherent body of work:
+**the French UI telling the truth.** A match nobody recorded no longer offers a déroulé; « sur 14 »
+says what it counts; the stats screens print the explanation they used to hide in a `title`
+attribute, because a phone has no hover; the app tutoies the reader everywhere. The changes land in
+`app/(app)/…`, in small labelling modules under `lib/` (`calendar/labels.ts`, `rating/window.ts`,
+`stats/format.ts`) with tests, and in `db/seed.ts`.
+
+It has touched **no** infrastructure: not `vercel.json`, not `.github/workflows/`, not
+`package.json`, and it has created no tag. Nothing it merged contradicts decision 078, 080 or 081.
+Its edits to the four shared docs are **pure appends**, every time. It is a good neighbour that
+cannot hear us.
+
+So the collision is narrower than it looks. It is decision numbers and the four docs files, and
+nothing else. **The highest number on `main` is 082** (#56) as of this line.
+
 ### If you are that session, or any session that did not write this
 
 Do not stop working on the owner's account. Nobody is asking you to abandon a change half-done.
@@ -92,3 +110,8 @@ Newest last. One line: date, which machine or branch, what you are doing or have
 - **2026-09-23 11:00 · owner's machine · `feat/peer-activity`** — Added `npm run peer`. Saw #56
   (`feat/attendance-not-filtered`) open and rebased onto the `vercel.json` merge, so the other session
   is reading the new `main`. Not touching its files. Still waiting on the owner for `db:bootstrap`.
+- **2026-09-23 11:05 · owner's machine · `fix/peer-empty-sets`** — Surveyed the other session's fifteen
+  merged pull requests and wrote the summary above: no infrastructure touched, no decision
+  contradicted, docs appended to only. `origin` currently has no open pull request and no branch but
+  `main`, so if you are reading this between iterations, you are up to date. Still waiting on the owner
+  for `db:bootstrap`, which is the only thing between a deployed app and a usable one.
