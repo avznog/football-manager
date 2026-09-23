@@ -15,6 +15,10 @@
  * - **The starting seven is pre-filled** from the composition the coach planned before the match,
  *   when there was one. It is a default he can change, not a fact — invariant 3's courtesy applied to
  *   a screen that is not game mode.
+ * - **The empty states describe the form, not a match.** With no planned composition the seven slots
+ *   open on « — personne — », and a card saying « les sept titulaires ont fini le match » is then
+ *   describing a match nobody has entered. So those sentences live in `lib/retro/labels.ts`, count
+ *   what is actually filled in, and are tested (decision 083).
  * - **The warnings are live.** `findRetroIssues` runs on every keystroke, so « Momo n'était pas sur
  *   le terrain à cette minute » appears next to the row rather than after a round trip.
  * - **It works without JavaScript.** Everything is native `<select>`s, number inputs and one
@@ -35,6 +39,7 @@ import { scoreLineFr } from "@/lib/calendar/labels";
 import { regulationMinutes } from "@/lib/match/clock";
 import { reduceMatch } from "@/lib/match/reducer";
 import { submitRetroMatch } from "@/lib/retro/actions";
+import { RETRO_NO_FACTS_FR, retroChangesEmptyFr } from "@/lib/retro/labels";
 import {
   RETRO_FACT_TYPES,
   buildRetroLog,
@@ -260,7 +265,9 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
         }
       >
         {changes.length === 0 ? (
-          <p className="text-sm text-ink-muted">Aucun changement : les sept titulaires ont fini le match.</p>
+          // `entry.starters` is the filled slots only, so the sentence cannot claim seven players on
+          // a sheet where nobody has been named yet (decision 083).
+          <p className="text-sm text-ink-muted">{retroChangesEmptyFr(entry.starters.length)}</p>
         ) : (
           <ul className="space-y-3">
             {changes.map((row) => (
@@ -350,11 +357,7 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
         }
       >
         {facts.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            {/* Not « sans carton » : this app deliberately records no cards at all (`docs/PLAN.md`),
-                so naming one here would promise a field that does not exist. */}
-            Rien pour l’instant. Un 0-0 sans rien à signaler, ça existe.
-          </p>
+          <p className="text-sm text-ink-muted">{RETRO_NO_FACTS_FR}</p>
         ) : (
           <ul className="space-y-3">
             {facts.map((row) => (
