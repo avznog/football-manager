@@ -5,6 +5,11 @@
  * shareable, survives a reload, and works with no JavaScript at all: the same reasoning as the
  * coach's forms on `/equipe`. `SegmentedControl` would have needed a client parent and an
  * `onChange` handler to do less.
+ *
+ * Both carry `scroll={false}`: a chip only ever replaces the numbers already under the reader's
+ * thumb, and Next scrolls to the top of the document on every navigation unless told not to. Sorting
+ * the player list from halfway down the page sent the reader back to the title — the one thing he
+ * was not looking at.
  */
 
 import Link from "next/link";
@@ -52,6 +57,7 @@ function Chip({
   return (
     <Link
       href={href}
+      scroll={false}
       // `aria-current` is what tells a screen reader which filter is on; the colour alone would not.
       aria-current={active ? "true" : undefined}
       className={cn(
@@ -123,6 +129,7 @@ export function SortTabs({ query }: { query: StatsQuery }) {
             <Link
               key={sort}
               href={statsHref({ ...query, sort })}
+              scroll={false}
               aria-current={active ? "true" : undefined}
               className={cn(
                 "inline-flex min-h-9 items-center rounded-lg px-2.5 text-xs font-semibold whitespace-nowrap",
