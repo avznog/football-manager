@@ -433,3 +433,203 @@ first one live in production too.
       and `docs/DEPLOY.md` state that `up` creates no account and that `admin`/`change-me` is a seed
       account `db:bootstrap` deliberately refuses. `db/seed.ts`'s `NODE_ENV=production` guard is
       untouched — the service runs from the `tools` image, which sets no `NODE_ENV`
+
+## The production audit at iPhone 16 conditions
+
+The owner asked for the live app at `7orteils.bgonzva.fr` to be looked at « everywhere », under iPhone
+16 conditions. It was: `npm run audit:screens` against production (100 screens, both themes, coach and
+player) plus two throwaway probes at the phone's real geometry — 393 × 852 CSS px, `deviceScaleFactor`
+3, touch, iOS user agent — in `scripts/probe-iphone16.mjs` and `scripts/probe-composition.mjs`.
+
+**The mechanical checks were all clean**: no console output anywhere, no sideways scroll at 393 px,
+no English framework string, no screen reachable by the wrong person, no page without an `h1`, and
+nothing permanently hidden under the tab bar at maximum scroll. Everything below needed eyes, or a
+viewport shaped like a hand. Not one of these defects fails a test, which is the same sentence the
+definition of done in `CLAUDE.md` already carries about waves 3 and 4.
+
+Caveat on the whole pass, stated once: it ran on **Chromium** with an iPhone 16 profile, not on
+WebKit. `npx playwright install webkit` needs system libraries that need `sudo`, so Safari's own
+rendering — `dvh`, `env(safe-area-inset-*)`, sticky behaviour, the 300 ms tap delay — is emulated
+rather than exercised. Two of the findings below are about exactly those, so a real Safari run is
+still owed. `sudo npx playwright install-deps webkit` is the one command the owner has to type.
+
+### The screens that state something untrue
+
+- [ ] A match still being played is announced as a win. The pinned calendar card is chipped « En
+      cours » and prints « 1 – 0 » beside a solid green **V**, and its screen-reader text reads
+      « Victoire, 1 – 0 » — a result declared for a match nobody has finished.
+      `app/(app)/calendrier/_components/next-event-card.tsx:92` renders `ScorePill` for any match with
+      a derived score; the `live` flag computed at `:41` only picks the border colour. The same class
+      of defect as « 0 – 0 » for an unrecorded match, and the fix belongs next to it in
+      `event-parts.tsx:86`: a live score is a running score, never a verdict
+- [ ] The recap contradicts itself about who came on. In « Les notes », Yanis and Fabien carry « entré
+      en jeu »; in « Temps de jeu » a few hundred pixels below, the same two men are « non entré ·
+      0 min ». `app/(app)/match/[id]/recap/_components/ratings-panel.tsx:91` deduces it from
+      `squadRole === "substitute"` — from what the coach *planned*. This is the exact bug whose fix
+      `lib/rating/progress.ts:144-159` documents at length: the notation flow was corrected and the
+      recap is the copy that was missed. The log answers this question, not the sheet
+- [ ] « Ce match a été saisi après coup, sans composition : les temps de jeu viennent de la saisie »
+      is shown for a match nothing has been entered for — the same screen still offers « Saisir le
+      match », which only renders when `score === null`. `lib/composition/plan.ts:437` branches on
+      `match.entryMode === "retro"` alone and never on whether a log exists, so it describes a record
+      the app does not hold. `app/(app)/match/[id]/saisie/page.tsx:76-81` refuses to make that claim;
+      this sentence should be held to the same standard
+- [ ] `/stats` shows two members of one team two different « Meilleures notes » podiums under
+      identical copy — coach: Julien 9,0 · Ali 8,0 · Hugo 8,0; Ali: Karim 7,0 · Samir 7,0 · Hugo 6,0,
+      and the counts diverge too (Nico « 6,0 sur 4 notes » against « 5,5 sur 2 notes »). Decision 007's
+      reciprocity gating is *why*, and it is right, but the card is titled as an absolute leaderboard
+      — « Moyenne reçue, à partir de 3 notes » — and the note at `app/(app)/stats/page.tsx:182` only
+      mentions the two excluded matches. Two team-mates will argue about who is best rated. The label
+      has to become viewer-relative: « d'après les matchs que tu as notés »
+- [ ] The rank column invents an order among ties: #2 Ali 8,0, #3 Hugo 8,0, #4 Karim 8,0, and #4
+      Rayan 1 but above #5 Ali 1 but. `app/(app)/stats/_components/leaderboard.tsx:50` prints
+      `{index + 1}`; a competition rank repeats on equal values
+- [ ] A rating for a man who never came on: Fabien reads MATCHS 0 · MINUTES 0′ · NOTE 5,0 « sur 4
+      notes » on the coach's `/stats` (« 3 fois remplaçant »). Either the notation screen should not
+      offer a 0-minute substitute, or the average is suppressed at zero minutes — the same argument
+      `playedLabelFr` already settled for « non entré »
+- [ ] « Présence aux entraînements » has no minimum denominator, so Rayan — who has left the club —
+      tops it at 1/1 · 100 %, above ten players on 1/2. `app/(app)/stats/_components/attendance.tsx:31`
+      sorts on the rate and uses `marked` only as a tie-break, while « Meilleures notes » enforces
+      `MIN_RATINGS = 3` for precisely this reason
+- [ ] Three already-archived competitions are advised to « Archive-la plutôt », beside a control that
+      only offers « Réactiver ». `lib/competition/labels.ts:56-72` never receives
+      `competition.archived`, so the advice clause is unconditional
+      (`app/(app)/equipe/competition-manager.tsx:151`)
+
+### The French
+
+- [ ] Two shipped vouvoiements, which decision 074 forbids without exception.
+      `lib/match/presenter.ts:787` « Renseign**ez**-la avant le coup d'envoi » — and on the player's
+      game-mode screen that sentence orders him to fill in a composition the banner above it says only
+      the operator may touch, so the copy is the coach's, served to everyone.
+      `components/action-sheet/terrain-sheet.tsx:206` « Appu**yez** sur un poste pour le placer » is a
+      live-region announcement, which is why no screenshot caught it — and `CLAUDE.md` quotes
+      « Appuie sur un poste » as the correct form. A `grep` for the `-ez` imperative belongs in the
+      review checklist: « vous » and « votre » were already clean, and these two hid behind that
+- [ ] « À **Les** grosses courges », on every away fixture whose opponent's name opens with an
+      article. `lib/calendar/labels.ts:111` is `` `${isHome ? "contre" : "à"} ${opponentName}` `` with
+      no elision, so « à » never contracts to « aux » or « au », and « à FC des Deux-Ponts » claims to
+      name a ground while « contre » names a club. It is the row's own heading — the one line that
+      does not truncate — so it is the most visible text in the calendar
+- [ ] « 0 joueur**s** avec des minutes », and « 1 joueurs » for the same reason: the plural is
+      hard-coded at `app/(app)/match/[id]/saisie/_components/retro-form.tsx:455` while its own
+      siblings two lines below guard it. French takes the singular after zéro and after un
+- [ ] « clean sheet » and « Clean sheets » in English, next to « sans encaisser » — the French for it
+      — elsewhere on the same screens. Worse, the team card's « Clean sheets 1 » and the keepers'
+      « Hugo 2 · Mehdi 0 » are different quantities (decision 018) under one label, so `/stats`
+      appears to say 1 = 2 + 0. `recap/_components/scoreboard.tsx:79`, `team-summary.tsx:70`,
+      `keepers.tsx:39`, `joueur/_components/stats-card.tsx:97`
+- [ ] A colon opens a line: « poste secondaire ⏎ : Milieu offensif central » on `/moi`. A plain space
+      before the colon is breakable; French typography needs a narrow no-break space
+      (`lib/player/positions.ts:133`, `:136`, `:139`). The same wrap splits a count from its label in
+      the availability line — « 4 ⏎ sans réponse » — at `lib/calendar/timeline.ts:316`
+- [ ] « Déplacer le poste de attaquant » in an accessible name:
+      `components/composition/composition-editor.tsx:960` interpolates the position bare, when
+      `atPositionFr` in `db/reference` exists for this and is used forty lines earlier
+- [ ] « 1 csc » is the one abbreviation on a screen that spells everything else out in a sentence
+
+### The phone
+
+- [ ] **The composition editor has no tappable post when it opens** — the worst of everything found.
+      At 393 × 852 and `scrollY = 0`: the pitch box sits at 508–918 while the sticky dock occupies
+      588–780 and the tab bar 795–852, so **80 of 410 px** of turf is in the clear band. On the create
+      route it is **zero of 410**: the dock's top edge bisects the « Terrain » card heading and slices
+      the Joueurs/Postes control in half, and the only pitch visible is a 15 px green sliver showing
+      the tops of two discs. `elementFromPoint` at each of the seven post centres returns a tab-bar
+      link, a bench disc, or nothing — the keeper is 65 px below the fold. The screen whose entire
+      purpose is « Appuie sur un joueur puis sur un poste » says exactly that while offering nothing to
+      press, until the coach scrolls 567 px (664 on create). The header comment at
+      `composition-editor.tsx:36-50` budgets `740 − 56 − 72 − 196 = 416 px` for a 410 px pitch "with no
+      scrolling"; the real chrome above the turf is 508 px, because that arithmetic counts the app
+      header and not the page header, the formation card, or the pre-fill notice
+      (`app/(app)/match/[id]/composition/_components/editor-screen.tsx:212-229`). The cap is not the
+      problem and shrinking the pitch is not the fix
+- [ ] The dock floats 15 px too high, leaving a window onto the scrolling turf between it and the tab
+      bar. `composition-editor.tsx:224` pins it at `bottom-[calc(4.5rem+env(safe-area-inset-bottom))]`
+      = 72 px, and the tab bar is 57 px plus its own `safe-pb`; the gap survives any inset. It reads as
+      a rendering glitch
+- [ ] Tap targets below Apple's 44 × 44 pt floor, in the places most used with a thumb: the player
+      names in every availability list are links as small as **16 × 32** (« Ali », « Léo » 24 × 32) —
+      thirteen of them per screen; the `/stats` filter and sort chips are 36 px tall; « Détails » on
+      the calendar is 45 × 20; « Rejoindre une équipe » on the login screen is 141 × **19**; the header
+      avatar is 40 × 44. A 24 px target is not a defect in a screenshot and is a defect in a hand
+- [ ] The relance textarea slices its last line through the middle of the glyphs. `rows={4}` is fixed
+      at `app/(app)/calendrier/_components/reminder-card.tsx:51` while the message grows with the
+      squad, and thirteen names need five lines at 393 px. Half a line of text reads as a broken
+      render, not as an invitation to scroll — and this card exists to be read and copied
+- [ ] The `/stats` competition filter is hard-clipped at the viewport edge with no affordance:
+      « Amical (arch… » is sliced mid-word and a fifth chip (« Tournoi ») is entirely invisible. The
+      comment at `app/(app)/stats/_components/filters.tsx:83` knows the row "scrolls sideways rather
+      than wrapping" and ships no fade, no partial chip, no hint — so a coach cannot discover that
+      filtering by Tournoi is possible. `SortTabs` at `:137` only just fits and will clip « Présence »
+      on a 360 px phone
+- [ ] The Formation select truncates its own value mid-number — « Classique 1-3- » for « Classique
+      1-3-2-1 » — in a 158 px grid column (`composition-editor.tsx:573`). A control showing half of
+      something that looks like a score looks broken
+- [ ] Opponent names truncate to unidentifiable stubs in six of ten calendar rows: « À FC des
+      Deux-P… », « À Stade de la C… », « Contre US des … ». The title is `block truncate` between a
+      fixed date column and a shrink-0 score, leaving roughly 135 px
+      (`app/(app)/calendrier/_components/event-row.tsx:66`). Two away trips to different clubs render
+      identically
+- [ ] « aujourd'hui » twice, 20 px apart, on the pinned card: the chip row says « Match · En cours ·
+      aujourd'hui » and the line under it « Aujourd'hui, 24/09/2026 à 17:41 ». `formatRelativeDays`
+      and `formatWhen` both emit the relative word, and only for today and tomorrow — which is exactly
+      when the card is looked at
+- [ ] The goalkeeper's name chip overlaps the drawn goal: 1 px of clearance against the pitch box's
+      bottom edge, because `PITCH_MARGIN` is ~10 px at this size and the disc's hanging chip is 16 px.
+      No other post has it
+- [ ] The white « Couleur secondaire » swatch is invisible in the light theme only — white fill and a
+      light-grey border on a white card reads as an unset box, where dark mode shows an unmistakable
+      white block (`app/(app)/equipe/team-settings.tsx:115`). A white change strip is the common case
+      for an amateur side, and no hex text sits beside the swatch to fall back on
+- [ ] « Archiver » / « Réactiver » have no button chrome: `variant="ghost"` is fill-less and
+      border-less at rest, and `hover:` never fires on a phone (decision 072), so the only control for
+      the archive decision is indistinguishable from the grey prose either side of it, while
+      « Renommer » right above is a bordered secondary button. It also omits `pending`, alone among the
+      card's four controls (`app/(app)/equipe/competition-manager.tsx:158`)
+- [ ] The « Forme récente » score strip runs together — « 2 – 0 3 – 2 2 – 2 1 – 3 2 – 1 » at 10 px
+      mono, where the gap between two matches is no wider than the gap inside one score
+      (`team-summary.tsx:141`). The same 10 px floor shows up across `/moi`'s stat captions; 11 px for
+      a tab-bar label is iOS convention and is not the complaint
+- [ ] Two copy asymmetries between the roles, both showing someone a remedy they cannot apply: the
+      player is told « Une saisie rétroactive les ferait apparaître » (`team-summary.tsx:93`), and only
+      the player — not the coach who can act — is told that an unmarked séance counts in no attendance
+      rate (`lib/calendar/labels.ts:237` against `attendance-list.tsx:91`). Also `/feuille`'s
+      « Enregistrer la feuille » is the one non-full-width primary submit in the app, left ragged after
+      2 000 px of scrolling, and a player is offered « Ouvrir le mode match » for a screen that then
+      tells him he may only watch
+- [ ] A player's page for a past session is 450 px of blank that never answers his own question: it
+      says « 11 présents sur 14 pointés » and never « Tu étais là »
+      (`app/(app)/entrainements/[id]/page.tsx:163`), because the availability grid is empty on an old
+      séance. Whether that is a defect or a choice is the owner's call, but the emptiness is not
+- [ ] The « pas encore pointé » state is the loudest thing on the coach's screen in light mode
+      (thirteen filled dark-slate pills) and the quietest in dark, for a state that means *nothing
+      decided yet*. `attendance-list.tsx:53` paints it `peer-checked:bg-ink-muted`, where
+      `components/ui/segmented-control.tsx` documents a `neutral` tone built for this exact case
+
+### The audit tooling itself
+
+- [ ] `npm run audit:screens` has been capturing the same screen twice and nobody noticed: the four
+      `*-stats-coupe-buts.png` are **byte-identical** to `*-stats.png`. `scripts/audit-screens.ts:179`
+      asks for `/stats?competition=cup&tri=buts`, but `competition` takes a competition **UUID** since
+      decision 107 and `tri` takes the English keys `minutes|goals|assists|rating|attendance`, so both
+      values are unrecognised and the page correctly degrades to « Toutes » / « Minutes ». The filtered,
+      goals-sorted screen has therefore never been reviewed by anyone, and four of the hundred shots
+      are dead weight. A regression from #97, and the script should fail rather than degrade when a
+      query it hard-codes stops meaning anything
+- [ ] `tri=goals` is a half-French query parameter — a French key with English values — in a URL
+      `app/(app)/stats/_components/filters.tsx:4-6` describes as shareable, i.e. user-facing, where the
+      project forbids mixing the two languages
+- [ ] The viewport in `scripts/audit-screens.ts` is `390 × 844`, an iPhone 12/13/14. The owner's phone
+      is an iPhone 16 — 393 × 852 at DPR 3 — and three pixels is exactly the margin a `w-[390px]`
+      assumption hides in. The two probes added in this pass measure the right geometry; the audit
+      script should take the viewport from one list of devices rather than a literal
+- [ ] `/match/nouveau/composition` answers HTTP 500 with React #441 in the console: `[id]` catches the
+      literal `nouveau`, and a non-UUID id should be a 404. No link reaches it, which is why it has
+      survived
+- [ ] Neither the audit script nor the first probe ever opened the composition **editor** — the audit
+      captures only its locked and empty states — which is why the worst defect in the app went
+      unrecorded until a probe drove it. `scripts/probe-composition.mjs` now does, read-only, and it
+      never submits: the screens past a save (the pending button, `state.error`, `minuteClash`,
+      `shapeProblems`) remain unaudited because the only database to drive is the owner's production one

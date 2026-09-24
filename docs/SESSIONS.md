@@ -2356,3 +2356,58 @@ showed React #441 with a digest. Set for Production and verified by pulling it b
 alias was four commits behind `main` despite green Vercel statuses on each, so `main` was deployed from
 the CLI. The demo season is loaded in the Neon database at the owner's explicit request, for this test
 only; he will drop the database and recreate it before it is real production.
+
+## The production audit at iPhone 16 conditions
+
+The owner asked for the live app to be looked at « everywhere », for visual problems and any bug there
+might be, under iPhone 16 conditions, with the findings written into the plan. Three passes ran:
+`npm run audit:screens` pointed at `7orteils.bgonzva.fr` (100 screens, both themes, coach and player),
+and two new probes at the phone's real geometry — 393 × 852, DPR 3, touch — one walking the tabs and the
+deep screens, one driving the composition editor. Four agents read the captures. Everything landed in a
+new `docs/ROADMAP.md` section, roughly forty items; nothing was fixed in this pass, because the request
+was to find and record.
+
+**The mechanical checks were all clean on production**: no console output, no sideways scroll at 393 px,
+no English framework string, no screen reachable by the wrong person, no page without an `h1`, nothing
+permanently hidden under the tab bar at maximum scroll. That is worth stating plainly, because every
+defect found needed eyes or a viewport shaped like a hand, and not one of them fails a test.
+
+The worst is the composition editor: at 393 × 852 and the opening scroll position, **not one of the
+seven posts is tappable**. The pitch box lands at 508–918 while the sticky dock holds 588–780 and the tab
+bar 795–852, so eighty of four hundred and ten pixels of turf are visible — and on the create route,
+zero, with the dock's top edge cutting the « Terrain » heading and the Joueurs/Postes control in half.
+`elementFromPoint` at each post centre returns a tab-bar link, a bench disc, or nothing. The screen says
+« Appuie sur un joueur puis sur un poste » while offering nothing to press. The header comment's own
+budget — `740 − 56 − 72 − 196 = 416 px` for a 410 px pitch "with no scrolling" — counts the app header
+and forgets the page header, the formation card and the pre-fill notice, so the real chrome above the
+turf is 508 px. The pitch cap is not the problem.
+
+Three screens state something untrue, the class the definition of done was written about: a match chipped
+« En cours » shows « 1 – 0 » with a green **V** and announces « Victoire » to a screen reader; the recap
+badges « entré en jeu » on two men its own « Temps de jeu » table calls « non entré », which is exactly
+the bug `lib/rating/progress.ts:144-159` documents as fixed — the notation flow was corrected and the
+recap is the copy that was missed; and « saisi après coup, sans composition : les temps de jeu viennent
+de la saisie » is shown for a match nothing has been entered for, beside a button offering to enter it.
+
+Two vouvoiements are shipped, which decision 074 forbids outright: « Renseignez-la » in
+`lib/match/presenter.ts` and « Appuyez sur un poste » in a live region, where no screenshot could catch
+it. « vous » and « votre » were clean, which is how both hid — the `-ez` imperative needs its own grep in
+the review checklist. « À Les grosses courges » is the other language defect, on every away fixture whose
+opponent opens with an article, on the one line in the calendar that does not truncate.
+
+One finding is about the audit itself: the four `*-stats-coupe-buts.png` are **byte-identical** to
+`*-stats.png`. `scripts/audit-screens.ts` asks for `?competition=cup&tri=buts`, but `competition` has
+taken a UUID since decision 107 and `tri` takes English keys, so both are ignored and the page degrades
+to « Toutes » / « Minutes ». The filtered screen has never been reviewed by anyone, and the tool that
+exists to catch silent degradation was silently degrading. Its viewport is also still 390 × 844.
+
+Honest timings, for the latency work the other machine holds: from a wired European connection a tab tap
+reaches its heading in 283–339 ms and a deep match page loads in 1.0–1.4 s. So the owner's two seconds is
+network and server, not layout — consistent with decision 111 — and the half that pinning `lhr1` cannot
+fix is still the acknowledgement of the tap.
+
+Caveat, stated in the roadmap too: the pass ran on **Chromium** with an iPhone 16 profile, not WebKit.
+`npx playwright install webkit` wants system libraries that want `sudo`, so Safari's own handling of
+`dvh`, `env(safe-area-inset-*)`, sticky positioning and the 300 ms tap delay was emulated rather than
+exercised — and several findings live exactly there. A real Safari run is still owed, and it needs the
+owner's hands for one command.

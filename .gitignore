@@ -47,5 +47,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# screen audit captures (npm run audit:screens)
+# screen audit captures (npm run audit:screens) and the iPhone 16 probes beside it
 /audit/
+/probe-iphone16*/
+/probe-composition/
