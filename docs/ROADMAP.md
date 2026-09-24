@@ -447,11 +447,21 @@ nothing permanently hidden under the tab bar at maximum scroll. Everything below
 viewport shaped like a hand. Not one of these defects fails a test, which is the same sentence the
 definition of done in `CLAUDE.md` already carries about waves 3 and 4.
 
-Caveat on the whole pass, stated once: it ran on **Chromium** with an iPhone 16 profile, not on
-WebKit. `npx playwright install webkit` needs system libraries that need `sudo`, so Safari's own
-rendering — `dvh`, `env(safe-area-inset-*)`, sticky behaviour, the 300 ms tap delay — is emulated
-rather than exercised. Two of the findings below are about exactly those, so a real Safari run is
-still owed. `sudo npx playwright install-deps webkit` is the one command the owner has to type.
+**The pass was then repeated on WebKit 26.6**, Safari's own engine, because `dvh`,
+`env(safe-area-inset-*)` and sticky positioning are emulated by Chromium rather than reproduced, and
+the composition-editor findings below rest entirely on those three. It changed nothing. Every
+geometry figure came back identical to within one pixel of scroll rounding — the pitch at 508–918,
+the dock at 588–780, the tab bar at 795–852, `innerHeight` 852, the same 80 px of reachable turf —
+and the finding counts were equal to the unit: 27 tap targets, 153 tiny texts, 38 under-bar overlaps,
+and the same HTTP 500 below. So the defects are the app's, not one engine's reading of it.
+
+Two things the repeat did *not* establish, recorded so they are not mistaken for conclusions.
+WebKit's timings were three to ten times Chromium's (3670 ms to log in against 379 ms, 495–1061 ms
+per tab against 283–339 ms), which is the headless Linux WebKit build and not an iPhone's Safari:
+nothing about it predicts what the owner's phone does, and it is not evidence of a performance
+defect. And headless WebKit has no browser chrome, so `innerHeight` is the full 852 px in both
+engines. A real iPhone spends 50–90 px of that on the URL bar until the page is scrolled, which makes
+the reachable-turf finding below an **under**-statement on device rather than an artefact.
 
 ### The screens that state something untrue
 
