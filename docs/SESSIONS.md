@@ -2411,3 +2411,35 @@ Caveat, stated in the roadmap too: the pass ran on **Chromium** with an iPhone 1
 `dvh`, `env(safe-area-inset-*)`, sticky positioning and the 300 ms tap delay was emulated rather than
 exercised — and several findings live exactly there. A real Safari run is still owed, and it needs the
 owner's hands for one command.
+
+## The Safari half of the audit, and a defect that was the probe's own
+
+The owner installed WebKit so the previous entry's caveat could be paid off, and the pass was repeated
+on **WebKit 26.6** — both probes now take `PROBE_ENGINE=webkit`. The answer is that the audit's
+findings are the app's, not Chromium's. Every geometry figure in the composition editor came back
+identical to within one pixel of scroll rounding: pitch 508–918, dock 588–780, tab bar 795–852,
+`innerHeight` 852, the same 80 px of the 410 px pitch reachable at the opening scroll. The finding
+counts were equal to the unit — 27 tap targets, 153 tiny texts, 38 under-bar overlaps — and the HTTP
+500 on `/match/nouveau/composition` reproduces on both engines. Nothing was added to the roadmap and
+nothing removed.
+
+The interesting part is a claim of this session's that turned out to be wrong, and is corrected rather
+than quietly dropped. The first WebKit run reported **eleven console errors where Chromium had none**,
+every one a `pageerror` reading « /joueur/<uuid>?_rsc=… due to access control checks », and it was
+reported as a possible Safari-only production bug whose consequence would be that every tap becomes a
+cold round trip. It is not a bug at all. A controlled comparison — log in, open one match page, dwell
+six seconds **without navigating** — has both engines fetching 23 `?_rsc=` payloads, all `200`, with
+zero page errors: webkit 26.6 and chromium 153.0.8010.12 alike, `fm_session` `sameSite=Lax`
+`secure=true` on both. The eleven were prefetches the probe itself cancelled by navigating away, which
+Safari surfaces as an unhandled rejection and Chromium swallows as `net::ERR_ABORTED`. Both probes now
+filter that exact shape, with the experiment written into the comment, so the next session does not
+spend an hour on its own footprints.
+
+Two things WebKit did not establish, recorded so they are not read as results. Its timings were three
+to ten times Chromium's — 3670 ms to log in against 379 ms, 495–1061 ms per tab against 283–339 ms —
+which is the headless Linux build and says nothing about an iPhone; the honest latency numbers remain
+the Chromium ones in the previous entry. And headless WebKit renders no browser chrome, so
+`innerHeight` is the full 852 px in both engines, while a real iPhone spends 50–90 px of it on the URL
+bar until the page scrolls. That makes the editor's reachable-turf finding an understatement on
+device, not an artefact — the one thing still owed here is a pair of human eyes on a real phone,
+`docs/DEPLOY.md` §6.

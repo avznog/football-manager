@@ -18,15 +18,22 @@
  * deleted.
  *
  *   PROBE_BASE_URL=… PROBE_USER=karim PROBE_PASSWORD=… node scripts/probe-iphone16.mjs
+ *
+ * `PROBE_ENGINE=webkit` is the one that actually answers the question. Chromium at iPhone 16
+ * dimensions is a phone-shaped viewport, not a phone: `dvh`, `env(safe-area-inset-*)`, sticky
+ * positioning and the tap delay are Safari's, and those are precisely where this app's layout lives.
+ * WebKit needs system libraries installed with `sudo` once — `sudo npx playwright install-deps
+ * webkit` — so Chromium stays the default and a WebKit run is something to ask for.
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
 
-import { chromium, devices } from "@playwright/test";
+import { chromium, devices, webkit } from "@playwright/test";
 
 const BASE = process.env.PROBE_BASE_URL ?? "https://7orteils.bgonzva.fr";
 const USER = process.env.PROBE_USER ?? "karim";
 const PASSWORD = process.env.PROBE_PASSWORD ?? "motdepasse";
+const ENGINE = process.env.PROBE_ENGINE === "webkit" ? webkit : chromium;
 const OUT = process.env.PROBE_OUT ?? "probe-iphone16";
 
 /** iPhone 16: 393 × 852 CSS px at 3×, touch, and iOS Safari's user agent. */
@@ -181,15 +188,35 @@ function coveredByBar(page, screen) {
 
 async function main() {
   await mkdir(OUT, { recursive: true });
-  const browser = await chromium.launch();
+  const browser = await ENGINE.launch();
   const context = await browser.newContext(IPHONE_16);
   const page = await context.newPage();
 
   const consoleErrors = [];
+
+  // A prefetch this probe cancels by navigating away is not a defect of the app, and WebKit reports
+  // it as one. Next prefetches `?_rsc=` payloads for every link in view; leaving the page aborts
+  // those fetches, and Safari surfaces an aborted fetch as an unhandled rejection reading "…due to
+  // access control checks", which looks exactly like a CORS failure in production. Chromium reports
+  // the same aborts as `requestfailed` with `net::ERR_ABORTED` and raises nothing.
+  //
+  // This was verified rather than assumed: on the same page with a 6 s dwell and no navigation, both
+  // engines fetch 23 RSC payloads, all 200, with zero page errors. So the eleven "WebKit console
+  // errors" of the first run were this probe's own footprints. Anything not matching this shape is
+  // still reported, because a real RSC failure must not be silently swallowed by the filter.
+  const abortedPrefetch = /_rsc=/i;
   page.on("console", (m) => {
     if (m.type() === "error") consoleErrors.push(page.url() + " :: " + m.text());
   });
-  page.on("pageerror", (e) => consoleErrors.push(page.url() + " :: pageerror " + e.message));
+  page.on("pageerror", (e) => {
+    if (
+      abortedPrefetch.test(e.message) &&
+      /access control checks|aborted|cancell?ed/i.test(e.message)
+    ) {
+      return;
+    }
+    consoleErrors.push(page.url() + " :: pageerror " + e.message);
+  });
 
   await page.goto(BASE + "/connexion", { waitUntil: "networkidle" });
   await page.getByLabel(/utilisateur/i).fill(USER);
@@ -298,13 +325,34 @@ async function main() {
 
   await writeFile(
     OUT + "/report.json",
-    JSON.stringify({ base: BASE, user: USER, timings, consoleErrors, findings }, null, 2),
+    JSON.stringify(
+      {
+        base: BASE,
+        user: USER,
+        engine: ENGINE.name() + " " + browser.version(),
+        timings,
+        consoleErrors,
+        findings,
+      },
+      null,
+      2,
+    ),
   );
 
   const byKind = new Map();
   for (const f of findings) byKind.set(f.kind, (byKind.get(f.kind) ?? 0) + 1);
 
-  console.log("\n" + BASE + " as " + USER + ", iPhone 16 (393×852, 3×, touch)\n");
+  console.log(
+    "\n" +
+      BASE +
+      " as " +
+      USER +
+      ", iPhone 16 (393×852, 3×, touch) on " +
+      ENGINE.name() +
+      " " +
+      browser.version() +
+      "\n",
+  );
   for (const t of timings) console.log("  " + t);
   console.log("");
   for (const [kind, n] of [...byKind].sort((a, b) => b[1] - a[1])) {

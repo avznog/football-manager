@@ -25,11 +25,18 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 
-import { chromium, devices } from "@playwright/test";
+import { chromium, devices, webkit } from "@playwright/test";
 
 const BASE = process.env.PROBE_BASE_URL ?? "https://7orteils.bgonzva.fr";
 const USER = process.env.PROBE_USER ?? "karim";
 const PASSWORD = process.env.PROBE_PASSWORD ?? "motdepasse";
+/**
+ * `PROBE_ENGINE=webkit` is the run that actually answers the question: Chromium at iPhone 16
+ * dimensions is a phone-shaped viewport, not a phone, and this editor's whole problem is where a
+ * sticky dock and a safe-area inset land.
+ */
+const ENGINE = process.env.PROBE_ENGINE === "webkit" ? webkit : chromium;
+
 const OUT = process.env.PROBE_OUT ?? "probe-composition";
 
 /** iPhone 16: 393 × 852 CSS px at 3×, touch, and iOS Safari's user agent. */
@@ -356,7 +363,7 @@ async function tapInClear(page, locator, label) {
 
 async function main() {
   await mkdir(OUT, { recursive: true });
-  const browser = await chromium.launch();
+  const browser = await ENGINE.launch();
   const context = await browser.newContext(IPHONE_16);
   const page = await context.newPage();
 
@@ -364,7 +371,16 @@ async function main() {
   page.on("console", (m) => {
     if (m.type() === "error") consoleErrors.push(page.url() + " :: " + m.text());
   });
-  page.on("pageerror", (e) => consoleErrors.push(page.url() + " :: pageerror " + e.message));
+  // WebKit reports a prefetch this probe cancelled by navigating away as an unhandled rejection
+  // reading "…due to access control checks", which reads exactly like a CORS failure in production.
+  // It is not one: dwelling on the same page without navigating, both engines fetch every `?_rsc=`
+  // payload with a 200 and raise nothing. Chromium logs the identical aborts as `net::ERR_ABORTED`
+  // and stays quiet. Filtered on that shape only, so a real RSC failure still surfaces.
+  page.on("pageerror", (e) => {
+    const aborted =
+      /_rsc=/i.test(e.message) && /access control checks|aborted|cancell?ed/i.test(e.message);
+    if (!aborted) consoleErrors.push(page.url() + " :: pageerror " + e.message);
+  });
 
   const findings = [];
   const geo = [];
@@ -377,6 +393,12 @@ async function main() {
   await page.waitForURL((u) => !u.pathname.includes("connexion"), {
     timeout: 30_000,
   });
+
+  // Wait for the screen the login redirected *to*, not for a duration. A fixed cushion was enough
+  // on Chromium and is not on WebKit, where the same login takes 3.7 s rather than 0.4 s: the goto
+  // below then fires while the redirect is still in flight and Playwright aborts it with
+  // "interrupted by another navigation". A committed heading cannot race.
+  await page.locator("main h1").first().waitFor({ state: "visible", timeout: 30_000 });
 
   /* --- 1. find a match whose compositions are still editable --------------- */
 
@@ -614,6 +636,7 @@ async function main() {
       {
         base: BASE,
         user: USER,
+        engine: ENGINE.name() + " " + browser.version(),
         editorUrl,
         notes,
         consoleErrors,
