@@ -3086,9 +3086,15 @@ rating of 9,0 becomes 7,0 while twelve ratings averaging 7,4 barely move. The mo
 the more he is judged on himself alone, which is exactly what was asked for. Three properties then fall
 out of the arithmetic rather than needing a special case, and each is what makes the screen defensible:
 
-- **a player with no data lands exactly on the squad mean**, so he heads neither the best seven nor the
-  worst. That is the rule `comparePlayers` already states in words — « unknown is not "worst" — but it
-  cannot head a ranking either » — obtained by division instead of a `null` branch;
+- **a player with no data lands exactly on the squad mean**, so he cannot *head* either ranking. That is
+  the rule `comparePlayers` already states in words — « unknown is not "worst" — but it cannot head a
+  ranking either » — obtained by division instead of a `null` branch. **This entry first said he
+  « heads neither the best seven nor the worst », and the review of the pull request was right that this
+  overstates it**: he is routinely *in* a seven, and in a slot with two candidates he is picked as the
+  worst whenever the squad mean falls below the other man's real figure. Which is defensible — being
+  shown at the squad's average is neither flattery nor punishment for not having played — but it is a
+  thing the screen has to say, and the card had ten disclosure paragraphs and not that one. It says it
+  now, with a count of how many of the seven it applies to;
 - **the worst seven is protected too.** Twenty minutes and three conceded is not automatically the
   squad's worst defender, which is precisely what a raw ratio would claim;
 - **it is continuous.** Nobody appears in or vanishes from the seven as a threshold is crossed.
@@ -3103,6 +3109,14 @@ the squad's figures are too close together for the spread to be measurable at al
 used — maximum scepticism is the only defensible reading of « we cannot tell these players apart » —
 and the sentence then **contains no digit**, because printing an unmeasured number as though it had
 been measured is the same defect wearing a decimal point.
+
+**And the clamp binds, which qualifies « measured, not chosen » more than the first draft of this entry
+admitted.** On the demo season's goals criterion the method of moments returns 9,64 and the clamp forces
+6; the screen then prints 6 as though it had been measured, because what was *applied* is 6 and that is
+what the reader needs in order to check the figures. So the honest statement is narrower than « the
+number is measured »: the number is measured **and then bounded**, the bound exists so that a
+three-match season cannot produce an absurd prior, and on a short season the bound is what is doing the
+work. A screen that printed 9,64 while using 6 would be worse.
 
 One idea, three shapes, because the criteria do not have one: Normal–Normal for ratings (`m` in
 ratings), Gamma–Poisson for goals and assists (`m` in 60-minute units), Beta–Binomial for the
@@ -3142,6 +3156,17 @@ repository's definition of done singles out, and this screen had four chances to
   reciprocity gate to season averages, so two teammates genuinely see two different sevens. The card
   says « d'après les matchs que tu as notés » and prints the hidden count, reusing the wording the
   roadmap already prescribed for the « Meilleures notes » card rather than inventing a third;
+- **why a sentence cannot say « we cannot tell these players apart » when there is only one of them.**
+  The « spread not measurable » wording originally gave one reason — « les écarts entre les joueurs sont
+  trop petits » — for four different causes, and was therefore false in three of them: with a single
+  keeper there are no écarts at all, on a filter where nobody was rated the truth is « personne n'a
+  de note », and in the fourth — several rated players, none of them rated *twice* — the écarts may be as
+  wide as the scale allows and it is the other moment that is missing, the noise within one player. The
+  causes were already distinguished in the arithmetic and were being thrown away at the copy boundary.
+  Four sentences now, one per cause, each tested — the same defect the previous slice's review found,
+  which is worth recording twice because it keeps recurring: a sentence true in the common case and false
+  in one branch. The fourth cause is the one this entry nearly folded into the third for being rare, and
+  the reason not to is that the two say opposite things about the same squad;
 - **the shrinkage and the two invincibilités**, as above. « sans encaisser » is the app's existing
   spelling and no third one was introduced;
 - **the formation is named with its count** — « utilisée dans 7 matchs » — because a shape without its
@@ -3168,6 +3193,16 @@ either side. On assists every raw caption truncated, needing 120 px in 96. And *
 silently swapped two players**: the picker opened during `pointerup` and the synthesised `click` landed
 on the sheet's first row. Five defects, none of them visible in a passing suite, which is the argument
 for `CLAUDE.md`'s « actually looked at, at 390 px » stated once more in numbers.
+
+**And what the review found after all that, which is the lesson worth keeping.** On a competition filter
+where nobody had a visible rating, all seven discs printed **« 0,0 »** — on a nought-to-ten scale, the
+worst possible mark, for the entire squad — while the team figure beside them correctly printed « — ».
+The zero was not an oversight: the module's own type documentation *specified* it, and the test asserted
+the aggregate was null while asserting nothing at all about the seven figures under it. Rule 1 of
+`lib/stats/aggregate.ts` had been in this repository from the beginning — « a number nobody has yet is
+`null`, never `0` » — and was broken seven times on one screen by code whose comments were otherwise
+careful. A green suite, a measured layout, twelve screens walked in two themes, and the worst defect in
+the slice was a documented constant. Figures are `number | null` now, from the arithmetic outward.
 
 **Out of scope, deliberately.** Weighted multi-criterion sliders were offered and refused: the team
 total would become a number with no unit that nothing on screen could verify. Saving a seven as a real
