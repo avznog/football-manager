@@ -2489,6 +2489,27 @@ page would have cost `getLiveMatch`'s seven queries on every view, so the roadma
 `hasFinalWhistle(matchId)` — one existence query — and the residual lie is written down rather than
 papered over (decision 113).
 
+The pull request was reviewed, and everything it found was in the one class no test covers: a screen
+saying less than the truth. Three things had been cut from the top bar that the reader cannot recover —
+the « Nous » caption, without which an away « 0 – 2 » is a team two goals *up*; « saisi après le match »,
+which is the one thing qualifying the largest minute in the app (decisions 013 and 048); and the
+`aria-label`s meant to compensate, which sat on a `<span>` and a `<p>` where **ARIA 1.2 forbids a name**,
+so a conforming screen reader read « 1 – 0 » and nothing else. All three are back, the labels on
+`role="img"`. The comment action stored its 280 characters and no timeline printed them: both builders
+described an event by its actors and neither knew about `note`, now fixed by one shared `noteDetailFr`
+rather than a second branch in the recap. The clock's short label « Fin » failed WCAG 2.5.3 — a visible
+label must appear in the accessible name as a **whole word**, and "Fin" is only the prefix of « final » —
+so it is « Sifflet », swept by a test over every phase of a 1, 2 and 3-period match. And the move itself
+had changed which `not-found.tsx` answers for the route, so `app/(jeu)/not-found.tsx` is a sibling of the
+app group's copy and not a duplicate. Decisions 112 and 114 were amended where the review proved them
+wrong, which is the point of decision 097: a claim in a decision entry is not evidence.
+
+Measured rather than eyeballed, on both engines: **66 px** above the pitch, the whole 538 px pitch inside
+a 730 px clear band at `scrollY = 0`, **0 px** gap under the bottom bar, and the three-button bar on one
+line at 375 × 667 with every target over 44 px. Version bumped to `1.0.0-beta.2` — a migration and a new
+user-facing action earn it, and a beta whose number did not move would make the §6 phone test ambiguous
+about which build it tested.
+
 **Next:** Part 2 of the approved plan, the preview/production split. It cannot merge before the owner
 creates the Neon `preview` branch and points Vercel's production branch away from `main` — otherwise
 `main` still deploys to production while `migrate-preview` points at a database that does not exist.
