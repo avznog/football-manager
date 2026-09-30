@@ -289,8 +289,11 @@ working as configured rather than broken.
 ### If the database came from the Neon integration
 
 Attaching Neon through Vercel's marketplace, rather than `vercel env add` by hand, writes eighteen
-variables prefixed `FOOTBALL_MANAGER_` (`…_DATABASE_URL`, `…_PGHOST`, `…_POSTGRES_PRISMA_URL`, the
-unpooled and non-pooling variants, …). **The application reads none of them.** It reads
+variables under a prefix the integration lets you choose — **`NEONDB_` today**, and it was
+`FOOTBALL_MANAGER_` until the owner renamed it (`…_DATABASE_URL`, `…_PGHOST`,
+`…_POSTGRES_PRISMA_URL`, the unpooled and non-pooling variants, …). The prefix is worth nothing to
+this repository and can be changed at will, which is the point: **the application reads none of
+them.** It reads
 `DATABASE_URL` and nothing else, so that one still has to exist on its own — the integration creates
 it too, but check it is there and that it holds the *pooled* string. Do not be tempted to make the app
 read the prefixed one instead: that ties this code to one integration's naming for no gain.
@@ -500,4 +503,4 @@ Notes worth having before something surprises you:
 | `SUPER_ADMIN_USERNAME` | command line, once | The first account, in `db:bootstrap`. |
 | `SUPER_ADMIN_PASSWORD` | command line, once | Its password. Never in Vercel, never in a GitHub secret. |
 | `ALLOW_REMOTE_RESET` | nowhere | Exists so `db:reset` can refuse. Do not set it in production. |
-| `FOOTBALL_MANAGER_*` | Vercel, written by Neon's integration | Read by nothing in this repository. Ignore them. |
+| `NEONDB_*` | Vercel, written by Neon's integration under a prefix it lets you rename — `FOOTBALL_MANAGER_*` before | Read by nothing in this repository, so renaming the prefix changes no code. Ignore them. |
