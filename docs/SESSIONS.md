@@ -2564,7 +2564,8 @@ Markdown outright, while saying at length what it deliberately does **not** do: 
 differ from what Prettier would emit, so this repository is hand-formatted and `--check` is not a gate.
 
 **Next:** Part 2 of the approved plan, the preview/production split, still blocked on the owner creating
-the Neon `preview` branch and pointing Vercel's production branch away from `main`. Owed from before and
+the Neon `preview` branch and pointing Vercel's production branch away from `main` — the second of which
+was done later the same day, on `vercel-production-placeholder`. Owed from before and
 still owed: the super admin password is the literal placeholder `choisis-en-un-vrai`, the Neon
 `neondb_owner` password has been in a transcript and wants rotating, and `docs/DEPLOY.md` §6 wants a real
 phone outside in daylight. The natural follow-up to this slice is on the roadmap rather than half-built:
@@ -2659,7 +2660,130 @@ Gate, all of it on the whole tree: `npm run typecheck` clean, `npm test` **1298 
 **Next:** the two approved pull requests above — the ratings redesign, then the ACTION icons with a
 « remarques » category. Still owed from before and still owed: Part 2 of the approved plan, the
 preview/production split, blocked on the owner creating the Neon `preview` branch and pointing Vercel's
-production branch away from `main`; the super admin password is the literal placeholder
+production branch away from `main` — that second one is since **done**, and no longer load-bearing either;
+the super admin password is the literal placeholder
 `choisis-en-un-vrai`; the Neon `neondb_owner` password has been in a transcript and wants rotating; and
 `docs/DEPLOY.md` §6 wants a real phone outside in daylight — which is, after this slice, exactly the
 instrument that found all eight of these.
+
+## Merging and shipping, pulled apart
+
+**2026-09-30** · `ci/production-on-a-tag`
+
+Part 2 of the approved plan, which had been blocked since #104 on the owner creating the Neon `preview`
+branch and pointing Vercel's production branch away from `main`. The second is **done** — the production
+branch is parked on `vercel-production-placeholder`, which the owner set today — and the first is
+*claimed* by the `PREVIEW_DATABASE_URL` secret existing, which no session can read. On that basis the
+split landed: a push to `main` runs the checks, migrates the **preview** database and deploys the preview,
+and cuts no tag; a tag `v*` pushed **by hand** gates, re-tests, migrates production, deploys production
+with the Vercel CLI and publishes the release. Nothing else deploys anywhere. Decision **119**.
+
+This entry said, in its first version, that the parked branch meant « a `main` push has been a Preview
+deployment all along ». **That was false, and the next entry is what came of it** — it is left here as a
+correction rather than deleted, because the sentence is the whole lesson.
+
+**The interesting part is that this reverses 081 and 078 without contradicting either's reasoning.** 081
+said a convention a human has to remember is one the next session will not know about, and it is right —
+so the argument had to be answered rather than ignored. It was about the *failure*, not about who acts:
+the failure is a tag that names a version nothing verified, and that property is now a gate with three
+guards (the tag equals `v$(package.json version)` **at the commit it points at**, the commit is reachable
+from `origin/main`, the same checks pass on it) instead of a generator. The gate also names, in its error,
+the command that deletes a bad tag. What is honestly given up is stated in the entry rather than
+smoothed over: forgetting to tag is now possible, and it costs an untagged version sitting tested on the
+preview while production serves the last tag — a safe failure, unlike the published false claim 081
+feared. And 078 rejected a repository `VERCEL_TOKEN` against « a window of seconds » *while `main` was
+production*; deploying from CI now buys a guarantee rather than seconds, since the deploy job `needs` the
+migration job. 078 named « a dropped column, a narrowed type » as its own trigger to revisit, and PR 3 of
+the plan does both, so that trigger was about to fire anyway.
+
+`checks.yml` is new and holds the two jobs verbatim, `workflow_call` only, called by `ci.yml` and by
+`release.yml` — one copy, because two copies of forty lines of `postgres:17` service configuration is how
+two callers quietly start testing different things. Worth knowing before editing it: inside a reusable
+workflow `github.event_name` is the *caller's* event, and it declares no `concurrency` group on purpose,
+because a group declared in a reusable workflow is shared by every caller and a tag run would cancel the
+`main` run that produced it.
+
+The documentation half was the larger half, and it is the reason this entry exists: `CLAUDE.md` still
+said « **Never create a release tag by hand** », which is the sentence every future session reads and was
+now the exact opposite of the truth. `docs/DEPLOY.md` said a push to `main` was a production deploy, that
+`DATABASE_URL` was one variable with the same value on Production and Preview, and that « Squash-merge
+the pull request. That is the whole procedure … Nothing to run by hand ». It now carries a numbered
+« Shipping a version » — bump, merge, look at the preview, tag and push — plus what to do when the gate
+refuses a tag, and the variable table names `PREVIEW_DATABASE_URL`, `VERCEL_TOKEN`, `VERCEL_ORG_ID` and
+`VERCEL_PROJECT_ID`. 080's `vercel.json` mechanism is untouched; two of its *sentences* are not, and 119
+says which.
+
+**One thing nobody in a session can check, and it is the sharpest risk here.** Whether the
+`PREVIEW_DATABASE_URL` secret actually holds the Neon preview branch's string is unverifiable from this
+side — a GitHub secret is write-only and the Vercel values are sensitive. If it holds the **production**
+string, every merge to `main` now migrates production, and the job would print `migrations applied` and
+go green while doing it. That is a « still to verify » in `docs/DEPLOY.md` §2 and an open roadmap item
+worded as a question to the owner, because it is his to answer and not ours to assume.
+
+**Next:** PR 3 of the approved plan, which drops a column and narrows a type — the first migration that
+is not safe in both directions, and therefore the first one to ship through the new flow deliberately,
+with the preview looked at between the merge and the tag. Still owed from before: the super admin
+password is the literal placeholder `choisis-en-un-vrai`, the Neon `neondb_owner` password has been in a
+transcript and wants rotating, and `docs/DEPLOY.md` §6 wants a real phone outside in daylight.
+
+## The premise of the entry above was false, and six documents said it
+
+**2026-09-30** · `ci/production-on-a-tag`
+
+A review of the branch asked the one question nobody had asked: *is* a push to `main` a Preview
+deployment? The Vercel and GitHub APIs were checked, and the answer was no, twice over.
+
+- The last three deployments Vercel's Git integration ever made were the `main` squash-merges of #104,
+  #105 and #106, and **all three were `target=production`** — the newest at 11:23 UTC. So right up to
+  today, merging a pull request deployed production. That is the thing decision 119 was written to stop
+  and the thing the document described as already handled by dashboard state.
+- The owner parked the project's production branch on `vercel-production-placeholder` later the same day —
+  that part is true and verified through `GET /v9/projects/…`. But the merge of `1e6ec71` at 14:46 UTC,
+  the first after the parking, has **zero** Vercel commit statuses, zero GitHub deployments and no Vercel
+  deployment record. A `main` push went from deploying production to deploying nothing at all, and the
+  claimed Preview never existed on either side of the change.
+
+So the sentence « a push to `main` moves the Preview deployment at `dev.7orteils.bgonzva.fr` » was wrong
+in both directions, and it was in `CLAUDE.md`, `docs/DEPLOY.md`, `docs/DECISIONS.md` 119,
+`docs/ROADMAP.md`, `docs/SESSIONS.md` and both workflow headers. **Nothing in the repository could have
+caught it**, which is the actual finding: it was a dashboard setting, and a paragraph asserting one is a
+paragraph nothing checks.
+
+**The fix is to stop depending on the dashboard.** `vercel.json` sets `git.deploymentEnabled` to `false`
+for **every** pattern including `main`, so the Git integration issues nothing ever, and CI issues both
+deployments itself with the Vercel CLI: a new `deploy-preview` job in `ci.yml` (`vercel pull
+--environment=preview`, `vercel build`, `vercel deploy --prebuilt`, **no** `--prod`) ordered
+`needs: [migrate-preview]`, and the existing `deploy-production` in `release.yml` ordered after
+`migrate-production`. Three consequences worth having in words. « No deployment for anything but `main` or
+a tag » is now true by construction — nothing outside a workflow can deploy, `pull_request` reaches no
+deploy job, `release.yml` fires only on `refs/tags/v*`. The seconds-wide race between schema and code that
+decision 078 documented is **gone for the preview too**, not merely survivable there. And parking the
+production branch stops being load-bearing: it is defence in depth now, worth keeping and no longer a
+blocker.
+
+**Two more corrections from the same review, both of which the docs had stated as procedure.**
+Re-pushing an unchanged tag is **not** a retry — `git push` of a tag the remote already has at the same
+commit prints `Everything up-to-date` and emits no push event, so `release.yml` never starts; the retry is
+`gh run rerun --failed <run-id>`. And **rolling back by tagging an older commit cannot work**, for two
+independent reasons: a `push` event resolves `uses: ./…` from the pushed ref's own commit, and every
+commit older than this branch has no `release.yml`, so such a tag runs nothing silently; and
+`npm run db:migrate` is forward-only, so production would serve older code against the newer schema. A
+rollback is a forward fix — revert, bump, merge, look at the preview, tag.
+
+**What is still not known, said as questions rather than as facts.** All three secrets and both variables
+exist (checked through the GitHub API), so a `main` push will not go red for want of a credential — but
+**what is inside `PREVIEW_DATABASE_URL` is unverifiable from any session**, because the API returns a
+secret's name and never its value and the Vercel copy is sensitive on purpose. If it holds the production
+string, every merge migrates production, green and silent. Whether the Neon `preview` branch exists at all
+is unverified for the same reason. And one piece of dashboard state the design does still depend on, which
+unlike the production-branch setting is *readable*, and is how it was found:
+**`dev.7orteils.bgonzva.fr` is pinned to the git branch `main`** (`gitBranch=main`). A git-pinned domain
+cannot be re-pointed with `vercel alias set`, so `deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` to
+make its deployment claim the branch. That is **expected to work and has not been observed**; the first
+`main` push after this merges is the test, and if `dev.` does not move the owner removes the pin and CI
+aliases the domain explicitly. `7orteils.bgonzva.fr`, by contrast, has no git pin and is attached to the
+Production environment, so a `--prod` deploy takes it — verified.
+
+**Next:** unchanged — PR 3 of the approved plan, the first migration that is not safe in both directions.
+Before that, the first `main` push wants watching for the two things it is the only test of: that
+`deploy-preview` actually deploys, and that `dev.7orteils.bgonzva.fr` serves what it deployed.

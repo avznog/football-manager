@@ -109,9 +109,12 @@ npm run peer           # what the other sessions changed on origin since last ru
 the page never hydrates, and the suite silently tests the no-JavaScript fallbacks instead. It owns
 its own fixture team and never touches the demo season (decision 044).
 
-`.github/workflows/ci.yml` runs the same checks on every push and pull request: one job for
-typecheck · lint · vitest, and one for the browser run on a `postgres:17` service with the committed
-migrations and a production build.
+`.github/workflows/checks.yml` holds those checks — one job for typecheck · lint · vitest, and one for
+the browser run on a `postgres:17` service with the committed migrations and a production build. It is
+`workflow_call` only and never runs on its own: `ci.yml` calls it for every pull request and every push
+to `main`, and `release.yml` calls it again for a tag, so a tag is tested exactly as the pull request
+was. `ci.yml` then migrates the **preview** database on a `main` push and deploys the preview, and creates
+no tag; `release.yml` is the only workflow that touches production (decision 119).
 
 `next typegen` has to run before `tsc`, so always go through `npm run typecheck` rather than
 calling `tsc` directly: `PageProps<"/route">` does not exist until the route types are generated.
@@ -137,13 +140,39 @@ calling `tsc` directly: `PageProps<"/route">` does not exist until the route typ
 One branch per slice, named `feat/<slice>`. Open a PR describing what the slice does and how to
 verify it. **Squash-merge** into `main`. Never commit directly to `main`.
 
-Only `main` deploys — a push to any other branch builds nothing on Vercel (decision 080), so the
-preview URL to check a change on is the one CI's browser job builds, or a local `npm run build`.
+**Nothing deploys from git any more.** `vercel.json` sets `git.deploymentEnabled` to `false` for
+**every** branch including `main`, so Vercel's Git integration issues no deployment at all, ever, and
+both deployments this project has are issued by a workflow with the Vercel CLI: `deploy-preview` in
+`ci.yml` after `migrate-preview` on a push to `main`, and `deploy-production` in `release.yml` after
+`migrate-production` on a tag (decision 119, which supersedes 080's reliance on the Git integration).
+So « a branch that is neither `main` nor a tag deploys nowhere » is now true by construction, and the
+way to look at a branch is still a local `npm run build`.
 
-**Versions are the `version` field in `package.json`, and CI turns them into tags.** Bump it in the PR
-that earns the bump and the `tag` job cuts `v<version>` on `main` once the tests and the migration have
-passed (decision 081). Never create a release tag by hand: a tag that does not follow that path is a
-claim about a version nothing verified.
+Do not restate this from memory: an earlier draft of decision 119 said a `main` push produced a
+*Preview* deployment from the Git integration, and that was checked against the Vercel API and found
+untrue — a `main` push was producing a **production** deployment until the owner parked the project's
+production branch, and after that it produced nothing at all. That branch is parked
+(`vercel-production-placeholder`, verified), and it is now defence in depth rather than the thing the
+split rests on.
+
+One piece of dashboard state the design does still depend on: **`dev.7orteils.bgonzva.fr` is pinned to
+the git branch `main`**, so the CLI preview deployment only takes that domain if it carries `main` as
+its git-branch metadata — which is why `deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` itself. That
+is expected to work and **has not been observed yet**; the first `main` push after this merges is the
+test, and `docs/DEPLOY.md` §4 has the fallback.
+
+**Versions are the `version` field in `package.json`, and a tag is the act that ships.** Bump the number
+in the pull request that earns it; then, when the owner decides to ship, the annotated tag is cut **by
+hand** on `main` — and pushing it is what migrates the production database and deploys production
+(decision 119, superseding 081). The `gate` job in `.github/workflows/release.yml` refuses any tag that
+does not equal `v$(package.json version)` **at the commit it points at**, or whose commit is not
+reachable from `origin/main`, and names in its error the command that deletes it. So a hand-cut tag is
+checked before it is believed rather than forbidden — but nothing cuts it for you, and an untagged
+version on `main` means production keeps serving the previous one. `docs/DEPLOY.md` « Shipping a
+version » is the four steps. Two things that are **not** how this works, both of which the docs claimed
+until they were checked: re-pushing an unchanged tag is not a retry — it prints `Everything up-to-date`
+and fires nothing, so the retry is `gh run rerun --failed <run-id>` — and a rollback is never a tag on an
+older commit, because that commit has no `release.yml` to run and `db:migrate` has no way back.
 
 **Nothing is done until it is on `origin`.** The whole reason this project keeps its spec, its
 decisions and its migrations in git is that sessions share no memory: work that exists only in a
