@@ -2853,3 +2853,84 @@ string then every merge to `main` migrates production, green and silent. Nothing
 merge would have shown it either way — #109 adds no migration, so `preview-migrations` had nothing
 to apply that was not applied already. That check remains the owner's, from a place that can read
 the value.
+
+## Where the two seconds on the iPhone actually are
+
+**2026-09-30.** Step 1 of the tap-latency brief in `COORDINATION.md`: measure, and write the numbers
+down before changing anything. No production code changed in this entry. The short version is that
+the owner's instinct about *what* is slow and the brief's guess about *why* point at two different
+things, and the numbers back the first and not the second.
+
+**Method.** A throwaway Playwright script at 390 × 844, logged in as `karim`, tapping each tab from a
+neighbouring screen five times and taking the median of two numbers per tap: how long the server took
+to answer the navigation's RSC request, and how long from the click until the target screen's own `h1`
+is on screen. Two profiles: this laptop unthrottled against a warm `next dev`, and the same with CDP
+CPU throttling ×4 and 100 ms RTT / 10 Mbps, which is an optimistic 4G. Production numbers separately,
+with `curl` against `dev.7orteils.bgonzva.fr` from a wired European connection.
+
+| tab tap | server RSC | tap → heading, no throttle | tap → heading, CPU ×4 + 100 ms RTT |
+| --- | --- | --- | --- |
+| Calendrier | 35 ms | 216 ms | 342 ms |
+| Équipe | 34 ms | 216 ms | 356 ms |
+| Stats | 33 ms | 217 ms | 844 ms |
+| Moi | 31 ms | 126 ms | 367 ms |
+
+Production path, `/connexion` (a screen that queries nothing), `cdg1::lhr1`, every response
+`x-vercel-cache: MISS` because every render is dynamic:
+
+| | TTFB |
+| --- | --- |
+| first request after an idle period | **1.54 s** |
+| the five that followed it | 118 · 148 · 328 · 118 · 152 ms |
+| warm, a second run | 155 · 203 · 161 ms |
+
+**1. The server is not the bottleneck, and neither are sequential awaits.** 31–35 ms of server think
+time for a whole screen. Step 2 of the brief asks for `Promise.all` over sequential awaits in
+`lib/queries/` and the page components — and that work is, with one exception, already done: 17 of the
+21 pages under `app/(app)/` already wrap their queries in `Promise.all`, and almost every function in
+`lib/queries` is a single `SELECT`. The exception is the one chain that runs before **every** page:
+`requireTeamContext` → `requireActor` → `getCurrentUser` → `readSession` is four *dependent* database
+round trips (session, then user, then memberships, then team) before a page's own first query starts.
+Two of the four can be collapsed into joins. In-region that is worth single-digit milliseconds, so it
+is a tidiness fix and it will not be shipped as a latency fix or described as one.
+
+**2. A cold function start is 1.54 s, on a page that reads nothing.** That is the two seconds, and it
+is the one number in this entry of the right order of magnitude. It also explains why the owner feels
+it and a synthetic run does not: a benchmark loops and stays warm, whereas a coach opens this app on
+a Sunday morning, having not touched it since the previous Sunday, and pays the cold start on the
+first tap of every session. Every render here is dynamic (`x-vercel-cache: MISS` on all of them),
+because every screen is behind a cookie — so there is no cached HTML to answer from while it boots.
+
+**3. Nothing acknowledges the tap, so the whole wait is indistinguishable from a dead phone.** There
+are **zero** `loading.tsx` files in this repository, no `useLinkStatus`, no `<Suspense>` and no
+`useTransition` anywhere in `app/` or `components/`. `components/nav/bottom-nav.tsx:32` is a bare
+`<Link>`: it has a `text-accent` colour for the tab you are *on* and no pressed state at all, so
+between the tap and the new screen the only feedback is Safari's own grey flash, which is over in
+100 ms whether the answer takes 200 ms or two seconds. This is the finding worth acting on. It does
+not make anything faster and it is the difference between « c'est lent » and « ça n'a pas marché ».
+
+**4. `/stats` is the one screen that costs real server work** — 844 ms throttled against 342–367 ms
+for its neighbours, and 314 ms against 109 ms as a cold local load. Its own aggregation, not the
+shared prefix, and the one place where a `<Suspense>` boundary would pay for itself twice.
+
+**5. A tap that lands before hydration becomes a full document load.** Under CPU ×4, tapping the
+instant the previous screen's heading appeared produced a native link navigation rather than a router
+navigation in 5 of 5 samples on Calendrier and 1 of 5 on Stats — the slowest possible path, since it
+re-downloads and re-executes everything. This was found by accident: the first version of the script
+timed with `performance.now()` inside the page and reported **negative** durations, which is only
+possible if the document was replaced and the time origin reset. Timing from Node's clock and leaving
+a marker on `window` to detect the swap is what turned a broken measurement into a finding.
+
+**The four iOS suspects the brief lists are all clean**, each with the file that clears it:
+`width=device-width` and `initialScale: 1` are set in `app/layout.tsx:22`, so there is no legacy
+300 ms tap delay; there is no `-webkit-tap-highlight-color` override anywhere, so Safari's own
+highlight is intact; `touch-action` appears only where a drag needs it — `touch-none` on the pitch
+discs and the terrain sheet, `touch-pan-x` on the bench strip, each with a comment saying why — and
+never on the tab bar or a chip row; and there is not a single `onTouchStart` or `onTouchEnd` in the
+codebase, so nothing is bound to `touchend` instead of `click`.
+
+**Next, one pull request per concern, in this order:** acknowledge the tap (finding 3, and finding 5
+belongs to it — a pressed state renders before hydration, a router pending state does not);
+`<Suspense>` on `/stats` (finding 4); and the auth prefix joins (finding 1) described as what they
+are. The cold start (finding 2) is the largest number here and the least code: it is
+infrastructure — the owner's lane — so it is written down and not touched.

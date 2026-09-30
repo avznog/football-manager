@@ -750,6 +750,20 @@ the reachable-turf finding below an **under**-statement on device rather than an
       — and the first browser check of it was void while reporting the expected result, because a
       three-migration-stale local database made the page throw and « ×0 » agreed for the wrong reason
       (decision 120)
+- [ ] Nothing in the app acknowledges a tap, so every wait looks like a tap that missed. Zero
+      `loading.tsx` files, no `useLinkStatus`, no `<Suspense>`, no `useTransition`; the tab bar at
+      `components/nav/bottom-nav.tsx:32` is a bare `<Link>` with a colour for the tab you are on and no
+      pressed state. Measured: 342–367 ms per tab tap on an emulated 4G phone, 844 ms for `/stats`, and
+      **1.54 s for a cold function start** — which is what the owner feels, because a coach opens this
+      app once a week and pays that on the first tap every time. The fix makes nothing faster and is
+      the difference between « c'est lent » and « ça n'a pas marché ». Numbers in `docs/SESSIONS.md`
+- [ ] `/stats` costs 844 ms of the 844 ms it takes to appear on an emulated 4G phone — 2.4× its
+      neighbours, and 314 ms against 109 ms as a local load. Its own aggregation, not the shared auth
+      prefix, and the one screen where a `<Suspense>` boundary pays for itself
+- [ ] The auth prefix is four *dependent* database round trips before any page's own first query:
+      `readSession` → `users` → `teamMembers` → `teams`, in `lib/auth/dal.ts`. Two of the four collapse
+      into joins. In-region that is single-digit milliseconds, so this is a tidiness item and must not
+      be described as a latency fix — measured, the server contributes 31–35 ms to a whole screen
 - [ ] Tap targets below Apple's 44 × 44 pt floor, in the places most used with a thumb: the player
       names in every availability list are links as small as **16 × 32** (« Ali », « Léo » 24 × 32) —
       thirteen of them per screen; the `/stats` filter and sort chips are 36 px tall; « Détails » on
