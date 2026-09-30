@@ -207,6 +207,7 @@ export const GAME_MODE_EVENT_TYPES: readonly MatchEventType[] = [
   "LINEUP_APPLIED",
   "FOUL",
   "INJURY",
+  "COMMENT",
   "FINAL_WHISTLE",
   "VOID",
 ];

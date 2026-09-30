@@ -56,6 +56,7 @@ export const matchEventType = pgEnum("match_event_type", [
   "LINEUP_APPLIED",
   "FOUL",
   "INJURY",
+  "COMMENT",
   "FINAL_WHISTLE",
   "VOID",
 ]);

@@ -52,6 +52,7 @@ export const MATCH_EVENT_TYPES = [
   "LINEUP_APPLIED",
   "FOUL",
   "INJURY",
+  "COMMENT",
   "FINAL_WHISTLE",
   "VOID",
 ] as const;
@@ -122,6 +123,13 @@ export function canBeVoided(type: MatchEventType): boolean {
 const reasonSchema = z.string().trim().min(1).max(120);
 
 /**
+ * The free-text note of a `COMMENT`, e.g. « Coup franc dangereux, mur mal placé ». Longer than a
+ * pause reason because it is the point of the event rather than an aside, and still short enough to
+ * read on one timeline line.
+ */
+const noteSchema = z.string().trim().min(1).max(280);
+
+/**
  * Both payload dictionaries come from here, differing only in how an id is validated.
  * `id` is applied to every `team_members.id` and `formation_slots.id` reference.
  */
@@ -179,6 +187,13 @@ function buildPayloadSchemas(id: z.ZodType<string, unknown>) {
 
     FOUL: z.object({ memberId: id }),
     INJURY: z.object({ memberId: id }),
+
+    /**
+     * A note the coach types during the match. `memberId` is optional: a comment is about the game
+     * as often as it is about a player, and forcing a subject would make the coach pick one.
+     */
+    COMMENT: z.object({ note: noteSchema, memberId: id.optional() }),
+
     FINAL_WHISTLE: empty,
 
     /** The target is carried by the `voids_event_id` column, not by the payload. */
@@ -356,6 +371,7 @@ export const EVENT_LABELS_FR: Record<MatchEventType, string> = {
   LINEUP_APPLIED: "Composition appliquée",
   FOUL: "Faute",
   INJURY: "Blessure",
+  COMMENT: "Commentaire",
   FINAL_WHISTLE: "Coup de sifflet final",
   VOID: "Annulation",
 };

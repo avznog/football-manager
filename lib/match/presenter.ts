@@ -34,6 +34,7 @@ import {
   type PlannedLineupFlagReason,
   type PlannedLineupState,
   type SquadEntry,
+  type TimelineEntry,
 } from "./reducer";
 
 /* -------------------------------------------------------------------------- */
@@ -625,7 +626,7 @@ export function timelineLines(
         clientEventId: entry.clientEventId,
         minuteLabel: entry.minuteLabel,
         title: entry.labelFr,
-        detail: describeActorsFr(entry.type, entry.actors, players),
+        detail: detailFr(entry, players),
         scoreLabel: entry.scoreAfter
           ? scoreLineFr(entry.scoreAfter.goalsFor, entry.scoreAfter.goalsAgainst)
           : null,
@@ -635,6 +636,17 @@ export function timelineLines(
         voidsEventId: entry.voidsEventId,
       };
     });
+}
+
+/**
+ * The line under the title: who the event was about, and the free text it carries if it has any.
+ * A comment attached to nobody is its note alone; attached to a player it reads « Karim : trop
+ * haut sur le côté », the same « name : text » idiom as `labelledFr`.
+ */
+function detailFr(entry: TimelineEntry, players: PlayerIndex): string | null {
+  const actors = describeActorsFr(entry.type, entry.actors, players);
+  if (!entry.note) return actors;
+  return actors ? `${actors} : ${entry.note}` : entry.note;
 }
 
 /** Who an event was about, phrased the way a coach reads it out. */
@@ -673,7 +685,13 @@ function describeActorsFr(
   }
 
   const single =
-    find("scorer") ?? find("penalty") ?? find("own-goal") ?? find("moved") ?? find("foul") ?? find("injured");
+    find("scorer") ??
+    find("penalty") ??
+    find("own-goal") ??
+    find("moved") ??
+    find("foul") ??
+    find("injured") ??
+    find("commented");
   return single ? players.nameOf(single.memberId) : null;
 }
 
@@ -874,29 +892,52 @@ export function pendingCountLabelFr(count: number): string {
   return count === 1 ? "1 action en attente" : `${count} actions en attente`;
 }
 
-/** What the big button says, which is the whole of the coach's decision at that moment. */
+/**
+ * What the big button says, which is the whole of the coach's decision at that moment.
+ *
+ * `shortLabel` is the same decision in as few letters as it can be said: the game-mode bottom bar
+ * gives this button a quarter of a 393 px screen, where « Coup de sifflet final » does not fit.
+ * It stays in this function rather than a second one so that the two labels of one action cannot
+ * drift apart, and it is purely additive — every caller reading `label` is untouched.
+ */
 export function clockActionFr(state: MatchState): {
   label: string;
+  shortLabel: string;
   event: "KICKOFF" | "PERIOD_END" | "PAUSE" | "RESUME" | "FINAL_WHISTLE" | null;
 } {
   const { phase } = state;
 
-  if (phase === "finished") return { label: "Match terminé", event: null };
-  if (phase === "before-kickoff") return { label: "Coup d’envoi", event: "KICKOFF" };
-  if (phase === "paused") return { label: "Reprendre", event: "RESUME" };
+  if (phase === "finished") return { label: "Match terminé", shortLabel: "Terminé", event: null };
+  if (phase === "before-kickoff") {
+    return { label: "Coup d’envoi", shortLabel: "Envoi", event: "KICKOFF" };
+  }
+  if (phase === "paused") return { label: "Reprendre", shortLabel: "Reprendre", event: "RESUME" };
   if (phase === "break") {
     return state.periodsStarted >= state.periods.periodsCount
-      ? { label: "Coup de sifflet final", event: "FINAL_WHISTLE" }
-      : { label: `Coup d’envoi ${ordinalPeriodFr(state.periodsStarted + 1)}`, event: "KICKOFF" };
+      ? { label: "Coup de sifflet final", shortLabel: "Fin", event: "FINAL_WHISTLE" }
+      : {
+          label: `Coup d’envoi ${ordinalPeriodFr(state.periodsStarted + 1)}`,
+          shortLabel: "Envoi",
+          event: "KICKOFF",
+        };
   }
   // Running: the period has to be closed before anything else can happen.
-  return { label: periodEndLabelFr(state), event: "PERIOD_END" };
+  const periodEnd = periodEndLabelFr(state);
+  return {
+    label: periodEnd,
+    // « Mi-temps » is already as short as it gets; « Fin du match » and « Fin de la 2e période »
+    // are not, and in a bar where the clock is right there, « Fin » says the same thing.
+    shortLabel: periodEnd === HALF_TIME_FR ? periodEnd : "Fin",
+    event: "PERIOD_END",
+  };
 }
+
+const HALF_TIME_FR = "Mi-temps";
 
 function periodEndLabelFr(state: MatchState): string {
   const isLast = state.clock.period >= state.periods.periodsCount;
   if (isLast) return "Fin du match";
-  return state.periods.periodsCount === 2 ? "Mi-temps" : `Fin de la ${ordinalPeriodFr(state.clock.period)}`;
+  return state.periods.periodsCount === 2 ? HALF_TIME_FR : `Fin de la ${ordinalPeriodFr(state.clock.period)}`;
 }
 
 function ordinalPeriodFr(period: number): string {

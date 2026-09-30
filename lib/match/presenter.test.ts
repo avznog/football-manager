@@ -542,6 +542,29 @@ describe("the timeline", () => {
     expect(timelineLines(state, index)[0].detail).toBe("Sort : Julien · Entre : Momo");
   });
 
+  it("reads a comment's own words as its detail", () => {
+    const note = "Coup franc dangereux, mur mal placé";
+    const commented = log([...KICKED_OFF, { type: "COMMENT", min: 14, payload: { note } }]);
+    const state = reduceLive(live(commented), [], T0 + 20 * MIN);
+
+    expect(timelineLines(state, index)[0]).toMatchObject({
+      title: "Commentaire",
+      detail: note,
+      minuteLabel: "14’",
+      scoreLabel: null,
+    });
+  });
+
+  it("puts the player first when a comment is about one", () => {
+    const commented = log([
+      ...KICKED_OFF,
+      { type: "COMMENT", min: 14, payload: { note: "trop haut sur le côté", memberId: "karim" } },
+    ]);
+    const state = reduceLive(live(commented), [], T0 + 20 * MIN);
+
+    expect(timelineLines(state, index)[0].detail).toBe("Karim : trop haut sur le côté");
+  });
+
   it("names an unknown player rather than printing an id at the coach", () => {
     const orphan = log([...KICKED_OFF, { type: "FOUL", min: 14, payload: { memberId: "ghost" } }]);
     const state = reduceLive(live(orphan), [], T0 + 20 * MIN);
@@ -740,31 +763,53 @@ describe("what the big button says", () => {
     reduceLive(live(log(fixtures)), [], T0 + nowMin * MIN);
 
   it("walks the coach through the match one tap at a time", () => {
-    expect(clockActionFr(at([], 0))).toEqual({ label: "Coup d’envoi", event: "KICKOFF" });
-    expect(clockActionFr(at(KICKED_OFF, 10))).toEqual({ label: "Mi-temps", event: "PERIOD_END" });
+    expect(clockActionFr(at([], 0))).toEqual({
+      label: "Coup d’envoi",
+      shortLabel: "Envoi",
+      event: "KICKOFF",
+    });
+    expect(clockActionFr(at(KICKED_OFF, 10))).toEqual({
+      label: "Mi-temps",
+      shortLabel: "Mi-temps",
+      event: "PERIOD_END",
+    });
 
     const halfTime = [...KICKED_OFF, { type: "PERIOD_END" as const, min: 30, period: 1 }];
     expect(clockActionFr(at(halfTime, 35))).toEqual({
       label: "Coup d’envoi 2e période",
+      shortLabel: "Envoi",
       event: "KICKOFF",
     });
 
     const secondHalf = [...halfTime, { type: "KICKOFF" as const, min: 30, period: 2 }];
-    expect(clockActionFr(at(secondHalf, 50))).toEqual({ label: "Fin du match", event: "PERIOD_END" });
+    expect(clockActionFr(at(secondHalf, 50))).toEqual({
+      label: "Fin du match",
+      shortLabel: "Fin",
+      event: "PERIOD_END",
+    });
 
     const played = [...secondHalf, { type: "PERIOD_END" as const, min: 60, period: 2 }];
     expect(clockActionFr(at(played, 62))).toEqual({
       label: "Coup de sifflet final",
+      shortLabel: "Fin",
       event: "FINAL_WHISTLE",
     });
 
     const over = [...played, { type: "FINAL_WHISTLE" as const, min: 60, period: 2 }];
-    expect(clockActionFr(at(over, 70))).toEqual({ label: "Match terminé", event: null });
+    expect(clockActionFr(at(over, 70))).toEqual({
+      label: "Match terminé",
+      shortLabel: "Terminé",
+      event: null,
+    });
   });
 
   it("offers to resume a stopped game", () => {
     const paused = [...KICKED_OFF, { type: "PAUSE" as const, min: 20 }];
-    expect(clockActionFr(at(paused, 25))).toEqual({ label: "Reprendre", event: "RESUME" });
+    expect(clockActionFr(at(paused, 25))).toEqual({
+      label: "Reprendre",
+      shortLabel: "Reprendre",
+      event: "RESUME",
+    });
     expect(phaseLabelFr(at(paused, 25))).toBe("Jeu arrêté");
   });
 

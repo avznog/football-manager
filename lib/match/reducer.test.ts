@@ -1248,6 +1248,64 @@ describe("planned compositions", () => {
 });
 
 /* -------------------------------------------------------------------------- */
+/* Comments                                                                   */
+/* -------------------------------------------------------------------------- */
+
+describe("a comment", () => {
+  const NOTE = "Coup franc dangereux, mur mal placé";
+
+  /** Kept off the last minute of the log so that the two reductions anchor the clock identically. */
+  const PLAYED: Fixture[] = [
+    { type: "KICKOFF", min: 0, period: 1 },
+    { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+    { type: "GOAL_FOR", min: 11, payload: { scorerId: "julien" } },
+  ];
+
+  const withComment = (payload: unknown) =>
+    reduceMatch(
+      log([...PLAYED.slice(0, 2), { type: "COMMENT", min: 5, payload }, ...PLAYED.slice(2)]),
+      [],
+      CONFIG,
+    );
+
+  it("changes nothing at all: not the score, not the clock, not the pitch, not the minutes", () => {
+    const plain = reduceMatch(log(PLAYED), [], CONFIG);
+    const commented = withComment({ note: NOTE });
+
+    // Everything but the log itself is identical — a comment is a note in the margin, and this
+    // compares the whole state rather than a chosen handful of fields.
+    expect({ ...commented, timeline: [] }).toEqual({ ...plain, timeline: [] });
+    expect(commented.goalsFor).toBe(1);
+    expect(commented.goalsAgainst).toBe(0);
+    expect(commented.onPitch).toHaveLength(7);
+    expect(commented.anomalies).toEqual([]);
+  });
+
+  it("appears in the timeline carrying its note, and about nobody in particular", () => {
+    const entry = withComment({ note: NOTE }).timeline.find((line) => line.type === "COMMENT")!;
+    expect(entry.note).toBe(NOTE);
+    expect(entry.labelFr).toBe("Commentaire");
+    expect(entry.minuteLabel).toBe("5’");
+    expect(entry.actors).toEqual([]);
+    expect(entry.scoreAfter).toBeNull();
+    expect(entry.invalidPayload).toBe(false);
+  });
+
+  it("attaches the player it is about, when the coach named one", () => {
+    const entry = withComment({ note: NOTE, memberId: "karim" }).timeline.find(
+      (line) => line.type === "COMMENT",
+    )!;
+    expect(entry.actors).toEqual([{ memberId: "karim", role: "commented" }]);
+    expect(entry.note).toBe(NOTE);
+  });
+
+  it("leaves no note on any other event", () => {
+    const state = reduceMatch(SEED_LOG, [], CONFIG);
+    expect(state.timeline.every((entry) => entry.note === null)).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
 /* Contracts                                                                  */
 /* -------------------------------------------------------------------------- */
 

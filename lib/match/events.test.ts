@@ -116,6 +116,23 @@ describe("payload parsing", () => {
     expect(parseMatchEventPayload("PAUSE", {}).ok).toBe(true);
   });
 
+  it("requires a comment to say something, and lets it name a player or nobody", () => {
+    expect(parseMatchEventPayload("COMMENT", { note: "  Mur mal placé  " })).toEqual({
+      ok: true,
+      payload: { note: "Mur mal placé" },
+    });
+    expect(parseMatchEventPayload("COMMENT", { note: "Trop haut", memberId: UUID_B }).ok).toBe(true);
+    // A note that is only whitespace is not a note: `trim()` empties it and `min(1)` refuses it.
+    expect(parseMatchEventPayload("COMMENT", { note: "   " }).ok).toBe(false);
+    expect(parseMatchEventPayload("COMMENT", {}).ok).toBe(false);
+    expect(parseMatchEventPayload("COMMENT", { note: "x".repeat(280) }).ok).toBe(true);
+    expect(parseMatchEventPayload("COMMENT", { note: "x".repeat(281) }).ok).toBe(false);
+    // Strict at the boundary: the member reference has to be a real id.
+    expect(
+      parseMatchEventPayload("COMMENT", { note: "Trop haut", memberId: "karim" }, { strict: true }).ok,
+    ).toBe(false);
+  });
+
   it("exposes one schema per event type, so nothing can be added without a payload definition", () => {
     for (const type of MATCH_EVENT_TYPES) {
       expect(MATCH_EVENT_PAYLOAD_SCHEMAS[type]).toBeDefined();
