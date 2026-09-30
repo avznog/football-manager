@@ -18,7 +18,10 @@ import {
   DEFAULT_CRITERION,
   DEFAULT_DIRECTION,
   DIRECTION_PARAM,
+  DIRECTION_VALUES,
   FORMATION_PARAM,
+  NO_FORMATION_FR,
+  SEVEN_CONTROL_LABEL_FR,
   aggregationLabelFr,
   cleanSheetReadingsFr,
   declaredPostsFr,
@@ -30,13 +33,16 @@ import {
   formationUsageFr,
   goalkeeperShrinkageSentenceFr,
   matchesWithoutCompositionFr,
+  mostUsedFormationOptionFr,
   noBasisFr,
   observedFigureFr,
   optimumComparisonFr,
   outOfPositionNoteFr,
+  parseCompetitionId,
   parseCriterion,
   parseDirection,
   resetLabelFr,
+  resolveFormationOverride,
   sevenHeadingFr,
   shrinkageSentenceFr,
   squadMeanStandInFr,
@@ -108,6 +114,101 @@ describe("reading the query string", () => {
     expect(params.get(CRITERION_PARAM)).toBe("ratings");
     expect(params.get(FORMATION_PARAM)).toBe("f1");
     expect(parseDirection(params.get(DIRECTION_PARAM) ?? undefined)).toBe("worst");
+  });
+
+  /**
+   * The no-JavaScript path, and the only reason these four cases exist.
+   *
+   * The controls are `<select>`s inside a `<form method="get">`, so a browser with no JavaScript submits
+   * **every** name it holds — including the ones the reader left at their default, as `?critere=`.
+   * `equipeTypeHref` never writes an empty value (it omits the key), so nothing else in the app can
+   * produce that URL and no other test would ever visit it. One parser throwing or mistaking `""` for a
+   * real id is a screen that works for everybody except the reader who needs the fallback most.
+   */
+  it("reads an empty value as « nothing chosen », on all four parameters", () => {
+    const competitions = [{ id: "c1" }, { id: "c2" }];
+    const formations = [
+      { formationId: "f1", matches: 5 },
+      { formationId: "f2", matches: 2 },
+    ];
+
+    expect(parseCriterion("")).toBe(DEFAULT_CRITERION);
+    expect(parseDirection("")).toBe(DEFAULT_DIRECTION);
+    expect(parseCompetitionId("", competitions)).toBeNull();
+    expect(resolveFormationOverride("", formations, "f1")).toBeNull();
+
+    // And the whole form at once, exactly as a `method="get"` submit of four untouched selects arrives.
+    const params = new URLSearchParams("critere=&sens=&formation=&competition=");
+    expect(parseCriterion(params.get(CRITERION_PARAM) ?? undefined)).toBe(DEFAULT_CRITERION);
+    expect(parseDirection(params.get(DIRECTION_PARAM) ?? undefined)).toBe(DEFAULT_DIRECTION);
+    expect(parseCompetitionId(params.get("competition") ?? undefined, competitions)).toBeNull();
+    expect(
+      resolveFormationOverride(params.get(FORMATION_PARAM) ?? undefined, formations, "f1"),
+    ).toBeNull();
+  });
+
+  it("keeps a competition only if the team has it", () => {
+    const competitions = [{ id: "c1" }, { id: "c2" }];
+    expect(parseCompetitionId("c2", competitions)).toBe("c2");
+    expect(parseCompetitionId(["c1", "c2"], competitions)).toBe("c1");
+    // A stale bookmark from a deleted competition degrades to « toutes », never to an error.
+    expect(parseCompetitionId("c9", competitions)).toBeNull();
+    expect(parseCompetitionId(undefined, competitions)).toBeNull();
+    expect(parseCompetitionId("c1", [])).toBeNull();
+  });
+
+  it("refuses a shape the team has not played, and the most-played one", () => {
+    const formations = [
+      { formationId: "f1", matches: 5, label: "1-3-2-1" },
+      { formationId: "f2", matches: 2, label: "2-3-1" },
+      { formationId: "f3", matches: 0, label: "1-2-3" },
+    ];
+
+    expect(resolveFormationOverride("f2", formations, "f1")?.label).toBe("2-3-1");
+    // Never the most-played shape: it is what `override ?? mostUsed` falls back to anyway, and calling
+    // it an override makes `formationOverrideFr` print « Ce n'est pas la forme… » about the one that is.
+    expect(resolveFormationOverride("f1", formations, "f1")).toBeNull();
+    // Played nothing, so laying the seven out on it would be a shape this team does not use.
+    expect(resolveFormationOverride("f3", formations, "f1")).toBeNull();
+    expect(resolveFormationOverride("bidon", formations, "f1")).toBeNull();
+    // With no most-played shape to protect, the same id *is* an honest override.
+    expect(resolveFormationOverride("f1", formations, null)?.label).toBe("1-3-2-1");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The controls, which are the only writers of that query string               */
+/* -------------------------------------------------------------------------- */
+
+describe("naming the four controls", () => {
+  it("labels every select, and tutoies nobody into « vous »", () => {
+    const labels = Object.values(SEVEN_CONTROL_LABEL_FR);
+    expect(labels).toHaveLength(4);
+    for (const label of labels) {
+      expect(label).not.toMatch(/\bvo(tre|s)\b/i);
+      expect(label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("offers the most-played shape once, and says why it is the default", () => {
+    expect(mostUsedFormationOptionFr("1-3-2-1")).toBe("1-3-2-1 (la plus jouée)");
+    // Unreachable from the screen (no shape played means no select at all), but the option must still
+    // not read « null (la plus jouée) » if it ever is.
+    expect(mostUsedFormationOptionFr(null)).toBe("La plus jouée");
+  });
+
+  it("spells the direction the way the URL does, so a GET submit round-trips", () => {
+    // The `<option value>`s *are* the query string on the no-JavaScript path: a second spelling of
+    // « pire » in the component would be a filter that silently stops working without JavaScript.
+    expect(parseDirection(DIRECTION_VALUES.worst)).toBe("worst");
+    expect(parseDirection(DIRECTION_VALUES.best)).toBe("best");
+  });
+
+  it("never sends the reader to a control that is not on screen", () => {
+    // The formation select only lists shapes the team has played, so the state this sentence describes
+    // — none played — is exactly the state in which there is nothing to choose from.
+    expect(NO_FORMATION_FR).not.toContain("ci-dessus");
+    expect(NO_FORMATION_FR).not.toContain("ci-dessous");
   });
 });
 
