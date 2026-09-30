@@ -2829,3 +2829,27 @@ measure first and write the numbers down, then the sequential awaits in `lib/que
 acknowledgement, then the iOS suspects, one pull request per concern. And the départed-marks slice
 (« 11 présents sur 14 pointés » over ten green badges), whose local commit deliberately does not
 typecheck and enumerates its five errors.
+
+## The two unobserved things in the entry above, observed
+
+**2026-09-30.** The entry two above this one ended with a list of what decision 119's design was
+*expected* to do and had never been seen doing. Two of those are now facts, so the list should not
+keep claiming otherwise.
+
+**`deploy-preview` deploys.** It has now succeeded on three pushes to `main` — the two at 16:08 and
+16:26 and the merge of #109 at 22:17 — each after `preview-migrations`, which also succeeded. So
+neither the `VERCEL_TOKEN`/`VERCEL_PROJECT_ID` route nor the migration step is missing a credential.
+
+**`dev.7orteils.bgonzva.fr` serves what that job built,** which was the open question, because a
+git-pinned domain cannot be re-pointed with `vercel alias set` and the workaround was to have the
+job claim the branch with `VERCEL_GIT_COMMIT_REF: main`. Verified by comparing the HTML the domain
+returns for `/connexion` against the HTML the run's own deployment URL returns for the same path:
+identical (`md5 7d4e4b13…`), served from `lhr1` as decision 111 pinned it. The pin can stay; CI does
+not need to alias the domain explicitly.
+
+**Still unverified, and still unverifiable from any session:** what `PREVIEW_DATABASE_URL` actually
+points at. The GitHub API returns a secret's name and never its value, so if it holds the production
+string then every merge to `main` migrates production, green and silent. Nothing in this session's
+merge would have shown it either way — #109 adds no migration, so `preview-migrations` had nothing
+to apply that was not applied already. That check remains the owner's, from a place that can read
+the value.
