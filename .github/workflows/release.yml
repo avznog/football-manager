@@ -9,9 +9,11 @@
 # claims, or that is not on `main`. `CLAUDE.md`'s « never create a release tag by hand » is now
 # « a hand-cut tag is checked before it is believed ».
 #
-# Nothing else deploys. `ci.yml` has no deploy job, `pull_request` builds nothing, and `vercel.json`
-# keeps Vercel's Git integration off every branch but `main` — which is a *Preview* deployment, not
-# production, because the Vercel project's production branch is a parked one (decision 080).
+# Nothing else reaches production. `vercel.json` turns Vercel's Git integration off for every branch
+# including `main`, so no push deploys anything by itself; `ci.yml` issues a **preview** with the CLI
+# on a push to `main` and never passes `--prod`; and `pull_request` reaches no deploy job at all. The
+# Vercel project's production branch is parked on a branch nobody pushes, which is the second lock on
+# the same door (decision 119).
 name: release
 
 on:
@@ -63,8 +65,10 @@ jobs:
           fi
           echo "::notice::$GITHUB_REF_NAME matches package.json at $(git rev-parse --short HEAD)."
 
-      # A tag on a side branch must never migrate or deploy production. Only `main` is deployed
-      # (decision 080) and only `main` has been through a pull request, CI and a review at 390 px.
+      # A tag on a side branch must never migrate or deploy production — not because a side branch
+      # cannot be deployed (since `vercel.json` turned the Git integration off, nothing outside these
+      # workflows deploys anything at all), but because only `main` has been through a pull request,
+      # CI and a review at 390 px. That is the property being checked here.
       - name: the tagged commit must be on main
         run: |
           git fetch --no-tags --quiet origin main
@@ -76,16 +80,21 @@ jobs:
             exit 1
           fi
 
-      # Re-pushing a tag that already has a release is not an error — it is how a failed deploy is
-      # retried. It only means the last job has nothing to publish, so it says so and skips.
+      # A tag that already has a release is not an error, and the job below is what makes that safe:
+      # it publishes nothing when a release exists, so the run can be repeated without the release
+      # page being rewritten. Repeating it is `gh run rerun --failed <run-id>` on *this* run — which
+      # is the only retry there is. Re-pushing the same tag is not one: git answers `Everything
+      # up-to-date`, no push event is emitted, and nothing at all happens.
       - name: does a release already exist for this tag
         id: existing
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "::notice::A GitHub release already exists for $GITHUB_REF_NAME — this run will" \
-                 "re-test, re-migrate and re-deploy it, and publish nothing."
+            echo "::notice::A GitHub release already exists for $GITHUB_REF_NAME, so this run will" \
+                 "publish nothing. Whatever else it does depends on how it was started: a fresh run" \
+                 "of the whole workflow re-tests, re-migrates and re-deploys, while gh run rerun" \
+                 "--failed repeats only the jobs that failed."
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -159,21 +168,46 @@ jobs:
       # a day nothing in this repository changed. Bump the major deliberately, with a run to prove it.
       - run: npm i -g vercel@61
 
+      # All three are set today. The guard is for the day one is rotated or deleted: without the org
+      # and project the CLI asks which project this is, finds no terminal, and fails with something
+      # about a missing link — and it would fail there with production's schema already migrated by the
+      # job above, which is the worst place to be given an unhelpful message.
+      - name: the Vercel credentials must be set
+        run: |
+          missing=
+          if [ -z "$VERCEL_TOKEN" ]; then missing="$missing VERCEL_TOKEN (a repository secret)"; fi
+          if [ -z "$VERCEL_ORG_ID" ]; then missing="$missing VERCEL_ORG_ID (a repository variable)"; fi
+          if [ -z "$VERCEL_PROJECT_ID" ]; then
+            missing="$missing VERCEL_PROJECT_ID (a repository variable)"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::Not set, so production was not deployed:$missing." \
+                 "Nothing but this workflow can deploy production any more (vercel.json), so an" \
+                 "absent credential means the tag migrated production and shipped no code —" \
+                 "docs/DEPLOY.md §4."
+            exit 1
+          fi
+
+      # No `--token` on any of the three lines below: the CLI reads `VERCEL_TOKEN` out of the
+      # environment, which the job already sets, and repeating it on the command line only adds a
+      # place for the two to disagree.
       - name: pull the production environment
-        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        run: vercel pull --yes --environment=production
 
       # Built here rather than on Vercel so that the artifact deployed is the one produced from the
-      # tagged commit, with the migration already applied. `vercel.json` still supplies the region
-      # (decision 111) — it is read from the repository, not from the dashboard.
+      # tagged commit, with the migration already applied. `vercel.json` is still read from the
+      # repository rather than the dashboard, and `regions` in it is what pins the deployment to
+      # `lhr1` (decision 111) — a property of the deployment, nothing to do with the build output.
       - name: build
-        run: vercel build --prod --token="$VERCEL_TOKEN"
+        run: vercel build --prod
 
+      # `7orteils.bgonzva.fr` is attached to the Production environment with no git-branch pin, so a
+      # `--prod` deployment from here is what that domain serves — it does not need an alias step, and
+      # it is not waiting for a push to some branch.
       - name: deploy
-        id: deploy
         run: |
-          url=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          url=$(vercel deploy --prebuilt --prod)
           echo "::notice::Deployed $GITHUB_REF_NAME to production: $url"
-          echo "url=$url" >> "$GITHUB_OUTPUT"
 
       # A green deploy does not prove the app works — `DATABASE_URL` is scoped per environment in
       # Vercel and the build deliberately does not need it (decision 075), so a production deploy
@@ -183,6 +217,23 @@ jobs:
         run: |
           echo "::notice::Open https://7orteils.bgonzva.fr and load one page that queries the" \
                "database — a green deploy is not proof that DATABASE_URL is right (docs/DEPLOY.md §5)."
+
+      # The one state this workflow can leave behind that nothing else would name: the migration
+      # succeeded and the deployment did not, so production's schema is ahead of the code running
+      # against it. It is survivable — every migration this repository has written is additive, so the
+      # previous code keeps serving — but it is survivable *silently*, which is how it would be found a
+      # week later by somebody wondering why a new column is empty. So it says so, at the top of the
+      # failed run.
+      - name: production is migrated and not deployed
+        if: failure()
+        run: |
+          echo "::error::The migration for $GITHUB_REF_NAME has been applied to production, but the" \
+               "deployment failed. Production is serving the previous code against the new schema;" \
+               "the migrations are additive, so it is still serving. Fix it by rerunning this run —" \
+               "gh run rerun --failed $GITHUB_RUN_ID — and not by tagging an older commit: a push" \
+               "event resolves 'uses: ./.github/workflows/...' from the pushed ref's own commit, and" \
+               "no commit older than this branch has release.yml at all, so an older tag would run" \
+               "nothing. npm run db:migrate is forward-only; there is no rollback to reach for."
 
   # A tag is a pointer; a release is the thing a human can read (decision 108). Last, so a release
   # page never names a version that failed to migrate or failed to deploy — the same reason 081 put
@@ -210,9 +261,9 @@ jobs:
       # `--prerelease`, which keeps GitHub's "Latest" badge on the last stable version: a beta that
       # advertises itself as the current release is worse than no release page at all (decision 110).
       #
-      # Idempotent, because a tag can be re-pushed to retry a failed deploy: the gate has already
-      # skipped this job if a release exists, and the check is repeated here so the job is safe on
-      # its own.
+      # Idempotent, because a failed run is retried with `gh run rerun --failed` and this job then
+      # runs a second time for a tag that already has a release: the gate has already skipped it in
+      # that case, and the check is repeated here so the job is safe on its own.
       - name: publish the release for this tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

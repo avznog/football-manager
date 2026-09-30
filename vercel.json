@@ -5,7 +5,7 @@
     "deploymentEnabled": {
       "**": false,
       "*": false,
-      "main": true
+      "main": false
     }
   }
 }

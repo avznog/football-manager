@@ -8,16 +8,18 @@
 # rule is now a gate in `release.yml` rather than a generator here. Do not re-add a `tag` job: two
 # things cutting tags is how a tag stops meaning anything.
 #
-# Where the `main` deployment comes from: **Vercel's own Git integration**, driven by
-# `vercel.json`'s `git.deploymentEnabled` (decision 080). The Vercel project's production branch is a
-# parked branch, not `main`, so a `main` push is a **Preview** deployment — the one serving
-# `dev.7orteils.bgonzva.fr`. CI does not issue it and does not order itself against it, which is the
-# same seconds-wide window decision 078 documented for production: for a few seconds the new code
-# can be serving against the old schema. The migrations are additive, which is what makes that
-# survivable; the first one that is not is the trigger to revisit it.
+# Where the `main` deployment comes from: **this workflow**, with the Vercel CLI. `vercel.json`'s
+# `git.deploymentEnabled` is now `false` for every pattern including `main`, so Vercel's own Git
+# integration issues nothing, ever, and every deployment this project has is one a job below or in
+# `release.yml` asked for. That is deliberate and it buys the ordering: `deploy-preview` runs after
+# `migrate-preview`, so the preview schema is always in place before the preview code that expects
+# it, rather than the two racing on a push the way Vercel's integration made them. The Vercel
+# project's production branch is also parked on a branch nobody pushes, so even a mistake here
+# cannot reach production from `main` (decision 119).
 #
-# A branch that is neither `main` nor a tag deploys nowhere: `vercel.json` keeps every other branch
-# off, `pull_request` runs no deploy job below, and `release.yml` only fires on `refs/tags/v*`.
+# A branch that is neither `main` nor a tag deploys nowhere, and now by construction rather than by
+# dashboard state: nothing outside CI can deploy at all, `pull_request` reaches no deploy job below,
+# and `release.yml` only fires on `refs/tags/v*`.
 name: CI
 
 on:
@@ -79,3 +81,77 @@ jobs:
             exit 1
           fi
           npm run db:migrate
+
+  # The preview deployment — `dev.7orteils.bgonzva.fr` — issued here because `vercel.json` has turned
+  # Vercel's Git integration off for every branch. Issuing it ourselves is the only way to put it
+  # *after* the migration: Vercel's integration starts building the moment the push lands, so the new
+  # code could answer a request against the old schema for as long as the migration took.
+  #
+  # There is deliberately no `if:` here. It would only repeat `migrate-preview`'s condition, and a job
+  # whose `needs` was skipped is skipped too — so this already runs on a push to `main` and on nothing
+  # else. Adding the guard back would mean two places to keep in agreement for no gain.
+  deploy-preview:
+    name: deploy preview
+    needs: [migrate-preview]
+    runs-on: ubuntu-latest
+
+    # `VERCEL_GIT_COMMIT_REF` is not decoration. The domain `dev.7orteils.bgonzva.fr` is pinned in
+    # Vercel to the git branch `main`, and a branch-pinned domain only ever points at deployments that
+    # claim that branch — it cannot be re-pointed with `vercel alias set`, Vercel refuses outright. So
+    # the deployment has to say it is `main` for the pin to match it. It is set explicitly rather than
+    # left to whatever the CLI infers from the CI environment, because inference is not something this
+    # repository can check. If `dev.` turns out not to move on the first push, the way out is for the
+    # owner to remove the `main` pin from that domain in the dashboard, after which an explicit alias
+    # step becomes possible; docs/DEPLOY.md has the detail.
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_GIT_COMMIT_REF: main
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Pinned to a major: the CLI ships several times a week and its `build`/`deploy --prebuilt`
+      # contract is what this job depends on. A floating `vercel@latest` means a push can fail on a
+      # day nothing in this repository changed. Bump the major deliberately, with a run to prove it.
+      - run: npm i -g vercel@61
+
+      # All three are set today. The guard is for the day one is rotated or deleted: without the org
+      # and project the CLI asks which project this is, finds no terminal, and fails with something
+      # about a missing link that sends the next session looking in the wrong place entirely. The same
+      # shape, and the same reason, as the DATABASE_URL guard above.
+      - name: the Vercel credentials must be set
+        run: |
+          missing=
+          if [ -z "$VERCEL_TOKEN" ]; then missing="$missing VERCEL_TOKEN (a repository secret)"; fi
+          if [ -z "$VERCEL_ORG_ID" ]; then missing="$missing VERCEL_ORG_ID (a repository variable)"; fi
+          if [ -z "$VERCEL_PROJECT_ID" ]; then
+            missing="$missing VERCEL_PROJECT_ID (a repository variable)"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::Not set, so the preview was not deployed:$missing." \
+                 "Nothing but CI can deploy this project any more (vercel.json), so an absent" \
+                 "credential means no preview at all — docs/DEPLOY.md §4."
+            exit 1
+          fi
+
+      # `preview`, not `production`, on all three lines below, and no `--prod` anywhere: this job must
+      # be incapable of touching production even if the token would allow it.
+      - name: pull the preview environment
+        run: vercel pull --yes --environment=preview
+
+      # Built here rather than on Vercel so the artifact deployed is the one produced from this commit,
+      # with the preview migration already applied.
+      - name: build
+        run: vercel build
+
+      - name: deploy
+        run: |
+          url=$(vercel deploy --prebuilt)
+          echo "::notice::Deployed ${GITHUB_SHA::7} to preview: $url" \
+               "(dev.7orteils.bgonzva.fr is the domain that points at this environment)."
