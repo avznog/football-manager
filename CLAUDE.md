@@ -75,6 +75,12 @@ travaillez ».
 - Match minutes are **continuous**: with 2×30, the second half runs 30'→60'. Never display a
   reset clock.
 - Tailwind only, with the design tokens in `app/globals.css`. No inline hex colours.
+- **The code is hand-formatted and Prettier is not the formatter.** It is not a dependency and runs in
+  no CI job; 106 of 274 source files differ from what it would emit, so `--check` is not a gate and
+  making it one would be a thousand-line diff. Use it on one file you are already editing, never on a
+  whole directory, and **never on anything in `docs/`** — it turns `*emphasis*` into `_emphasis_` across
+  the entire file and buries the paragraph you added. `.prettierrc` and `.prettierignore` exist to make
+  that safe; read the comment at the top of the second one before overriding either.
 - Light and dark themes must both be checked for any new screen.
 - Nothing is explained on hover. A `title` is at most a duplicate of something already
   visible or announced: there is no hover on a phone (decision 072).

@@ -1,0 +1,26 @@
+# **This repository is hand-formatted, and Prettier is not its formatter.** It is not a dependency, it
+# runs in no CI job, and 106 of the 274 files under `lib/`, `app/` and `components/` differ from what it
+# would produce — so `prettier --check` is not a gate here and reformatting to make it one would be a
+# thousand-line diff nobody asked for. What Prettier *is* used for is one file a session is already
+# editing, by hand, deliberately. These two files exist so that reaching for it that way cannot do
+# damage outside that file.
+#
+# `.prettierrc` pins `printWidth: 100`, because the default is 80 against a codebase written at 100:
+# without it, formatting one file rewraps every line in it and the real change disappears.
+#
+# Everything below is what must never be reformatted at all.
+#
+# Every Markdown file. Prettier rewrites prose it was never asked about: `*emphasis*` becomes
+# `_emphasis_` throughout, and a blank line is inserted before every `---`. On `docs/DECISIONS.md` that
+# is several hundred lines of diff nobody wrote, burying the one paragraph that was actually added — it
+# has happened twice in one session, and both times the file had to be rebuilt from `HEAD` by hand.
+*.md
+
+# Generated, vendored or not ours to shape.
+.next/
+node_modules/
+db/migrations/
+coverage/
+playwright-report/
+test-results/
+audit/
