@@ -38,11 +38,12 @@ import {
 } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
 import { buildReminderMessage, tallyAvailability, type Responder } from "@/lib/calendar/timeline";
-import { finishMatch, reopenMatch } from "@/lib/match/actions";
+import { reopenMatch } from "@/lib/match/actions";
 import { getMatch, getMatchAnswers, getMatchScore, hasMatchEvents } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
 import { ratingDeadlineFr } from "@/lib/rating/window";
 import { getSquad } from "@/lib/team/queries";
+import { FinishMatchCard } from "./_components/finish-match-card";
 import { CompositionCard } from "./composition/_components/composition-card";
 import { AvailabilityControl } from "../../calendrier/_components/availability-control";
 import { AvailabilityGrid } from "../../calendrier/_components/availability-grid";
@@ -122,6 +123,16 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
     ratingDuty !== null && notation !== null
       ? ratingDeadlineFr(notation.window.closesAtMs, now.getTime())
       : null;
+  /**
+   * Whether the « Terminer le match » card is offered, and which of its two slots it goes in.
+   *
+   * `!logged` is the line decision 121 draws: a match with a déroulé is `live` or `finished`
+   * already, and a `live` one has a correct way to end — game mode's own final whistle, which
+   * derives the minute from the reducer instead of inventing one out here.
+   */
+  const mayFinish = mayAmend && match.status !== "finished" && !logged;
+  /** The kick-off has come round. Only the card's placement and its extra sentence depend on it. */
+  const played = kickoff.getTime() <= now.getTime();
   const declarable = team.isPlayer && match.status === "scheduled";
   const myAnswer =
     answers.find((answer) => answer.teamMemberId === team.membershipId)?.status ?? null;
@@ -200,6 +211,14 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         ) : null}
       </header>
 
+      {/* A match already played, with nothing in its log, is on this page for exactly one reason:
+          the coach is here to type it up (decision 121). So it leads — above the availability grid
+          and the « relancer » message, which are both a record of a question that closed. The same
+          argument the comment below makes for moving « Après le match » up. */}
+      {mayFinish && played ? (
+        <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff={false} />
+      ) : null}
+
       {declarable ? (
         <Card title="Ta réponse" description="Un seul appui. Tu peux changer d’avis jusqu’au coup d’envoi.">
           <AvailabilityControl
@@ -276,47 +295,11 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         </Card>
       ) : null}
 
-      {/* Declaring the match over without running game mode for an afternoon that is already gone
-          (decision 121). The card the coach actually wants is the retro-entry one just below, and it
-          is gated on `finished` — so before this existed the only key to it was a final whistle, and
-          the only thing that appends one is game mode.
-
-          Two buttons for one destination: the primary finishes *and* opens the form, because that is
-          what the coach is here for, and the secondary just closes the match for somebody who will
-          type it up later. Plain forms, no confirmation dialog: « Rouvrir le match » in the card
-          below is the undo, and it is a better answer than a dialog to a mis-tap. */}
-      {mayAmend && match.status !== "finished" && !logged ? (
-        <Card title="Terminer le match" as="h2">
-          <div className="space-y-3">
-            <p className="text-sm text-ink-muted">
-              Pas besoin du mode match pour un match joué sans le téléphone. Termine-le ici, puis
-              renseigne qui a joué et les buts : le score, les minutes et les clean sheets se
-              déduisent.
-            </p>
-            {/* Said out loud rather than forbidden: closing a match that has not kicked off is
-                allowed on purpose, and an app that does it silently looks broken. */}
-            {kickoff.getTime() > now.getTime() ? (
-              <p className="text-sm text-ink-muted">
-                Le coup d’envoi n’a pas encore eu lieu : ce match passera dans l’historique.
-              </p>
-            ) : null}
-            <form action={finishMatch}>
-              <input type="hidden" name="teamId" value={team.id} />
-              <input type="hidden" name="matchId" value={match.id} />
-              <input type="hidden" name="then" value="saisie" />
-              <Button type="submit" fullWidth>
-                Saisir le match
-              </Button>
-            </form>
-            <form action={finishMatch}>
-              <input type="hidden" name="teamId" value={team.id} />
-              <input type="hidden" name="matchId" value={match.id} />
-              <Button type="submit" variant="secondary" fullWidth>
-                Marquer comme terminé
-              </Button>
-            </form>
-          </div>
-        </Card>
+      {/* The second of the two slots `mayFinish` can fill: a fixture still to come. Low on the page,
+          because closing one before its kick-off is a rare deliberate act and must not push « Ta
+          réponse » and the composition down the screen. */}
+      {mayFinish && !played ? (
+        <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff />
       ) : null}
 
       {/* « Saisie rétroactive » (`docs/PLAN.md`, screen 8). A match played without the phone is typed
