@@ -67,6 +67,7 @@ import {
   mostUsedFormationOptionFr,
   parseCriterion,
   parseDirection,
+  showsCompetitionSelect,
   type BestSevenQuery,
 } from "@/lib/stats/best-seven-copy";
 
@@ -193,8 +194,14 @@ export function SevenControls({
 
         {/* Kept working across this screen, as on `/stats`: a seven of the championship is a different
             claim from a seven of the season, and decision 107 keys it by id so a rename cannot break a
-            bookmark. With a single competition there is nothing to choose between. */}
-        {competitions.length > 1 ? (
+            bookmark. With a single competition there is nothing to choose between — *unless* the reader
+            arrived already filtered on it, in which case the select is his only way back to « Toutes »
+            and the empty state says so out loud. `showsCompetitionSelect` carries that rule and its
+            test. */}
+        {showsCompetitionSelect({
+          competitionCount: competitions.length,
+          competitionId: query.competitionId,
+        }) ? (
           <Field htmlFor="equipe-type-competition" label={SEVEN_CONTROL_LABEL_FR.competition}>
             {({ id }) => (
               <Select

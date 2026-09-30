@@ -123,6 +123,12 @@ export default async function EquipeTypePage({
    * the pitch and above the notes when there is a seven, under the empty state when there is not. It is
    * never absent — an empty state whose own text says « choisis « Toutes » » with no select on screen
    * would be an instruction to use a control the reader does not have.
+   *
+   * Rendering it is necessary and was not sufficient: the block is on screen, and each select inside it
+   * decides for itself whether it has anything to offer. The competition one used to require two
+   * competitions, so a team with one and a bookmarked `?competition=<id>` got the « Choisis « Toutes » »
+   * sentence over a form with no competition select in it. `showsCompetitionSelect` now keeps it for a
+   * reader who arrived filtered, which is the state that prints the sentence.
    */
   const controls = (
     <SevenControls

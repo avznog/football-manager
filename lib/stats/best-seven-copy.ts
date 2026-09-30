@@ -109,6 +109,31 @@ export function parseCompetitionId(
 }
 
 /**
+ * Whether the competition select belongs on screen.
+ *
+ * More than one competition is the obvious reason — with a single one there is nothing to choose
+ * between, and a select holding « Toutes » and « Championnat » about the same set of matches is a
+ * control that cannot change anything.
+ *
+ * **A filter already applied is the other reason, and it is the one that was missing.** A team with
+ * exactly one competition still has `?competition=<id>` as a legal, bookmarkable URL — `/stats`'s own
+ * filter writes it, and `parseCompetitionId` keeps it because the id is real. The screen then read
+ * « Aucun match terminé en championnat … Choisis « Toutes » pour voir la saison entière » with no
+ * select anywhere under it: an instruction to use a control the reader does not have, which is exactly
+ * the failure `NO_FORMATION_FR` is tested against. A reader who arrived filtered must be able to get
+ * back out, however he arrived.
+ */
+export function showsCompetitionSelect({
+  competitionCount,
+  competitionId,
+}: {
+  competitionCount: number;
+  competitionId: string | null;
+}): boolean {
+  return competitionCount > 1 || competitionId !== null;
+}
+
+/**
  * The shape the reader chose himself, or null for « la plus jouée » — and **naming the most-played
  * shape is not overriding it.**
  *

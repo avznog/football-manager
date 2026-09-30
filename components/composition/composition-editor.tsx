@@ -572,6 +572,21 @@ export function CompositionEditor(props: CompositionEditorProps) {
    * `pointercancel` handler: a cancelled gesture clears the drag, so the ring goes out with it.
    */
   const dropOnBench = lifted !== null && overDock;
+  /**
+   * What the dock says about the release, and `null` when it says nothing — the ring is drawn on the
+   * same value, so the sentence and the highlight cannot disagree about what letting go does.
+   *
+   * `fromPitch` is the distinction `sendToBench` already makes, asked here one render earlier: a disc
+   * lifted *from the bench* and released over the bench has not moved, so promising « retourne sur le
+   * banc » about it would be the contradiction `benchDropHintFr` documents.
+   */
+  const benchDropHint =
+    dropOnBench && lifted
+      ? benchDropHintFr({
+          name: nameOf(lifted),
+          fromPitch: slotOfMember(assignments, lifted) !== null,
+        })
+      : null;
   const hoveredSlot =
     drag?.subject.kind === "player" && drag.moved && drag.point && !dropOnBench
       ? (nearestSlot(shape, drag.point)?.key ?? null)
@@ -861,24 +876,24 @@ export function CompositionEditor(props: CompositionEditorProps) {
       />
 
       {/* --- the dock: the bench and the confirm button, both always on screen --- */}
-      <div ref={dockRef} className={cn(DOCK_CLASS, dropOnBench && DOCK_TARGET_CLASS)}>
+      <div ref={dockRef} className={cn(DOCK_CLASS, benchDropHint !== null && DOCK_TARGET_CLASS)}>
         {/* One line for the two things that are true of the whole screen: what a thumb can do next,
             and whether anything is unsaved. They were two blocks of their own before — 60 px between
             the pitch and the bench for two short sentences. */}
         <div className="flex items-start justify-between gap-2">
-          {/* While a player is carried over the dock the line says what releasing him does, because
-              the lifted disc cannot: `Pitch` is `overflow-hidden`, so it is clipped off at the edge
-              of the turf and the gesture looks like it lost him. `text-accent`, and the ring on the
-              dock, so the answer does not depend on reading a sentence mid-drag. */}
+          {/* While a player carried off the turf is over the dock the line says what releasing him
+              does, because the lifted disc cannot: `Pitch` is `overflow-hidden`, so it is clipped off
+              at the edge of the turf and the gesture looks like it lost him. `text-accent`, and the
+              ring on the dock, so the answer does not depend on reading a sentence mid-drag — and
+              both of them come from `benchDropHint`, which is `null` for a disc carried *from* the
+              bench: nothing was clipped, and letting go there moves nobody. */}
           <p
             className={cn(
               "min-w-0 flex-1 text-xs leading-snug",
-              dropOnBench ? "font-medium text-accent" : "text-ink-muted",
+              benchDropHint !== null ? "font-medium text-accent" : "text-ink-muted",
             )}
           >
-            {dropOnBench && lifted
-              ? benchDropHintFr(nameOf(lifted))
-              : benchHintFr({ mode, benchCount: bench.length, freeSlots })}
+            {benchDropHint ?? benchHintFr({ mode, benchCount: bench.length, freeSlots })}
           </p>
           {/* `editorSaveStateFr`, not a ternary on `dirty`: a composition being created has never
               been saved whether or not it has been touched, and it now opens with seven pre-filled

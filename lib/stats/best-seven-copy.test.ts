@@ -48,6 +48,7 @@ import {
   resolveFormationOverride,
   sevenHeadingFr,
   sevenQuestionKey,
+  showsCompetitionSelect,
   shrinkageSentenceFr,
   squadMeanStandInFr,
   swapAnnouncementFr,
@@ -296,6 +297,38 @@ describe("naming the four controls", () => {
     // — none played — is exactly the state in which there is nothing to choose from.
     expect(NO_FORMATION_FR).not.toContain("ci-dessus");
     expect(NO_FORMATION_FR).not.toContain("ci-dessous");
+  });
+
+  /**
+   * The same rule, on the one control that broke it. Both empty states print « Choisis « Toutes » pour
+   * voir la saison entière » whenever a competition is being filtered on, and the select used to appear
+   * only for a team with two or more — so a single-competition team with a bookmarked `?competition=<id>`
+   * read an instruction with no control under it and no way back to the season.
+   */
+  it("keeps the competition select for a reader who arrived filtered", () => {
+    expect(showsCompetitionSelect({ competitionCount: 1, competitionId: "c1" })).toBe(true);
+    // The case that made the sentence a lie: one competition, one filtered URL.
+    expect(showsCompetitionSelect({ competitionCount: 1, competitionId: null })).toBe(false);
+    // More than one is a choice worth offering whether or not anything is filtered.
+    expect(showsCompetitionSelect({ competitionCount: 2, competitionId: null })).toBe(true);
+    expect(showsCompetitionSelect({ competitionCount: 2, competitionId: "c2" })).toBe(true);
+    // A team with no competitions at all has nothing to filter by, and `parseCompetitionId` has already
+    // turned any id into null by the time this is asked.
+    expect(showsCompetitionSelect({ competitionCount: 0, competitionId: null })).toBe(false);
+  });
+
+  /**
+   * Decision 097's rule once more: the predicate above is worth nothing if the form keeps its own copy
+   * of the condition, which is precisely the shape the defect had — `competitions.length > 1` typed into
+   * the JSX, where no test could reach it.
+   */
+  it("asks that predicate instead of counting the competitions itself", () => {
+    const controls = readFileSync(
+      join(process.cwd(), "app", "(app)", "stats", "equipe-type", "_components", "controls.tsx"),
+      "utf8",
+    );
+    expect(controls).toContain("showsCompetitionSelect({");
+    expect(controls).not.toContain("competitions.length > 1");
   });
 });
 

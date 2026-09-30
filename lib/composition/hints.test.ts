@@ -98,11 +98,25 @@ describe("benchPlayerLabelFr", () => {
 
 describe("benchDropHintFr", () => {
   it("names the player, because the disc under the finger is clipped away", () => {
-    expect(benchDropHintFr("Momo")).toBe("Relâche ici : Momo retourne sur le banc.");
+    expect(benchDropHintFr({ name: "Momo", fromPitch: true })).toBe(
+      "Relâche ici : Momo retourne sur le banc.",
+    );
+  });
+
+  /**
+   * The defect: `BenchDisc` starts its drag as a `player` too, so a bench disc nudged a few pixels
+   * inside the strip lit the dock up and promised « Momo retourne sur le banc » — about a player who
+   * is on it, and against the editor's own announcement, which says « Momo reste sur le banc ». Both
+   * the ring and the sentence hang off this `null`.
+   */
+  it("promises nothing about a disc that was already on the bench", () => {
+    expect(benchDropHintFr({ name: "Momo", fromPitch: false })).toBeNull();
   });
 
   it("tutoies (decision 074)", () => {
-    expect(benchDropHintFr("Momo")).not.toMatch(/\b(vous|votre|vos)\b/i);
+    expect(benchDropHintFr({ name: "Momo", fromPitch: true })).not.toMatch(
+      /\b(vous|votre|vos)\b/i,
+    );
   });
 });
 
@@ -123,6 +137,17 @@ describe("parseMinute", () => {
     expect(parseMinute("abc")).toBeNull();
     expect(parseMinute("12,5")).toBeNull();
     expect(parseMinute("12.5")).toBeNull();
+  });
+
+  /**
+   * The two forms `Number` reads and a minute field cannot mean. `type="number"` accepts `1e2` — it is
+   * a valid floating-point literal in HTML — and `Number("1e2")` is an integer 100, so the field read
+   * « 1e2 » under a card reading « à partir de la 100ᵉ minute ». `0x10` is the same failure via the
+   * keyboard, at 16.
+   */
+  it("is null for the exponent and hex forms Number would happily read", () => {
+    expect(parseMinute("1e2")).toBeNull();
+    expect(parseMinute("0x10")).toBeNull();
   });
 });
 
