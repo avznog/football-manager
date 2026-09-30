@@ -412,6 +412,17 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   Nothing touched in `vercel.json`, `.github/`, `package.json` or the deployment: Part 2 of the
   approved plan is the deployment split and is **not** in this PR, because it cannot merge before the
   owner creates the Neon `preview` branch and points Vercel's production branch away from `main`.
+- **2026-09-30 · the owner's machine · `feat/best-seven`** — **#104 is merged and `main` is at
+  `v1.0.0-beta.2`**, tagged and published as a pre-release by CI, with `0004_tricky_human_torch.sql`
+  applied to production. If you were mid-rebase, that is what moved. Next free decision number is
+  **115** and I am taking it for Part 3 of the approved plan: **« l'équipe type »**, a pitch under
+  `/stats/equipe-type` that names the best (or worst) seven for one chosen criterion. What I am
+  touching, so nobody duplicates it: a new `lib/stats/best-seven.ts` (pure — shrinkage and an exact
+  assignment, no database), `lib/stats/formation-usage.ts`, `app/(app)/stats/equipe-type/**`, and two
+  **additive** edits to `lib/stats/aggregate.ts` and `lib/stats/queries.ts` — one extra accumulator for
+  the spread of a player's ratings, kept **inside** the existing visibility gate. No migration and no
+  new table: every figure this needs is already in `PlayerSeasonStats`. Part 2, the deployment split,
+  is still blocked on the owner creating the Neon `preview` branch.
 
 ### From the other machine
 
