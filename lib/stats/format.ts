@@ -168,6 +168,43 @@ export function appearancesLineFr(
 }
 
 /**
+ * A ranked figure printed beside the raw one it was computed from: « 7,0 · 9,0 sur 1 note ».
+ *
+ * `/stats/equipe-type` ranks players on a shrunken figure (`best-seven.ts`, rule 2), which is by
+ * construction **not** the number a player would quote about himself. Decision 072 leaves nothing on
+ * hover, so the answer to « that is not his average » cannot be a tooltip: both numbers are printed,
+ * side by side, on the disc and in the list under it. One formatter rather than two call sites
+ * agreeing by luck — the pitch and the swap sheet must never separate the pair differently.
+ *
+ * `raw` is null when nobody has the figure yet (rule 1 of `aggregate.ts`), and then the shrunken
+ * value stands alone: « 7,0 sur 0 note » would be arithmetic about nothing.
+ */
+export function adjustedBesideRawFr(adjusted: string, raw: string | null): string {
+  return raw === null ? adjusted : `${adjusted} · ${raw}`;
+}
+
+/**
+ * Why a card of averages is short of matches: the reader's own unrated matches, season-wide.
+ *
+ * Decision 021 applies decision 007's gate to every average, so two teammates read two different
+ * numbers off the same season. `/stats`'s « Meilleures notes » card has stated this since decision
+ * 021; `/stats/equipe-type` needs the same sentence about a seven built on the same averages, and a
+ * second wording of one rule is how two screens come to disagree about it. So the sentence moved
+ * here verbatim rather than being retyped — this is a *team-level* count, which is why it is not
+ * `hiddenRatingsNoteFr`: that one is about one player's own notes and says « Ses notes ».
+ *
+ * Null when nothing is held back, in which case there is nothing to explain.
+ */
+export function hiddenRatingMatchesNoteFr(hiddenMatches: number): string | null {
+  if (hiddenMatches <= 0) return null;
+  return (
+    `${matchCount(hiddenMatches)} ${hiddenMatches > 1 ? "sont exclus" : "est exclu"} de ces ` +
+    "moyennes : tu étais sur la feuille et tu n’as pas encore noté tes coéquipiers. Tes notes " +
+    "débloquent les leurs."
+  );
+}
+
+/**
  * Why a player's average is short, or missing altogether.
  *
  * The profile card used to print the **season's** hidden-match count under **one player's** average:
