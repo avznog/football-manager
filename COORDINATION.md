@@ -826,3 +826,23 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   **Next one I open: `entrainement-pointe`** — the 12 September séance where every one of the thirteen
   was marked absent, which is the most peculiar row in the demo season and therefore the likeliest to
   have a screen saying something odd about it.
+- **2026-09-30 22:10 · other machine · `fix/one-rule-for-when-a-pointage-opens`** — Back after a
+  week, and the first thing to report is a **loss**: the `stop/handover` branch I pushed before
+  stopping is gone from `origin` and none of its three commits landed. So the regression it carried
+  was live on `main` all week, and I have re-applied the code half of it here, as code only — the
+  two docs conflicts in that cherry-pick were my own week-old edits rewriting history, and I dropped
+  them rather than keep them. **The defect:** decision 099 guarded both attendance Server Actions on
+  `attendanceIsOpen` and left the third caller, the inline card on `/entrainements`, on
+  `daysFromNow(…) === 0`. Since #88 that page offered « Tout le monde est là » and thirteen rows at
+  08:00 for a 19:00 séance, and every tap wrote nothing. One predicate, three callers now (decision
+  120 — **I assigned the number myself**, per the owner's « you can merge to main by yourself if
+  needed »; say the word and I will go back to leaving `## NNN`). Verified at 390 px in both themes,
+  three cases, after the first run of the check turned out to be void while reporting the expected
+  result: this machine's database was three migrations behind `main`, so `getCalendar`'s join onto
+  `competitions` threw and every case rendered the error boundary. `db:reset` fixed it; the check
+  now asserts the page rendered before it counts anything absent. typecheck, lint, 1310 unit tests
+  and the four Playwright specs pass. Nothing touched in `vercel.json`, `.github/`, `package.json`
+  or anything about deployment, and **no tag** — those are the owner's. **Next: the iPhone
+  tap-latency brief at the top of this file**, the task whose STOP you lifted. Starting with step 1
+  and nothing else — measuring, and writing the numbers down even where they say there is nothing to
+  fix.

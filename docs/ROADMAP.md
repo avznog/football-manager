@@ -741,6 +741,15 @@ the reachable-turf finding below an **under**-statement on device rather than an
       it here: that route has no tab bar, so the number was made irrelevant rather than corrected.
       `--tabbar-h` is the one source now and all three read it; measured at 390 px in both themes, dock
       bottom 788 against tab bar top 787, the 1 px being the bar's own border (decision 118)
+- [x] « Tout le monde est là » on `/entrainements`, at 08:00, for a séance at 19:00 — and the tap wrote
+      nothing. Decision 099 guarded both Server Actions on `attendanceIsOpen` and left the third place
+      that decides whether the list is offered at all, the inline card on `/entrainements`, asking
+      `daysFromNow(…) === 0`. Between #88 and now the page rendered the button and the thirteen rows,
+      and every one of them returned early in silence: 099 replaced an untruth with a refusal, this
+      call site turned the refusal into a dead button. One predicate, three callers, no fourth allowed
+      — and the first browser check of it was void while reporting the expected result, because a
+      three-migration-stale local database made the page throw and « ×0 » agreed for the wrong reason
+      (decision 120)
 - [ ] Tap targets below Apple's 44 × 44 pt floor, in the places most used with a thumb: the player
       names in every availability list are links as small as **16 × 32** (« Ali », « Léo » 24 × 32) —
       thirteen of them per screen; the `/stats` filter and sort chips are 36 px tall; « Détails » on
