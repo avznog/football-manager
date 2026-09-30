@@ -539,19 +539,36 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       and **so is tagging, since decision 119**: the generator became a gate, and the item below is where
       that flow is written down
 - [x] Shipping and merging are two acts. A push to `main` now runs the checks, migrates the **preview**
-      database (`PREVIEW_DATABASE_URL`) and moves the Preview deployment at `dev.7orteils.bgonzva.fr`,
-      and cuts **no** tag; a tag `v*` pushed **by hand** is what gates, re-tests, migrates production and
-      deploys it with the Vercel CLI before publishing the release (decision 119, superseding 081 and
-      078's rejection of a repository `VERCEL_TOKEN`). The checks live once, in
+      database (`PREVIEW_DATABASE_URL`) and then deploys the preview with the Vercel CLI, and cuts **no**
+      tag; a tag `v*` pushed **by hand** is what gates, re-tests, migrates production and deploys it with
+      the CLI before publishing the release (decision 119, superseding 081, 078's rejection of a
+      repository `VERCEL_TOKEN`, and 080's reliance on Vercel's Git integration). The checks live once, in
       `.github/workflows/checks.yml`, called by both `ci.yml` and `release.yml`. What this buys that the
-      old flow could not: production's migration provably precedes the code that needs it, and there is a
-      running copy of the app to look at before anything ships
-- [ ] **A question only the owner can answer: does the `PREVIEW_DATABASE_URL` secret really hold the Neon
-      *preview* branch's connection string?** A GitHub secret is write-only and the Vercel values are
-      sensitive, so no session can read it. If it holds the production string instead — pasted before the
-      preview branch existed, or copied from the wrong tab — then every merge to `main` migrates
-      production, silently and green, which is exactly what decision 119 was written to stop. One look at
-      the secret settles it; `docs/DEPLOY.md` §2 « still to verify » says what to compare
+      old flow could not: each migration provably precedes the code that needs it, on the preview as much
+      as on production, and there is a running copy of the app to look at before anything ships
+- [x] Both deployments are issued by CI, and Vercel's Git integration issues none. `vercel.json` sets
+      `git.deploymentEnabled` to `false` for every pattern including `main`. This item exists because the
+      first draft of 119 said the integration was producing a Preview from `main`, and the Vercel API said
+      otherwise: the last three integration deployments were `main` merges with `target=production`, and
+      the merge after the owner parked the production branch produced no deployment at all. « Only `main`
+      and a tag deploy » is now true by construction rather than by dashboard state
+- [ ] **Watch the first push to `main` after this merges and confirm `https://dev.7orteils.bgonzva.fr`
+      serves the new commit.** This is the one thing in the new design that is expected rather than
+      observed. That domain is pinned to the git branch `main`, and a git-pinned domain cannot be
+      re-pointed with `vercel alias set`, so `deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` to make
+      the CLI's deployment claim the branch. If `dev.` does not move: the owner removes the `main` pin from
+      the domain in the Vercel dashboard, after which CI can alias it explicitly — `docs/DEPLOY.md` §4
+- [ ] **A question only the owner can answer: does the `PREVIEW_DATABASE_URL` secret hold the Neon
+      *preview* branch's connection string, or production's?** That the secret **exists** is verified
+      through the GitHub API, along with `DATABASE_URL`, `VERCEL_TOKEN`, `VERCEL_ORG_ID` and
+      `VERCEL_PROJECT_ID`; what is *inside* it cannot be read from any session, because the API returns a
+      secret's name and never its value and the Vercel copy is sensitive on purpose. If it holds the
+      production string — pasted before the preview branch existed, or copied from the wrong tab — then
+      every merge to `main` migrates production, silently and green, which is exactly what decision 119 was
+      written to stop. One look at the secret settles it; `docs/DEPLOY.md` §2 says what to compare
+- [ ] Related and equally unverified: **does the Neon `preview` branch exist at all?** Nothing in the
+      repository names it and no session can resolve a connection string it cannot read. If it does not
+      exist, the item above answers itself the wrong way
 - [ ] `db:bootstrap` — the super admin. This is the last thing between a working deployment and a
       usable one: the schema is there and every screen is reachable, but there is no account to log in
       with, and an invite-only app cannot make one from the browser (decision 052). One command,
@@ -564,11 +581,18 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       both, because it is idempotent and re-hashes the password every time
 - [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6. No longer blocked by the
       login page; it now waits only on an account to log in with
-- [x] Preview has its own Neon branch. Decision 080 removed the hazard by removing the previews and this
+- [ ] Preview has its own Neon branch. Decision 080 removed the hazard by removing the previews and this
       item kept the real fix on the list, because « we turned it off » is not « we solved it ». Decision
-      119 pays it: one preview deployment, `dev.7orteils.bgonzva.fr`, with its own connection string in
-      Vercel's Preview scope and in the `PREVIEW_DATABASE_URL` secret — subject to the verification
-      question above
+      119 is *designed* to pay it — one preview deployment with its own connection string in Vercel's
+      Preview scope and in the `PREVIEW_DATABASE_URL` secret — but it stays unticked, because the two
+      questions above are exactly the question of whether it was paid, and neither can be answered from a
+      session. It was ticked once on the strength of the intent; that is the same mistake as the premise
+      119 had to correct
+- [x] The Vercel project's production branch points away from `main` — it is parked on
+      `vercel-production-placeholder`, set by the owner and read back from the Vercel API. This was an
+      outstanding owner action across three sessions' notes and is **done**. Note it is no longer
+      load-bearing: with the Git integration off for every branch, it is a second thing that would have to
+      be wrong before a push could reach production, not the thing that keeps `main` off production
 
 ## First run and static assets
 

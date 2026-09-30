@@ -3457,23 +3457,52 @@ roadmap.
 
 ## 119 — Merging moves the preview; a tag, cut by hand, is what ships
 
-**2026-09-30** · accepted · supersedes 081 and 078's rejection of a repository `VERCEL_TOKEN` · amends
-080, 108 and 110
+**2026-09-30** · accepted · supersedes 081, 078's rejection of a repository `VERCEL_TOKEN`, and 080's
+reliance on Vercel's Git integration · amends 108 and 110
 
 Merging a pull request deployed production. That is one act doing two jobs — « this change is good » and
 « the team should be running this now » — and the second one was never anybody's decision, it was a
 side effect of the first. The owner asked for them separated.
 
 **Decision.** A push to `main` runs the checks, applies the committed migrations to the **preview**
-database (`PREVIEW_DATABASE_URL`), and creates no tag. The Preview deployment at
-`dev.7orteils.bgonzva.fr` still comes from Vercel's own Git integration, because the Vercel project's
-production branch is a parked branch rather than `main` — so a merge moves a real running copy of the app
-and nothing the team uses. An annotated tag `v*`, pushed **by hand**, is what ships: `release.yml` gates
-the tag, re-runs the same checks on the tagged commit, migrates **production**, then builds and deploys
-production with the Vercel CLI, then publishes the GitHub release. Nothing else deploys anywhere. The
-checks themselves live once, in `checks.yml`, called by both workflows — with two callers, a second copy
-of forty lines of `postgres:17` service configuration is how the two quietly start testing different
-things.
+database (`PREVIEW_DATABASE_URL`), then builds and deploys the preview with the Vercel CLI, and creates no
+tag. An annotated tag `v*`, pushed **by hand**, is what ships: `release.yml` gates the tag, re-runs the
+same checks on the tagged commit, migrates **production**, then builds and deploys production with the
+Vercel CLI, then publishes the GitHub release. **Vercel's Git integration issues nothing at all** —
+`vercel.json` sets `git.deploymentEnabled` to `false` for every pattern including `main` — so every
+deployment this project has is one of the two jobs above, each ordered after its own migration. Nothing
+else deploys anywhere. The checks themselves live once, in `checks.yml`, called by both workflows — with
+two callers, a second copy of forty lines of `postgres:17` service configuration is how the two quietly
+start testing different things.
+
+**An earlier draft of this decision rested on a claim about infrastructure that was false, and that is
+why the deployments moved into CI.** It said the preview at `dev.7orteils.bgonzva.fr` came from Vercel's
+Git integration, on the strength of the project's production branch being parked rather than `main`. It
+was checked against the Vercel and GitHub APIs and neither half held. The last three deployments the
+integration ever made were `main` squash-merges and all three were `target=production` — so until the
+afternoon the owner parked the branch, **merging deployed production**, which is exactly the thing this
+decision exists to stop and which the decision described as already fixed. And the merge *after* the
+branch was parked produced no deployment at all: no Vercel record, no Vercel commit status, no GitHub
+deployment. A `main` push had gone straight from "deploys production" to "deploys nothing", and the
+document asserted a third thing that was never true on either side of the change.
+
+Nothing in the repository could have caught that, because nothing in the repository determined it: it
+was a dashboard setting, readable only by an API call nobody makes while writing a paragraph. That is
+the argument for issuing both deployments from a workflow. A job in `ci.yml` with `needs:
+[migrate-preview]` is a claim a session can verify by reading a file it already has, and the sentence
+in the runbook that describes it can be checked against the thing it describes. Parking the production
+branch stays — it is verified (`vercel-production-placeholder`) and it is a second thing that would have
+to be wrong before a push could reach production — but it is defence in depth now and no longer
+load-bearing.
+
+**One piece of dashboard state this still depends on, and it is checkable.** `dev.7orteils.bgonzva.fr`
+is pinned to the git branch `main` (`gitBranch=main`, read from the Vercel API — which is how it was
+found, and the difference from the production-branch setting is exactly that this one can be read). A
+domain assigned to a git branch cannot be re-pointed with `vercel alias set`, so the CLI's preview
+deployment takes that domain only if it carries `main` as its own git-branch metadata, which is why
+`deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` rather than trusting the CLI to infer it. Expected to
+work; **not observed**. The first `main` push after this merges is the test, and the fallback is written
+down in `docs/DEPLOY.md` §4: the owner removes the pin, and CI aliases the domain itself.
 
 **What 081 was protecting, and why a gate keeps it.** 081 had CI cut `v<version>` from `package.json`
 once `main` was green, and it argued the point in a sentence that deserves quoting because it is the
@@ -3489,8 +3518,8 @@ without saying what to do is a gate somebody works around.
 
 **And the honest half: the convention now does need a human to remember it.** 081 is right that it will
 sometimes be forgotten. What matters is what forgetting *costs*, and that is the asymmetry the two
-designs do not share. Forget to tag and the version sits on `main`, tested, migrated on the preview,
-visible at `dev.7orteils.bgonzva.fr` — and production keeps serving the last tag, which is a version that
+designs do not share. Forget to tag and the version sits on `main`, tested, migrated on the preview and
+deployed to it — and production keeps serving the last tag, which is a version that
 went through this whole path. Nothing is broken, nothing is half-deployed, and the repair is to push a
 tag whenever somebody notices. The failure 081 feared was not like that: a tag naming a version nothing
 verified is a false claim already published, and the thing that reads it — a human deciding what is
@@ -3507,23 +3536,37 @@ provably arrives before the code that needs it — not « within seconds of », 
 happens at all. 078 also named its own trigger to revisit: « a dropped column, a narrowed type », the
 first migration that is not safe in both directions. PR 3 of the current plan drops a column and narrows
 a type, so that trigger is about to fire regardless; this decision reaches it first. The token is scoped
-to the project, it is never printed, and `vercel.json` is still the source of the region (111) and the
-branch rule, so the deployment is configured from the repository and not from a dashboard.
+to the project, it is never printed, and `vercel.json` is still the source of the region (111) and of the
+git rule, so the deployment is configured from the repository and not from a dashboard.
 
-**080's mechanism survives; two of its sentences do not.** `vercel.json` permitting `main` and nothing
-else is untouched, and it is still what keeps a `feat/<slice>` branch from deploying. But 080 says « a
-push to `main` is a production deploy », and it is now a Preview deploy; and it lists « no preview URL to
-hand somebody » under what is given up, which is no longer given up — there is exactly one, it is
-`dev.7orteils.bgonzva.fr`, and it has its own Neon branch, which is the fix 080 explicitly deferred
-rather than declared unnecessary.
+And the guarantee is bought **twice**, which the first draft of this decision did not claim because it
+believed Vercel was still issuing the preview: `deploy-preview` `needs: [migrate-preview]` in the same
+way, so the window 078 described is gone on the preview as well, rather than being tolerated there on the
+grounds that only a preview lives through it. The price is that an absent or revoked token now means no
+deployment at all instead of a slower one — an outage of the *deploy*, which is loud, rather than a wrong
+deployment, which is not.
+
+**080's intent survives; its mechanism does not.** 080 said only `main` deploys, by an allow-list in
+`vercel.json` with `main` set to `true`. That key is `false` now, along with every other one, so the Git
+integration deploys nothing and « a branch that is neither `main` nor a tag deploys nowhere » is true by
+construction rather than by dashboard state: nothing outside a workflow can deploy, `pull_request` reaches
+no deploy job, and `release.yml` fires only on `refs/tags/v*`. Two of 080's sentences also go. It says « a
+push to `main` is a production deploy » — which was true right up to the day this was written, and is now
+false because a workflow decides what `main` produces. And it lists « no preview URL to hand somebody »
+under what is given up, which is no longer given up: there is meant to be exactly one, and whether it
+lands on `dev.7orteils.bgonzva.fr` is the observation still owed above.
 
 **108 and 110 still hold, one workflow to the left.** Every tag still gets a GitHub release, still cut by
 CI, still with the squashed commit subjects since the previous tag as its notes (108); a hyphenated
 version is still published `--prerelease` on the strength of the hyphen alone (110). What changed is that
 the release step publishes for a tag CI did **not** create, and it runs last for the same reason 108 put
 it after `migrate` — a release page must never name a version that failed to migrate or failed to deploy.
-It is idempotent: re-pushing a tag re-tests, re-migrates and re-deploys, which is how a deploy that
-failed on a bad afternoon is retried, and publishes no second release. 110's closing line, « no hand-cut
+It is idempotent, because it checks for an existing release — but **re-pushing the tag is not how a failed
+deploy is retried**, as an earlier draft of this entry said twice. `git push` of a tag the remote already
+has at the same commit prints `Everything up-to-date` and emits no push event, so nothing runs. The retry
+is `gh run rerun --failed <run-id>`, which re-runs the failed job and everything downstream of it on the
+same commit; the jobs are safe under it for the same reasons they were thought safe under a re-push.
+110's closing line, « no hand-cut
 tag — a tag nothing verified is still forbidden », now reads « a hand-cut tag is checked before it is
 believed ».
 
@@ -3531,9 +3574,18 @@ believed ».
 `package.json`, **not to the tag history**: a tag can be pushed at a commit whose version was never
 bumped past the previous release, so `v1.0.0-beta.3` can be deleted and re-pushed at a later commit that
 still says `1.0.0-beta.3`, and it will gate, migrate and deploy. Nothing enforces that versions increase,
-that a tag is only ever pushed once, or that the commit tagged is the newest on `main` — a tag on a
-commit from last week is allowed on purpose, because rolling back by re-deploying an older verified
-version is a thing a coach may need on a Sunday morning. And re-pushing a tag **re-deploys**, which is
-the retry mechanism and also the sharpest edge here: `git push --force origin v…` at a different commit
-is a production deploy with no pull request in front of it. The guard on that is the same one as on every
-other irreversible act in this repository — it is the owner's own hand, and it is written down here.
+that a tag is only ever pushed once, or that the commit tagged is the newest on `main`.
+
+**And rolling back by tagging an older commit does not work, which the first draft of this entry assumed
+it did.** Two independent reasons, both found by reading rather than by trying it, and each enough on its
+own. A `push` event resolves a `uses: ./.github/workflows/…` reference from the **pushed ref's own
+commit**: every commit older than this branch has no `release.yml`, so such a tag runs nothing, silently.
+And `npm run db:migrate` is forward-only — there are no down migrations here — so even if it ran,
+production would serve older code against the newer schema, the one combination nothing has ever tested.
+A rollback is therefore a *forward* fix: revert on `main` in a pull request, bump, merge, look at the
+preview, tag. `vercel --prod` from a laptop is the break-glass route and moves code without schema.
+
+The sharpest edge that remains is a **force-moved** tag: `git push --force origin v…` at a different
+commit does fire a run, and that is a production deploy with no pull request in front of it. The guard on
+it is the same one as on every other irreversible act in this repository — the owner's own hand, and this
+paragraph.

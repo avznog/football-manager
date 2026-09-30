@@ -190,10 +190,13 @@ Do not stop working on the owner's account. Nobody is asking you to abandon a ch
 
 Check these against the current files rather than trusting this list — it is a snapshot.
 
-- **Only `main` deploys to Vercel.** `vercel.json` holds one rule and nothing else (decision 080).
-  Your branch will get **no preview deployment**, and no Vercel status check on its pull request.
-  That is deliberate, not a broken integration: every preview ran against the _production_ Neon
-  database. GitHub Actions is the gate. Do not delete `vercel.json` to "restore previews".
+- **Nothing deploys from git at all.** `vercel.json` turns `git.deploymentEnabled` off for **every**
+  branch including `main`, and both deployments are issued by a workflow with the Vercel CLI — the
+  preview from `ci.yml` after the preview migration, production from `release.yml` after the production
+  migration (decision 119, superseding 080's mechanism). Your branch will get **no deployment** and no
+  Vercel status check on its pull request. That is deliberate, not a broken integration: every preview
+  used to run against the *production* Neon database. GitHub Actions is the gate. Do not set a
+  `deploymentEnabled` key back to `true` to "restore previews".
 - **Migrations are applied by CI** (decision 078), never by hand. A push to `main` migrates the
   **preview** database from `PREVIEW_DATABASE_URL`; production's schema moves only on a tag, in
   `release.yml`, from `DATABASE_URL` (decision 119). Do not run `db:migrate` against either by hand, and
@@ -415,7 +418,9 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   the bar sits at `bottom-0`. Decisions **112**, **113**, **114** — so the next free number is **115**.
   Nothing touched in `vercel.json`, `.github/`, `package.json` or the deployment: Part 2 of the
   approved plan is the deployment split and is **not** in this PR, because it cannot merge before the
-  owner creates the Neon `preview` branch and points Vercel's production branch away from `main`.
+  owner creates the Neon `preview` branch and points Vercel's production branch away from `main`. (The
+  second of those is **done** — parked on `vercel-production-placeholder`, verified through the Vercel
+  API — and is no longer load-bearing; see the `ci/production-on-a-tag` bullets below.)
 - **2026-09-30 · the owner's machine · `feat/best-seven`** — **#104 is merged and `main` is at
   `v1.0.0-beta.2`**, tagged and published as a pre-release by CI, with `0004_tricky_human_torch.sql`
   applied to production. If you were mid-rebase, that is what moved. Next free decision number is
@@ -470,10 +475,32 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   reachable from `origin/main`. Decision **119**, superseding 081 and 078's rejection of a repository
   `VERCEL_TOKEN`, amending 080, 108 and 110 — so the next free number is **120**, and note this branch was
   cut behind another that had already taken 116–118. The checks moved to
-  `.github/workflows/checks.yml`, called by both `ci.yml` and `release.yml`; `vercel.json` is unchanged.
+  `.github/workflows/checks.yml`, called by both `ci.yml` and `release.yml`.
   `docs/DEPLOY.md` has a numbered « Shipping a version » and a « still to verify » that is the one real
   risk here: **only the owner can confirm `PREVIEW_DATABASE_URL` points at the Neon preview branch** — if
-  it holds the production string, a `main` push now migrates production, green and silent.
+  it holds the production string, a `main` push now migrates production, green and silent. **Read the next
+  bullet before acting on this one: its claim that `main` was already producing a Preview deployment was
+  checked and found false, and `vercel.json` did change after all.**
+- **2026-09-30 · the owner's machine · `ci/production-on-a-tag`, same branch, after a review** — the
+  branch's central premise was wrong and six documents stated it as fact. Checked against the Vercel and
+  GitHub APIs: the last three Git-integration deployments were the `main` merges of #104/#105/#106 and
+  **all three were `target=production`** — so until today, merging deployed production — and the merge
+  after the owner parked the production branch (`vercel-production-placeholder`, which is real and
+  verified) produced **no deployment at all**. The claimed Preview from `main` never existed. So
+  **`vercel.json` now sets `git.deploymentEnabled` to `false` for every pattern including `main`**, and
+  **CI issues both deployments itself with the Vercel CLI**: a new `deploy-preview` job in `ci.yml` after
+  `migrate-preview`, and `deploy-production` in `release.yml` after `migrate-production`. Three things to
+  carry: « nothing but `main` or a tag deploys » is now true by construction, not by dashboard state; 078's
+  schema/code race is gone on the **preview** too; and the parked production branch is defence in depth
+  rather than the thing the split rests on. Two procedures in the docs were also wrong and are fixed —
+  **re-pushing an unchanged tag is not a retry** (`Everything up-to-date`, no push event; use
+  `gh run rerun --failed <run-id>`), and **rollback by tagging an older commit cannot work** (a `push`
+  resolves `uses: ./…` from the pushed ref's own commit, and `db:migrate` is forward-only). Decision
+  **119** is amended in place rather than superseded, so the next free number is still **120**. One thing
+  left unobserved and it is the risk in the new design: `dev.7orteils.bgonzva.fr` is pinned to the git
+  branch `main`, so `deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` to make the CLI deployment take
+  that domain — **expected, not seen**. Watch the first `main` push. `7orteils.bgonzva.fr` has no git pin
+  and is on the Production environment, so `--prod` takes it (verified).
 
 ### From the other machine
 
