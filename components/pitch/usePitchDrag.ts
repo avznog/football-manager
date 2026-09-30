@@ -7,6 +7,7 @@ import {
   boxOf,
   pointOf,
   startDrag,
+  type ClientPoint,
   type PitchDrag,
 } from "@/lib/pitch/drag";
 import type { PitchPoint } from "@/lib/pitch/geometry";
@@ -28,6 +29,15 @@ import type { PitchPoint } from "@/lib/pitch/geometry";
  *   onTap: (memberId) => select(memberId),
  *   onDrop: (memberId, point) => (point ? place(nearestSlot(point), memberId) : bench(memberId)),
  * });
+ * ```
+ *
+ * Both `onDrop` and `onMove` are also handed the raw **client** point, because a pitch point cannot
+ * answer « is the finger over that other element ». The composition editor needs exactly that: its
+ * bench is a `sticky z-20` dock drawn *in front of* the bottom of the turf, so a finger on the bench
+ * is still inside the pitch's rectangle and `point` alone would place the player on the nearest
+ * defender. A screen with something in front of the pitch tests the client point first.
+ *
+ * ```tsx
  *
  * <div ref={pitchRef}>…</div>
  * <button onPointerDown={(event) => gesture.begin(event, memberId)} {...gesture.handlers} />
@@ -50,13 +60,20 @@ export function usePitchDrag<S>({
   pitchRef: RefObject<HTMLDivElement | null>;
   /** The gesture went nowhere: it was a tap on `subject`. */
   onTap: (subject: S) => void;
-  /** The gesture ended. `point` is `null` when the finger was off the turf — an answer, not a failure. */
-  onDrop: (subject: S, point: PitchPoint | null) => void;
   /**
-   * Called on every move once the gesture counts as a drag and the finger is over the turf. Only the
-   * editor uses it, to make a formation slot follow the finger so the « 1-3-2-1 » label updates live.
+   * The gesture ended. `point` is `null` when the finger was off the turf — an answer, not a failure
+   * — and `client` is where the finger actually was, for hit-testing anything drawn over the pitch.
    */
-  onMove?: (subject: S, point: PitchPoint) => void;
+  onDrop: (subject: S, point: PitchPoint | null, client: ClientPoint) => void;
+  /**
+   * Called on every move once the gesture counts as a drag, whether or not the finger is over the
+   * turf: a screen with a drop target beside the pitch has to be able to light it up, and a `point`
+   * of `null` is the only news a finger that has left the turf carries.
+   *
+   * The editor uses it twice over — to make a formation slot follow the finger so the « 1-3-2-1 »
+   * label updates live, and to ring its docked bench while a player is carried over it.
+   */
+  onMove?: (subject: S, point: PitchPoint | null, client: ClientPoint) => void;
 }) {
   const [drag, setDrag] = useState<PitchDrag<S> | null>(null);
 
@@ -83,12 +100,10 @@ export function usePitchDrag<S>({
   const move = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
       if (!drag || event.pointerId !== drag.pointerId) return;
-      const next = advanceDrag(drag, {
-        client: { x: event.clientX, y: event.clientY },
-        box: box(),
-      });
+      const client = { x: event.clientX, y: event.clientY };
+      const next = advanceDrag(drag, { client, box: box() });
       setDrag(next);
-      if (next.moved && next.point) onMove?.(next.subject, next.point);
+      if (next.moved) onMove?.(next.subject, next.point, client);
     },
     [box, drag, onMove],
   );
@@ -96,9 +111,10 @@ export function usePitchDrag<S>({
   const end = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
       if (!drag || event.pointerId !== drag.pointerId) return;
-      const point = pointOf({ x: event.clientX, y: event.clientY }, box());
+      const client = { x: event.clientX, y: event.clientY };
+      const point = pointOf(client, box());
       setDrag(null);
-      if (drag.moved) onDrop(drag.subject, point);
+      if (drag.moved) onDrop(drag.subject, point, client);
       else onTap(drag.subject);
     },
     [box, drag, onDrop, onTap],

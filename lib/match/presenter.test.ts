@@ -779,19 +779,24 @@ describe("what the big button says", () => {
   it("walks the coach through the match one tap at a time", () => {
     expect(clockActionFr(at([], 0))).toEqual({
       label: "Coup d’envoi",
-      shortLabel: "Envoi",
+      // « Début », not « Envoi »: the button starts the match, and half of a term is not a word.
+      // It is not a word of « Coup d’envoi » either, which is what `name` is for (WCAG 2.5.3).
+      shortLabel: "Début",
+      name: "Début : coup d’envoi",
       event: "KICKOFF",
     });
     expect(clockActionFr(at(KICKED_OFF, 10))).toEqual({
       label: "Mi-temps",
       shortLabel: "Mi-temps",
+      name: "Mi-temps",
       event: "PERIOD_END",
     });
 
     const halfTime = [...KICKED_OFF, { type: "PERIOD_END" as const, min: 30, period: 1 }];
     expect(clockActionFr(at(halfTime, 35))).toEqual({
       label: "Coup d’envoi 2e période",
-      shortLabel: "Envoi",
+      shortLabel: "Début",
+      name: "Début : coup d’envoi 2e période",
       event: "KICKOFF",
     });
 
@@ -799,6 +804,7 @@ describe("what the big button says", () => {
     expect(clockActionFr(at(secondHalf, 50))).toEqual({
       label: "Fin du match",
       shortLabel: "Fin",
+      name: "Fin du match",
       event: "PERIOD_END",
     });
 
@@ -808,6 +814,7 @@ describe("what the big button says", () => {
       // Not « Fin »: it is a word of « final » rather than a word of the label, so voice control
       // could not activate the button that ends the match (WCAG 2.5.3 — see below).
       shortLabel: "Sifflet",
+      name: "Coup de sifflet final",
       event: "FINAL_WHISTLE",
     });
 
@@ -815,6 +822,7 @@ describe("what the big button says", () => {
     expect(clockActionFr(at(over, 70))).toEqual({
       label: "Match terminé",
       shortLabel: "Terminé",
+      name: "Match terminé",
       event: null,
     });
   });
@@ -823,12 +831,17 @@ describe("what the big button says", () => {
    * WCAG 2.5.3 Label in Name, over every shape of the state machine rather than over the pairs
    * somebody thought to list.
    *
-   * Game mode prints `shortLabel` on the button and announces `label` as its `aria-label`, so voice
+   * Game mode prints `shortLabel` on the button and announces `name` as its `aria-label`, so voice
    * control looks for the visible word inside the accessible name: « Fin » against « Coup de sifflet
    * final » matches no word at all, only the inside of *final*, and that is the button that ends the
    * match. Nothing in the suite pinned `shortLabel` before this — it could have rendered empty and
    * stayed green — so the assertion walks every reachable phase, for every number of periods a match
    * can be configured with, and also checks that all five phases really were reached.
+   *
+   * It asserts against `name` rather than `label` because that is the string the button announces, and
+   * the two differ for exactly one action: « Début » is the right word on a kick-off button and is not
+   * a word of « Coup d’envoi ». The name is also checked to still contain the label it came from, so
+   * « Début : … » cannot quietly become the whole of what a screen reader hears.
    */
   describe("the short label on the button", () => {
     /** Accent- and punctuation-insensitive words: « Coup d’envoi » is three, « Mi-temps » is two. */
@@ -898,12 +911,17 @@ describe("what the big button says", () => {
 
     it("is always a whole word of the name the button announces", () => {
       for (const { where, state } of everyState()) {
-        const { label, shortLabel } = clockActionFr(state);
+        const { label, shortLabel, name } = clockActionFr(state);
 
         expect(shortLabel, where).not.toBe("");
         expect(
-          containsWords(label, shortLabel),
-          `${where} : « ${shortLabel} » n’est pas un mot de « ${label} »`,
+          containsWords(name, shortLabel),
+          `${where} : « ${shortLabel} » n’est pas un mot de « ${name} »`,
+        ).toBe(true);
+        // And the name still says the whole thing: it extends the label, it never replaces it.
+        expect(
+          containsWords(name, label),
+          `${where} : « ${name} » ne contient plus « ${label} »`,
         ).toBe(true);
       }
     });
@@ -918,7 +936,9 @@ describe("what the big button says", () => {
       // The defect this sweep exists for: « Fin » against « Coup de sifflet final ».
       expect(containsWords("Coup de sifflet final", "Fin")).toBe(false);
       expect(containsWords("Coup de sifflet final", "Sifflet")).toBe(true);
-      expect(containsWords("Coup d’envoi 2e période", "Envoi")).toBe(true);
+      // The second one, and the reason `name` exists: the visible word is nowhere in the term.
+      expect(containsWords("Coup d’envoi 2e période", "Début")).toBe(false);
+      expect(containsWords("Début : coup d’envoi 2e période", "Début")).toBe(true);
       expect(containsWords("Mi-temps", "Mi-temps")).toBe(true);
     });
   });
@@ -928,6 +948,7 @@ describe("what the big button says", () => {
     expect(clockActionFr(at(paused, 25))).toEqual({
       label: "Reprendre",
       shortLabel: "Reprendre",
+      name: "Reprendre",
       event: "RESUME",
     });
     expect(phaseLabelFr(at(paused, 25))).toBe("Jeu arrêté");

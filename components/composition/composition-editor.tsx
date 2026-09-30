@@ -19,7 +19,8 @@
  * ## Three ways to do the same thing
  *
  * 1. **Drag** a player from the bench onto a slot. Dropping on an occupied slot swaps the two;
- *    dropping off the pitch sends the player back to the bench.
+ *    dropping **on the dock**, or off the screen entirely, sends the player back to the bench. The
+ *    dock is a real drop target and says so while a finger is over it — see `DOCK_TARGET_CLASS`.
  * 2. **Tap** a player, then tap a slot. Same result, and the only thing that works reliably in a
  *    wool glove in February. It is also the keyboard path: every disc, slot and bench entry is a
  *    real `<button>`, so `Tab` + `Entrée` does the whole job, and in `postes` mode the arrow keys
@@ -44,10 +45,11 @@
  *   (48 px, above the 44 px minimum): compactness is never bought out of the drop target.
  * - **The bench, the errors and the confirm button are one sticky dock**, pinned above the tab bar.
  *   At 390 × 740 the dock is at most ~196 px tall (a two-line hint, a 76 px strip, a 48 px button
- *   row) and the tab bar is 72 px, which leaves 740 − 56 (app header) − 72 − 196 = 416 px between
- *   the header and the dock: the whole 410 px pitch, the whole bench and « Créer la composition »,
- *   with no scrolling. One sticky element rather than two also removes the stacking arithmetic that
- *   put the old save bar *underneath* the fixed tab bar at `bottom-3`.
+ *   row) and the tab bar is 56 px — `--tabbar-h`, which is also what the dock is now offset by —
+ *   leaving 740 − 56 (app header) − 56 − 196 = 432 px between the header and the dock: the whole
+ *   410 px pitch, the whole bench and « Créer la composition », with no scrolling. One sticky element
+ *   rather than two also removes the stacking arithmetic that put the old save bar *underneath* the
+ *   fixed tab bar at `bottom-3`.
  *
  * The dock's strip scrolls sideways when there are more players than fit, which is the one place a
  * scroll container could eat the gesture. Each disc is `touch-pan-x`, not `touch-none`: the browser
@@ -97,9 +99,13 @@ import {
   type SlotAssignment,
 } from "@/lib/composition/editor";
 import {
+  MINUTE_MAX,
+  benchDropHintFr,
   benchHintFr,
   benchPlayerLabelFr,
+  minuteFieldErrorFr,
   minuteFieldHintFr,
+  parseMinute,
 } from "@/lib/composition/hints";
 import {
   deduceChanges,
@@ -217,13 +223,29 @@ const PITCH_MAX_WIDTH = "max-w-[280px] sm:max-w-sm";
 
 /**
  * The sticky dock: the bench, the blocking errors and the confirm button, pinned just above the
- * fixed tab bar (`4.5rem` + the home indicator, the offset game mode already uses) and back in the
- * flow from `md`, where the screen is tall enough not to need it.
+ * fixed tab bar and back in the flow from `md`, where the screen is tall enough not to need it.
+ *
+ * The offset is `--tabbar-h` plus the home indicator, and it is the token rather than a literal
+ * because the literal was wrong: it said `4.5rem` — 72 px — where `BottomNav` is 56 px tall, and the
+ * inset cancels on both sides, so 16 px of scrolling turf showed through between the dock and the
+ * tab bar on every device. Exactly the arithmetic decision 112 had already found and fixed in game
+ * mode, in a second copy of the same number. There is one copy now (`app/globals.css`).
  */
 const DOCK_CLASS =
-  "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] z-20 -mx-4 space-y-2 " +
+  "sticky bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom,0px))] z-20 -mx-4 space-y-2 " +
   "border-t border-border/60 bg-canvas/95 px-4 pt-2 pb-2 backdrop-blur " +
   "md:static md:mx-0 md:rounded-2xl md:border md:px-4 md:py-3";
+
+/**
+ * What the dock looks like while a player from the pitch is carried over it: the drop target, said
+ * on screen.
+ *
+ * It is not decoration. `Pitch` is `overflow-hidden` — which is what keeps markers on the turf — so
+ * the lifted disc is *clipped* the moment the finger crosses the bottom of the pitch, and a gesture
+ * whose subject has visibly vanished reads as broken even when it is about to work. The ring is the
+ * feedback the clipped disc cannot give, and it is why the overlay is not portalled out of the turf.
+ */
+const DOCK_TARGET_CLASS = "ring-2 ring-accent";
 
 /* -------------------------------------------------------------------------- */
 /* The editor                                                                 */
@@ -237,12 +259,28 @@ export function CompositionEditor(props: CompositionEditorProps) {
   const [formationId, setFormationId] = useState(props.formationId);
   const [shape, setShape] = useState<ShapeSlot[]>(() => shapeOfFormation(formations, props.formationId));
   const [assignments, setAssignments] = useState<SlotAssignment[]>(() => [...props.assignments]);
-  const [fromMinute, setFromMinute] = useState(props.fromMinute);
+  /**
+   * The minute field holds **the string the coach typed**, not a number, and that is the whole fix
+   * for a field that could not be emptied: with a `number` in state, `clampMinute("")` was `NaN` was
+   * `0`, so the field snapped back to `0` the instant it was empty and reaching 10 meant typing
+   * `010` and deleting from the left. `""` is a legal transient state — and an invalid one to
+   * submit, which the error below says rather than silently substituting a minute. Same shape as
+   * every other number field in the app (`MinuteInput` in the retro form, and the score fields).
+   */
+  const [fromMinute, setFromMinute] = useState(() => String(props.fromMinute));
   const [mode, setMode] = useState<"players" | "shape">("players");
   const [selection, setSelection] = useState<Selection>(null);
   const [announcement, setAnnouncement] = useState("");
+  /** True while a player lifted off the turf is held over the dock: the bench is the drop target. */
+  const [overDock, setOverDock] = useState(false);
 
   const pitchRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * The dock's box, so a drop on the bench can be told from a drop on the turf. It has to be a real
+   * hit test on a real element: the dock is `sticky`, its height changes with the errors it shows,
+   * and it is drawn *in front of* the bottom of the pitch.
+   */
+  const dockRef = useRef<HTMLDivElement | null>(null);
 
   const byId = useMemo(
     () => new Map(members.map((member) => [member.membershipId, member])),
@@ -284,18 +322,36 @@ export function CompositionEditor(props: CompositionEditorProps) {
   const blocking = issues.filter((issue) => issue.blocking);
   const warnings = issues.filter((issue) => !issue.blocking);
 
-  const previous = planInForceBefore(props.otherPlans, fromMinute, props.lineupId);
+  /**
+   * The two places the minute has to be a number, and the only two: what this composition follows
+   * on from, and whether another one already starts there. `null` while the field is empty — which
+   * is not a clash and not a zero, it is a coach mid-keystroke.
+   *
+   * Everything that only *describes* the composition — the card's title, the « à partir de la 30ᵉ »
+   * — falls back to the minute the editor was opened on, because an empty field is a keystroke and
+   * not a decision to retitle the card « Composition de départ ».
+   */
+  const minute = parseMinute(fromMinute);
+  const minuteError = minuteFieldErrorFr(fromMinute);
+  const titleMinute = minute ?? props.fromMinute;
+
+  const previous = planInForceBefore(props.otherPlans, titleMinute, props.lineupId);
   const changes = deduceChanges(previous, { assignments, slots: planSlots }, nameOf);
-  const minuteClash = props.otherPlans.some((plan) => plan.fromMinute === fromMinute);
+  const minuteClash =
+    minute !== null && props.otherPlans.some((plan) => plan.fromMinute === minute);
 
   const dirty =
     assignmentsSignature(assignments) !== assignmentsSignature(props.assignments) ||
-    fromMinute !== props.fromMinute ||
+    fromMinute !== String(props.fromMinute) ||
     formationId !== props.formationId ||
     isCustom;
 
   const canSave =
-    !pending && blocking.length === 0 && shapeProblems.length === 0 && !minuteClash;
+    !pending &&
+    blocking.length === 0 &&
+    shapeProblems.length === 0 &&
+    !minuteClash &&
+    minuteError === null;
 
   /* --- the gesture --------------------------------------------------------- */
 
@@ -303,23 +359,39 @@ export function CompositionEditor(props: CompositionEditorProps) {
     pitchRef,
     // A slot follows the finger as it goes, so the label and the position code update live: the
     // coach sees « 1-2-3-1 » appear the moment the defender he is dragging crosses the halfway line.
-    onMove: (carried, point) => {
-      if (carried.kind === "slot" && mode === "shape") {
+    onMove: (carried, point, client) => {
+      if (carried.kind === "player") {
+        // The one containment test, driving the ring on the dock. `onDrop` asks the same question of
+        // the same rectangle, so what the coach is shown and what the release does cannot disagree.
+        setOverDock(isInside(dockRef.current, client));
+        return;
+      }
+      if (point && mode === "shape") {
         setShape((current) => moveShapeSlot(current, carried.id, point));
       }
     },
     // A pointer sequence that went nowhere is a tap.
     onTap: (carried) => (carried.kind === "player" ? tapPlayer(carried.id) : tapSlot(carried.id)),
-    onDrop: (carried, point) => {
+    onDrop: (carried, point, client) => {
+      setOverDock(false);
       if (carried.kind === "player") {
+        // **The dock is asked first, before `point`** — and that order is the whole fix. The dock is
+        // `sticky z-20` over a pitch at `z-auto`, so it is drawn *in front of* the bottom of the
+        // turf: a finger on the bench is still inside the pitch's own rectangle, `pointOf` answers
+        // with a perfectly valid point near the goal line, and `nearestSlot` used to put the player
+        // in the nearest defender's slot. Dragging somebody onto the bench did nothing, or worse.
+        // Asking the dock first is the stacking order the screen already shows, written down.
+        if (isInside(dockRef.current, client)) {
+          sendToBench(carried.id);
+          return;
+        }
         const target = point ? nearestSlot(shape, point) : null;
         if (target) {
           place(target.key, carried.id);
         } else {
-          // Dropped on the bench, or off the screen: the player comes off. TERRAIN deliberately does
-          // the opposite (decision 045) — here there is no match in progress to lose a player from.
-          setAssignments((current) => removeMember(current, carried.id));
-          setAnnouncement(`${nameOf(carried.id)} retourne sur le banc.`);
+          // Dropped off the screen: the player comes off too. TERRAIN deliberately does the opposite
+          // (decision 045) — here there is no match in progress to lose a player from.
+          sendToBench(carried.id);
         }
         setSelection(null);
         return;
@@ -337,6 +409,22 @@ export function CompositionEditor(props: CompositionEditorProps) {
   const drag = gesture.drag;
 
   /* --- what a gesture does ------------------------------------------------- */
+
+  /**
+   * The player comes off the pitch. Whether he was on it decides the sentence: a disc picked up on
+   * the bench and put back on the bench has not moved, and saying « retourne sur le banc » about it
+   * would be an account of something that did not happen.
+   */
+  function sendToBench(memberId: string) {
+    const fromPitch = slotOfMember(assignments, memberId) !== null;
+    setAssignments((current) => removeMember(current, memberId));
+    setSelection(null);
+    setAnnouncement(
+      fromPitch
+        ? `${nameOf(memberId)} retourne sur le banc.`
+        : `${nameOf(memberId)} reste sur le banc.`,
+    );
+  }
 
   function place(slotKey: string, memberId: string) {
     const occupant = memberInSlot(assignments, slotKey);
@@ -464,7 +552,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
     setFormationId(props.formationId);
     setShape(shapeOfFormation(formations, props.formationId));
     setAssignments([...props.assignments]);
-    setFromMinute(props.fromMinute);
+    setFromMinute(String(props.fromMinute));
     setSelection(null);
     setAnnouncement("Modifications annulées.");
   }
@@ -479,8 +567,28 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
   const lifted = drag?.subject.kind === "player" && drag.moved ? drag.subject.id : null;
   const visible = lifted ? removeMember(assignments, lifted) : assignments;
+  /**
+   * Whether releasing now would bench the carried player. Gated on `lifted` rather than reset in a
+   * `pointercancel` handler: a cancelled gesture clears the drag, so the ring goes out with it.
+   */
+  const dropOnBench = lifted !== null && overDock;
+  /**
+   * What the dock says about the release, and `null` when it says nothing — the ring is drawn on the
+   * same value, so the sentence and the highlight cannot disagree about what letting go does.
+   *
+   * `fromPitch` is the distinction `sendToBench` already makes, asked here one render earlier: a disc
+   * lifted *from the bench* and released over the bench has not moved, so promising « retourne sur le
+   * banc » about it would be the contradiction `benchDropHintFr` documents.
+   */
+  const benchDropHint =
+    dropOnBench && lifted
+      ? benchDropHintFr({
+          name: nameOf(lifted),
+          fromPitch: slotOfMember(assignments, lifted) !== null,
+        })
+      : null;
   const hoveredSlot =
-    drag?.subject.kind === "player" && drag.moved && drag.point
+    drag?.subject.kind === "player" && drag.moved && drag.point && !dropOnBench
       ? (nearestSlot(shape, drag.point)?.key ?? null)
       : null;
 
@@ -556,7 +664,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
       {/* --- formation and minute --- */}
       <Card
-        title={planTitleFr({ fromMinute, isInitial: fromMinute === 0 })}
+        title={planTitleFr({ fromMinute: titleMinute, isInitial: titleMinute === 0 })}
         description={
           isCustom
             ? `Formation dessinée : ${customFormationNameFr(label)}`
@@ -613,12 +721,14 @@ export function CompositionEditor(props: CompositionEditorProps) {
               type="number"
               inputMode="numeric"
               min={0}
-              max={200}
+              max={MINUTE_MAX}
               step={1}
               value={fromMinute}
-              invalid={minuteClash}
+              invalid={minuteClash || minuteError !== null}
               aria-describedby="fromMinute-hint"
-              onChange={(event) => setFromMinute(clampMinute(event.target.value))}
+              /* Stored exactly as typed. Nothing is coerced here: a field that repairs itself on
+                 every keystroke is a field a thumb cannot empty. */
+              onChange={(event) => setFromMinute(event.target.value)}
               disabled={pending}
             />
           </div>
@@ -627,12 +737,17 @@ export function CompositionEditor(props: CompositionEditorProps) {
           <p id="fromMinute-hint" className="col-span-2 text-xs text-ink-muted">
             {minuteFieldHintFr(props.totalMinutes)}
           </p>
-          {minuteClash ? (
+          {/* An empty or impossible minute is shown here rather than substituted for a 0: the
+              server's own schema coerces `""` to 0, so a silent repair would create a « composition
+              de départ » the coach never asked for. The clash keeps its own sentence. */}
+          {minuteClash || minuteError !== null ? (
             <div className="col-span-2">
               <FieldError>
-                {fromMinute === 0
-                  ? "Il y a déjà une composition de départ."
-                  : `Une composition démarre déjà à la ${ordinalFr(fromMinute)} minute.`}
+                {minuteError !== null
+                  ? minuteError
+                  : minute === 0
+                    ? "Il y a déjà une composition de départ."
+                    : `Une composition démarre déjà à la ${ordinalFr(minute ?? 0)} minute.`}
               </FieldError>
             </div>
           ) : null}
@@ -761,13 +876,24 @@ export function CompositionEditor(props: CompositionEditorProps) {
       />
 
       {/* --- the dock: the bench and the confirm button, both always on screen --- */}
-      <div className={DOCK_CLASS}>
+      <div ref={dockRef} className={cn(DOCK_CLASS, benchDropHint !== null && DOCK_TARGET_CLASS)}>
         {/* One line for the two things that are true of the whole screen: what a thumb can do next,
             and whether anything is unsaved. They were two blocks of their own before — 60 px between
             the pitch and the bench for two short sentences. */}
         <div className="flex items-start justify-between gap-2">
-          <p className="min-w-0 flex-1 text-xs leading-snug text-ink-muted">
-            {benchHintFr({ mode, benchCount: bench.length, freeSlots })}
+          {/* While a player carried off the turf is over the dock the line says what releasing him
+              does, because the lifted disc cannot: `Pitch` is `overflow-hidden`, so it is clipped off
+              at the edge of the turf and the gesture looks like it lost him. `text-accent`, and the
+              ring on the dock, so the answer does not depend on reading a sentence mid-drag — and
+              both of them come from `benchDropHint`, which is `null` for a disc carried *from* the
+              bench: nothing was clipped, and letting go there moves nobody. */}
+          <p
+            className={cn(
+              "min-w-0 flex-1 text-xs leading-snug",
+              benchDropHint !== null ? "font-medium text-accent" : "text-ink-muted",
+            )}
+          >
+            {benchDropHint ?? benchHintFr({ mode, benchCount: bench.length, freeSlots })}
           </p>
           {/* `editorSaveStateFr`, not a ternary on `dirty`: a composition being created has never
               been saved whether or not it has been touched, and it now opens with seven pre-filled
@@ -946,10 +1072,25 @@ function statusLabelOf(member: EditorMember | undefined): string | undefined {
   return undefined;
 }
 
-function clampMinute(raw: string): number {
-  const value = Number.parseInt(raw, 10);
-  if (Number.isNaN(value)) return 0;
-  return Math.min(200, Math.max(0, value));
+/**
+ * Is the finger over `element`? Its live rectangle, hit-tested against the client point — no margin,
+ * unlike the pitch's: the dock has a visible edge with a border on it, and the turf's 12 px of
+ * forgiveness exists for a goalkeeper's slot sitting against the goal line.
+ *
+ * An element that is not laid out yet answers « no » rather than a guessed box. From `md` the dock is
+ * `static` and sits below the pitch instead of over it; the same test still answers correctly there,
+ * because it asks the rectangle where it is now rather than where the mobile layout puts it.
+ */
+function isInside(element: HTMLElement | null, client: { x: number; y: number }): boolean {
+  if (!element) return false;
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  return (
+    client.x >= rect.left &&
+    client.x <= rect.right &&
+    client.y >= rect.top &&
+    client.y <= rect.bottom
+  );
 }
 
 /** French name of a position, lower-cased for the middle of a sentence. */

@@ -87,7 +87,9 @@ test("le hors-ligne : les actions tapées sans réseau arrivent une fois chacune
     await page.getByRole("link", { name: "Ouvrir le mode match" }).click();
     await expect(clock).toHaveText("00:00");
 
-    await page.getByRole("button", { name: "Coup d’envoi", exact: true }).click();
+    // The button shows « Début » and announces the football term as well, so that the visible word is
+    // a word of its accessible name (WCAG 2.5.3) — `clockActionFr().name`.
+    await page.getByRole("button", { name: "Début : coup d’envoi", exact: true }).click();
     // The bar prints the time, the score and the pending count, and no phase line (decision 112):
     // that the first period is running is what the clock button offering « Mi-temps » says.
     await expect(page.getByRole("button", { name: "Mi-temps" })).toBeVisible();

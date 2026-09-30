@@ -19,6 +19,13 @@
  * Read-only, so no new permission: `team:read` (decision 002), and the layout guard has already
  * refused anybody with no team.
  *
+ * ## The order of the screen
+ *
+ * Title, then the pitch, then the four controls, then the caveats, then the « et la pire équipe ? »
+ * link. The controls used to be four chip rows in the `<header>` — about 216 px of ways to ask the
+ * question above any answer to it — and they are `SevenControls`' four `<select>`s under the pitch now,
+ * which is what the owner asked for and what `_components/controls.tsx` argues at length.
+ *
  * ## Why so little happens here
  *
  * The page queries, adapts and words. The arithmetic is `lib/stats/best-seven.ts` (pure, no imports),
@@ -52,8 +59,11 @@ import {
   matchesWithoutCompositionFr,
   noBasisFr,
   outOfPositionNoteFr,
+  parseCompetitionId,
   parseCriterion,
   parseDirection,
+  resolveFormationOverride,
+  sevenQuestionKey,
   shrinkageSentenceFr,
   squadMeanStandInFr,
   viewerRelativeRatingsFr,
@@ -71,20 +81,16 @@ import { SevenPitch, type SevenCell } from "./_components/seven-pitch";
 
 export const metadata = { title: "Équipe type" };
 
-/** Same rule as `/stats`: a stale or forged id degrades to « toutes », never to an error. */
-function firstOf(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
 export default async function EquipeTypePage({
   searchParams,
 }: PageProps<"/stats/equipe-type">) {
   const [{ team }, params] = await Promise.all([requireTeamContext(), searchParams]);
 
   const competitions = statsFilterOptions(await getTeamCompetitions(team.id));
-  const requestedCompetition = firstOf(params[COMPETITION_PARAM]);
-  const competitionId =
-    competitions.find((competition) => competition.id === requestedCompetition)?.id ?? null;
+  // Every one of the four reads below tolerates a **missing, forged or empty** value: the controls are a
+  // `method="get"` form now, and a browser with no JavaScript submits `?critere=&competition=` for
+  // whatever the reader left alone. All four are pinned in `best-seven-copy.test.ts`.
+  const competitionId = parseCompetitionId(params[COMPETITION_PARAM], competitions);
 
   const [stats, usage, squad] = await Promise.all([
     getSeasonStats(team.id, team.membershipId, { competitionId }),
@@ -94,25 +100,13 @@ export default async function EquipeTypePage({
     getSquad(team.id),
   ]);
 
-  // The override is only honoured if it names a shape this team has actually played: a chip is the
-  // only way to set it, and a hand-typed id must not lay the seven out on a formation nobody uses.
-  const requestedFormation = firstOf(params[FORMATION_PARAM]);
-  /**
-   * **Naming the most-played shape is not overriding it.** `formationOverrideFr` ends « Ce n'est pas la
-   * forme que l'équipe a le plus jouée », which was printed about the very shape the chip row had just
-   * labelled « (la plus jouée) »: two chips, identical layout, contradictory captions. The chip for it
-   * is gone from `SevenControls`, but a bookmark or a hand-typed `?formation=` can still carry that id,
-   * so the request is resolved to null here — one place, rather than a special case in the sentence, in
-   * the chip's `active` test and in `equipeTypeHref` separately. The shape drawn is identical either
-   * way: `override ?? usage.mostUsed`.
-   */
-  const override =
-    usage.formations.find(
-      (formation) =>
-        formation.formationId === requestedFormation &&
-        formation.matches > 0 &&
-        formation.formationId !== usage.mostUsed?.formationId,
-    ) ?? null;
+  // The override is only honoured if it names a shape this team has actually played, and never the
+  // most-played one: both rules, and why, are in `resolveFormationOverride`.
+  const override = resolveFormationOverride(
+    params[FORMATION_PARAM],
+    usage.formations,
+    usage.mostUsed?.formationId ?? null,
+  );
 
   const query: BestSevenQuery = {
     competitionId,
@@ -124,18 +118,31 @@ export default async function EquipeTypePage({
   const filterLabel = competitionLabelOf(competitions, competitionId);
   const scopeLabel = filterLabel?.toLocaleLowerCase("fr-FR") ?? "toutes compétitions";
 
+  /**
+   * Built here and **rendered by `Body`**, because where it goes depends on what there is to show: under
+   * the pitch and above the notes when there is a seven, under the empty state when there is not. It is
+   * never absent — an empty state whose own text says « choisis « Toutes » » with no select on screen
+   * would be an instruction to use a control the reader does not have.
+   *
+   * Rendering it is necessary and was not sufficient: the block is on screen, and each select inside it
+   * decides for itself whether it has anything to offer. The competition one used to require two
+   * competitions, so a team with one and a bookmarked `?competition=<id>` got the « Choisis « Toutes » »
+   * sentence over a form with no competition select in it. `showsCompetitionSelect` now keeps it for a
+   * reader who arrived filtered, which is the state that prints the sentence.
+   */
   const controls = (
     <SevenControls
       query={query}
       competitions={competitions}
       formations={usage.formations.filter((formation) => formation.matches > 0)}
       mostUsed={usage.mostUsed}
+      competitionParam={COMPETITION_PARAM}
     />
   );
 
   return (
     <div className="space-y-6">
-      <header className="space-y-3">
+      <header>
         <div>
           {/* `min-h-11` and `inline-flex`, the same back link as every other `/match/[id]`-style
               screen: at `text-xs` alone it measured 81 × 17 px, which is a target no thumb hits at
@@ -153,10 +160,10 @@ export default async function EquipeTypePage({
             {stats.matchesConsidered > 1 ? "s" : ""}
           </p>
         </div>
-        {controls}
       </header>
 
       <Body
+        controls={controls}
         query={query}
         stats={stats}
         usage={usage}
@@ -175,6 +182,7 @@ export default async function EquipeTypePage({
 /* -------------------------------------------------------------------------- */
 
 function Body({
+  controls,
   query,
   stats,
   usage,
@@ -184,6 +192,8 @@ function Body({
   filterLabel,
   scopeLabel,
 }: {
+  /** `SevenControls`, placed under whatever this function decided to draw. */
+  controls: React.ReactNode;
   query: BestSevenQuery;
   stats: Awaited<ReturnType<typeof getSeasonStats>>;
   usage: Awaited<ReturnType<typeof getFormationUsage>>;
@@ -202,14 +212,17 @@ function Body({
    */
   if (stats.isEmpty) {
     return (
-      <EmptyState
-        title="Pas encore de statistiques"
-        description={
-          filterLabel === null
-            ? "Dès qu’un match sera terminé ou qu’une séance sera pointée, les buts, les minutes et les présences apparaîtront ici."
-            : `Aucun match terminé en ${scopeLabel}, et aucune note à afficher. Choisis « Toutes » pour voir la saison entière.`
-        }
-      />
+      <>
+        <EmptyState
+          title="Pas encore de statistiques"
+          description={
+            filterLabel === null
+              ? "Dès qu’un match sera terminé ou qu’une séance sera pointée, les buts, les minutes et les présences apparaîtront ici."
+              : `Aucun match terminé en ${scopeLabel}, et aucune note à afficher. Choisis « Toutes » pour voir la saison entière.`
+          }
+        />
+        {controls}
+      </>
     );
   }
 
@@ -230,6 +243,7 @@ function Body({
             {stats.liveMatches > 1 ? "sont exclus" : "est exclu"} : ses minutes bougent encore.
           </p>
         ) : null}
+        {controls}
       </>
     );
   }
@@ -239,7 +253,12 @@ function Body({
   // Nobody ever drew a composition on a finished match. Seven invented posts would be an opinion
   // dressed as a measurement, so the screen draws nothing and says what to do about it.
   if (formation === null) {
-    return <EmptyState title="Aucune forme de jeu connue" description={NO_FORMATION_FR} />;
+    return (
+      <>
+        <EmptyState title="Aucune forme de jeu connue" description={NO_FORMATION_FR} />
+        {controls}
+      </>
+    );
   }
 
   const slots = toBestSevenSlots(formation.slots);
@@ -323,7 +342,10 @@ function Body({
 
   return (
     <>
+      {/* Keyed to the question, because the answer is state: `sevenQuestionKey` says why a `key` and not
+          an effect, and what a soft navigation printed without it. */}
       <SevenPitch
+        key={sevenQuestionKey(query, formation.formationId)}
         criterion={query.criterion}
         direction={query.direction}
         aggregation={result.aggregation}
@@ -344,6 +366,11 @@ function Body({
         optimumAggregate={result.aggregate}
         kit={kit}
       />
+
+      {/* The four selects sit here, between the seven and the paragraphs about it: the reader meets the
+          answer first, then the ways of asking a different question. Four chip rows above the pitch put
+          about 216 px of controls before anything they control. */}
+      {controls}
 
       {/* One card, one paragraph per caveat. Printed, never hovered (decision 072), and never folded
           behind a « en savoir plus »: a reader who does not open the accordion has read a claim the

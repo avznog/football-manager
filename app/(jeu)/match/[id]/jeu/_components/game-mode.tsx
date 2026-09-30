@@ -592,7 +592,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         <ActionBar
           actionDisabled={!canAct}
           clockLabel={clockAction.shortLabel}
-          clockName={clockAction.label}
+          clockName={clockAction.name}
           clockDisabled={clockAction.event === null}
           clockTone={clockAction.event === "FINAL_WHISTLE" ? "danger" : "secondary"}
           onClock={pressClockAction}
@@ -844,7 +844,7 @@ const ACTOR_QUESTIONS = {
 type ActionBarProps = {
   actionDisabled: boolean;
   clockLabel: string;
-  /** The full `clockActionFr().label`, which is what a screen reader hears. */
+  /** `clockActionFr().name`, which is what a screen reader hears. */
   clockName: string;
   clockDisabled: boolean;
   clockTone: "secondary" | "danger";
@@ -869,11 +869,12 @@ type ActionBarProps = {
  *
  * The clock button is the one place in the app where what is written and what is announced differ, and
  * on purpose: `clockLabel` is `clockActionFr().shortLabel`, because « Coup de sifflet final » does not
- * fit a quarter of 393 px, while `clockName` is the full label, because « Fin » on its own does not say
- * whether it ends the half or the match. Both come from the same function's return so they cannot
- * drift, and every short form is contained in its long one — « Envoi » in « Coup d'envoi 2e période »,
- * « Fin » in « Fin du match » — which is what WCAG 2.5.3 asks of a visible label inside an accessible
- * name, so a voice-control user saying what they can read still hits the button.
+ * fit a quarter of 393 px, while `clockName` is `clockActionFr().name`, because « Fin » on its own does
+ * not say whether it ends the half or the match. Both come from the same function's return so they
+ * cannot drift, and every visible form is contained in the name it announces — « Début » in
+ * « Début : coup d’envoi 2e période », « Fin » in « Fin du match » — which is what WCAG 2.5.3 asks of a
+ * visible label inside an accessible name, so a voice-control user saying what they can read still hits
+ * the button.
  *
  * Grid, not flex: `Button` is `shrink-0`, so a `fullWidth` button beside another one pushes it off
  * the right edge of a 390 px screen rather than sharing the row.

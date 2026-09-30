@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +17,7 @@ import {
   periodsLabel,
   resultLabel,
   resultLetter,
+  SCORE_SEPARATOR_FR,
   scoreLineFr,
   unmarkedSessionNoteFr,
   venueFieldHintFr,
@@ -72,6 +76,57 @@ describe("the labels the match header shares with the calendar", () => {
     // An en dash, not a hyphen: it is a score, not a range of two numbers.
     expect(scoreLineFr(1, 1)).toContain("–");
     expect(scoreLineFr(1, 1)).not.toContain("-");
+  });
+
+  /*
+   * Game mode's bar underlines our own figure, so it cannot print the whole string and joins the two
+   * goals with this constant instead. The point of exporting it is that there is still one separator
+   * in the app; the point of this test is that it is still the separator `scoreLineFr` uses.
+   */
+  it("joins the two figures with the separator it exports", () => {
+    expect(SCORE_SEPARATOR_FR).toBe(" – ");
+    expect(scoreLineFr(3, 2)).toBe(`3${SCORE_SEPARATOR_FR}2`);
+  });
+});
+
+/**
+ * Decision 097's rule, applied to the constant above: a tested export proves nothing about a screen
+ * that does not use it, and the two tests either side of this one would both stay green with a second
+ * « – » typed straight into game mode's bar. That is not a hypothetical shape — it is the shape the bar
+ * *had*, and the reason `SCORE_SEPARATOR_FR` was exported at all: the bar underlines our own figure, so
+ * it cannot print `scoreLineFr`'s whole string and has to join the two `<span>`s itself. Two separators
+ * in the app is one of them drifting, silently, on the one scoreboard a coach reads for ninety minutes.
+ *
+ * Vitest collects `lib/**` and nothing under `app/`, so the file is read as text — the same scan
+ * `lib/composition/hints.test.ts` runs on the dock's offset and `lib/stats/best-seven-copy.test.ts` on
+ * the pitch's key.
+ */
+describe("game mode's bar joins the score with that constant", () => {
+  const bar = readFileSync(
+    join(process.cwd(), "app", "(jeu)", "match", "[id]", "jeu", "_components", "match-bar.tsx"),
+    "utf8",
+  );
+
+  /** The score `<p>`, found by the accessible name it carries, so the scan cannot walk the clock's. */
+  function scoreParagraph(): string {
+    const label = bar.indexOf("aria-label={`Score ");
+    expect(label).toBeGreaterThan(0);
+    const open = bar.lastIndexOf("<p", label);
+    const close = bar.indexOf("</p>", label);
+    expect(open).toBeGreaterThan(0);
+    expect(close).toBeGreaterThan(label);
+    return bar.slice(open, close);
+  }
+
+  it("imports it from here, so there is one scoreline in the app", () => {
+    expect(bar).toContain("SCORE_SEPARATOR_FR");
+    expect(bar).toContain('from "@/lib/calendar/labels"');
+  });
+
+  it("prints it between the two figures, and never an en dash of its own", () => {
+    const paragraph = scoreParagraph();
+    expect(paragraph).toContain("{SCORE_SEPARATOR_FR}");
+    expect(paragraph).not.toContain("–");
   });
 });
 

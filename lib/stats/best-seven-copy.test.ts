@@ -8,6 +8,9 @@
  * Those branches are what is pinned below.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { ObservedFigure, ShrinkageReport } from "./best-seven";
@@ -18,7 +21,10 @@ import {
   DEFAULT_CRITERION,
   DEFAULT_DIRECTION,
   DIRECTION_PARAM,
+  DIRECTION_VALUES,
   FORMATION_PARAM,
+  NO_FORMATION_FR,
+  SEVEN_CONTROL_LABEL_FR,
   aggregationLabelFr,
   cleanSheetReadingsFr,
   declaredPostsFr,
@@ -30,18 +36,24 @@ import {
   formationUsageFr,
   goalkeeperShrinkageSentenceFr,
   matchesWithoutCompositionFr,
+  mostUsedFormationOptionFr,
   noBasisFr,
   observedFigureFr,
   optimumComparisonFr,
   outOfPositionNoteFr,
+  parseCompetitionId,
   parseCriterion,
   parseDirection,
   resetLabelFr,
+  resolveFormationOverride,
   sevenHeadingFr,
+  sevenQuestionKey,
+  showsCompetitionSelect,
   shrinkageSentenceFr,
   squadMeanStandInFr,
   swapAnnouncementFr,
   viewerRelativeRatingsFr,
+  type BestSevenQuery,
 } from "./best-seven-copy";
 
 const report = (overrides: Partial<ShrinkageReport> = {}): ShrinkageReport => ({
@@ -108,6 +120,215 @@ describe("reading the query string", () => {
     expect(params.get(CRITERION_PARAM)).toBe("ratings");
     expect(params.get(FORMATION_PARAM)).toBe("f1");
     expect(parseDirection(params.get(DIRECTION_PARAM) ?? undefined)).toBe("worst");
+  });
+
+  /**
+   * The no-JavaScript path, and the only reason these four cases exist.
+   *
+   * The controls are `<select>`s inside a `<form method="get">`, so a browser with no JavaScript submits
+   * **every** name it holds — including the ones the reader left at their default, as `?critere=`.
+   * `equipeTypeHref` never writes an empty value (it omits the key), so nothing else in the app can
+   * produce that URL and no other test would ever visit it. One parser throwing or mistaking `""` for a
+   * real id is a screen that works for everybody except the reader who needs the fallback most.
+   */
+  it("reads an empty value as « nothing chosen », on all four parameters", () => {
+    const competitions = [{ id: "c1" }, { id: "c2" }];
+    const formations = [
+      { formationId: "f1", matches: 5 },
+      { formationId: "f2", matches: 2 },
+    ];
+
+    expect(parseCriterion("")).toBe(DEFAULT_CRITERION);
+    expect(parseDirection("")).toBe(DEFAULT_DIRECTION);
+    expect(parseCompetitionId("", competitions)).toBeNull();
+    expect(resolveFormationOverride("", formations, "f1")).toBeNull();
+
+    // And the whole form at once, exactly as a `method="get"` submit of four untouched selects arrives.
+    const params = new URLSearchParams("critere=&sens=&formation=&competition=");
+    expect(parseCriterion(params.get(CRITERION_PARAM) ?? undefined)).toBe(DEFAULT_CRITERION);
+    expect(parseDirection(params.get(DIRECTION_PARAM) ?? undefined)).toBe(DEFAULT_DIRECTION);
+    expect(parseCompetitionId(params.get("competition") ?? undefined, competitions)).toBeNull();
+    expect(
+      resolveFormationOverride(params.get(FORMATION_PARAM) ?? undefined, formations, "f1"),
+    ).toBeNull();
+  });
+
+  it("keeps a competition only if the team has it", () => {
+    const competitions = [{ id: "c1" }, { id: "c2" }];
+    expect(parseCompetitionId("c2", competitions)).toBe("c2");
+    expect(parseCompetitionId(["c1", "c2"], competitions)).toBe("c1");
+    // A stale bookmark from a deleted competition degrades to « toutes », never to an error.
+    expect(parseCompetitionId("c9", competitions)).toBeNull();
+    expect(parseCompetitionId(undefined, competitions)).toBeNull();
+    expect(parseCompetitionId("c1", [])).toBeNull();
+  });
+
+  it("refuses a shape the team has not played, and the most-played one", () => {
+    const formations = [
+      { formationId: "f1", matches: 5, label: "1-3-2-1" },
+      { formationId: "f2", matches: 2, label: "2-3-1" },
+      { formationId: "f3", matches: 0, label: "1-2-3" },
+    ];
+
+    expect(resolveFormationOverride("f2", formations, "f1")?.label).toBe("2-3-1");
+    // Never the most-played shape: it is what `override ?? mostUsed` falls back to anyway, and calling
+    // it an override makes `formationOverrideFr` print « Ce n'est pas la forme… » about the one that is.
+    expect(resolveFormationOverride("f1", formations, "f1")).toBeNull();
+    // Played nothing, so laying the seven out on it would be a shape this team does not use.
+    expect(resolveFormationOverride("f3", formations, "f1")).toBeNull();
+    expect(resolveFormationOverride("bidon", formations, "f1")).toBeNull();
+    // With no most-played shape to protect, the same id *is* an honest override.
+    expect(resolveFormationOverride("f1", formations, null)?.label).toBe("1-3-2-1");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The key that throws the previous answer away                                */
+/* -------------------------------------------------------------------------- */
+
+describe("keying the pitch to the question", () => {
+  const query: BestSevenQuery = {
+    competitionId: null,
+    criterion: "goals",
+    direction: "best",
+    formationId: null,
+  };
+
+  it("changes with every value that changes which seven is right", () => {
+    const base = sevenQuestionKey(query, "f1");
+    expect(sevenQuestionKey({ ...query, criterion: "ratings" }, "f1")).not.toBe(base);
+    expect(sevenQuestionKey({ ...query, direction: "worst" }, "f1")).not.toBe(base);
+    expect(sevenQuestionKey({ ...query, competitionId: "c1" }, "f1")).not.toBe(base);
+    expect(sevenQuestionKey(query, "f2")).not.toBe(base);
+  });
+
+  it("is the same key for the same question, asked twice", () => {
+    expect(sevenQuestionKey({ ...query }, "f1")).toBe(sevenQuestionKey({ ...query }, "f1"));
+  });
+
+  /**
+   * « la plus jouée » and an explicit override of the *same* shape are one question, because
+   * `resolveFormationOverride` has already collapsed them: the resolved id is what goes in, so the seven
+   * on screen and the key agree about which shape it is laid out on.
+   */
+  it("reads the resolved shape, not the overridden one", () => {
+    expect(sevenQuestionKey({ ...query, formationId: "f1" }, "f1")).toBe(
+      sevenQuestionKey(query, "f1"),
+    );
+    // No shape at all is still a question — one the page answers with an empty state.
+    expect(sevenQuestionKey(query, null)).not.toBe(sevenQuestionKey(query, "f1"));
+  });
+});
+
+/**
+ * Decision 097's rule again, in the one place a unit test cannot reach: the function above is worth
+ * nothing unless the page actually hands it to React as a `key`, and a component's identity is invisible
+ * to Vitest, which collects `lib/**` and nothing under `app/`.
+ *
+ * What this guards is measured, not imagined. Without the `key`, choosing « La pire » navigated to
+ * `?sens=pire` and the pitch kept the best seven under the heading « Ton équipe » — the reader credited
+ * with a lineup he had never touched.
+ */
+describe("the page hands that key to the pitch", () => {
+  const page = readFileSync(
+    join(process.cwd(), "app", "(app)", "stats", "equipe-type", "page.tsx"),
+    "utf8",
+  );
+
+  it("renders the pitch at all, so this scan is not walking an empty file", () => {
+    expect(page).toContain("<SevenPitch");
+  });
+
+  it("gives every <SevenPitch> a key, built by sevenQuestionKey", () => {
+    const tags = page.split("<SevenPitch").slice(1);
+    expect(tags).toHaveLength(1);
+    for (const tag of tags) {
+      const end = tag.indexOf("/>");
+      expect(end).toBeGreaterThan(0);
+      const props = tag.slice(0, end);
+      expect(props).toContain("key={");
+      expect(props).toContain("sevenQuestionKey(");
+    }
+  });
+
+  /**
+   * The rejected alternative, pinned so it cannot creep back: an effect that copied `optimumBySlot` into
+   * state would overwrite the reader's own swaps, which this screen allows on purpose.
+   */
+  it("does not sync the seven with an effect instead", () => {
+    const pitch = readFileSync(
+      join(process.cwd(), "app", "(app)", "stats", "equipe-type", "_components", "seven-pitch.tsx"),
+      "utf8",
+    );
+    expect(pitch).not.toContain("useEffect");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The controls, which are the only writers of that query string               */
+/* -------------------------------------------------------------------------- */
+
+describe("naming the four controls", () => {
+  it("labels every select, and tutoies nobody into « vous »", () => {
+    const labels = Object.values(SEVEN_CONTROL_LABEL_FR);
+    expect(labels).toHaveLength(4);
+    for (const label of labels) {
+      expect(label).not.toMatch(/\bvo(tre|s)\b/i);
+      expect(label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("offers the most-played shape once, and says why it is the default", () => {
+    expect(mostUsedFormationOptionFr("1-3-2-1")).toBe("1-3-2-1 (la plus jouée)");
+    // Unreachable from the screen (no shape played means no select at all), but the option must still
+    // not read « null (la plus jouée) » if it ever is.
+    expect(mostUsedFormationOptionFr(null)).toBe("La plus jouée");
+  });
+
+  it("spells the direction the way the URL does, so a GET submit round-trips", () => {
+    // The `<option value>`s *are* the query string on the no-JavaScript path: a second spelling of
+    // « pire » in the component would be a filter that silently stops working without JavaScript.
+    expect(parseDirection(DIRECTION_VALUES.worst)).toBe("worst");
+    expect(parseDirection(DIRECTION_VALUES.best)).toBe("best");
+  });
+
+  it("never sends the reader to a control that is not on screen", () => {
+    // The formation select only lists shapes the team has played, so the state this sentence describes
+    // — none played — is exactly the state in which there is nothing to choose from.
+    expect(NO_FORMATION_FR).not.toContain("ci-dessus");
+    expect(NO_FORMATION_FR).not.toContain("ci-dessous");
+  });
+
+  /**
+   * The same rule, on the one control that broke it. Both empty states print « Choisis « Toutes » pour
+   * voir la saison entière » whenever a competition is being filtered on, and the select used to appear
+   * only for a team with two or more — so a single-competition team with a bookmarked `?competition=<id>`
+   * read an instruction with no control under it and no way back to the season.
+   */
+  it("keeps the competition select for a reader who arrived filtered", () => {
+    expect(showsCompetitionSelect({ competitionCount: 1, competitionId: "c1" })).toBe(true);
+    // The case that made the sentence a lie: one competition, one filtered URL.
+    expect(showsCompetitionSelect({ competitionCount: 1, competitionId: null })).toBe(false);
+    // More than one is a choice worth offering whether or not anything is filtered.
+    expect(showsCompetitionSelect({ competitionCount: 2, competitionId: null })).toBe(true);
+    expect(showsCompetitionSelect({ competitionCount: 2, competitionId: "c2" })).toBe(true);
+    // A team with no competitions at all has nothing to filter by, and `parseCompetitionId` has already
+    // turned any id into null by the time this is asked.
+    expect(showsCompetitionSelect({ competitionCount: 0, competitionId: null })).toBe(false);
+  });
+
+  /**
+   * Decision 097's rule once more: the predicate above is worth nothing if the form keeps its own copy
+   * of the condition, which is precisely the shape the defect had — `competitions.length > 1` typed into
+   * the JSX, where no test could reach it.
+   */
+  it("asks that predicate instead of counting the competitions itself", () => {
+    const controls = readFileSync(
+      join(process.cwd(), "app", "(app)", "stats", "equipe-type", "_components", "controls.tsx"),
+      "utf8",
+    );
+    expect(controls).toContain("showsCompetitionSelect({");
+    expect(controls).not.toContain("competitions.length > 1");
   });
 });
 

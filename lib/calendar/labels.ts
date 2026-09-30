@@ -156,6 +156,17 @@ export function matchReminderTitleFr(match: {
 }
 
 /**
+ * What `scoreLineFr` joins the two figures with, spaces included — an en dash, not a hyphen, because
+ * a score is not a range of two numbers.
+ *
+ * It is exported for the one caller that cannot use the whole string: game mode's bar underlines
+ * *our* figure, so it renders the two goals as two elements with this between them. Typing « – » a
+ * second time there is how a second convention starts, which is what the function below exists to
+ * prevent.
+ */
+export const SCORE_SEPARATOR_FR = " – ";
+
+/**
  * A scoreline: **our goals first, always**, whether the match was at home or away.
  *
  * There is no `isHome` parameter, and that is the decision this function exists to hold. Two
@@ -172,7 +183,7 @@ export function matchReminderTitleFr(match: {
  * in words instead, by `venueSideLabel` and the badges that use it.
  */
 export function scoreLineFr(goalsFor: number, goalsAgainst: number): string {
-  return `${goalsFor} – ${goalsAgainst}`;
+  return `${goalsFor}${SCORE_SEPARATOR_FR}${goalsAgainst}`;
 }
 
 /** « Victoire » / « Défaite » / « Match nul », from a derived score. */

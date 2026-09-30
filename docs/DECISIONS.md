@@ -3209,3 +3209,248 @@ total would become a number with no unit that nothing on screen could verify. Sa
 composition is the obvious next ask and a genuinely different feature — it writes `lineups` rows and
 has to respect invariant 3. Per-player win/draw/loss records need a column that does not exist; the
 chosen reading of « invincibilité » avoids needing one.
+
+## 116 — A filter sits under the thing it filters, and a `<select>` is how it says so
+
+**2026-09-30** · accepted · extends decision 100
+
+`/stats/equipe-type` shipped with its four controls — criterion, direction, formation, competition — as
+four rows of `min-h-11` `<Link>` chips in the page `<header>`. About **216 px of controls above the
+answer**, on a 393 px phone: the reader met every way of asking the question before he had seen a single
+seven, and the pitch he came for started below the fold. The owner reported it as the filters taking the
+whole screen, which is a layout complaint with a design decision inside it.
+
+**They are four labelled native `<select>`s in a two-column grid, below the pitch.** Two rows of ~74 px
+instead of four of 48: 160 px of controls where there were 216, and a **48 px** tap target where a chip
+was 44 — the iPhone 16 audit's tap-target finding says 44 pt is a floor, not a target. Below, because a
+control whose whole purpose is to change the seven above it is read *after* the seven: the first screen a
+reader meets is now an answer, and the way to ask a different question is where a thumb already is.
+
+**« Smaller » came out of the layout and never out of the type size.** The selects keep
+`components/ui/input.tsx`'s `text-base`, whose comment says why: under 16 px iOS Safari zooms the page
+the moment a picker opens, and a screen that zooms when you filter it is not smaller, it is broken. The
+height that was asked for came out of the count of rows, and none of it out of the type.
+
+**Decision 100 is why the chips were links, and both of its properties survive.** That entry — and
+`app/(app)/stats/_components/filters.tsx` before it — records that a filter on this app's statistics
+screens is a *view of the URL*: `?critere=ratings` is shareable, survives a reload, and works with
+JavaScript off. So there are now **two paths to the same query string**, and neither is a fallback that
+was never run:
+
+- with JavaScript, `onChange` pushes `equipeTypeHref(next)` — still the single function that knows the
+  parameter names and that **omits** whatever is at its default, so a shared URL carries only what was
+  actually chosen;
+- without it, the surrounding `<form method="get">` submits the four selects itself, with a `<noscript>`
+  button as the only thing that can trigger it.
+
+**And that second path made a tolerance load-bearing that had until then been an accident.** A GET form
+submits every control it holds, so it sends `?critere=` — an empty value — for anything left at its
+default, which `equipeTypeHref` has never written and the parsers had therefore never been given. Two of
+the four parsers did not even exist as functions: they were inline in `page.tsx`, unreachable by Vitest,
+so `parseCompetitionId` and `resolveFormationOverride` moved into `lib/stats/best-seven-copy.ts` to be
+testable at all. All four now have a test for the empty string.
+
+**Said precisely, because the first draft of this entry overstated it: no parser's behaviour changed.**
+`parseCriterion("")` and `parseDirection("")` already fell through to their defaults, and the inline
+`competitions.find((c) => c.id === "")` already found nothing — so the four new empty-string tests pass
+verbatim against the code as it was, and they are regression guards rather than proofs of a fix. What the
+form actually changed is the *status* of that behaviour: an incidental property of four `find`s and two
+`??`s became a requirement of a path a reader can reach with JavaScript off, and a requirement nothing
+states is one the next refactor is free to delete. That is decision 097's rule in a new place — a path
+nothing exercises is a claim — with the correction that the claim here was about who is allowed to change
+it, not about whether it worked.
+
+`scroll={false}` (decision 100) still matters, and now means the opposite thing. It was added so that
+sorting from halfway down `/stats` did not throw the reader back to the title; here the controls are
+*below* the pitch, so a navigation that jumped to the top of the document would put the reader above the
+select he had just used, and above the answer it changed, on every filter.
+
+**The reasoning above originally said that jump would hide « both the select and the seven it changed »,
+and that part was measured and is false.** The select and the **pitch graphic** can never be on screen
+together: the pitch SVG ends at **780** and the form starts at **1217**, because **437 px of the seven
+repeated as a list** — the full-width rows where no figure is abbreviated — sit between them. Seeing both
+at once would want **1123 px** of viewport, and a 393 × 852 phone has **736**. What is actually true is
+better than the claim it replaces: **the seven is on screen in words, immediately above the selects.**
+A reader who changes a criterion reads the new names and the new figures without scrolling at all, in the
+list that never truncates; the pitch is the same seven, laid out, further up. So `scroll={false}` keeps
+him at the answer either way — it is the list that is co-visible with the control, not the drawing.
+
+**The selects are `defaultValue` with a `key`, not `value`.** A controlled `value` comes from the server
+render, so between the tap and the new screen — the two seconds `COORDINATION.md`'s latency brief is
+about — the picker would visibly snap back to the option the reader had just abandoned. `defaultValue`
+leaves his choice on screen while the navigation runs, and the `key` keeps that honest in the other
+direction: a URL that changes without this form (the « et la pire équipe ? » link, the back button)
+remounts the select, so it can never display a choice the pitch above it has stopped obeying.
+
+**One sentence had to go rather than move.** `NO_FORMATION_FR` ended « ou choisis une forme toi-même
+ci-dessus », and the state that sentence appears in is exactly the state with no formation control on
+screen at all. Moving the controls turned a misplaced word into a false one — « ci-dessus » pointing at
+nothing — which is the class of defect this repository's definition of done is written around, and the
+clause is deleted. A sentence that names where a control is is a sentence that breaks when the control
+moves.
+
+**And « a filter that navigates » had a second requirement nobody had written down: the component that
+displays the answer must be keyed to the question.** Routing all four controls through a soft navigation
+exposed a defect that predates them and that the « et la pire équipe ? » link had been reproducing all
+along. Choosing « La pire » put `?sens=pire` in the URL, the server computed the worst seven, and the
+pitch **kept the best one** — relabelled « Ton équipe », with « La pire équipe : 1,94/h » and a
+« Revenir à la pire » button beside it. Measured: a fresh `GET ?sens=pire` gives « La pire équipe »,
+1,94/h, Hugo in goal; the same URL reached by using the select gives « Ton équipe », 2,01/h and Mehdi in
+goal, all seven rows unchanged. The screen was crediting the reader with a lineup he had never touched.
+`seven-pitch.tsx` holds the seven in `useState(() => ({ ...optimumBySlot }))`, a soft navigation reuses
+the component instance, the initialiser never re-runs — and because the state then disagrees with the new
+optimum, the one flag that means « the reader has edited this » (decision 087's `touched`) went true on
+its own.
+
+**The fix is a `key`, `sevenQuestionKey(query, resolvedFormationId)`, and deliberately not a `useEffect`
+that syncs state to props.** Hand-editing the seven is a *feature* here — the « Revenir à la meilleure »
+button exists for it — so an effect pushing the server's optimum back into state would fight the reader's
+own taps on every re-render. A `key` fights nothing: it discards the previous question's answer,
+initialiser included, and keeps his edits for exactly as long as the question they were an edit *to*. Ask
+a different question and you get the new optimum, never last question's edit carried onto it. The
+resolved formation goes into the key rather than `?formation=`, because « la plus jouée » names a
+different shape in a different competition. Guarded by a source scan in `best-seven-copy.test.ts`, in
+decision 097's style and for its reason: a `key` is a fact about a component's identity, invisible to a
+unit test of either file, and only the call site can be wrong about it.
+
+**As a rule, since it is not about this screen:** *state initialised from props is a cached answer, and it
+must carry the question in its `key`.* Anywhere a filter navigates and the component below it holds a
+`useState` seeded from what the server just computed, the two can silently disagree. Checked while
+writing this: the **only** two client components anywhere under `/stats` are this pitch and its controls,
+so no other statistics screen has the shape — every other one is a Server Component with no state to go
+stale. Nothing else was touched on the strength of the rule; where it might apply elsewhere in the app it
+is a roadmap item, not a drive-by.
+
+## 117 — The game-mode bar at 369 px: an underline for our own figure, and a third string for the clock
+
+**2026-09-30** · accepted · restates decisions 061, 064 and 112
+
+Two defects the owner found on his phone, in the one row decision 112 collapsed the top of game mode
+into. They are one entry because they are one row, and because both come down to the same question asked
+twice: when a word cannot stay where it was — for want of 34 px, or because the owner wants a different
+one visible — what gives way, and what must not.
+
+**The clock was overlapping the score, and the row had already overflowed before kickoff.** `MM:SS` in
+30 px digits was spilling out of its box and under the score. The cause was a flex row in which **the
+clock was the only child flex was permitted to squeeze**: `min-w-0`, no `shrink-0`, no
+`truncate`, beside a score and an action that were both `shrink-0`. So the row gave way at the one place
+it must not. **A clock is never squeezed and never abbreviated** — it is the one thing on this screen a
+coach reads at arm's length from the touchline — so it is `shrink-0` now.
+
+That alone does not make the row fit, and the arithmetic is measured in a headless browser against the
+real compiled CSS rather than estimated. Inside the **369 px** the row has at 393 px (393 less its
+`px-3`): back button 40, three `gap-2` 24, clock 90–140 depending on `MM:SS` and the stoppage span,
+score 72–101, TERRAIN 83, « Composition » 110. A typical row — « 45:00 », « 2 – 1 », TERRAIN — wanted
+**355** and now wants **321**, with 48 px spare at 393 and 30 px spare at 375.
+
+**The 34 px of that came from dropping the word « Nous », and it is the finding that matters:** with the
+caption, « 00:00 » and « 0 – 0 » beside a « Composition » button wanted **370 of 369** — so the bar
+overflowed *before a match had begun*, on the owner's own phone, in the state every match starts in. The
+defect was not a long scoreline or a long clock; it was the default.
+
+**Two rows still cannot fit at any font metric**, and they are named rather than hoped away: « 10 – 10 »
+with a stoppage span wants 370, and a match long enough to print « 120:00 » wants 388. So the **action
+slot** is the child that yields — `min-w-0 shrink overflow-hidden` — because it is the only label a reader
+can finish from context, and clipping the end of TERRAIN by 19 px keeps the whole bar on screen where
+`shrink-0` everywhere pushed the button off the right edge instead. Choosing which child gives way is the
+decision; `shrink-0` on everything is the absence of one.
+
+**So which figure is ours is said by an underline.** Decision 061 made the scoreline ours-first on every
+screen that prints one, with the venue said in words, and 064 made `scoreLineFr` the only function that
+writes one. Nothing in the *figures* says which way
+round they read: on an away match « 0 – 2 » is a team two goals **up**. The review of #104 was right to
+put the « Nous » caption back after decision 112 first cut it, and that reasoning is not withdrawn here —
+**the reader is still owed the fact; only the word is gone.** An `aria-label` alone was the wrong answer
+for the same reason it was the wrong answer then: it tells the one reader who did not need telling.
+
+**Our own figure is underlined.** A mark on the numeral costs nothing horizontally, which is what buys
+the 34 px above. It is an **underline and not a colour** on purpose: `--color-accent` on one of two
+numerals would read as a *state* — leading, live, chosen — and a score has no state. The separator is
+`SCORE_SEPARATOR_FR`, now exported from `lib/calendar/labels.ts` rather than a second « – » typed into
+the bar, so decision 064 still holds and the app still has exactly one scoreline.
+
+What was lost with the caption and is not recoverable from the figures is the *opponent's* name, which is
+in the back button's accessible name and one tap away on the match page — the same trade decision 112
+made for the venue badge and the phase line, stated again rather than assumed.
+
+**One claim above is weaker than it reads, and the review of this entry was right to say so.** « The
+reader is still owed the fact; only the word is gone » is true of what the *screen* now contains: the
+`aria-label` still says « Score 1 nous, 0 Courges », and a mark on the left-hand numeral is where the fact
+went. But the mark is **unlabelled** — nothing on screen says that an underline means « nous » — so for a
+sighted reader meeting it for the first time it is a convention to infer, not a fact stated, and the
+entry should not claim otherwise. It is kept rather than reversed because the alternative was measured and
+does not fit (370 of 369 px with the caption, before kick-off) and because the convention is learnable in
+one match from a score the reader watched go up. What makes it acceptable is that it is never the *only*
+statement of the fact: decision 061's ours-first ordering holds on every screen in the app, `scoreLineFr`
+is still the one function that writes a scoreline, and the announced name is unabbreviated. A follow-up on
+`docs/ROADMAP.md` asks the question this entry cannot settle from a desk — whether anybody actually reads
+the underline — because the answer is a coach on a touchline, not an argument.
+
+**« Envoi » → « Début », and why the accessible name is what gave way.** The owner asked for the clock
+button's short label to say « Début ». He is right — « Envoi » is a word a coach has to translate, and
+the button starts the match — and the rename immediately broke **WCAG 2.5.3
+Label in Name**: game mode prints `shortLabel` and announced `label` as the `aria-label`, so the visible
+text must appear in the accessible name as a *whole word*, or voice control saying « clique sur Début »
+activates nothing. « Début » is not a word of « Coup d’envoi ».
+
+The final whistle is the contrasting precedent, and it is why this needed a new answer. There, « Fin »
+occurred in « Coup de sifflet final » only inside *final*, and the fix was to change the **short label**,
+to « Sifflet ». That was available because no particular word had to be visible. Here the visible word is
+the whole of the owner's request, and the `label` is the football term the button's full form should
+print. So the **third string is the one that yields**: `clockActionFr` returns `name` beside `label` and
+`shortLabel`, which is `label` everywhere except the two kick-off branches, where it is « Début : coup
+d’envoi » (with the period ordinal for the second). The visible word is contained in it, so 2.5.3 is
+satisfied by addition rather than by giving up the word.
+
+**The rule, for the next time this happens:** when a mandated visible word is not a word of the term the
+control's full label has to use, change the accessible name, not the visible label and not the term. And
+it stays inside `clockActionFr` rather than being assembled at the call site, for the reason `shortLabel`
+did: three strings describing one action cannot be allowed to drift apart. `presenter.test.ts` walks
+every reachable phase of a 1, 2 and 3-period match and asserts the containment against `name`, so a
+fourth string or a fifth phase cannot quietly break it again.
+
+## 118 — One token for the tab bar's height, because three numbers had to agree about it and did not
+
+**2026-09-30** · accepted · restates decision 112
+
+The composition editor's sticky dock — the bench, the blocking errors and the confirm button (decision
+105) — floated **16 px above the tab bar**, showing a band of scrolling turf between the two. It reads as
+a rendering glitch, which is how the iPhone 16 audit recorded it and how it looks in the hand.
+
+It was arithmetic. The dock said `bottom-[calc(4.5rem + safe-area)]` = **72 px**, `BottomNav` is
+`min-h-14` = **56 px**, and `app/globals.css`'s `tabbar-pb` said **4 rem** = 64: three places that had to
+agree about one height, each carrying its own literal, and no two of them agreeing. 72 − 56 is the gap.
+
+**This is exactly why fixing it in game mode did not fix it here.** Decision 112 found the same
+subtraction in the game-mode bar and could fix it for free, because that route escapes `AppShell` and has
+no tab bar at all — the bar went to `bottom-0`. The number was never corrected; it was made irrelevant on
+one screen, and the two other copies of it were left standing. A fix that removes the need for a number
+does not repair the number.
+
+So **`--tabbar-h` in `app/globals.css` is the one source, and all three read it**: `BottomNav`'s
+`min-h-[var(--tabbar-h)]`, the `tabbar-pb` utility, and the dock's
+`bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom,0px))]`. A token cannot disagree with itself.
+
+**With one honest qualification: `tabbar-pb` has no callers.** Its only other mention in the repository is
+the comment in `AppShell` explaining why that component deliberately does *not* use it, so of the « three
+places » above, two are live consumers and the third is an unused utility whose value moved from 4 rem to
+the token with no effect on any screen. It is kept rather than deleted because it is the right utility for
+the next screen that needs to clear the bar exactly, and because a wrong number left in a utility is how
+this defect propagated the first time — but nobody should read the count of three as three places that
+were rendering.
+Two things about its definition are deliberate and are written at its declaration rather than left to be
+rediscovered: the **home indicator is not included**, because `BottomNav` pads itself with `safe-pb` so
+the inset is *inside* the bar and anything positioned against the bar must add `env()` itself; and
+`AppShell`'s content padding uses the token **plus 1 rem**, because it wants clearance and not adjacency,
+which is a different quantity and says so.
+
+Measured at 390 px in both themes, which is the only way this class of defect is ever confirmed: dock
+bottom 788, tab bar top 787, the 1 px between them being the bar's own border. And there is a guard, in
+the shape decision 097 argued for: `lib/composition/hints.test.ts` reads the editor's source and fails if
+`bottom-[calc(4.5rem` comes back. A token only helps while everybody reads it, and nothing else in this
+repository can see that a component has gone back to a literal.
+
+**What this does not fix**, so it is not read as more than it is: the same editor's worst defect — the
+dock covering the whole pitch at the opening scroll, so the screen that says « Appuie sur un joueur puis
+sur un poste » has no post to press — is a layout problem and not an arithmetic one. It stays on the
+roadmap.
