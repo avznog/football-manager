@@ -3628,3 +3628,72 @@ assert the page rendered at all** — that is now the first thing any throwaway 
 does, and the six byte-identical screenshots were what gave it away. The second is smaller: after a
 direct `UPDATE` on `trainings`, nothing calls `revalidatePath`, so the séance must be moved before
 the page is opened rather than between two screenshots of it.
+
+## 121 — A match is over when the coach says so; the déroulé says how it went
+
+**2026-10-01** · accepted · refines 113
+
+The owner wanted to type up matches already played this season, and the screen for that exists and
+works — `/match/[id]/saisie`, milestone M7. It was unreachable. The card that leads to it is offered
+only when `match.status === "finished"`; the only writer of that column was `finalizeMatch`, which
+refuses unless the log already holds a `FINAL_WHISTLE`; and the only thing that appends one is game
+mode. So backfilling an afternoon from three weeks ago meant starting a live clock for it, tapping
+through a match that was long over, and blowing the final whistle — which is exactly what he said he
+did not want to do. The one match in the repository that *was* in the target state is the seed's J6,
+and it only exists because the seed writes the column by hand.
+
+**Decision.** Two Server Actions in `lib/match/actions.ts`, `finishMatch` and `reopenMatch`, write
+`matches.status` directly and append nothing. Decision 113 said *finished* is one fact, the column,
+and that the column is a **cache**; that still holds, and this entry only widens what it caches. It
+caches « somebody closed this match », and a `FINAL_WHISTLE` is one cause of that. The coach's word
+is the other.
+
+**The mechanism not to use, which is the obvious one.** Do not append a bare `FINAL_WHISTLE` to mark
+a match over. `getMatchScores` (`lib/match/queries.ts:174`) counts `match_events` rows and
+`getMatchScore` returns `scores.get(matchId) ?? null`, so `score === null` means *literally zero
+rows* — it is the repository's test for « nobody recorded this ». One whistle turns that `null` into
+`{0, 0}`, and the calendar starts printing « 0 – 0 » for a match nobody watched: the wave-3 defect
+`CLAUDE.md` names by name, and the untruth decision 013 exists to prevent. It would also make
+`submitRetroMatch` refuse with « Ce match a déjà un déroulé », pushing whole-match entry into the
+action-by-action corrections list. So: **set the column, leave the log empty.** That is the J6 state,
+and every screen already renders it — the scoreboard shows « ? – ? », `lib/stats/aggregate.ts` counts
+it in `unrecordedMatches`, and the match page hides « Mode match » for it.
+
+**Where the line falls: both actions refuse if the log is not empty.** A match with a déroulé is
+`live` or `finished` already — `applyEffects` sets `live` on the first kick-off — and a `live` one has
+a correct way to end, game mode's own final whistle, which derives the minute from the reducer
+instead of inventing one out here. Reimplementing that derivation outside `lib/match/reducer.ts` to
+save the coach a tap would trade invariant 2 for nothing. Symmetrically, « Rouvrir le match » is only
+offered while the log is empty: going back to `scheduled` with events on file would mean voiding them
+to stay coherent, which is a different and bigger feature. `hasMatchEvents` is the question both ask,
+not `score === null` — that one ignores voided events, so a match whose every action was corrected
+away reads as empty there, and declaring is the case that must not get it wrong.
+
+**No chronology gate at all**, which is the owner's call and is the literal reading of « at any
+time »: a match dated next Sunday can be declared over. Three things had to follow it rather than
+fight it. `isPast` in `lib/calendar/timeline.ts` split on `endsAt` alone with `isLiveEvent` the only
+status override, so such a match would sit under « À venir » while its own page said it was finished
+and `/stats` counted it — one screen contradicting another, the failure mode of waves 3 and 4. It now
+has the mirror, `isFinishedEvent`, and the ordinary case improves too: a match ended early leaves
+« À venir » at the whistle rather than at `endsAt`. `submitRetroMatch` had to stop refusing a
+kick-off in the future for a match declared over; the consequence is that the built log's
+`occurredAt` values are in the future, which is inert — the reducer reads `clockMs` and `period`,
+never `occurredAt` — and is the honest record of what the coach declared. And game mode now
+redirects a finished match with an empty log back to the match page: the reducer reads an empty log
+as « not started », so that screen drew a 0-0 scoreboard and a « Coup d'envoi » button for an
+afternoon already over. That state used to be seed-only and unlinked; this decision makes it one tap
+away.
+
+**What is deliberately unchanged.** The retro form asks for the same things it always did: who
+played, and the goals. The score, the minutes and the clean sheets stay derived (invariant 2), there
+is still no score column, and `entry_mode` remains the label decision 013 made it. Nothing downstream
+needed a branch — `amendMatchEvents` already re-freezes `match_player_stats` when the match is
+finished, and the retro log carries its own `FINAL_WHISTLE` — because the entry path is the one J6
+already exercised. The rating window needed no change either: `getNextKickoffAfter` keys on the
+match's own kick-off, so a future match declared over opens its window immediately and closes at the
+match after it, which is what decision 007 says.
+
+One untruth this makes visible without causing, recorded in `docs/ROADMAP.md` rather than fixed here
+because when a player may still answer is a product call: a match in the past that nobody has
+declared over still shows « Ta réponse » with « Tu peux changer d'avis jusqu'au coup d'envoi », and
+still chases the players who never answered.
