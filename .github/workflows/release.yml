@@ -49,7 +49,7 @@ jobs:
           fetch-depth: 0
 
       # The failure decision 081 existed to prevent: a tag that names a version the code does not
-      # claim. `v1.0.0` on a commit whose package.json says `1.0.0-beta.4` would deploy a beta under
+      # claim. `v1.0.0` on a commit whose package.json says `1.0.0-beta.5` would deploy a beta under
       # the name of the stable release, and the number is the only thing anybody can read afterwards.
       # Checked at the *tagged commit*, not at `main`, because a tag may name an older commit.
       - name: the tag must name the version at the tagged commit

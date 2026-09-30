@@ -365,7 +365,7 @@ is a **deliberate human act**, four steps:
    git push origin v1.0.0-beta.5
    ```
 
-   Every version up to `v1.0.0-beta.4` is already tagged, so `v1.0.0-beta.5` is the next one that can
+   Every version up to `v1.0.0-beta.5` is already tagged, so `v1.0.0-beta.6` is the next one that can
    actually be cut. A tag that already exists is not a way to ship again — see below.
 
 Then **watch `release.yml`** — `gh run watch` or the Actions tab. It gates the tag, re-runs the same
