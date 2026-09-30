@@ -29,8 +29,11 @@
  *   an empty value — pinned in `best-seven-copy.test.ts`, not hoped for.
  *
  * `scroll={false}` (decision 100) still matters and now means the opposite thing: the controls sit
- * *below* the pitch, so a navigation that jumped to the top of the document would hide both the select
- * the reader just used and the seven it changed.
+ * *below* the pitch, so a navigation that jumped to the top of the document would put the reader above
+ * the select he just used and above the answer it changed. Measured at 393 px, that answer is the **list**
+ * of the seven and not the pitch: the SVG ends at 780 and this form starts at 1217, so the drawing and a
+ * select can never be on screen together, while the list of seven names and figures sits directly above
+ * them. Decision 116 carries the numbers.
  *
  * Data in, URL out. No fetching, no derived sentence of its own: this is the second client component on
  * the screen and it is kept the smaller of the two.

@@ -8,6 +8,9 @@
  * Those branches are what is pinned below.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { ObservedFigure, ShrinkageReport } from "./best-seven";
@@ -44,10 +47,12 @@ import {
   resetLabelFr,
   resolveFormationOverride,
   sevenHeadingFr,
+  sevenQuestionKey,
   shrinkageSentenceFr,
   squadMeanStandInFr,
   swapAnnouncementFr,
   viewerRelativeRatingsFr,
+  type BestSevenQuery,
 } from "./best-seven-copy";
 
 const report = (overrides: Partial<ShrinkageReport> = {}): ShrinkageReport => ({
@@ -173,6 +178,88 @@ describe("reading the query string", () => {
     expect(resolveFormationOverride("bidon", formations, "f1")).toBeNull();
     // With no most-played shape to protect, the same id *is* an honest override.
     expect(resolveFormationOverride("f1", formations, null)?.label).toBe("1-3-2-1");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The key that throws the previous answer away                                */
+/* -------------------------------------------------------------------------- */
+
+describe("keying the pitch to the question", () => {
+  const query: BestSevenQuery = {
+    competitionId: null,
+    criterion: "goals",
+    direction: "best",
+    formationId: null,
+  };
+
+  it("changes with every value that changes which seven is right", () => {
+    const base = sevenQuestionKey(query, "f1");
+    expect(sevenQuestionKey({ ...query, criterion: "ratings" }, "f1")).not.toBe(base);
+    expect(sevenQuestionKey({ ...query, direction: "worst" }, "f1")).not.toBe(base);
+    expect(sevenQuestionKey({ ...query, competitionId: "c1" }, "f1")).not.toBe(base);
+    expect(sevenQuestionKey(query, "f2")).not.toBe(base);
+  });
+
+  it("is the same key for the same question, asked twice", () => {
+    expect(sevenQuestionKey({ ...query }, "f1")).toBe(sevenQuestionKey({ ...query }, "f1"));
+  });
+
+  /**
+   * « la plus jouée » and an explicit override of the *same* shape are one question, because
+   * `resolveFormationOverride` has already collapsed them: the resolved id is what goes in, so the seven
+   * on screen and the key agree about which shape it is laid out on.
+   */
+  it("reads the resolved shape, not the overridden one", () => {
+    expect(sevenQuestionKey({ ...query, formationId: "f1" }, "f1")).toBe(
+      sevenQuestionKey(query, "f1"),
+    );
+    // No shape at all is still a question — one the page answers with an empty state.
+    expect(sevenQuestionKey(query, null)).not.toBe(sevenQuestionKey(query, "f1"));
+  });
+});
+
+/**
+ * Decision 097's rule again, in the one place a unit test cannot reach: the function above is worth
+ * nothing unless the page actually hands it to React as a `key`, and a component's identity is invisible
+ * to Vitest, which collects `lib/**` and nothing under `app/`.
+ *
+ * What this guards is measured, not imagined. Without the `key`, choosing « La pire » navigated to
+ * `?sens=pire` and the pitch kept the best seven under the heading « Ton équipe » — the reader credited
+ * with a lineup he had never touched.
+ */
+describe("the page hands that key to the pitch", () => {
+  const page = readFileSync(
+    join(process.cwd(), "app", "(app)", "stats", "equipe-type", "page.tsx"),
+    "utf8",
+  );
+
+  it("renders the pitch at all, so this scan is not walking an empty file", () => {
+    expect(page).toContain("<SevenPitch");
+  });
+
+  it("gives every <SevenPitch> a key, built by sevenQuestionKey", () => {
+    const tags = page.split("<SevenPitch").slice(1);
+    expect(tags).toHaveLength(1);
+    for (const tag of tags) {
+      const end = tag.indexOf("/>");
+      expect(end).toBeGreaterThan(0);
+      const props = tag.slice(0, end);
+      expect(props).toContain("key={");
+      expect(props).toContain("sevenQuestionKey(");
+    }
+  });
+
+  /**
+   * The rejected alternative, pinned so it cannot creep back: an effect that copied `optimumBySlot` into
+   * state would overwrite the reader's own swaps, which this screen allows on purpose.
+   */
+  it("does not sync the seven with an effect instead", () => {
+    const pitch = readFileSync(
+      join(process.cwd(), "app", "(app)", "stats", "equipe-type", "_components", "seven-pitch.tsx"),
+      "utf8",
+    );
+    expect(pitch).not.toContain("useEffect");
   });
 });
 

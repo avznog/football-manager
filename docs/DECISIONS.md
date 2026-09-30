@@ -3253,8 +3253,18 @@ nothing exercises is a claim, and the no-JS path is the one nobody looks at.
 
 `scroll={false}` (decision 100) still matters, and now means the opposite thing. It was added so that
 sorting from halfway down `/stats` did not throw the reader back to the title; here the controls are
-*below* the pitch, so a navigation that jumped to the top of the document would hide both the select the
-reader just used and the seven it changed.
+*below* the pitch, so a navigation that jumped to the top of the document would put the reader above the
+select he had just used, and above the answer it changed, on every filter.
+
+**The reasoning above originally said that jump would hide « both the select and the seven it changed »,
+and that part was measured and is false.** The select and the **pitch graphic** can never be on screen
+together: the pitch SVG ends at **780** and the form starts at **1217**, because **437 px of the seven
+repeated as a list** — the full-width rows where no figure is abbreviated — sit between them. Seeing both
+at once would want **1123 px** of viewport, and a 393 × 852 phone has **736**. What is actually true is
+better than the claim it replaces: **the seven is on screen in words, immediately above the selects.**
+A reader who changes a criterion reads the new names and the new figures without scrolling at all, in the
+list that never truncates; the pitch is the same seven, laid out, further up. So `scroll={false}` keeps
+him at the answer either way — it is the list that is co-visible with the control, not the drawing.
 
 **The selects are `defaultValue` with a `key`, not `value`.** A controlled `value` comes from the server
 render, so between the tap and the new screen — the two seconds `COORDINATION.md`'s latency brief is
@@ -3269,6 +3279,38 @@ screen at all. Moving the controls turned a misplaced word into a false one — 
 nothing — which is the class of defect this repository's definition of done is written around, and the
 clause is deleted. A sentence that names where a control is is a sentence that breaks when the control
 moves.
+
+**And « a filter that navigates » had a second requirement nobody had written down: the component that
+displays the answer must be keyed to the question.** Routing all four controls through a soft navigation
+exposed a defect that predates them and that the « et la pire équipe ? » link had been reproducing all
+along. Choosing « La pire » put `?sens=pire` in the URL, the server computed the worst seven, and the
+pitch **kept the best one** — relabelled « Ton équipe », with « La pire équipe : 1,94/h » and a
+« Revenir à la pire » button beside it. Measured: a fresh `GET ?sens=pire` gives « La pire équipe »,
+1,94/h, Hugo in goal; the same URL reached by using the select gives « Ton équipe », 2,01/h and Mehdi in
+goal, all seven rows unchanged. The screen was crediting the reader with a lineup he had never touched.
+`seven-pitch.tsx` holds the seven in `useState(() => ({ ...optimumBySlot }))`, a soft navigation reuses
+the component instance, the initialiser never re-runs — and because the state then disagrees with the new
+optimum, the one flag that means « the reader has edited this » (decision 087's `touched`) went true on
+its own.
+
+**The fix is a `key`, `sevenQuestionKey(query, resolvedFormationId)`, and deliberately not a `useEffect`
+that syncs state to props.** Hand-editing the seven is a *feature* here — the « Revenir à la meilleure »
+button exists for it — so an effect pushing the server's optimum back into state would fight the reader's
+own taps on every re-render. A `key` fights nothing: it discards the previous question's answer,
+initialiser included, and keeps his edits for exactly as long as the question they were an edit *to*. Ask
+a different question and you get the new optimum, never last question's edit carried onto it. The
+resolved formation goes into the key rather than `?formation=`, because « la plus jouée » names a
+different shape in a different competition. Guarded by a source scan in `best-seven-copy.test.ts`, in
+decision 097's style and for its reason: a `key` is a fact about a component's identity, invisible to a
+unit test of either file, and only the call site can be wrong about it.
+
+**As a rule, since it is not about this screen:** *state initialised from props is a cached answer, and it
+must carry the question in its `key`.* Anywhere a filter navigates and the component below it holds a
+`useState` seeded from what the server just computed, the two can silently disagree. Checked while
+writing this: the **only** two client components anywhere under `/stats` are this pitch and its controls,
+so no other statistics screen has the shape — every other one is a Server Component with no state to go
+stale. Nothing else was touched on the strength of the rule; where it might apply elsewhere in the app it
+is a roadmap item, not a drive-by.
 
 ## 117 — The game-mode bar at 369 px: an underline for our own figure, and a third string for the clock
 

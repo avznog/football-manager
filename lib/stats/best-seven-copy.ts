@@ -162,6 +162,37 @@ export function equipeTypeHref(query: BestSevenQuery, competitionParam = "compet
   return search === "" ? "/stats/equipe-type" : `/stats/equipe-type?${search}`;
 }
 
+/**
+ * The identity of the **question** the pitch is answering: change any of these and a different seven is
+ * the right one, so the component that draws it has to be a different component.
+ *
+ * It is a React `key` for `<SevenPitch>` and not a `useEffect` syncing state to props, and the
+ * difference is the whole point. The pitch holds the reader's own swaps in `useState` — hand-editing the
+ * seven is a feature, which is why there is a « Revenir à la meilleure » button — so an effect that
+ * pushed the server's optimum back into that state would fight his taps every time the page re-rendered.
+ * A `key` fights nothing: it throws the old question's answer away, initialiser included, and keeps his
+ * edits for exactly as long as the question they were an edit *to*. `_components/controls.tsx` argues the
+ * same trade for its own selects, under « `defaultValue` with a `key`, and not `value` ».
+ *
+ * Without it, a soft navigation reused the instance and `useState(() => ({ ...optimumBySlot }))` never
+ * re-ran: choosing « La pire » relabelled the pitch « Ton équipe » over the *best* seven, as though the
+ * reader had picked it himself.
+ *
+ * The **resolved** formation is what goes in, not `query.formationId`: that one is null for « la plus
+ * jouée », whose identity changes with the competition.
+ */
+export function sevenQuestionKey(
+  query: BestSevenQuery,
+  resolvedFormationId: string | null,
+): string {
+  return [
+    query.competitionId ?? "all",
+    query.criterion,
+    query.direction,
+    resolvedFormationId ?? "none",
+  ].join("|");
+}
+
 /* -------------------------------------------------------------------------- */
 /* Naming the criterion                                                       */
 /* -------------------------------------------------------------------------- */

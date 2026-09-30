@@ -63,6 +63,7 @@ import {
   parseCriterion,
   parseDirection,
   resolveFormationOverride,
+  sevenQuestionKey,
   shrinkageSentenceFr,
   squadMeanStandInFr,
   viewerRelativeRatingsFr,
@@ -335,7 +336,10 @@ function Body({
 
   return (
     <>
+      {/* Keyed to the question, because the answer is state: `sevenQuestionKey` says why a `key` and not
+          an effect, and what a soft navigation printed without it. */}
       <SevenPitch
+        key={sevenQuestionKey(query, formation.formationId)}
         criterion={query.criterion}
         direction={query.direction}
         aggregation={result.aggregation}
