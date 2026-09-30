@@ -3057,3 +3057,155 @@ the same component as everything that does, rather than a copy of it.
 in the stats and still be voidable. What changed is the one user-facing menu it appeared in. Amateur
 7-a-side has no card count and no disciplinary consequence to compute, so the tile was asking a coach
 watching football to do data entry for nobody.
+
+## 115 — The best seven shrinks every figure toward the squad, and says by how much
+
+**2026-09-30** · accepted · builds on decisions 011 and 021
+
+The owner asked for a pitch in the statistics section showing the **best possible seven** for a chosen
+measure — best scorers, best ratings, best « invincibilité » — and the worst by the same measures, with
+positions respected and the team figure recomputing live when a player is swapped. Three questions had
+to be answered before a single disc could be drawn honestly, and the third is the substance.
+
+**Rates, not totals.** « Meilleur buteur de la saison » is already the `/stats` leaderboard. A best
+*seven* is a claim about who to put on a pitch, so every criterion is a rate — goals per 60 minutes,
+the share of minutes played without conceding — and a player who played half the season is not beaten
+by one who merely played all of it.
+
+**No threshold, because the owner refused one and was right.** `/stats` handles thin samples with a
+hard `MIN_RATINGS = 3`, whose own comment says « three is the smallest number that needs a second
+opinion to agree ». Asked whether to exclude thin-sample players here, the owner rejected all the
+options offered and answered: the ratings must be **weighted by how many matches a player has played**.
+A threshold throws away real signal and makes the seven jump discontinuously as one player crosses the
+line.
+
+**So every figure is an empirical-Bayes posterior mean:** the player's own rate and the squad's,
+weighted by his exposure against a prior strength expressed in the same unit —
+`adjusted = (n × observed + m × squadMean) / (n + m)`. With a squad averaging 6,5 and `m = 4`, one
+rating of 9,0 becomes 7,0 while twelve ratings averaging 7,4 barely move. The more a player has played,
+the more he is judged on himself alone, which is exactly what was asked for. Three properties then fall
+out of the arithmetic rather than needing a special case, and each is what makes the screen defensible:
+
+- **a player with no data lands exactly on the squad mean**, so he cannot *head* either ranking. That is
+  the rule `comparePlayers` already states in words — « unknown is not "worst" — but it cannot head a
+  ranking either » — obtained by division instead of a `null` branch. **This entry first said he
+  « heads neither the best seven nor the worst », and the review of the pull request was right that this
+  overstates it**: he is routinely *in* a seven, and in a slot with two candidates he is picked as the
+  worst whenever the squad mean falls below the other man's real figure. Which is defensible — being
+  shown at the squad's average is neither flattery nor punishment for not having played — but it is a
+  thing the screen has to say, and the card had ten disclosure paragraphs and not that one. It says it
+  now, with a count of how many of the seven it applies to;
+- **the worst seven is protected too.** Twenty minutes and three conceded is not automatically the
+  squad's worst defender, which is precisely what a raw ratio would claim;
+- **it is continuous.** Nobody appears in or vanishes from the seven as a threshold is crossed.
+
+**`m` is measured, not chosen.** It is the ratio of the noise *within* one player's figures to the real
+spread *between* players — within-player variance over between-player variance, by method of moments.
+A uniform squad yields a large `m` and a sceptical screen; a squad with real gulfs yields a small one
+and a single good match counts for more. It is clamped per criterion so a three-match season cannot
+produce an absurd value, and it is **printed**: « les notes sont ramenées vers la moyenne de l'équipe,
+à hauteur de 2 notes ». A number a screen will not explain is a number that screen should not use. When
+the squad's figures are too close together for the spread to be measurable at all, the clamp ceiling is
+used — maximum scepticism is the only defensible reading of « we cannot tell these players apart » —
+and the sentence then **contains no digit**, because printing an unmeasured number as though it had
+been measured is the same defect wearing a decimal point.
+
+**And the clamp binds, which qualifies « measured, not chosen » more than the first draft of this entry
+admitted.** On the demo season's goals criterion the method of moments returns 9,64 and the clamp forces
+6; the screen then prints 6 as though it had been measured, because what was *applied* is 6 and that is
+what the reader needs in order to check the figures. So the honest statement is narrower than « the
+number is measured »: the number is measured **and then bounded**, the bound exists so that a
+three-match season cannot produce an absurd prior, and on a short season the bound is what is doing the
+work. A screen that printed 9,64 while using 6 would be worse.
+
+One idea, three shapes, because the criteria do not have one: Normal–Normal for ratings (`m` in
+ratings), Gamma–Poisson for goals and assists (`m` in 60-minute units), Beta–Binomial for the
+clean-minute share (`m` in minutes). Ratings needed the spread of each player's own scores, which was
+one additive field on `PlayerRating` — the scores were already in the accumulator, **inside** the
+visibility gate, so the spread inherits decision 021 for free and cannot leak a score the viewer has
+not earned.
+
+**Decision 011 turns out to need two fitted models, not one scoring rule.** That entry recorded that
+« minutes d'invincibilité » was ambiguous and that **both** readings were kept: `cleanMinutes` over all
+pitch time, and `gkCleanMinutes` in goal. The goalkeeper slot therefore reads the keeper pair — but
+shrinking a keeper's figure toward an *all-pitch* mean would mix two populations and flatter or punish
+keepers for nothing, so the keeper pair gets its own prior and keepers are only ever compared with each
+other. Every pick says which pair produced it, and the card says it in French.
+
+**Positions are an exact assignment, not a greedy pass.** Seven slots and up to twenty-five candidates:
+filling slots greediest-first is wrong the moment two of them want the same man. A bitmask DP over the
+seven slots — candidates × 2⁷ states, about 22 000 comparisons — solves it exactly with no Hungarian
+implementation, and the tests assert the greedy answer is *worse* rather than merely asserting a
+number. The objective is **lexicographic and stated on screen**: fill the slot, then prefer somebody
+who declared the post, then prefer a primary declaration, then the criterion total. That is the honest
+reading of « il faut faire attention aux postes » — it will not put the squad's best scorer in goal to
+win a goals total, and it will not refuse to fill a slot nobody declared either: it fills it and badges
+the disc « pas son poste ». Ties are a named constant with a test, minutes then jersey number, never
+array position.
+
+**What the screen has to say out loud, and why each sentence exists.** This is the class of defect this
+repository's definition of done singles out, and this screen had four chances to commit it:
+
+- **the posts are declarations, not measurements.** There is exactly one positional figure anywhere in
+  the database — `match_player_stats.gkMinutes` — and the reducer's `positionSpells` are in-memory
+  match state the freeze path never writes down. « Meilleur milieu droit » would therefore imply a
+  measurement this app does not have, so the card says the posts come from what players declared on
+  their profiles. The roadmap carries what would change that: a `minutes_by_position` table written at
+  the final whistle, and a backfill by replaying the log;
+- **a ratings seven is viewer-relative, and not optionally so.** Decision 021 applies decision 007's
+  reciprocity gate to season averages, so two teammates genuinely see two different sevens. The card
+  says « d'après les matchs que tu as notés » and prints the hidden count, reusing the wording the
+  roadmap already prescribed for the « Meilleures notes » card rather than inventing a third;
+- **why a sentence cannot say « we cannot tell these players apart » when there is only one of them.**
+  The « spread not measurable » wording originally gave one reason — « les écarts entre les joueurs sont
+  trop petits » — for four different causes, and was therefore false in three of them: with a single
+  keeper there are no écarts at all, on a filter where nobody was rated the truth is « personne n'a
+  de note », and in the fourth — several rated players, none of them rated *twice* — the écarts may be as
+  wide as the scale allows and it is the other moment that is missing, the noise within one player. The
+  causes were already distinguished in the arithmetic and were being thrown away at the copy boundary.
+  Four sentences now, one per cause, each tested — the same defect the previous slice's review found,
+  which is worth recording twice because it keeps recurring: a sentence true in the common case and false
+  in one branch. The fourth cause is the one this entry nearly folded into the third for being rare, and
+  the reason not to is that the two say opposite things about the same squad;
+- **the shrinkage and the two invincibilités**, as above. « sans encaisser » is the app's existing
+  spelling and no third one was introduced;
+- **the formation is named with its count** — « utilisée dans 7 matchs » — because a shape without its
+  denominator is a claim with the count hidden, and matches played without a recorded composition get
+  their own sentence rather than being silently absent from the total.
+
+**Once anybody is swapped, the screen stops claiming to be the best seven.** The heading becomes « Ton
+équipe », with the optimum's total beside it to compare against and a way back. Decision 087 is the
+standing rule — a heading is a claim about every row under it — and a pitch still headed « la meilleure
+équipe » after two swaps is that claim being false. The swap recomputes from a cell table the server
+ships, so the client never reimplements any of the arithmetic above.
+
+**No migration and no new table.** Every figure this needs already existed in `match_player_stats`,
+`player_positions` and `formation_slots`; the only genuinely new query counts which formation the team
+has used most. That was the point of inventorying before designing: three of the findings above — no
+per-post minutes, the ratings seven being viewer-relative, « invincibilité » naming two figures — each
+changed the feature, and none of them would have been discovered by writing the screen first.
+
+**What measuring at 390 px found that no test would have.** The keeper's caption was clipped 14 px by
+the pitch's own `overflow-hidden`, his point sitting at 93.7 % of the box; moving it above the disc
+overlapped the centre-back's caption by 18 px, since those two share the 500‰ column. His figures sit
+beside him now, because the bottom of a 7-a-side pitch is one disc wide with 120 px of empty grass
+either side. On assists every raw caption truncated, needing 120 px in 96. And **one real touch tap
+silently swapped two players**: the picker opened during `pointerup` and the synthesised `click` landed
+on the sheet's first row. Five defects, none of them visible in a passing suite, which is the argument
+for `CLAUDE.md`'s « actually looked at, at 390 px » stated once more in numbers.
+
+**And what the review found after all that, which is the lesson worth keeping.** On a competition filter
+where nobody had a visible rating, all seven discs printed **« 0,0 »** — on a nought-to-ten scale, the
+worst possible mark, for the entire squad — while the team figure beside them correctly printed « — ».
+The zero was not an oversight: the module's own type documentation *specified* it, and the test asserted
+the aggregate was null while asserting nothing at all about the seven figures under it. Rule 1 of
+`lib/stats/aggregate.ts` had been in this repository from the beginning — « a number nobody has yet is
+`null`, never `0` » — and was broken seven times on one screen by code whose comments were otherwise
+careful. A green suite, a measured layout, twelve screens walked in two themes, and the worst defect in
+the slice was a documented constant. Figures are `number | null` now, from the arithmetic outward.
+
+**Out of scope, deliberately.** Weighted multi-criterion sliders were offered and refused: the team
+total would become a number with no unit that nothing on screen could verify. Saving a seven as a real
+composition is the obvious next ask and a genuinely different feature — it writes `lineups` rows and
+has to respect invariant 3. Per-player win/draw/loss records need a column that does not exist; the
+chosen reading of « invincibilité » avoids needing one.

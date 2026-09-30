@@ -295,6 +295,25 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       the reader was comparing two shapes of the same fact. The year is unconditional now — a season
       crosses 1 January — and `MONTHS_FR`, `formatDayMonthFr` and three format constants go with their
       last callers (decision 109)
+- [x] **« L'équipe type » — a pitch that names the best (or worst) seven for one chosen criterion**, at
+      `/stats/equipe-type`. Buts, passes, notes and invincibilité, all as rates, each figure shrunk
+      toward the squad by a **measured** amount rather than gated behind a minimum number of matches —
+      so a one-rating 9,0 ranks below a twelve-rating 7,4, a player with no data lands exactly on the
+      squad mean and heads neither ranking, and nobody appears or vanishes at a threshold. Positions
+      are an exact assignment, not a greedy pass, and the objective is stated on screen. Tapping a disc
+      swaps a player and the heading stops claiming to be the best seven (decision 115)
+- [ ] **Minutes by position, so « meilleur milieu droit » becomes a measurement.** There is exactly
+      one positional figure anywhere in the database — `match_player_stats.gkMinutes` — and the
+      reducer's `positionSpells` are in-memory match state that the freeze path never writes down. So
+      every screen that talks about a post can only mean what a player has *declared* in
+      `player_positions`, and « l'équipe type » says so out loud rather than implying a measurement
+      that does not exist (decision 115). What would change that: a `minutes_by_position` table
+      written at the final whistle from `positionSpells`, plus a backfill by replaying the log. A
+      migration, a change to the freeze path and a backfill — worth doing, not worth smuggling into
+      the screen that revealed it
+- [ ] **Save an « équipe type » as a real composition.** The obvious next ask after the pitch exists,
+      and a genuinely different feature: it writes `compositions` rows, so it has to respect invariant
+      3 — a composition is never applied automatically, the coach confirms it
 - [x] The pre-fill notice names its source without stuttering: « Équipe reprise de la composition de
       départ », not « de la composition « composition de départ » ». `planSourcePhraseFr`, and the
       test asserts the whole line (decision 106)

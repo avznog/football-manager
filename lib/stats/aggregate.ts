@@ -128,6 +128,19 @@ export type PlayerRating = {
   average: number | null;
   /** How many ratings the average is built on. */
   count: number;
+  /**
+   * Population variance of the same scores — how much the team disagreed about this player, or how
+   * much he varied from one Sunday to the next. Exposed because an average alone cannot be ranked
+   * fairly: `lib/stats/best-seven.ts` shrinks a thin average towards the team's mean, and the
+   * strength of that shrinkage is a ratio of within-player spread to between-player spread. Without
+   * this field the ranking would have to re-read the ratings, and decision 021's gate would have to
+   * be trusted a second time in a second place.
+   *
+   * Null below two scores (rule 1): one score has no spread, and `0` would claim perfect agreement
+   * where there is simply no second opinion. Genuinely `0` when every score is identical — that is
+   * a measurement, not a missing number.
+   */
+  variance: number | null;
 };
 
 export type PlayerAttendance = {
@@ -250,6 +263,24 @@ export function attendanceRate(present: number, marked: number): number | null {
 export function average(values: readonly number[]): number | null {
   if (values.length === 0) return null;
   return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+/**
+ * Mean squared deviation about the set's own mean — the **population** variance, dividing by `n`.
+ *
+ * `n` and not `n - 1`: these are not a sample of some larger pool of opinions about a player, they
+ * are every opinion that exists and that this viewer may read (decision 021). Bessel's correction
+ * estimates a population from a sample; there is no population beyond the scores themselves, so
+ * correcting for one would inflate the spread of exactly the thin sets — two or three ratings — that
+ * the shrinkage it feeds exists to distrust.
+ *
+ * Null under two values (rule 1): a single score has no spread to measure, and `0` there would read
+ * as unanimity. Zero for identical scores, which is the real answer.
+ */
+export function variance(values: readonly number[]): number | null {
+  if (values.length < 2) return null;
+  const mean = values.reduce((total, value) => total + value, 0) / values.length;
+  return values.reduce((total, value) => total + (value - mean) ** 2, 0) / values.length;
 }
 
 export function resultOf(score: MatchScore): "win" | "draw" | "loss" {
@@ -420,7 +451,11 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
         concededWhileGk: acc.concededWhileGk,
         cleanMinutes: acc.cleanMinutes,
         concededWhileOn: acc.concededWhileOn,
-        rating: { average: average(acc.ratings), count: acc.ratings.length },
+        rating: {
+          average: average(acc.ratings),
+          count: acc.ratings.length,
+          variance: variance(acc.ratings),
+        },
         attendance: {
           present: acc.present,
           marked: acc.marked,

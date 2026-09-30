@@ -2516,3 +2516,57 @@ creates the Neon `preview` branch and points Vercel's production branch away fro
 Still owed from before: the super admin password is the literal placeholder `choisis-en-un-vrai`, the
 Neon `neondb_owner` password has been in a transcript and wants rotating, and `docs/DEPLOY.md` §6
 wants a real phone outside in daylight.
+
+## L'équipe type, and a prior strength nobody had to choose
+
+**2026-09-30** · `feat/best-seven`
+
+The owner asked for a pitch in the statistics section naming the best possible seven for a chosen
+measure, the worst by the same measures, positions respected, and the team figure recomputing when a
+player is swapped live. Then, asked how to handle a player with one rating, he refused every option
+offered and answered that the figures should be **weighted by matches played**, leaving the statistics
+to be designed. That answer is the whole shape of this slice.
+
+The design is empirical-Bayes shrinkage, and the part worth remembering is that **the prior strength is
+measured rather than chosen**: within-player noise over between-player spread, by method of moments,
+clamped per criterion and printed on screen — « à hauteur de 2 notes ». A uniform squad gets a sceptical
+screen, a squad with real gulfs gets a trusting one, and when the spread is not measurable at all the
+sentence carries no digit, because an unmeasured number printed as measured is the same lie with a
+decimal point. Three properties then come out of the arithmetic instead of a `null` branch: no-data
+lands exactly on the squad mean and heads neither ranking, the worst seven is protected from the man who
+played twenty minutes, and nothing jumps as a threshold is crossed. Positions are an exact bitmask
+assignment, not a greedy pass — greediest-first is wrong the moment two slots want the same man — and
+the tests assert the greedy answer is *worse* rather than just asserting a number.
+
+**Inventorying before designing changed the feature three times**, which is the argument for doing it in
+that order. There are no per-post minutes anywhere: `gkMinutes` is the only positional figure in the
+database and the reducer's `positionSpells` never reach the freeze path, so a post can only mean what a
+player declared, and the card says so. A ratings seven is viewer-relative and not optionally — decision
+021's gate means two teammates see two different sevens. And « invincibilité » already named two figures
+(decision 011), which turned out to need two *fitted models*, not one scoring rule: shrinking a keeper
+toward an all-pitch mean would mix two populations, so keepers are only compared with keepers. None of
+the three would have been found by writing the screen first. No migration and no new table: the only
+new query counts which formation the team has actually played.
+
+**Measuring at 390 px found five defects a green suite could not.** The keeper's caption was clipped
+14 px by the pitch's own `overflow-hidden`; moving it above the disc overlapped the centre-back's by
+18 px, because those two share the 500‰ column — his figures sit beside him now. Every raw caption
+truncated on assists, needing 120 px in 96. Under « La pire équipe » the explanatory sentence still read
+« qui est le meilleur sur le critère choisi », the screen saying the opposite of the seven above it. And
+**one real touch tap silently swapped two players**: the picker opened on `pointerup` and the
+synthesised `click` landed on the sheet's first row.
+
+Also landed, from two sessions' worth of the same accident: `.prettierrc` and `.prettierignore`.
+Prettier has now twice reformatted the whole of `docs/DECISIONS.md` — `*emphasis*` to `_emphasis_` on
+every line, a blank line before every `---`, several hundred lines burying the paragraph actually added
+— and both times the file had to be rebuilt from `HEAD` by hand. The config pins 100 columns and ignores
+Markdown outright, while saying at length what it deliberately does **not** do: 106 of 274 source files
+differ from what Prettier would emit, so this repository is hand-formatted and `--check` is not a gate.
+
+**Next:** Part 2 of the approved plan, the preview/production split, still blocked on the owner creating
+the Neon `preview` branch and pointing Vercel's production branch away from `main`. Owed from before and
+still owed: the super admin password is the literal placeholder `choisis-en-un-vrai`, the Neon
+`neondb_owner` password has been in a transcript and wants rotating, and `docs/DEPLOY.md` §6 wants a real
+phone outside in daylight. The natural follow-up to this slice is on the roadmap rather than half-built:
+per-post minutes, which would make « meilleur milieu droit » a measurement, and saving a seven as a real
+composition.
