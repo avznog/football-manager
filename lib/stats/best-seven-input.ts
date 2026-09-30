@@ -33,13 +33,20 @@ import type { PlayerSeasonStats } from "./aggregate";
 import type { BestSevenCandidate, BestSevenSlot, PositionDeclaration } from "./best-seven";
 
 /**
- * One member's declared posts, in the shape `getSquad` already returns (`lib/team/queries.ts`:
- * `membershipId`, `isPlayer`, `positions`). Restated structurally rather than importing
+ * One member's identity and declared posts, in the shape `getSquad` already returns
+ * (`lib/team/queries.ts`: `membershipId`, `displayName`, `jerseyNumber`, `isPlayer`, `positions`).
+ * Restated structurally rather than importing
  * `SquadMember`, so a test can write a squad in three lines and so this module never depends on a
  * `"server-only"` one.
  */
 export type DeclaredPositions = {
   membershipId: string;
+  /**
+   * Who he is, from the squad row. The season row carries the same name — both read `users` — but only
+   * the squad is guaranteed to have a row here at all, which is why identity comes from this side.
+   */
+  displayName: string;
+  jerseyNumber: number | null;
   isPlayer: boolean;
   positions: readonly { code: string; preference: PositionDeclaration }[];
 };
@@ -108,8 +115,16 @@ export function toBestSevenSquad(
       const figures = season ?? NO_SEASON;
       return {
         id: member.membershipId,
-        displayName: season?.displayName ?? "",
-        jerseyNumber: season?.jerseyNumber ?? null,
+        /**
+         * **Identity from the squad row, figures from the season row.**
+         *
+         * It used to be `season?.displayName ?? ""`, and an empty string is not a fallback: a squad
+         * member missing from `getSeasonStats().players` would have drawn a nameless disc on the pitch
+         * and a nameless row in the picker, which is a worse answer than the name the squad row was
+         * already holding. The join is what may be missing; who he is never is.
+         */
+        displayName: member.displayName,
+        jerseyNumber: member.jerseyNumber,
         minutes: figures.minutes,
         goals: figures.goals,
         assists: figures.assists,

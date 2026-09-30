@@ -33,7 +33,7 @@ import { Badge, Button, Sheet, cn } from "@/components/ui";
 import { OptionRow } from "@/components/action-sheet";
 import { positionLabelFr } from "@/db/reference";
 import type { BestSevenCriterion, ObservedFigure, SlotFit } from "@/lib/stats/best-seven";
-import { aggregateSeven } from "@/lib/stats/best-seven";
+import { aggregateSeven, hasOwnExposure } from "@/lib/stats/best-seven";
 import {
   OUT_OF_POSITION_BADGE_FR,
   aggregationLabelFr,
@@ -71,7 +71,12 @@ export type SevenCandidateView = {
 /** One cell of `SquadEvaluation`, narrowed to what a disc prints. */
 export type SevenCell = {
   fit: SlotFit;
-  adjusted: number;
+  /**
+   * Null when the model behind this slot has no squad mean at all: there is then no basis for a figure
+   * here, and every place that prints it prints « — » (`NO_VALUE_FR`). Never `0` — on a 0–10 scale a
+   * zero is the worst mark there is, printed under seven names nobody measured.
+   */
+  adjusted: number | null;
   observed: ObservedFigure;
 };
 
@@ -87,8 +92,6 @@ export type SevenPitchProps = {
   optimumBySlot: Readonly<Record<string, string | null>>;
   /** `bestSeven().aggregate` — the figure « Ton équipe » is compared against after a swap. */
   optimumAggregate: number | null;
-  /** False when nobody has any exposure: the figures are all the squad mean, and the page says so. */
-  hasBasis: boolean;
   kit: KitColors;
 };
 
@@ -105,7 +108,6 @@ export function SevenPitch({
   cells,
   optimumBySlot,
   optimumAggregate,
-  hasBasis,
   kit,
 }: SevenPitchProps) {
   const [assignment, setAssignment] = useState<Record<string, string | null>>(
@@ -143,16 +145,22 @@ export function SevenPitch({
    */
   const touched = slots.some((slot) => assignment[slot.slotId] !== optimumBySlot[slot.slotId]);
 
+  /**
+   * The figures of the **filled** slots, in slot order, nulls kept.
+   *
+   * An empty slot contributes nothing at all — there is no man in it, so there is nothing to total.
+   * A filled slot whose figure is null is the opposite: a disc under a name, with no basis for a
+   * number. Keeping that null is what lets `aggregateSeven` refuse to total the others (rule 1b), so
+   * the team figure reads « — » instead of a sum over five discs presented as a sum over seven.
+   */
   const values = slots
-    .map((slot) => {
-      const chosen = assignment[slot.slotId];
-      return chosen ? (cellFor(slot.slotId, chosen)?.adjusted ?? null) : null;
-    })
-    .filter((value): value is number => value !== null);
+    .filter((slot) => assignment[slot.slotId] != null)
+    .map((slot) => cellFor(slot.slotId, assignment[slot.slotId] as string)?.adjusted ?? null);
 
-  // Null rather than 0 when there is no basis at all: a figure nobody has is not a zero
-  // (`aggregate.ts`, rule 1), and `bestSeven` applies the same gate to its own aggregate.
-  const aggregate = hasBasis ? aggregateSeven(values, criterion) : null;
+  // No second gate here on purpose: `adjusted` is null exactly when the model behind that slot has no
+  // squad mean, so the nulls already carry `hasBasis` — per model, which is more than a single flag
+  // could say now that `cleanSheet` reads two of them (decision 011).
+  const aggregate = aggregateSeven(values, criterion);
 
   // The turf's live rectangle is what turns a finger into a pitch point, so the hook takes the
   // caller's ref rather than owning one (see its header).
@@ -240,7 +248,9 @@ export function SevenPitch({
           {sevenHeadingFr(direction, touched)}
         </h2>
         <p className="text-sm text-ink-muted">
-          {aggregationLabelFr(aggregation)} ·{" "}
+          {/* `values.length`, not seven: a squad short of men fills fewer slots, and « Total des
+              sept » over five discs is a claim about a team that never took the field. */}
+          {aggregationLabelFr(aggregation, values.length)} ·{" "}
           <span className="font-semibold text-ink tabular-nums">
             {formatCriterionValue(criterion, aggregate)}
           </span>
@@ -285,12 +295,24 @@ export function SevenPitch({
                 {...gesture.handlers}
                 onClick={(event) => {
                   // `detail === 0` is a click with no pointer behind it: Enter or Space on the focused
-                  // disc, which produces no `pointerup` and therefore no `onTap` to have set this.
-                  const target = pendingSlotId.current ?? (event.detail === 0 ? slot.id : null);
+                  // disc, which produces no `pointerup` and therefore no `onTap` to have set this. It
+                  // must also **discard** whatever a pointer left behind, because a `pointerup` whose
+                  // `click` the browser never synthesised — a tap the page turned into a scroll —
+                  // leaves the ref pointing at another slot, and a keyboard activation here would then
+                  // open that one's picker instead of this one's.
+                  const target = event.detail === 0 ? slot.id : pendingSlotId.current;
                   pendingSlotId.current = null;
                   if (target !== null) setOpenSlotId(target);
                 }}
-                aria-label={`${positionLabelFr(slot.positionCode)} — changer de joueur`}
+                /**
+                 * **No `aria-label` here.** One replaced the whole button's contents, so a screen
+                 * reader heard « Milieu central — changer de joueur » twice on a 1-3-2-1 and never
+                 * heard who was in the slot or what his figure was — on a screen whose only subject is
+                 * who is in the slot and what his figure is. The name is therefore computed from the
+                 * contents: the disc's own « Karim, numéro 8, milieu central », then the figures, then
+                 * the action. That also satisfies WCAG 2.5.3 by construction — every visible word on
+                 * the control is in its accessible name, because the name *is* the visible words.
+                 */
                 className={cn(
                   "flex touch-none flex-col items-center gap-0.5 rounded-lg",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
@@ -299,6 +321,11 @@ export function SevenPitch({
               >
                 {content}
                 {cell ? <DiscFigures criterion={criterion} cell={cell} /> : null}
+                {/* Said last, because it is the only part that is not a fact about the slot. An empty
+                    slot has nobody to change, so it is worded for what the tap will do there. */}
+                <span className="sr-only">
+                  {slot.player === null ? "choisir un joueur" : "changer de joueur"}
+                </span>
               </button>
             );
           }}
@@ -366,7 +393,8 @@ export function SevenPitch({
 /* -------------------------------------------------------------------------- */
 
 /**
- * The ranked figure and the raw one, under the disc, always both.
+ * The ranked figure and the raw one, under the disc, always both — and when the ranked figure is not
+ * his, the disc says so rather than leaving it to the paragraph under the pitch.
  *
  * This is the answer to the obvious objection — « 7,0 is not his average » — and it cannot be a
  * tooltip, because there is no hover on a phone (decision 072). The chip is capped at 104 px, which is
@@ -389,6 +417,20 @@ function DiscFigures({
   cell: SevenCell;
 }) {
   const raw = observedFigureCompactFr(criterion, cell.observed);
+  /**
+   * He has no exposure of his own, so the figure above is the **squad's**, printed under his name
+   * (rule 2 of `best-seven.ts`: `n = 0` lands him exactly on the mean).
+   *
+   * That has to be on the disc, not only in a paragraph below the pitch: rule 2 of `aggregate.ts` is
+   * that no figure is printed without its denominator, and this one has none at all — the raw line is
+   * absent for exactly these discs. Measured on the demo season, two of the seven « 0,30/h » discs of
+   * `?critere=goals` in the championship were this, contributing 24 % of the total out of nothing,
+   * and the only way to find out was to open the picker sheet.
+   *
+   * `adjusted === null` is the other case and not this one: then there is no figure at all, his or
+   * anybody's, and « moyenne de l'équipe » would name an average that does not exist.
+   */
+  const standsInForSquadMean = cell.adjusted !== null && !hasOwnExposure(cell.observed);
   return (
     <span className="flex max-w-26 flex-col items-center leading-tight">
       <span className="rounded-full bg-surface/90 px-1.5 text-[0.6875rem] font-bold text-ink tabular-nums">
@@ -397,6 +439,18 @@ function DiscFigures({
       {raw !== null ? (
         <span className="max-w-full truncate rounded-full bg-surface/80 px-1 text-[0.5625rem] font-medium text-ink-muted tabular-nums">
           {raw}
+        </span>
+      ) : null}
+      {standsInForSquadMean ? (
+        /* Two lines rather than one, measured at the 9 px the raw line is set in: « aucun chiffre :
+           moyenne de l'équipe » needs 154 px on one line and the caption budget is 104 px — the
+           width at which two neighbouring captions start printing over each other. Split, the wider
+           line is « moyenne de l'équipe » at 94 px. Same `text-ink-muted` as the raw line it replaces,
+           so the contrast stays the pair already measured on the turf rather than a new token. The
+           colon is what makes the two lines read as one sentence aloud. */
+        <span className="flex max-w-full flex-col items-center rounded-full bg-surface/80 px-1 text-[0.5625rem] font-medium text-ink-muted">
+          <span className="max-w-full truncate">aucun chiffre :</span>
+          <span className="max-w-full truncate">moyenne de l’équipe</span>
         </span>
       ) : null}
       {cell.fit === "none" ? (
@@ -459,13 +513,19 @@ function SlotList({
                 {positionLabelFr(slot.positionCode)}
               </span>
             </span>
-            <span className="shrink-0 text-right text-xs text-ink-muted tabular-nums">
+            <span className="max-w-28 shrink-0 text-right text-xs text-ink-muted">
               {cell ? (
                 <>
-                  <span className="block text-sm font-semibold text-ink">
+                  <span className="block text-sm font-semibold text-ink tabular-nums">
                     {formatCriterionValue(criterion, cell.adjusted)}
                   </span>
-                  {raw !== null ? <span className="block">{raw}</span> : null}
+                  {raw !== null ? <span className="block tabular-nums">{raw}</span> : null}
+                  {/* The same fact as the disc's two-line caption, in full: this is the row that never
+                      abbreviates. `tabular-nums` deliberately not inherited here — it is a sentence,
+                      not a figure. */}
+                  {cell.adjusted !== null && !hasOwnExposure(cell.observed) ? (
+                    <span className="block">aucun chiffre : moyenne de l’équipe</span>
+                  ) : null}
                 </>
               ) : null}
             </span>

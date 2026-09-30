@@ -34,7 +34,7 @@ import { Card, EmptyState } from "@/components/ui";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { competitionLabelOf, statsFilterOptions } from "@/lib/competition/options";
 import { getTeamCompetitions } from "@/lib/competition/queries";
-import { bestSeven, evaluateSquad } from "@/lib/stats/best-seven";
+import { bestSeven, evaluateSquad, hasOwnExposure } from "@/lib/stats/best-seven";
 import {
   CRITERION_CHIP_FR,
   CRITERION_PARAM,
@@ -55,6 +55,7 @@ import {
   parseCriterion,
   parseDirection,
   shrinkageSentenceFr,
+  squadMeanStandInFr,
   viewerRelativeRatingsFr,
   type BestSevenQuery,
 } from "@/lib/stats/best-seven-copy";
@@ -96,9 +97,21 @@ export default async function EquipeTypePage({
   // The override is only honoured if it names a shape this team has actually played: a chip is the
   // only way to set it, and a hand-typed id must not lay the seven out on a formation nobody uses.
   const requestedFormation = firstOf(params[FORMATION_PARAM]);
+  /**
+   * **Naming the most-played shape is not overriding it.** `formationOverrideFr` ends « Ce n'est pas la
+   * forme que l'équipe a le plus jouée », which was printed about the very shape the chip row had just
+   * labelled « (la plus jouée) »: two chips, identical layout, contradictory captions. The chip for it
+   * is gone from `SevenControls`, but a bookmark or a hand-typed `?formation=` can still carry that id,
+   * so the request is resolved to null here — one place, rather than a special case in the sentence, in
+   * the chip's `active` test and in `equipeTypeHref` separately. The shape drawn is identical either
+   * way: `override ?? usage.mostUsed`.
+   */
   const override =
     usage.formations.find(
-      (formation) => formation.formationId === requestedFormation && formation.matches > 0,
+      (formation) =>
+        formation.formationId === requestedFormation &&
+        formation.matches > 0 &&
+        formation.formationId !== usage.mostUsed?.formationId,
     ) ?? null;
 
   const query: BestSevenQuery = {
@@ -116,7 +129,7 @@ export default async function EquipeTypePage({
       query={query}
       competitions={competitions}
       formations={usage.formations.filter((formation) => formation.matches > 0)}
-      mostUsedLabel={usage.mostUsed?.label ?? null}
+      mostUsed={usage.mostUsed}
     />
   );
 
@@ -124,13 +137,16 @@ export default async function EquipeTypePage({
     <div className="space-y-6">
       <header className="space-y-3">
         <div>
+          {/* `min-h-11` and `inline-flex`, the same back link as every other `/match/[id]`-style
+              screen: at `text-xs` alone it measured 81 × 17 px, which is a target no thumb hits at
+              390 px. Nothing invented here — the class list is the one eleven other headers use. */}
           <Link
             href={`/stats${competitionId === null ? "" : `?${COMPETITION_PARAM}=${competitionId}`}`}
-            className="text-xs font-medium text-ink-muted hover:text-ink"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             ← Statistiques
           </Link>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-ink">L’équipe type</h1>
+          <h1 className="text-xl font-bold tracking-tight text-ink">L’équipe type</h1>
           <p className="mt-0.5 text-sm text-ink-muted">
             {CRITERION_CHIP_FR[query.criterion]} · saison en cours, {scopeLabel} ·{" "}
             {matchCount(stats.matchesConsidered)} terminé
@@ -251,6 +267,14 @@ function Body({
   for (const pick of result.picks) optimumBySlot[pick.slotId] = pick.player?.id ?? null;
 
   const emptySlots = result.picks.filter((pick) => pick.player === null).length;
+  /**
+   * Picks whose figure is the squad's rather than their own (rule 2: no exposure lands exactly on the
+   * mean). Counted on the picks and not on the squad: a man with nothing to his name only misleads the
+   * reader if he is actually *on* the pitch, and the discs say so one by one.
+   */
+  const squadMeanStandIns = result.picks.filter(
+    (pick) => pick.player !== null && pick.adjusted !== null && !hasOwnExposure(pick.observed),
+  ).length;
 
   const notes = [
     // 1 — the posts are declarations. First, because it is the sentence that changes what the whole
@@ -264,6 +288,9 @@ function Body({
     // none to print.
     shrinkageSentenceFr(query.criterion, result.shrinkage),
     goalkeeperShrinkageSentenceFr(query.criterion, result.goalkeeperShrinkage),
+    // 3b — and how many of the seven figures are the squad's own, worn by somebody who has none. Each
+    // such disc also says it on its face: this paragraph is the count, not the only statement.
+    squadMeanStandInFr(squadMeanStandIns),
     // 4 — which invincibilité. `cleanSheetReadingsFr` is null on the other three criteria.
     cleanSheetReadingsFr(query.criterion),
     // And the facts about the shape and the squad the seven was drawn from.
@@ -277,7 +304,21 @@ function Body({
     matchesWithoutCompositionFr(usage.matchesWithoutComposition),
     excludedFromSquadFr({ departedWithData, nonPlayers }),
     emptySlotsFr(emptySlots),
-    result.hasBasis ? null : noBasisFr(query.criterion),
+    /**
+     * « Personne n'a encore de chiffre » — and it has to be true of **both** models before it is
+     * printed, now that `hasBasis` is the all-pitch one alone. On `cleanSheet` a season whose only
+     * recorded minutes are a keeper's has `hasBasis === false` and a GB disc showing a real figure, so
+     * keying on `hasBasis` alone would print « personne » under a number (decision 011's two readings
+     * again). `goalkeeperHasBasis` is `null` on the three criteria that have no second model, which
+     * means « not applicable » and never « false ».
+     *
+     * The opposite case — field figures, no keeper minutes anywhere, reachable whenever a match was run
+     * in game mode without a confirmed composition — is already stated by
+     * `goalkeeperShrinkageSentenceFr`, whose `noData` branch names that exact cause.
+     */
+    result.hasBasis || result.goalkeeperHasBasis === true
+      ? null
+      : noBasisFr(query.criterion),
   ].filter((note): note is string => note !== null);
 
   return (
@@ -301,7 +342,6 @@ function Body({
         cells={cells}
         optimumBySlot={optimumBySlot}
         optimumAggregate={result.aggregate}
-        hasBasis={result.hasBasis}
         kit={kit}
       />
 
@@ -317,20 +357,21 @@ function Body({
         ))}
       </Card>
 
-      <p className="text-xs text-ink-subtle">
-        <Link
-          href={equipeTypeHref({
-            ...query,
-            direction: query.direction === "best" ? "worst" : "best",
-          })}
-          scroll={false}
-          className="font-medium text-ink-muted underline hover:text-ink"
-        >
-          {query.direction === "best"
-            ? "Et la pire équipe, sur le même critère ?"
-            : "Et la meilleure équipe, sur le même critère ?"}
-        </Link>
-      </p>
+      {/* The link that flips the whole screen, and therefore a primary action rather than a footnote:
+          at `text-xs` in a paragraph it measured 215 × 17 px. Sized like every other link-shaped action
+          in the app — `inline-flex min-h-11 items-center`, `text-accent`, underline on hover. */}
+      <Link
+        href={equipeTypeHref({
+          ...query,
+          direction: query.direction === "best" ? "worst" : "best",
+        })}
+        scroll={false}
+        className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        {query.direction === "best"
+          ? "Et la pire équipe, sur le même critère ?"
+          : "Et la meilleure équipe, sur le même critère ?"}
+      </Link>
     </>
   );
 }

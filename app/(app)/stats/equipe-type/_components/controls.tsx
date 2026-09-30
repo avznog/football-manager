@@ -79,7 +79,7 @@ export function SevenControls({
   query,
   competitions,
   formations,
-  mostUsedLabel,
+  mostUsed,
 }: {
   query: BestSevenQuery;
   competitions: readonly CompetitionOption[];
@@ -89,9 +89,24 @@ export function SevenControls({
    * on a formation this team does not use.
    */
   formations: readonly { formationId: string; label: string }[];
-  /** The shape chosen when nothing overrides it, named on the « Forme la plus jouée » chip. */
-  mostUsedLabel: string | null;
+  /**
+   * The shape chosen when nothing overrides it, named on the first chip of the row. Its **id** matters
+   * as much as its label: it is how the row avoids offering the same shape twice (see below).
+   */
+  mostUsed: { formationId: string; label: string } | null;
 }) {
+  /**
+   * The most-played shape is named once, by the first chip, and is **not repeated** in the list.
+   *
+   * It used to be in both, and the two chips then said opposite things about the same formation: the
+   * first was labelled « 1-3-2-1 (la plus jouée) », and tapping the second set `formation=` in the URL,
+   * which made the card under the pitch print « 1-3-2-1, choisie par toi. Ce n'est pas la forme que
+   * l'équipe a le plus jouée. » Two chips, identical layout, contradictory captions — decision 087's
+   * defect exactly, and unfixable by wording alone because both chips lead to the same seven.
+   */
+  const others = formations.filter(
+    (formation) => formation.formationId !== mostUsed?.formationId,
+  );
   return (
     <div className="space-y-2">
       {/* One criterion at a time, on purpose: a seven that mixed goals and notes would be ranked on
@@ -123,15 +138,15 @@ export function SevenControls({
         ))}
       </ChipRow>
 
-      {formations.length > 1 ? (
+      {others.length > 0 ? (
         <ChipRow label="Choisir la forme">
           <Chip
             href={equipeTypeHref({ ...query, formationId: null })}
             active={query.formationId === null}
           >
-            {mostUsedLabel === null ? "Forme la plus jouée" : `${mostUsedLabel} (la plus jouée)`}
+            {mostUsed === null ? "Forme la plus jouée" : `${mostUsed.label} (la plus jouée)`}
           </Chip>
-          {formations.map((formation) => (
+          {others.map((formation) => (
             <Chip
               key={formation.formationId}
               href={equipeTypeHref({ ...query, formationId: formation.formationId })}

@@ -53,6 +53,8 @@ function seasonRow(overrides: Partial<PlayerSeasonStats> = {}): PlayerSeasonStat
 function member(overrides: Partial<DeclaredPositions> = {}): DeclaredPositions {
   return {
     membershipId: "m1",
+    displayName: "Karim",
+    jerseyNumber: 9,
     isPlayer: true,
     positions: [{ code: "AT", preference: "primary" }],
     ...overrides,
@@ -224,13 +226,29 @@ describe("toBestSevenSquad", () => {
   it("keeps the squad's order, and takes identity from the squad rather than the season", () => {
     const { candidates } = toBestSevenSquad(
       [seasonRow({ teamMemberId: "b", displayName: "Momo", jerseyNumber: 4 })],
-      [member({ membershipId: "a" }), member({ membershipId: "b" })],
+      [
+        member({ membershipId: "a", displayName: "Alex", jerseyNumber: 7 }),
+        member({ membershipId: "b", displayName: "Momo", jerseyNumber: 4 }),
+      ],
     );
 
     expect(candidates.map((candidate) => candidate.id)).toEqual(["a", "b"]);
-    // No season row: no name and no shirt to print, and inventing either would be a claim.
-    expect(candidates[0]).toMatchObject({ displayName: "", jerseyNumber: null });
+    // No season row for « a », and that must not cost him his name: the join is what is missing, not
+    // his identity. `displayName: ""` drew a nameless disc on the pitch and a nameless picker row.
+    expect(candidates[0]).toMatchObject({ displayName: "Alex", jerseyNumber: 7 });
     expect(candidates[1]).toMatchObject({ displayName: "Momo", jerseyNumber: 4 });
+  });
+
+  it("never prefers the season row's identity over the squad's", () => {
+    // Both come from `users`, so they agree in production — but only the squad row is certain to
+    // exist, so it is the one this adapter reads. Pinned because « they agree anyway » is exactly the
+    // reasoning that made the empty string look harmless.
+    const { candidates } = toBestSevenSquad(
+      [seasonRow({ teamMemberId: "m1", displayName: "périmé", jerseyNumber: 99 })],
+      [member({ displayName: "Karim", jerseyNumber: 8 })],
+    );
+
+    expect(candidates[0]).toMatchObject({ displayName: "Karim", jerseyNumber: 8 });
   });
 });
 
