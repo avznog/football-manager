@@ -15,6 +15,7 @@ import {
   comparePlayers,
   resultOf,
   sortPlayers,
+  variance,
 } from "./aggregate";
 
 /* -------------------------------------------------------------------------- */
@@ -109,6 +110,24 @@ describe("average", () => {
   });
 });
 
+describe("variance", () => {
+  it("is null below two values, where there is no spread to measure", () => {
+    expect(variance([])).toBeNull();
+    expect(variance([7])).toBeNull();
+  });
+
+  it("is zero for identical scores — a measurement, not a missing number", () => {
+    expect(variance([6, 6, 6])).toBe(0);
+    expect(variance([0, 0])).toBe(0);
+  });
+
+  it("divides by n, not by n - 1", () => {
+    // Mean 7; deviations -2, 0, +2; squares 4, 0, 4 → 8 / 3. A sample variance would say 4.
+    expect(variance([5, 7, 9])).toBeCloseTo(8 / 3, 12);
+    expect(variance([6, 8])).toBe(1);
+  });
+});
+
 describe("resultOf", () => {
   it("reads the score from our point of view", () => {
     expect(resultOf({ goalsFor: 3, goalsAgainst: 2 })).toBe("win");
@@ -135,7 +154,7 @@ describe("an empty season", () => {
     // but every derived number is null, not zero.
     const hugo = playerNamed(stats.players, "hugo");
     expect(hugo.hasData).toBe(false);
-    expect(hugo.rating).toEqual({ average: null, count: 0 });
+    expect(hugo.rating).toEqual({ average: null, count: 0, variance: null });
     expect(hugo.attendance).toEqual({ present: 0, marked: 0, rate: null });
   });
 
@@ -322,8 +341,17 @@ describe("ratings", () => {
         { matchId: "m2", ratedMemberId: "julien", score: 6 },
       ],
     });
-    expect(playerNamed(stats.players, "julien").rating).toEqual({ average: 7, count: 3 });
-    expect(playerNamed(stats.players, "karim").rating).toEqual({ average: null, count: 0 });
+    expect(playerNamed(stats.players, "julien").rating).toEqual({
+      average: 7,
+      count: 3,
+      // Mean 7; deviations 0, +1, -1 → 2 / 3.
+      variance: 2 / 3,
+    });
+    expect(playerNamed(stats.players, "karim").rating).toEqual({
+      average: null,
+      count: 0,
+      variance: null,
+    });
   });
 
   it("ignores a rating attached to a match outside the filter", () => {
@@ -333,6 +361,28 @@ describe("ratings", () => {
       ratings: [{ matchId: "m2", ratedMemberId: "julien", score: 9 }],
     });
     expect(playerNamed(stats.players, "julien").rating.count).toBe(0);
+  });
+
+  it("measures the spread over the ratings the viewer may see, and no others", () => {
+    // `queries.ts` never reads a score from a gated match (decision 021), so a hidden rating simply
+    // is not in this input. What must not happen is the *matches* filter leaking into the spread:
+    // m2's 2 is dropped here, and a variance that still counted it would be 8 rather than 0.
+    const stats = season({
+      members,
+      matches: [match("m1")],
+      ratings: [
+        { matchId: "m1", ratedMemberId: "julien", score: 8 },
+        { matchId: "m1", ratedMemberId: "julien", score: 8 },
+        { matchId: "m2", ratedMemberId: "julien", score: 2 },
+      ],
+      hiddenRatingMatches: 1,
+    });
+
+    expect(playerNamed(stats.players, "julien").rating).toEqual({
+      average: 8,
+      count: 2,
+      variance: 0,
+    });
   });
 
   it(`keeps a thin average out of the leaderboard but not out of the table (${MIN_RATINGS} minimum)`, () => {
@@ -348,7 +398,11 @@ describe("ratings", () => {
       ],
     });
 
-    expect(playerNamed(stats.players, "karim").rating).toEqual({ average: 10, count: 1 });
+    expect(playerNamed(stats.players, "karim").rating).toEqual({
+      average: 10,
+      count: 1,
+      variance: null,
+    });
     expect(stats.topRated.map((entry) => entry.teamMemberId)).toEqual(["julien"]);
     expect(stats.topRated[0]).toMatchObject({ value: 6, count: 3 });
   });
@@ -503,7 +557,7 @@ describe("a competition filter that excludes somebody's only match", () => {
     expect(yanis.goals).toBe(0);
     expect(yanis.gkMinutes).toBe(0);
     expect(yanis.appearances.selected).toBe(0);
-    expect(yanis.rating).toEqual({ average: null, count: 0 });
+    expect(yanis.rating).toEqual({ average: null, count: 0, variance: null });
     expect(yanis.hasData).toBe(false);
   });
 
