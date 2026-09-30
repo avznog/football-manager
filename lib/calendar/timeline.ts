@@ -126,6 +126,23 @@ export function isLiveEvent(event: TimelineItem): boolean {
   return event.kind === "match" && event.status === "live";
 }
 
+/**
+ * `true` once a match is over — such an event is **always** history, whatever the clock says.
+ *
+ * The mirror image of `isLiveEvent`, and the reason it exists is decision 121: the coach can now
+ * declare a match over at any moment, including before its own kick-off, so `endsAt` on its own is
+ * no longer a safe answer to « has this happened ». A match dated next Sunday and typed up today
+ * would otherwise sit under « À venir » with a « Je suis dispo » control while its own page says it
+ * is finished and `/stats` counts it in the season — one screen contradicting another, which is the
+ * whole family of defect the screen audits went looking for.
+ *
+ * It also settles a case that predates the feature: a match that ends early — a forfeit, a 2×25
+ * agreed on the pitch — used to linger under « À venir » until its scheduled `endsAt`.
+ */
+export function isFinishedEvent(event: TimelineItem): boolean {
+  return event.kind === "match" && event.status === "finished";
+}
+
 /* -------------------------------------------------------------------------- */
 /* Chronology                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -151,14 +168,19 @@ export function byStartAscending(a: TimelineItem, b: TimelineItem): number {
 /** Started, not finished: the event that is happening right now. */
 export function isOngoing(item: TimelineItem, now: Date): boolean {
   if (isLiveEvent(item)) return true;
+  if (isFinishedEvent(item)) return false;
   const start = Date.parse(item.startsAt);
   const end = Date.parse(item.endsAt);
   return start <= now.getTime() && now.getTime() < end;
 }
 
-/** Over and done with — including its grace window. A live match is never past. */
+/**
+ * Over and done with — including its grace window. A live match is never past; a finished one
+ * always is, even if its kick-off has not come round yet.
+ */
 export function isPast(item: TimelineItem, now: Date): boolean {
   if (isLiveEvent(item)) return false;
+  if (isFinishedEvent(item)) return true;
   return Date.parse(item.endsAt) <= now.getTime();
 }
 
