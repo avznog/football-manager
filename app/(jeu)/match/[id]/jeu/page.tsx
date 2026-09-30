@@ -18,7 +18,6 @@
  */
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
@@ -57,28 +56,23 @@ export default async function GameModePage({ params }: PageProps<"/match/[id]/je
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        {/*
-         * The only `h1` in the app that is not drawn. Every pixel above the pitch is the clock and
-         * the score, on purpose — a title bar here would push the ACTION button down the screen, and
-         * a coach holding the phone at 0-0 in the 58th minute knows which match he is at. But the
-         * page still needs a name: an audit of every screen found this one and the composition
-         * editor were the only two with no level-one heading, so a screen reader landing here had
-         * nothing to announce. `sr-only` is the same answer the recap table and the squad rows give.
-         */}
-        <h1 className="sr-only">
-          Mode match · {matchNameFr(live.match.opponentName, live.match.isHome)}
-        </h1>
-        <Link
-          href={`/match/${live.match.id}`}
-          className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          ← {live.match.opponentName}
-        </Link>
-      </div>
+    <>
+      {/*
+       * The only `h1` in the app that is not drawn. Every pixel above the pitch is the clock and the
+       * score, on purpose — a title bar here would push the ACTION button down the screen, and a coach
+       * holding the phone at 0-0 in the 58th minute knows which match he is at. But the page still
+       * needs a name: an audit of every screen found this one and the composition editor were the only
+       * two with no level-one heading, so a screen reader landing here had nothing to announce.
+       * `sr-only` is the same answer the recap table and the squad rows give.
+       *
+       * The back link that used to sit beside it is now the first thing in `MatchBar`, which is where
+       * it can be the only way out of the screen.
+       */}
+      <h1 className="sr-only">
+        Mode match · {matchNameFr(live.match.opponentName, live.match.isHome)}
+      </h1>
 
       <GameMode live={live} canOperate={canOperate} />
-    </div>
+    </>
   );
 }

@@ -2900,3 +2900,160 @@ broken. This entry only removes the ocean.
 every function with its region in brackets; before this it read `[iad1]` five times. The honest
 measurement is the phone itself, which is where the report came from.
 
+## 112 — Game mode gets the whole phone, and its own route group
+
+**2026-09-30** · accepted
+
+The owner asked, about the one screen used standing on a touchline: _« quand j'arrive et que je scrolle
+en haut, le terrain doit être presque entièrement visible, là il est à peine visible »_. He was right,
+and the reason was measurable rather than aesthetic. At 393 × 852 the chrome above the pitch was: app
+header 59 px, `main` padding 16, back-link row 44, scoreboard ≈ 98, gap 16, and the « Sur le terrain »
+card header 68 — **≈ 325 px**. The pitch is drawn to a fixed 1080/1580 aspect ratio, so inside a `p-4`
+card inside `px-4` main it was 329 px wide and therefore 481 px tall, of which **318** fell in the
+clear band. On a real iPhone, where Safari's URL bar takes 50–90 px until the page scrolls, closer to 230.
+
+**Decision.** Game mode does not live in `AppShell`. `app/(app)/layout.tsx` wraps everything in it and
+a nested layout cannot remove a parent layout's chrome, so the route moved to a sibling group:
+`app/(jeu)/match/[id]/jeu/`. **Route groups do not affect the URL** — `/match/<id>/jeu` is unchanged,
+every link to it still works, and the e2e happy path is the proof. `app/(jeu)/layout.tsx` keeps
+`requireTeamContext()` verbatim, so invariant 5 is enforced exactly as before, and renders no header,
+no tab bar, no theme toggle and no skip link: there is no navigation to skip past, and the only way out
+is the back button in the screen's own top bar.
+
+What that bought, and what was spent to get it: the header (59) and the tab bar (56) are gone for free;
+the scoreboard card, the back-link row and the pitch card's header were **replaced** by one 56 px
+`MatchBar`, which prints the time and the live score. The venue badge and the phase line were each true
+and neither is read at 78′ — they are one tap away on the match page, which is where a reader who wants
+them already is. 325 px of chrome became 64. The pitch went from 481 px tall with 318 visible to 540 px
+tall against 715 available.
+
+**Three things were cut with them that had to come back, and the difference matters.** « Not read at
+78′ » is a fair reason to drop a badge. It is not a reason to drop something a reader cannot recover:
+
+- the old `Scoreboard` printed a visible caption « Nous – Courges » under the figures, and its own doc
+  comment said why — away from home « 0 – 2 » is a team two goals **up**, and the caption was the only
+  thing saying which way round the figures were meant. Replacing it with an `aria-label` told the one
+  reader who did not need telling. « Nous » is now a word on the score's own baseline, inside the row,
+  because a caption under the figures would cost the row the 56 px that are the whole of this entry;
+- « saisi après le match » came back for the same reason, and it is decisions 013 and 048 rather than a
+  preference: this screen prints the largest minute in the app, and on a log typed up afterwards the
+  badge is the one thing qualifying it. It sits in the hairline under the row, so it costs no height
+  when there is nothing to say;
+- the `aria-label`s meant to compensate were on a `<span>` and a `<p>`, and **ARIA 1.2 forbids a name on
+  `role=generic` and `role=paragraph`** — a conforming screen reader ignored both and read « 1 – 0 » and
+  nothing else. Both now carry `role="img"`, which is a role that takes a name.
+
+None of the three was caught by a test, and none would have been: they are a screen saying less than the
+truth, which is the class of defect this repository's definition of done singles out, and the reason a
+review reads the diff rather than the suite.
+
+**A fourth, from the move itself.** `notFound()` in game mode resolved to `app/(app)/not-found.tsx`,
+whose « la page n'existe pas, **ou elle est réservée aux coachs** » is deliberately ambiguous because
+`getLiveMatch` returns null both for a match that does not exist and for one belonging to another team.
+Outside that group it fell through to `app/not-found.tsx`, whose own comment records that its wording is
+false for exactly this case. Moving a route moves which `not-found.tsx` answers for it, so
+`app/(jeu)/not-found.tsx` is a sibling and not a duplicate — with no `<main>` of its own, because the
+group layout already renders one and two `main` landmarks is invalid HTML.
+
+**A second thing this closes, which was arithmetic and not a rendering glitch.** The owner reported a
+gap between the ACTION bar and the tab bar. The bar was pinned at
+`bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]` — 72 px — while `BottomNav` is `min-h-14`, 56.
+72 − 56 = **16 px of scrolling page showing through, at every inset**. With no tab bar to clear the bar
+sits at `bottom-0` and the gap has nowhere to be. The composition editor still carries its own copy of
+the same defect (`docs/ROADMAP.md`), and so do the three different numbers the app uses for the tab
+bar's height — `4.5rem` in two sticky docks, `4rem` in the `tabbar-pb` utility, `min-h-14` in the bar
+itself. Game mode stops depending on any of them; unifying them belongs to the screen that still does.
+
+**The cost, stated plainly.** There are now two application layouts with the same guard, and a change
+to what « signed-in member of a real team » means has to be made in both. That is a real duplication and
+it is the price of a route that is not in the shell. The alternative — a flag threaded through `AppShell`
+to hide itself — makes every other screen in the app pay attention to game mode, which is worse.
+
+## 113 — The log decides whether a match is over; `matches.status` is a cache of it
+
+**2026-09-30** · accepted
+
+The owner asked _« how is it possible that a match can be resumed (in the match mode) and at the same
+time, have the summary of the match »_. It needed no race to explain. The match page gated its
+« Après le match » card — « Voir le résumé », « Noter mes coéquipiers » — on `status !== "scheduled"`,
+and its « Mode match » card on anything but a finished match with no score. **For every ordinary
+in-progress match both were true**, so « Voir le résumé » sat directly above « Reprendre le mode
+match ». The recap only refused a `scheduled` match, so it then produced a man of the match, a minutes
+table and a result for an afternoon that was 0–0 in its 12th minute. The header did the same thing in
+one word: `resultLabel` printed « Victoire » beside a live 2–1.
+
+**Decision.** *Finished* is one fact with one test, and it is `status === "finished"`. Both gates use
+it, and the recap refuses anything else the way it already refused a scheduled match — an `EmptyState`
+saying « Le match n'est pas terminé » and a link to the one screen that can actually end it. « Has
+kicked off » is a different fact, and the only thing that should ever be gated on it is history: the
+availability grid below still reads `!== "scheduled"`, correctly, because « 11 réponses sur 13 » was
+true from the kick-off onwards.
+
+**Where `status` comes from, and what it therefore is.** `matches.status` is a stored column;
+`state.finished` is derived from a `FINAL_WHISTLE` in the log by `lib/match/reducer.ts` (invariant 2).
+The log is the source of truth and the column is a **cache of it**, maintained by `finalizeMatchById`.
+If that call fails after the event lands, the two disagree until someone opens game mode, which
+self-heals. So a screen may read `status` — it is cheap and it is nearly always right — but it must
+never read it *as a second opinion*: nothing in the app is allowed to decide « finished » one way in one
+place and another way in another.
+
+**What is not done here, deliberately.** The match page does not self-heal. It loads with `getMatch` +
+`getMatchScore`; `finalizeMatchById` calls `getLiveMatch`, which is seven queries, and paying that on
+every view of an unfinished match cuts straight across the latency work decision 111 started. The cheap
+version is one existence query — `hasFinalWhistle(matchId)`, the `hasMatchEvents` shape with
+`type = 'FINAL_WHISTLE'` and the same not-voided predicate — and it is on the roadmap. Until it exists,
+a match whose log holds a final whistle but whose column still says `live` badges « En cours » on the
+calendar and, now, hides « Voir le résumé » until somebody opens game mode once. That is a smaller lie
+than the one this entry removes, and it is written down rather than left to be discovered.
+
+## 114 — One comment, four tiles, and « Faute » no longer offered
+
+**2026-09-30** · accepted
+
+Every action game mode could record was a fact that moves a number: a goal moves the score, a
+substitution moves a player, a `POSITION_CHANGE` moves a shirt. Nothing could record the sentence that
+explains a scoreline three weeks later — « mur mal placé sur le coup franc », « l'arbitre a laissé
+jouer » — so the *reason* a match went the way it did lived nowhere at all.
+
+**`COMMENT`** is a free-text note of up to 280 characters and, optionally, the player it is about. It is
+inert by construction: both of the reducer's switches already end in `default: break;`, so it changes
+no score, no clock, no minutes and nothing on the pitch, and the reducer test proves that by comparing
+the entire state of a log reduced with and without it. The only reducer change it required is
+`note: string | null` on `TimelineEntry`, which had no field for free text and therefore no way to
+display one.
+
+It belongs in the recap, which is where a note written on a touchline is actually read three weeks
+later, and `HIDDEN_EVENT_TYPES` — `PAUSE`, `RESUME`, `VOID` — correctly does not hide it. **This entry
+first claimed it therefore appeared there automatically, and that was wrong.** The recap builds its
+timeline with its own `describeActors`, not the presenter's, and neither knew about `note`: the line
+rendered « 14’ · Commentaire » with an empty detail, so the 280 characters the coach typed were
+recoverable only from the raw log. The review of the pull request caught it. The fix is one exported
+`noteDetailFr` in `lib/match/presenter.ts` that both call, rather than a second `commented` branch in
+the recap — the duplication was the defect, and a second copy would have hidden the next event type
+just as quietly. The rest of the two builders stays deliberately separate: the recap says « Julien
+Marchal, passe de Karim Benali » and game mode « Julien (passe de Karim) », both pinned by tests, and
+unifying those would be a change of copy dressed up as a refactor.
+
+The lesson is the one decision 097 already states in other words: a claim in a decision entry is not
+evidence. « It appears automatically » was an inference from `HIDDEN_EVENT_TYPES`, and nothing had been
+looked at.
+
+It is also the only step in game mode with a keyboard, so it is the only one that is a form rather than
+a chain of taps — and therefore the only one where the player is a native `<select>` instead of a
+full-screen picker, because a second sheet would have to destroy the first and take the half-typed
+sentence with it. Like every other action it is stamped with the minute the coach **tapped ACTION**,
+not the minute the typing finished (decision 031).
+
+**The menu is four tiles and an « Autre… ».** But · But encaissé · Changement · Commentaire, with CSC,
+the two penalties, Blessure and Changement de poste one tap further. Nine tiles was a list wearing a
+grid's clothes: the whole point of the grid is that « But » is found without reading, and that stops
+being true when the four that matter are scrolled past to reach « Blessure ». `ActionChoice` became
+generic over its key so the « Autre… » tile — which records nothing and has no `MatchEventType` — uses
+the same component as everything that does, rather than a copy of it.
+
+**« Faute » is no longer offered, and that is not the same as removing it.** `FOUL` stays in
+`MATCH_EVENT_TYPES`, in `GAME_MODE_EVENT_TYPES`, in `RETRO_FACT_TYPES` and in the `Flow` union, because
+`match_events` is append-only (invariant 1): the fouls already in a log must still render, still count
+in the stats and still be voidable. What changed is the one user-facing menu it appeared in. Amateur
+7-a-side has no card count and no disciplinary consequence to compute, so the tile was asking a coach
+watching football to do data entry for nobody.

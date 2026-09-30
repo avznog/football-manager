@@ -66,9 +66,12 @@ test("le hors-ligne : les actions tapées sans réseau arrivent une fois chacune
 
   const scoreboard = page.getByRole("region", { name: "Chrono et score" });
   const clock = scoreboard.locator('span[aria-label^="Chrono"]');
-  const score = scoreboard.locator("span").filter({ hasText: /^\d+ – \d+$/ });
+  const score = scoreboard.locator('p[aria-label^="Score"]');
   // `Card` renders a bare `<section>`, so « Déroulé du match » is not a landmark to ask for by role.
-  const timeline = page.locator("section").filter({ hasText: "Déroulé du match" }).locator("ol > li");
+  const timeline = page
+    .locator("section")
+    .filter({ hasText: "Déroulé du match" })
+    .locator("ol > li");
   const queued = page.getByText("en attente d’envoi");
 
   await test.step("the coach creates a match and kicks off, with a network", async () => {
@@ -84,8 +87,10 @@ test("le hors-ligne : les actions tapées sans réseau arrivent une fois chacune
     await page.getByRole("link", { name: "Ouvrir le mode match" }).click();
     await expect(clock).toHaveText("00:00");
 
-    await page.getByRole("button", { name: "Coup d’envoi" }).click();
-    await expect(scoreboard).toContainText("1re période");
+    await page.getByRole("button", { name: "Coup d’envoi", exact: true }).click();
+    // The bar prints the time, the score and the pending count, and no phase line (decision 112):
+    // that the first period is running is what the clock button offering « Mi-temps » says.
+    await expect(page.getByRole("button", { name: "Mi-temps" })).toBeVisible();
     // The baseline: with a network, an action leaves the queue immediately. Every « en attente »
     // below therefore means the network, and not a queue that never flushes at all.
     await expect(queued).toHaveCount(0);

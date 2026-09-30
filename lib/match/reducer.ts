@@ -245,7 +245,9 @@ export type TimelineActorRole =
   | "out"
   | "moved"
   | "foul"
-  | "injured";
+  | "injured"
+  /** The player a `COMMENT` is about, when the coach attached one. */
+  | "commented";
 
 export type TimelineActor = {
   memberId: string;
@@ -271,6 +273,11 @@ export type TimelineEntry = {
   voidsEventId: string | null;
   /** Whom the entry is about, so the UI can splice in names without re-reading the payload. */
   actors: readonly TimelineActor[];
+  /**
+   * The free text an event carries, today only a `COMMENT`'s note. `null` on everything else, so
+   * the presenter has one field to read rather than a payload to re-interpret.
+   */
+  note: string | null;
   /** The running score immediately after this event, on the events that changed it. */
   scoreAfter: { goalsFor: number; goalsAgainst: number } | null;
   /** True when the payload could not be read; the entry is still shown. */
@@ -967,6 +974,16 @@ export function reduceMatch(
       }
     }
 
+    // A COMMENT moves nothing: no score, no clock, no pitch, no minutes — both switches above let
+    // it fall to their `default`, deliberately. Its whole content is its text, so it is read here,
+    // outside them, which also means an annulled comment still shows what it said.
+    let note: string | null = null;
+    if (event.type === "COMMENT") {
+      const comment = payload as MatchEventPayloads["COMMENT"] | null;
+      note = comment?.note ?? null;
+      if (comment?.memberId) actors.push({ memberId: comment.memberId, role: "commented" });
+    }
+
     timeline.push({
       eventId: event.id,
       clientEventId: event.clientEventId ?? null,
@@ -980,6 +997,7 @@ export function reduceMatch(
       voidedByEventId: voidedBy.get(event.id) ?? null,
       voidsEventId: event.type === "VOID" ? (event.voidsEventId ?? null) : null,
       actors,
+      note,
       scoreAfter,
       invalidPayload,
     });

@@ -270,6 +270,40 @@ describe("buildRecap — timeline", () => {
     expect(applied?.detail).toContain("Momo Diarra entre");
   });
 
+  /*
+   * A comment is the one event whose content *is* the event (decision 114), and the recap is the
+   * screen it exists for: a player reading the match back is the reader of « mur mal placé ». It
+   * rendered as « 14’ · Commentaire » with an empty detail, because this module had its own actor
+   * formatter that knew nothing about `note`. Both cases are pinned here and in `presenter.test.ts`,
+   * against the one formatter they now share.
+   */
+  it("prints a comment's own words as its detail", () => {
+    const note = "L’arbitre a laissé jouer sur le deuxième but";
+    const events = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTERS) },
+      { type: "COMMENT", min: 14, payload: { note } },
+    ]);
+
+    expect(recapOf(events).timeline.at(-1)).toMatchObject({
+      label: "Commentaire",
+      detail: note,
+      minuteLabel: "14’",
+      scoreAfter: null,
+      tone: "neutral",
+    });
+  });
+
+  it("names the player a comment is about, before his own words", () => {
+    const events = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTERS) },
+      { type: "COMMENT", min: 22, payload: { note: "trop haut sur le côté", memberId: "karim" } },
+    ]);
+
+    expect(recapOf(events).timeline.at(-1)?.detail).toBe("Karim Benali : trop haut sur le côté");
+  });
+
   it("runs oldest first, with continuous minutes", () => {
     expect(timeline.map((entry) => entry.minuteLabel)).toEqual([
       "0’",
@@ -381,16 +415,26 @@ describe("buildRecap — a goal nobody could attribute", () => {
 
 describe("buildRecap — the supporter on the sheet", () => {
   const squad = [...SQUAD, { teamMemberId: "gerard", role: "supporter" as const }];
-  const members = [...MEMBERS, { memberId: "gerard", displayName: "Gérard Simon", jerseyNumber: null }];
+  const members = [
+    ...MEMBERS,
+    { memberId: "gerard", displayName: "Gérard Simon", jerseyNumber: null },
+  ];
   const recap = buildRecap(reduceMatch(FULL_MATCH, [], { slots: SLOTS, squad }), members);
-  const lineOf = (memberId: string) =>
-    recap.players.find((player) => player.memberId === memberId);
+  const lineOf = (memberId: string) => recap.players.find((player) => player.memberId === memberId);
 
   it("carries the role of the sheet, so 0’ can be explained", () => {
     // Both were on the sheet and neither played: one was an option the coach did not use, the other
     // was never an option. « non entré » is only true of the first (decision 039).
-    expect(lineOf("gerard")).toMatchObject({ squadRole: "supporter", minutes: 0, playedMatch: false });
-    expect(lineOf("ali")).toMatchObject({ squadRole: "substitute", minutes: 0, playedMatch: false });
+    expect(lineOf("gerard")).toMatchObject({
+      squadRole: "supporter",
+      minutes: 0,
+      playedMatch: false,
+    });
+    expect(lineOf("ali")).toMatchObject({
+      squadRole: "substitute",
+      minutes: 0,
+      playedMatch: false,
+    });
     expect(lineOf("hugo")?.squadRole).toBe("starter");
   });
 
