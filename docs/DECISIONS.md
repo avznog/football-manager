@@ -3589,3 +3589,42 @@ The sharpest edge that remains is a **force-moved** tag: `git push --force origi
 commit does fire a run, and that is a production deploy with no pull request in front of it. The guard on
 it is the same one as on every other irreversible act in this repository — the owner's own hand, and this
 paragraph.
+
+## 120 — One rule for when a pointage opens, asked by all three places that need it
+
+**2026-09-30** · accepted · completes 099
+
+Decision 099 gave the présent/absent list a window: it opens half an hour before the séance, and
+`markTrainingAttendance` and `markEveryonePresent` both refuse to write outside it. What that change
+missed is that a third place also decides whether the list is offered at all — the inline card on
+`/entrainements`, which was still asking « is the séance today? » (`daysFromNow(…) === 0`).
+
+So from #88 until now, at 08:00 on the day of a 19:00 séance, that page rendered « Tout le monde est
+là » and the thirteen présent/absent rows, and **every tap on any of them wrote nothing**. The action
+returned early, correctly, and the screen said not a word about why. Decision 099 existed to replace
+an untruth with a refusal; this call site turned the refusal into a dead button, which is the worse
+of the two — an untruthful screen at least tells you something is off when the number is wrong,
+whereas a button that does nothing looks exactly like a button that worked.
+
+**Decision.** `attendanceIsOpen(startsAt, now)` in `lib/calendar/timeline.ts` is the only thing in
+this repository that answers « can a pointage be recorded? ». Three callers ask it — the two Server
+Actions and this page — and no fourth is allowed to reimplement the question. `daysFromNow` keeps its
+other uses; it is simply not an answer to this one.
+
+It is worth recording how this was found, because it was not by reading. A later branch touched the
+imports of that page and `tsc` complained; the wrong predicate was two lines away. Three call sites
+of a rule, with only two of them guarded, is invisible to every test in the suite: the reducer tests
+do not reach `app/`, and Vitest collects `lib/**` and `db/**` only. The pure predicate is in `lib/`
+and is well tested — it was never the predicate that was wrong, it was one of the call sites, and
+that is exactly the class of defect the screen audit of waves 3 and 4 kept finding.
+
+**Two notes from verifying it in the browser**, both of which cost time. The first run of the check
+was **void, while reporting the expected result**: the local database was three migrations behind
+`main`, `getCalendar`'s join onto `competitions` (#97) threw, and `/entrainements` rendered the error
+boundary in all three cases. A check that counts the *absence* of a string then agrees with the
+happy expectation for entirely the wrong reason, in two of the three cases, and the two that agreed
+were the two meant to prove the fix. So: **a check that asserts something is absent must first
+assert the page rendered at all** — that is now the first thing any throwaway script of this kind
+does, and the six byte-identical screenshots were what gave it away. The second is smaller: after a
+direct `UPDATE` on `trainings`, nothing calls `revalidatePath`, so the séance must be moved before
+the page is opened rather than between two screenshots of it.

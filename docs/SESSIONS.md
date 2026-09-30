@@ -2787,3 +2787,45 @@ Production environment, so a `--prod` deploy takes it — verified.
 **Next:** unchanged — PR 3 of the approved plan, the first migration that is not safe in both directions.
 Before that, the first `main` push wants watching for the two things it is the only test of: that
 `deploy-preview` actually deploys, and that `dev.7orteils.bgonzva.fr` serves what it deployed.
+
+## One rule for when a pointage opens, and a browser check that lied
+
+**2026-09-30.** One defect, one file of production code, twelve lines changed — and a verification that
+took longer than the fix and was worth every minute of it.
+
+**The defect.** Decision 099 (#88) gave the training pointage a window: it opens half an hour before the
+séance, and `markTrainingAttendance` and `markEveryonePresent` both refuse to write outside it. It left
+the third place that decides whether the list is *offered*, the inline card on `/entrainements`, still
+asking « is the séance today? ». So at 08:00 on the day of a 19:00 séance that page rendered « Tout le
+monde est là » and thirteen présent/absent rows, and every tap on them wrote nothing at all — the action
+returned early, correctly, and the screen said not a word. 099 existed to replace an untruth with a
+refusal; this call site turned the refusal into a dead button, which is worse, because a wrong number at
+least looks wrong. `attendanceIsOpen` is now the only thing in the repository that answers the question,
+with three callers and no fourth (decision 120).
+
+Found by `tsc`, not by reading: a later branch touched that page's imports and the wrong predicate
+was two lines away. Nothing in the suite could have caught it — the predicate itself is in `lib/` and
+well tested, it was a call site that was wrong, and Vitest collects `lib/**` and `db/**` only.
+
+**The verification, and why its first run was worthless.** Three cases at 390 px in both themes,
+driven by a throwaway Playwright script: a séance three days out (must not offer the list), a séance
+**today at 23:30** — the case that discriminates the old rule from the new — and a séance eighteen
+minutes away (must offer it). The first run reported « ×0, ×0, ×0 » for all three, which is the
+expected answer for two of them, including both cases meant to prove the fix. It was **void**. The
+local database was three migrations behind `main`, `getCalendar`'s join onto `competitions` (#97)
+threw, and `/entrainements` rendered the error boundary every time. What gave it away was not the
+numbers, it was six screenshots with byte-identical sizes across three different cases. **A check
+that counts the absence of a string must first assert the page rendered**, and that assertion is now
+the first thing in any script of this kind.
+After `npm run db:reset`: 0 / 0 / 1 across light and dark, which is the fix. Second, smaller: a direct
+`UPDATE` on `trainings` calls no `revalidatePath`, so the séance has to be moved before the page is
+opened, not between two shots of it.
+
+`npm run typecheck`, `npm run lint` and `npm test` pass — 64 files, 1310 tests. The demo season is back
+as the seed leaves it, and the throwaway script is deleted.
+
+**Next:** the iPhone tap-latency brief in `COORDINATION.md`, the one task whose STOP the owner lifted —
+measure first and write the numbers down, then the sequential awaits in `lib/queries/`, then tap
+acknowledgement, then the iOS suspects, one pull request per concern. And the départed-marks slice
+(« 11 présents sur 14 pointés » over ten green badges), whose local commit deliberately does not
+typecheck and enumerates its five errors.
