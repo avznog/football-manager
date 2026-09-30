@@ -3,7 +3,8 @@
  *
  *   seed a team → the coach logs in → creates a match → two players declare their availability →
  *   the coach picks the squad and builds a composition plus a planned change at the 30th minute →
- *   starts game mode → logs a goal with an assist, a goal conceded, and applies the planned change →
+ *   starts game mode → logs a goal with an assist, a goal conceded, a missed penalty from behind
+ *   « Autre… », two free-text comments, and applies the planned change →
  *   final whistle → score and minutes played are right → a player submits his ratings →
  *   the recap shows the man of the match.
  *
@@ -20,7 +21,14 @@
  * 4. that the planned change was applied **only after confirmation** (invariant 3): while the
  *    prompt is on screen the pitch still shows the man who is about to come off, and the substitute
  *    is nowhere on it;
- * 5. the man of the match on the recap.
+ * 5. the man of the match on the recap;
+ * 6. **the shape of the ACTION menu** (decision 114): four tiles and an « Autre… », with « Faute »
+ *    offered nowhere. `FOUL` deliberately stays in the vocabulary, so nothing else in the repo can
+ *    tell « no longer offered » from « still there, one tap further » — only the count of 0 below;
+ * 7. **the comment round trip**, which is the one flow in the app with a keyboard: what is typed
+ *    lands in the timeline at the minute ACTION was tapped, survives a `page.reload()` — so the
+ *    payload schema, the ingest allow-list and the reducer are all covered, not just client state —
+ *    and is still readable on the recap three weeks later.
  *
  * ## Where its data comes from
  *
@@ -51,6 +59,44 @@ import type { Fixture, FixturePlayer, FixturePlayerKey } from "./fixtures/types"
 import { MS_PER_MINUTE, discName, login, logout, parisDate, pitch, segment } from "./helpers/app";
 
 const OPPONENT = "US Vallonnée";
+
+/**
+ * The two notes the coach types, in the one flow in the app that has a keyboard (decision 114).
+ *
+ * Long enough to be a real sentence rather than a token, because what is being proved is that a
+ * free-text payload survives the schema, the ingest allow-list, the reducer and the recap — and a
+ * three-letter note would pass through a `note.slice(0, 3)` that a coach's sentence would not.
+ */
+const NOTE_ALONE =
+  "Coup franc dangereux à vingt mètres, le mur est mal placé et le ballon passe dessous.";
+const NOTE_ABOUT_PLAYER =
+  "Très bon appel dans le dos du défenseur central, il faut le servir plus tôt sur ce genre de course.";
+
+/** Mirrors `MAX_NOTE` in `comment-sheet.tsx` and `noteSchema` in `lib/match/events.ts`. */
+const MAX_NOTE = 280;
+
+/** « Autre… », which records nothing and opens the second menu. Spelt once, used three times. */
+const MORE_TILE = "Autre… CSC, penalty, blessure, poste";
+
+/**
+ * The whole of the ACTION menu, in order, by accessible name — label then hint, which is how a
+ * screen reader and a thumb both read a tile. `CHOICES` and `MORE_CHOICES` in `game-mode.tsx`.
+ */
+const FIRST_TIER: readonly string[] = [
+  "But buteur, passeur",
+  "But encaissé enregistré aussitôt",
+  "Changement qui sort, qui entre",
+  "Commentaire une note libre",
+  MORE_TILE,
+];
+
+const SECOND_TIER: readonly string[] = [
+  "CSC notre joueur",
+  "Penalty marqué tireur",
+  "Penalty manqué tireur",
+  "Blessure notre joueur",
+  "Changement de poste qui, vers quel poste",
+];
 
 /** The starting seven, and the French position name each one is placed on in the 1-3-2-1. */
 const STARTERS: readonly (readonly [FixturePlayerKey, string])[] = [
@@ -182,7 +228,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 
     /*
      * The editor opens on the team in force at the 30th minute — the starting seven — so the coach
-     * makes one substitution instead of placing seven players again (decision NNN). Two things are
+     * makes one substitution instead of placing seven players again (decision 106). Two things are
      * asserted before he touches anything, because they are the two ways a pre-filled pitch could
      * lie: it must not claim to be saved (nothing exists until the submit below, invariant 3), and
      * the deduced changes must be empty rather than « 7 changements ».
@@ -216,6 +262,8 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   const clock = scoreboard.locator('span[aria-label^="Chrono"]');
   const score = scoreboard.locator('p[aria-label^="Score"]');
   const onPitch = pitch(page, "Joueurs sur le terrain");
+  /** One line of « Déroulé du match », found by something it says. */
+  const logLine = (text: string) => timelineLine(page, text);
 
   await test.step("game mode opens with the composition proposed, not applied", async () => {
     // Fix the browser's clock before the page loads: from here on, match time is ours to set.
@@ -275,6 +323,93 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(score).toHaveText("1 – 1");
   });
 
+  await test.step("the menu is four tiles and an « Autre… », and « Faute » is offered nowhere", async () => {
+    await page.clock.setFixedTime(at(27));
+    await expect(clock).toHaveText("27:00");
+
+    await page.getByRole("button", { name: "ACTION" }).click();
+    const first = menu(page);
+    // The minute the action will carry is printed on the sheet, because it is the minute of *this*
+    // tap and not of the answer three taps later (decision 031).
+    await expect(first).toContainText("27’");
+
+    // Each tile by its whole accessible name — label *and* hint. The hint is what says where the
+    // tap leads, and it is the only thing distinguishing a tile that records something from
+    // « Autre… », which records nothing.
+    for (const name of FIRST_TIER) {
+      await expect(first.getByRole("button", { name, exact: true })).toBeVisible();
+    }
+    // Five tiles and « Fermer », and nothing else: nine tiles is what decision 114 removed, and a
+    // sixth tile creeping back into the row a thumb finds without reading is what this catches.
+    await expect(first.getByRole("button")).toHaveCount(FIRST_TIER.length + 1);
+
+    // Decision 114, the half nothing else can pin: `FOUL` stays in `MATCH_EVENT_TYPES`, in
+    // `GAME_MODE_EVENT_TYPES` and in the retro-entry screen — because `match_events` is append-only
+    // and the fouls already logged must still render — while leaving the one menu it appeared in.
+    // Every type-level test therefore still passes with the tile put back.
+    await expect(first.getByRole("button", { name: "Faute" })).toHaveCount(0);
+
+    await first.getByRole("button", { name: MORE_TILE, exact: true }).click();
+
+    const more = menu(page, "Autre action");
+    await expect(more).toContainText("27’");
+    for (const name of SECOND_TIER) {
+      await expect(more.getByRole("button", { name, exact: true })).toBeVisible();
+    }
+    await expect(more.getByRole("button")).toHaveCount(SECOND_TIER.length + 1);
+    await expect(more.getByRole("button", { name: "Faute" })).toHaveCount(0);
+
+    // One of the five round-trips, which is what proves the generic `ActionChoice<T>` and the `MORE`
+    // key actually reach `pickAction` rather than falling through its `default`. « Penalty manqué »
+    // rather than « CSC » on purpose: it takes one player and moves no number, so it cannot disturb
+    // the 1 – 1 and the « Match nul » that five later assertions in this file are built on.
+    await more.getByRole("button", { name: "Penalty manqué tireur", exact: true }).click();
+    await picker(page, "Qui a manqué ?").getByRole("button", { name: striker.displayName }).click();
+
+    const missed = logLine("Penalty manqué");
+    await expect(missed).toContainText("27’");
+    await expect(missed).toContainText(striker.displayName);
+    // A missed penalty is not a goal, and the reducer counts it in its own column.
+    await expect(score).toHaveText("1 – 1");
+  });
+
+  await test.step("a comment about nobody, typed at the only keyboard in the app", async () => {
+    await page.clock.setFixedTime(at(28));
+    await expect(clock).toHaveText("28:00");
+
+    await action(page, "Commentaire");
+    const sheet = page.getByRole("dialog", { name: "Commentaire", exact: true });
+    const field = sheet.getByRole("textbox", { name: "Ce qui s’est passé" });
+
+    // `maxLength`, not a validation error: the field stops accepting characters at exactly the
+    // length the server accepts, so there is no state in which the sheet holds a sentence the
+    // server would refuse. Filled to 280 — which `fill` can do, since `maxLength` only constrains
+    // typing — then one real keystroke, which must do nothing at all.
+    await field.fill("a".repeat(MAX_NOTE));
+    await expect(sheet.getByText("0 caractères restants")).toBeVisible();
+    await field.pressSequentially("b");
+    await expect(field).toHaveValue("a".repeat(MAX_NOTE));
+
+    await field.fill(NOTE_ALONE);
+    // Attaching a player is optional and unset until the coach chooses one: « À propos de… » is not
+    // « qui », because a note about a player is not a note blaming one.
+    await expect(sheet.getByRole("combobox", { name: "À propos de…" })).toHaveValue("");
+
+    await sheet.getByRole("button", { name: "Enregistrer" }).click();
+
+    const line = logLine(NOTE_ALONE);
+    await expect(line).toContainText("Commentaire");
+    // The minute of the tap that opened ACTION, like every other action (decision 031).
+    await expect(line).toContainText("28’");
+    // Inert by construction (decision 114): a note moves no score, no clock and nobody on the pitch.
+    await expect(score).toHaveText("1 – 1");
+    await expect(
+      onPitch.getByRole("img", {
+        name: discName(striker.displayName, striker.jerseyNumber, "attaquant"),
+      }),
+    ).toBeVisible();
+  });
+
   await test.step("the second half kicks off at 30:00 — the clock never resets", async () => {
     await page.clock.setFixedTime(at(30));
     await expect(clock).toHaveText("30:00");
@@ -287,7 +422,9 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 
     // Decision 009 and `CLAUDE.md`: match minutes are continuous. A reset would read 00:00 here.
     await expect(clock).toHaveText("30:00");
-    await expect(clock).toHaveAttribute("aria-label", /^Chrono 30’/);
+    // The whole label, not a prefix: « en cours » is the screen saying the clock is really moving,
+    // and a second period that kicked off and then sat still would pass a `/^Chrono 30’/`.
+    await expect(clock).toHaveAttribute("aria-label", "Chrono 30’, en cours");
     await expect(clock).not.toHaveText("00:00");
     // The last period is running, so the button is now the final whistle rather than another break.
     await expect(page.getByRole("button", { name: "Fin du match" })).toBeVisible();
@@ -314,6 +451,46 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
       }),
     ).toBeVisible();
     await expect(replaced).toHaveCount(0);
+  });
+
+  await test.step("a comment about a player, and both comments survive the server", async () => {
+    await page.clock.setFixedTime(at(55));
+    await expect(clock).toHaveText("50:00");
+
+    await action(page, "Commentaire");
+    const sheet = page.getByRole("dialog", { name: "Commentaire", exact: true });
+    await sheet.getByRole("textbox", { name: "Ce qui s’est passé" }).fill(NOTE_ABOUT_PLAYER);
+    // A native `<select>` and not a second full-screen picker: a sheet on top of this one would have
+    // to destroy it and take the half-typed sentence with it (decision 114).
+    await sheet
+      .getByRole("combobox", { name: "À propos de…" })
+      .selectOption({ label: striker.displayName });
+    await sheet.getByRole("button", { name: "Enregistrer" }).click();
+
+    const about = logLine(NOTE_ABOUT_PLAYER);
+    await expect(about).toContainText("50’");
+    // « Nom : texte » — the same idiom the reducer's other labelled details use.
+    await expect(about).toContainText(striker.displayName);
+
+    /*
+     * The reload is the assertion, the way it is in `offline.spec.ts`. Up to here every character on
+     * screen could have come from React state and IndexedDB; afterwards the only source is the
+     * server's own log replayed by the reducer — so this one line covers the `COMMENT` branch of
+     * `matchEventPayloadSchema`, the ingest allow-list in `GAME_MODE_EVENT_TYPES`, the `note` column
+     * of `TimelineEntry` and the fact that `reduceMatch` carries free text at all. None of that is
+     * exercised by anything that stops at the client.
+     */
+    await page.reload();
+
+    await expect(clock).toHaveText("50:00");
+    await expect(score).toHaveText("1 – 1");
+    await expect(logLine(NOTE_ALONE)).toContainText("28’");
+    const replayed = logLine(NOTE_ABOUT_PLAYER);
+    await expect(replayed).toContainText("50’");
+    await expect(replayed).toContainText(striker.displayName);
+    // Nothing was refused on the way through, and nothing is still on the device.
+    await expect(page.getByText("Actions refusées")).toHaveCount(0);
+    await expect(page.getByText("en attente d’envoi")).toHaveCount(0);
   });
 
   await test.step("the final whistle freezes the match", async () => {
@@ -416,6 +593,27 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await page.getByRole("link", { name: "Retour au calendrier" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Calendrier" })).toBeVisible();
   });
+
+  /*
+   * Last on purpose. A comment exists to be read after the match — decision 114's whole
+   * justification is « the sentence that explains a scoreline three weeks later » — and the recap is
+   * where that reading happens, by a player rather than by the coach who typed it.
+   *
+   * `buildTimeline` in `lib/rating/recap.ts` sets each entry's `detail` from `describeActors` alone,
+   * and never from `entry.note`. So today the recap prints « Commentaire » with the minute, the dot,
+   * and no text whatsoever: the note is on the server, the reducer carries it, and the one screen
+   * that exists to show it drops it. That is a real defect and not a missing test, so the assertion
+   * below is written for the correct behaviour and left to fail until `detail` reads the note.
+   */
+  await test.step("a comment is still readable on the recap, three weeks later", async () => {
+    await page.goto(`${matchUrl}/recap`);
+    await expect(page.getByRole("heading", { name: "Déroulé du match" })).toBeVisible();
+
+    await expect(timelineLine(page, NOTE_ALONE)).toContainText("28’");
+    const about = timelineLine(page, NOTE_ABOUT_PLAYER);
+    await expect(about).toContainText("50’");
+    await expect(about).toContainText(striker.displayName);
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -485,6 +683,29 @@ function tomorrow(): Date {
 
 function picker(page: Page, title: string): Locator {
   return page.getByRole("dialog", { name: title });
+}
+
+/**
+ * An ACTION menu by its French title. `exact`, unlike `picker`, because « Action » is a substring of
+ * « Autre action » and the whole point of the second tier is that it is a different sheet.
+ */
+function menu(page: Page, title = "Action"): Locator {
+  return page.getByRole("dialog", { name: title, exact: true });
+}
+
+/**
+ * One line of « Déroulé du match », found by something it says.
+ *
+ * `Card` renders a bare `<section>`, so the log is not a landmark to ask for by role — the same
+ * idiom `offline.spec.ts` uses. It matches game mode's timeline and the recap's, which are two
+ * components rendering the same heading and, for a comment, must say the same thing.
+ */
+function timelineLine(page: Page, text: string): Locator {
+  return page
+    .locator("section")
+    .filter({ hasText: "Déroulé du match" })
+    .locator("ol > li")
+    .filter({ hasText: text });
 }
 
 /**

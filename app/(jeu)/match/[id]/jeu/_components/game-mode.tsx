@@ -18,7 +18,7 @@ import {
 import { PitchLayout } from "@/components/pitch/PitchLayout";
 import { Badge, Button, ButtonLink, Card, EmptyState } from "@/components/ui";
 import { positionLabelFr } from "@/db/reference";
-import { matchNameFr } from "@/lib/calendar/labels";
+import { entryModeBadgeFr, matchNameFr } from "@/lib/calendar/labels";
 import type { MatchEventType } from "@/lib/match/events";
 import { createOutbox, toWireEvent, type OutboxRecord, type OutboxState } from "@/lib/match/outbox";
 import {
@@ -331,7 +331,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
 
   const canAct = canOperate && state.started && !state.finished;
   // Who the list of players off the pitch is written for: the operator taps it, everybody else reads
-  // it, and before the kick-off nobody can tap it at all (decision NNN).
+  // it, and before the kick-off nobody can tap it at all (decision 087).
   const enterable = enterableCardFr({ available, players: live.players, canAct });
 
   // An empty pitch is not the same fact as an empty `lineups`, and the copy used to say the second
@@ -480,6 +480,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         matchHref={`/match/${matchId}`}
         opponentName={live.match.opponentName}
         pendingLabel={queue.pending.length > 0 ? pendingCountLabelFr(queue.pending.length) : null}
+        entryBadge={entryModeBadgeFr(live.match.entryMode, { recorded: live.events.length > 0 })}
         action={pitchAction}
       />
 
@@ -557,7 +558,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           <PitchLayout slots={pitch} kit={live.kit} pitchLabel="Joueurs sur le terrain" />
         )}
 
-        {/* Not « Remplaçants »: ten of the thirteen rows under that heading were not (decision NNN). */}
+        {/* Not « Remplaçants »: ten of the thirteen rows under that heading were not (decision 087). */}
         <Card title={enterable.titleFr} description={enterable.hintFr ?? undefined} flush>
           {available.length === 0 ? (
             <div className="p-4">

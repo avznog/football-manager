@@ -14,6 +14,15 @@ export type MatchBarProps = {
   opponentName: string;
   /** « 3 actions en attente », or null when everything has reached the server. */
   pendingLabel: string | null;
+  /**
+   * « saisi après le match », or null — `entryModeBadgeFr(match.entryMode, { recorded })`.
+   *
+   * This screen prints the largest minute in the app and decision 048 stamps the minutes of a match
+   * typed up afterwards, so on a `retro` log the reader is owed the sentence: without it the biggest
+   * number on the screen is the one number nothing qualifies (decision 013, and the reason the old
+   * `Scoreboard` carried it). It costs no height when there is nothing to say.
+   */
+  entryBadge?: string | null;
   /** TERRAIN or « Composition » — the one button that belongs beside the score. */
   action?: React.ReactNode;
 };
@@ -23,21 +32,36 @@ export type MatchBarProps = {
  * old `Scoreboard` card — 217 px of chrome down to 64 including the route's padding.
  *
  * What it keeps is what the owner asked for and nothing else: **the time and the live score**
- * (decision 112). The venue badge, the entry-mode badge and the phase line all said something true and
- * none of them is looked at at 78′; they are one tap away on the match page, which is where a reader
- * who wants them already is. The clock stays `font-mono … tabular-nums` so the digits do not jump as the seconds
+ * (decision 112). The venue badge and the phase line both said something true and neither is looked at
+ * at 78′; they are one tap away on the match page, which is where a reader who wants them already is.
+ * The clock stays `font-mono … tabular-nums` so the digits do not jump as the seconds
  * tick, and stays **continuous** (decision 009) — the second half of a 2 × 30 reads 30′ → 60′, and a
  * half running long grows a « +2 » rather than resetting.
  *
- * Two things survive because they are the screen saying it still works: the « en cours » dot, and the
- * count of actions the outbox has not yet delivered. Both sit as a hairline rather than a row of their
- * own — a line that exists only when something is wrong costs nothing when nothing is.
+ * **« Nous » is printed beside the score**, because the score is ours first (`scoreLineFr`) and nothing
+ * in the figures says so. On an away match « 0 – 2 » is a team two goals *up*, and the old `Scoreboard`
+ * had a caption saying which way round it was. Replacing that caption with an `aria-label` alone told
+ * the one reader who did not need telling. It is a word and not a second line: a caption under the
+ * figures would cost the row its 56 px, which is the whole of decision 112.
+ *
+ * Three things sit as a hairline under the row rather than in it, because a line that only exists when
+ * there is something to say costs nothing when there is not: the count of actions the outbox has not
+ * delivered, and « saisi après le match » for a log that was typed up afterwards. The « en cours » dot
+ * stays in the row — it is the screen saying the clock is really moving.
  *
  * The back button is the only way out other than the final whistle, so it is an icon with an accessible
  * name rather than « ← Courges »: at 393 px the opponent's name is the width the score needs.
  *
  * It keeps the old `Scoreboard`'s `region` and its name: this is still the one part of the screen a
  * screen reader wants to be able to jump to, and « Chrono et score » is now literally all it holds.
+ *
+ * **Why the clock and the score are `role="img"`.** Both carry an `aria-label` that says more than the
+ * glyphs do — « Chrono 30’, en cours », « Score 1 nous, 0 Courges » — and ARIA 1.2 forbids a name on
+ * `role=generic` and `role=paragraph`, which is what a bare `<span>` and `<p>` are. A conforming
+ * screen reader therefore ignored both labels and read « 1 – 0 » and nothing else. `role="img"` is a
+ * role that *takes* a name, it keeps the glyphs on screen for everyone else, and it leaves the two
+ * selectors the end-to-end suite uses (`p[aria-label^="Score"]`, `span[aria-label^="Chrono"]`)
+ * exactly as they were.
  */
 export function MatchBar({
   reading,
@@ -46,6 +70,7 @@ export function MatchBar({
   matchHref,
   opponentName,
   pendingLabel,
+  entryBadge = null,
   action,
 }: MatchBarProps) {
   return (
@@ -71,6 +96,7 @@ export function MatchBar({
             />
           ) : null}
           <span
+            role="img"
             className="font-mono text-3xl leading-none font-bold text-ink tabular-nums"
             aria-label={`Chrono ${reading.label}${reading.running ? ", en cours" : ""}`}
           >
@@ -83,19 +109,31 @@ export function MatchBar({
           ) : null}
         </p>
 
-        <p
-          className="ml-auto shrink-0 font-mono text-2xl leading-none font-bold text-ink tabular-nums"
-          aria-label={`Score ${goalsFor} nous, ${goalsAgainst} ${opponentName}`}
-        >
-          {scoreLineFr(goalsFor, goalsAgainst)}
-        </p>
+        <div className="ml-auto flex shrink-0 items-baseline gap-1">
+          {/* `aria-hidden`: the score's own label already says « 1 nous, 0 Courges », so announcing
+              the word again would only make the figures harder to place. */}
+          <span
+            aria-hidden="true"
+            className="text-[0.625rem] leading-none font-semibold tracking-wide text-ink-muted uppercase"
+          >
+            Nous
+          </span>
+          <p
+            role="img"
+            className="font-mono text-2xl leading-none font-bold text-ink tabular-nums"
+            aria-label={`Score ${goalsFor} nous, ${goalsAgainst} ${opponentName}`}
+          >
+            {scoreLineFr(goalsFor, goalsAgainst)}
+          </p>
+        </div>
 
         {action ? <span className="shrink-0">{action}</span> : null}
       </div>
 
-      {pendingLabel ? (
-        <p className="pb-1 text-xs text-ink-muted" role="status">
-          {pendingLabel}
+      {entryBadge !== null || pendingLabel !== null ? (
+        <p className="flex flex-wrap items-center gap-x-2 pb-1 text-xs text-ink-muted">
+          {entryBadge !== null ? <span>{entryBadge}</span> : null}
+          {pendingLabel !== null ? <span role="status">{pendingLabel}</span> : null}
         </p>
       ) : null}
     </div>
