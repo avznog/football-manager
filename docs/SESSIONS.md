@@ -1597,7 +1597,7 @@ stand over, and this one was written while looking at the first three.
 
 `enterableCardFr` also splits the card by what the reader can do with it: the operator is told what to
 tap, a player watching is told what the list is. 921 tests. Checked at 390 px in both themes, before
-the kick-off and after it, then `npm run db:reset` because tapping « Coup d'envoi » to see the second
+the kick-off and after it, then `npm run db:reset` because tapping « Coup d’envoi » to see the second
 state starts the demo match for real.
 
 ### « Déjà joué », over three trainings and a match nobody had recorded
@@ -2570,3 +2570,96 @@ still owed: the super admin password is the literal placeholder `choisis-en-un-v
 phone outside in daylight. The natural follow-up to this slice is on the roadmap rather than half-built:
 per-post minutes, which would make « meilleur milieu droit » a measurement, and saving a seven as a real
 composition.
+
+## Eight defects and two words, from a thumb on a real phone
+
+**2026-09-30** · `feat/match-bar-composition-filters`
+
+The owner used the app on his iPhone and came back with **nine** items. This slice is the eight defects
+and the two words he asked to be changed; the ninth and the rest of the batch are two further pull
+requests, designed and approved and not started — **the ratings redesign**, and **icons for the ACTION
+menu plus a « remarques » category**. So a session picking this up should read that as the queue rather
+than looking for new work.
+
+**« L'équipe type »'s filters were 216 px of question above the first answer.** Four rows of `min-h-11`
+chips in the page header, on a 393 px phone whose pitch then began below the fold. They are four labelled
+native `<select>`s in a two-column grid **below** the pitch now: 160 px, and a 48 px tap target where a
+chip was 44. The type size is untouched on purpose — `components/ui/input.tsx` sets `text-base` because
+anything under 16 px makes iOS Safari zoom the page the moment a picker opens, so « smaller » had to come
+out of the layout. Decision 100's two properties survive, by two paths to the same query string: with
+JavaScript, `onChange` pushes `equipeTypeHref(next)`; without it, a `<form method="get">` submits the four
+selects. **The second path is what taught us something**, because it sends `?critere=` for anything left
+at its default and `equipeTypeHref` never writes an empty value — so the parsers had never been handed
+one, and two of them were inline in `page.tsx` where Vitest could not reach them at all.
+`parseCompetitionId` and `resolveFormationOverride` are in `lib/stats/best-seven-copy.ts` now, and all
+four have a test for `""`. Moving the controls also turned one sentence from misplaced into **false**:
+`NO_FORMATION_FR` ended « ou choisis une forme toi-même ci-dessus », and the state it appears in is
+exactly the state with no formation control on screen. The clause is gone (decision 116).
+
+**The game-mode clock was overlapping the score, and the bar had been overflowing before kickoff.** The
+clock was the only child flex was allowed to squeeze — `min-w-0`, no `shrink-0`, beside a score and an
+action both `shrink-0` — so the row gave way at the one thing a coach reads at arm's length, and `MM:SS`
+in 30 px digits spilled under the score. It is `shrink-0`, and the **action** is the child that yields and
+clips. Measured in a headless browser against the compiled CSS rather than estimated, inside the 369 px
+the row has at 393: the typical row wanted 355 and wants 321. **The word « Nous » was 34 px of that**, and
+with it « 00:00 » and « 0 – 0 » beside « Composition » wanted 370 of 369 — the bar overflowed in the state
+every match begins in, which is why a thumb found it and no test in this repository ever would. The
+review of #104 was right to put that caption back after decision 112 first cut it, so the fact is kept
+and only the word is gone: **our own figure is underlined**, an underline and not a colour, because
+`--color-accent` on one of two numerals reads as a state and a score has no state.
+`SCORE_SEPARATOR_FR` is exported from
+`lib/calendar/labels.ts` so the app still has one scoreline (decision 064). Two rows cannot fit at any
+font metric — « 10 – 10 » with a stoppage span, and a match printing « 120:00 » — and they are on the
+roadmap with what would actually fix them.
+
+**« Envoi » → « Début » broke WCAG 2.5.3 in the same breath as fixing the word.** The clock button
+announces its label and « Début » is not a word of « Coup d’envoi », so voice control saying the visible
+word would have hit nothing. The final whistle's fix — change the *short* label, « Sifflet » rather than
+« Fin » — was unavailable, because « Début » is the word that had to be visible. So the **accessible name
+is what gave way**: `clockActionFr` returns a third string, `name`, which is `label` everywhere except the
+two kick-off branches, where it is « Début : coup d’envoi [2ᵉ période] ». Three strings for one action,
+still in one function so they cannot drift, with `presenter.test.ts` walking every reachable phase of a
+1, 2 and 3-period match asserting the containment (decision 117).
+
+**Three defects in the composition editor, and the third is the one worth remembering.** The **minute
+field could not be emptied**: it was the only controlled `type="number"` in the app whose state was a
+`number`, and `clampMinute` turned `""` into `NaN` into `0`, so it snapped back the instant it was empty
+and reaching 10 meant typing `010` then deleting from the left. It holds the typed string now, like
+`MinuteInput` in `retro-form.tsx` — `""` is legal to be in and invalid to submit, and `parseMinute`
+returns `null` and never 0, because `z.coerce.number("")` is 0 server-side and a silent 0 would overwrite
+the starting composition. The **dock floated 16 px above the tab bar**: the dock said 4.5rem = 72,
+`BottomNav` is 56, `tabbar-pb` said 64, three places that had to agree about one height and did not — and
+that is precisely why fixing the identical subtraction in game mode (decision 112) did not travel, because
+that route has no tab bar, so the number was made irrelevant rather than corrected. `--tabbar-h` is the
+one source now and all three read it; 788 against 787 at 390 px in both themes, the 1 px being the bar's
+own border (decision 118). And **dragging a player onto the bench put him in a defender's slot**: the
+bench was a drag *source* only, and the dock is `sticky z-20` over a `z-auto` pitch, so a finger on the
+bench is still inside the pitch's bounding box — `pointOf` answered with a valid point near the goal line
+and `nearestSlot` took over. `usePitchDrag` hands the raw **client** point to `onDrop`/`onMove` beside the
+pitch point, and the editor tests the dock's rect *before* anything reads the pitch point: the dock is
+painted in front, so it wins on overlap, and the pitch's 12 px of forgiveness is deliberately not extended
+to it. The lifted disc is still clipped by the pitch's `overflow-hidden` — that is what keeps markers on
+the turf — so what replaces it is feedback driven from the same containment test, and the ring and the
+drop cannot disagree.
+
+**The bench defect shipped because the e2e suite placed every player by tapping.** `usePitchDrag`'s whole
+pointer path had no browser-level coverage at all, on any screen. There is a drag test now, in
+`e2e/happy-path.spec.ts`, and it was verified to fail against the unfixed code. Its subtlety is worth
+carrying forward: `usePitchDrag`'s `end` closes over the `drag` state of the render its handler was
+attached to, so a `pointerup` in the same task as the `pointermove` still sees `moved: false`, calls
+`onTap`, and the test passes for the wrong reason. The assertion between the two is the render tick that
+defeats it. **That closure has now produced a false negative twice in this repository.** The other two
+callers of the gesture — TERRAIN and « l'équipe type »'s pitch — still have no drag test, and both have
+something painted in front of the pitch that the new client-point check would have to be right about;
+that is on the roadmap.
+
+Gate, all of it on the whole tree: `npm run typecheck` clean, `npm test` **1298 passed across 64 files**,
+`npx eslint` silent on the repo's sources, `npm run test:e2e` **4 passed**.
+
+**Next:** the two approved pull requests above — the ratings redesign, then the ACTION icons with a
+« remarques » category. Still owed from before and still owed: Part 2 of the approved plan, the
+preview/production split, blocked on the owner creating the Neon `preview` branch and pointing Vercel's
+production branch away from `main`; the super admin password is the literal placeholder
+`choisis-en-un-vrai`; the Neon `neondb_owner` password has been in a transcript and wants rotating; and
+`docs/DEPLOY.md` §6 wants a real phone outside in daylight — which is, after this slice, exactly the
+instrument that found all eight of these.

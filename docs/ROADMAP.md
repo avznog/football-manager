@@ -198,6 +198,37 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       cannot disagree — and an inherited player who has left the sheet is not placed, his post stays
       open and the notice names him. Nothing is written until the coach submits, which the footer now
       says: « Rien n'est encore enregistré. » (decision 106)
+- [x] The minute field can be emptied. It was the only controlled `type="number"` in the app whose state
+      was a `number`, and `clampMinute` turned `""` into `NaN` into `0`, so the field snapped back to 0
+      the instant it was empty and reaching 10 meant typing `010` and then deleting from the left. It
+      holds the typed string now, like `MinuteInput` in `retro-form.tsx` has since M7: `""` is legal to
+      be *in* and invalid to *submit*, and `parseMinute` returns `null` rather than 0, because
+      `z.coerce.number("")` is 0 on the server and a silent 0 would overwrite the starting composition
+- [x] Dragging a player onto the bench benches him, instead of putting him in a defender's slot. The
+      bench was a drag *source* and never a target, and the only way off the pitch was a drop outside
+      it — but the dock is `sticky z-20` over a `z-auto` pitch, so a finger on the bench is still inside
+      the pitch's bounding box, `pointOf` returned a valid point and `nearestSlot` took over.
+      `usePitchDrag` hands the raw **client** point to `onDrop` and `onMove` as well as the pitch point,
+      and the editor tests the dock's rect *before* anything reads the pitch point: the dock is painted
+      in front, so it wins on overlap, and the pitch's 12 px of forgiveness is deliberately not extended
+      to it. The drop feedback is driven from the same containment test, so the ring and the drop cannot
+      disagree
+- [x] …and the e2e suite exercises a drag at all. It placed every player by **tapping** — the documented
+      equivalent, and the path that works in a glove — so `usePitchDrag`'s whole pointer path had no
+      browser-level coverage, which is why the defect above shipped. `e2e/happy-path.spec.ts` now has a
+      test of its own that drags the attacker onto the bench, verified to fail against the unfixed code.
+      It needs an assertion **between** the `pointermove` and the `pointerup`, because `end` closes over
+      the `drag` state of the render its handler was attached to: released in the same task as the move
+      it still sees `moved: false`, calls `onTap`, and the test passes for a reason that has nothing to
+      do with dragging. **That closure has now produced a false negative twice in this repository**
+- [ ] No other screen has a drag test. The gesture is one implementation — the React part in
+      `components/pitch/usePitchDrag.ts` over the rules in `lib/pitch/drag.ts` — with three callers: the
+      composition editor, which now has one, plus TERRAIN's `components/action-sheet/terrain-sheet.tsx`
+      and `app/(app)/stats/equipe-type/_components/seven-pitch.tsx`. What a drop
+      *means* is per screen on purpose (decisions 045 and 055), so a covered call site proves nothing
+      about the other two: TERRAIN's drop off the turf is a no-op and the seven's disc opens a picker,
+      and both screens have something painted in front of the pitch that the new client-point check
+      would have to be right about
 
 ## M4 — Game mode
 - [x] `lib/match/clock.ts` — continuous minutes with pauses
@@ -241,6 +272,33 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] A live match no longer offers its own summary. Both « Après le match » and the recap gate on
       `status === "finished"` rather than « has kicked off », and `resultLabel` stopped printing
       « Victoire » beside a 2–1 in the 20th minute (decision 113)
+- [x] The clock no longer runs into the score, and the bar fits the phone it was measured on. The clock
+      was the only child flex was allowed to squeeze — `min-w-0`, no `shrink-0`, beside a score and an
+      action that were both `shrink-0` — so the row gave way at the one place it must not and « 45:00 »
+      in 30 px digits spilled under the score. It is `shrink-0` now, and the **action** is the child that
+      yields and clips its right edge. Measured against the compiled CSS inside the 369 px the row has at
+      393: a typical row wanted 355 and wants 321. The word « Nous » was 34 px of that and is gone —
+      with it, « 00:00 » and « 0 – 0 » beside « Composition » wanted 370 of 369 *before kickoff on a
+      393 px phone*, so the bar overflowed in the state every match starts in. Which way round the score
+      reads is now said by **underlining our own figure**: an underline and not a colour, because
+      `--color-accent` on one of two numerals would read as a state and a score has no state
+      (decision 117, restating 061, 064 and 112)
+- [x] The clock button says « Début », and still answers to it. « Envoi » is a word a coach has to
+      translate; the rename broke **WCAG 2.5.3 Label in Name**, because the button announces its label
+      and « Début » is not a word of « Coup d'envoi », so voice control saying the visible word would
+      have activated nothing. The final whistle's fix — change the *short* label, « Sifflet » rather than
+      « Fin » — was unavailable here, since « Début » is the word that had to be visible. So the
+      **accessible name** gave way: `clockActionFr` returns a third string, `name`, which is `label`
+      everywhere except the two kick-off branches. `presenter.test.ts` walks every reachable phase of a
+      1, 2 and 3-period match asserting the containment (decision 117)
+- [ ] Two shapes of the match bar still do not fit at 393 px and cannot at any font metric: « 10 – 10 »
+      with a stoppage span wants 370 of the 369 available, and a match long enough to print « 120:00 »
+      wants 388. Today the action slot absorbs it by clipping — TERRAIN loses up to 19 px of its right
+      edge, which is legible from context and is why that child was chosen to yield. What would actually
+      fix it is a shorter action word or an icon with its name in the `aria-label`, and neither should be
+      designed from the arithmetic alone: « TERRAIN » is the word the owner's team uses out loud, and an
+      icon for « ajuster le terrain » is not obvious. At 375 px the typical row still has 30 px spare, so
+      this is a tail case and not a phone size
 - [ ] `hasFinalWhistle(matchId)` — one existence query, the `hasMatchEvents` shape with
       `type = 'FINAL_WHISTLE'` and the same not-voided predicate — so the match page can self-heal a
       stale `matches.status` without paying `getLiveMatch`'s seven queries on every view (decision 113).
@@ -302,6 +360,18 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       squad mean and heads neither ranking, and nobody appears or vanishes at a threshold. Positions
       are an exact assignment, not a greedy pass, and the objective is stated on screen. Tapping a disc
       swaps a player and the heading stops claiming to be the best seven (decision 115)
+- [x] …and its four filters sit **under** the seven, as labelled native selects. They shipped as four
+      rows of `min-h-11` chips in the page header — 216 px of ways to ask the question above the first
+      answer, with the pitch below the fold on a 393 px phone. Two rows of selects in a grid instead:
+      160 px, and a 48 px tap target where a chip was 44. The type size is untouched, because
+      `components/ui/input.tsx` sets `text-base` deliberately — under 16 px iOS Safari zooms the page
+      when a picker opens. The filter is still a view of the URL and still works with JavaScript off:
+      `onChange` pushes `equipeTypeHref(...)`, and the surrounding `<form method="get">` submits the same
+      four parameters without it. That second path sends `?critere=` for anything left at its default,
+      which `equipeTypeHref` never writes, so all four parsers now have a test for an empty value and two
+      of them moved out of `page.tsx` into `best-seven-copy.ts` to be testable at all. `NO_FORMATION_FR`
+      lost « ou choisis une forme toi-même **ci-dessus** », which the move turned from misplaced into
+      false (decision 116)
 - [ ] **Minutes by position, so « meilleur milieu droit » becomes a measurement.** There is exactly
       one positional figure anywhere in the database — `match_player_stats.gkMinutes` — and the
       reducer's `positionSpells` are in-memory match state that the freeze path never writes down. So
@@ -599,10 +669,14 @@ the reachable-turf finding below an **under**-statement on device rather than an
       header and not the page header, the formation card, or the pre-fill notice
       (`app/(app)/match/[id]/composition/_components/editor-screen.tsx:212-229`). The cap is not the
       problem and shrinking the pitch is not the fix
-- [ ] The dock floats 15 px too high, leaving a window onto the scrolling turf between it and the tab
+- [x] The dock floats 15 px too high, leaving a window onto the scrolling turf between it and the tab
       bar. `composition-editor.tsx:224` pins it at `bottom-[calc(4.5rem+env(safe-area-inset-bottom))]`
       = 72 px, and the tab bar is 57 px plus its own `safe-pb`; the gap survives any inset. It reads as
-      a rendering glitch
+      a rendering glitch — and `app/globals.css`'s `tabbar-pb` was a **third** number for the same bar
+      (4 rem), which is why fixing the identical subtraction in game mode (decision 112) did not fix
+      it here: that route has no tab bar, so the number was made irrelevant rather than corrected.
+      `--tabbar-h` is the one source now and all three read it; measured at 390 px in both themes, dock
+      bottom 788 against tab bar top 787, the 1 px being the bar's own border (decision 118)
 - [ ] Tap targets below Apple's 44 × 44 pt floor, in the places most used with a thumb: the player
       names in every availability list are links as small as **16 × 32** (« Ali », « Léo » 24 × 32) —
       thirteen of them per screen; the `/stats` filter and sort chips are 36 px tall; « Détails » on

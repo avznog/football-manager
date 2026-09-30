@@ -437,6 +437,25 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   is the only thing that would make « meilleur milieu droit » a measurement rather than a declaration,
   and saving a seven as a real composition. Part 2 is still blocked on the owner creating the Neon
   `preview` branch, and until it exists every merge to `main` still deploys straight to production.
+- **2026-09-30 · the owner's machine · `feat/match-bar-composition-filters`** — The owner used the beta on
+  his iPhone and came back with nine items; this branch is **eight defects and two words** from that
+  batch, across « l'équipe type », the game-mode bar and the composition editor. Decisions **116**, **117**
+  and **118**, so the next free number is **119**. Four things in it are shared surfaces another session
+  could trip over, none of them a rename you would notice by reading a diff. **`clockActionFr` returns a
+  third field, `name`** — `label`, `shortLabel`, `name` — because « Début » is not a word of « Coup
+  d’envoi » and WCAG 2.5.3 made the accessible name the thing that had to give way; it is additive, but if
+  you add a phase, give it a `name` rather than letting it default. **`usePitchDrag`'s `onDrop` and
+  `onMove` take a third argument**, the raw client point, because a pitch point cannot tell you that the
+  finger was over something painted *in front* of the pitch — that is what put a player dragged onto the
+  bench into a defender's slot. The two other callers, `terrain-sheet.tsx` and `equipe-type`'s
+  `seven-pitch.tsx`, ignore it and are unchanged. **`--tabbar-h` in `app/globals.css` is now the one
+  source for the tab bar's height**: `BottomNav`'s `min-h`, the `tabbar-pb` utility and the composition
+  editor's dock all read it, and it excludes the home indicator on purpose — add
+  `env(safe-area-inset-bottom)` yourself. Do not reintroduce a literal `4.5rem` or `3.5rem` for it. And
+  **`SCORE_SEPARATOR_FR` is exported from `lib/calendar/labels.ts`**, for the game-mode bar, which prints
+  the two figures separately so it can underline ours — use it rather than typing a second « – »
+  (decision 064 still holds). Nothing touched in `vercel.json`, `.github/`, `package.json` or the
+  deployment. Part 2 is still blocked on the Neon `preview` branch.
 
 ### From the other machine
 
