@@ -88,9 +88,55 @@ export function benchPlayerLabelFr({
 }
 
 /**
+ * What the bench says while a player lifted off the turf is held over it.
+ *
+ * The dock is the drop target that sends a player back to the bench, and until it said so the
+ * gesture looked broken even once it worked: `Pitch` is `overflow-hidden`, so the disc under the
+ * finger is clipped away the moment it leaves the turf. This sentence and the ring around the dock
+ * are what replace it — not the disc, which must stay inside the turf with the other markers.
+ */
+export function benchDropHintFr(name: string): string {
+  return `Relâche ici : ${name} retourne sur le banc.`;
+}
+
+/**
  * The hint under the minute field. It interpolates the length of the match, so it cannot be a
  * constant: a 2×25 match must not be told it lasts 60 minutes.
  */
 export function minuteFieldHintFr(totalMinutes: number): string {
   return `0 pour la composition de départ. Le match dure ${totalMinutes} minutes et les minutes sont continues.`;
+}
+
+/** Highest minute a composition may start at — `fromMinuteSchema`'s ceiling, in the field's `max`. */
+export const MINUTE_MAX = 200;
+
+/**
+ * The minute a composition starts at, read from what the coach has actually typed, or `null` when
+ * that is not a minute yet.
+ *
+ * It lives beside the sentences about the field because it is the same question they answer: what
+ * the field *says*. And it is the reason the field can be emptied at all — the editor used to hold a
+ * `number` and coerce `""` to `0` on every keystroke, so the value snapped back to `0` the instant
+ * the field was empty and reaching 10 meant typing `010` and deleting from the left. An empty field
+ * is a coach mid-keystroke: a legal state to be in, an invalid one to submit.
+ */
+export function parseMinute(raw: string): number | null {
+  if (raw.trim() === "") return null;
+  const value = Number(raw);
+  return Number.isInteger(value) ? value : null;
+}
+
+/**
+ * Why the minute field cannot be submitted, or `null` when it can.
+ *
+ * Out of range says the same thing as `fromMinuteSchema`'s own message, on purpose: the coach must
+ * not be told two different stories about the same number by the field and by the server.
+ */
+export function minuteFieldErrorFr(raw: string): string | null {
+  const minute = parseMinute(raw);
+  if (minute === null) {
+    return "Indique la minute à partir de laquelle cette composition s’applique.";
+  }
+  if (minute < 0 || minute > MINUTE_MAX) return "Cette minute est en dehors du match.";
+  return null;
 }

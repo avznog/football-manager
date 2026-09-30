@@ -159,10 +159,23 @@
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
-/* Height of the fixed bottom tab bar, safe area included. Used to pad the
-   bottom of scrollable content so nothing hides behind the bar. */
+/* Height of the fixed bottom tab bar, home indicator NOT included: add
+   `env(safe-area-inset-bottom)` yourself, because `BottomNav` pads itself with
+   `safe-pb` and the inset is therefore *inside* the bar, not under it.
+
+   One number, because three places have to agree about it and did not: the bar
+   itself (`min-h`), the padding below scrolling content (`tabbar-pb`), and the
+   composition editor's docked bench, which is *positioned* at exactly this
+   distance from the bottom. The dock said 4.5rem and the bar said 3.5rem, so
+   16 px of scrolling turf showed through between the two — the same arithmetic
+   decision 112 had already fixed in game mode. A token cannot disagree with
+   itself. */
+:root {
+  --tabbar-h: 3.5rem;
+}
+/* Pads the bottom of scrollable content so nothing hides behind the bar. */
 @utility tabbar-pb {
-  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
 }
 
 @layer base {

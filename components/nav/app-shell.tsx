@@ -126,13 +126,20 @@ export function AppShell({ team, user, isCoach, children }: AppShellProps) {
           </div>
         </aside>
 
-        {/* The bottom padding clears the fixed tab bar (56px + home indicator)
-            on mobile; from md: the tab bar is gone and `md:pb-10` takes over.
-            Written as a `pb-*` utility, not the `tabbar-pb` helper, so the
-            `md:` variant reliably wins in the cascade. */}
+        {/* The bottom padding clears the fixed tab bar on mobile; from md: the
+            tab bar is gone and `md:pb-10` takes over. Written as a `pb-*`
+            utility, not the `tabbar-pb` helper, so the `md:` variant reliably
+            wins in the cascade.
+
+            It uses `--tabbar-h` **plus 1rem**, where the dock uses the token
+            alone, and the difference is the point: this pads content, it does
+            not position anything against the bar. The 1rem is air under the
+            last card, named as air — it used to hide inside a 4.5rem that
+            claimed to be the height of a 3.5rem bar. Same pixels as before,
+            one fewer number that can be wrong. */}
         <main
           id="contenu"
-          className="mx-auto w-full max-w-3xl flex-1 px-4 py-4 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:px-6 md:py-6 md:pb-10"
+          className="mx-auto w-full max-w-3xl flex-1 px-4 py-4 pb-[calc(var(--tabbar-h)+1rem+env(safe-area-inset-bottom,0px))] md:px-6 md:py-6 md:pb-10"
         >
           {children}
         </main>
