@@ -2922,10 +2922,38 @@ is the back button in the screen's own top bar.
 
 What that bought, and what was spent to get it: the header (59) and the tab bar (56) are gone for free;
 the scoreboard card, the back-link row and the pitch card's header were **replaced** by one 56 px
-`MatchBar`, which prints the time and the live score and nothing else. The venue badge, the entry-mode
-badge and the phase line were each true and none of them is read at 78′ — they are one tap away on the
-match page, which is where a reader who wants them already is. 325 px of chrome became 64. The pitch
-went from 481 px tall with 318 visible to 540 px tall against 715 available.
+`MatchBar`, which prints the time and the live score. The venue badge and the phase line were each true
+and neither is read at 78′ — they are one tap away on the match page, which is where a reader who wants
+them already is. 325 px of chrome became 64. The pitch went from 481 px tall with 318 visible to 540 px
+tall against 715 available.
+
+**Three things were cut with them that had to come back, and the difference matters.** « Not read at
+78′ » is a fair reason to drop a badge. It is not a reason to drop something a reader cannot recover:
+
+- the old `Scoreboard` printed a visible caption « Nous – Courges » under the figures, and its own doc
+  comment said why — away from home « 0 – 2 » is a team two goals **up**, and the caption was the only
+  thing saying which way round the figures were meant. Replacing it with an `aria-label` told the one
+  reader who did not need telling. « Nous » is now a word on the score's own baseline, inside the row,
+  because a caption under the figures would cost the row the 56 px that are the whole of this entry;
+- « saisi après le match » came back for the same reason, and it is decisions 013 and 048 rather than a
+  preference: this screen prints the largest minute in the app, and on a log typed up afterwards the
+  badge is the one thing qualifying it. It sits in the hairline under the row, so it costs no height
+  when there is nothing to say;
+- the `aria-label`s meant to compensate were on a `<span>` and a `<p>`, and **ARIA 1.2 forbids a name on
+  `role=generic` and `role=paragraph`** — a conforming screen reader ignored both and read « 1 – 0 » and
+  nothing else. Both now carry `role="img"`, which is a role that takes a name.
+
+None of the three was caught by a test, and none would have been: they are a screen saying less than the
+truth, which is the class of defect this repository's definition of done singles out, and the reason a
+review reads the diff rather than the suite.
+
+**A fourth, from the move itself.** `notFound()` in game mode resolved to `app/(app)/not-found.tsx`,
+whose « la page n'existe pas, **ou elle est réservée aux coachs** » is deliberately ambiguous because
+`getLiveMatch` returns null both for a match that does not exist and for one belonging to another team.
+Outside that group it fell through to `app/not-found.tsx`, whose own comment records that its wording is
+false for exactly this case. Moving a route moves which `not-found.tsx` answers for it, so
+`app/(jeu)/not-found.tsx` is a sibling and not a duplicate — with no `<main>` of its own, because the
+group layout already renders one and two `main` landmarks is invalid HTML.
 
 **A second thing this closes, which was arithmetic and not a rendering glitch.** The owner reported a
 gap between the ACTION bar and the tab bar. The bar was pinned at
@@ -2992,8 +3020,23 @@ inert by construction: both of the reducer's switches already end in `default: b
 no score, no clock, no minutes and nothing on the pitch, and the reducer test proves that by comparing
 the entire state of a log reduced with and without it. The only reducer change it required is
 `note: string | null` on `TimelineEntry`, which had no field for free text and therefore no way to
-display one. It appears in the recap automatically, which is correct: `HIDDEN_EVENT_TYPES` is `PAUSE`,
-`RESUME` and `VOID`, and a coach's note is exactly the kind of thing a player reads afterwards.
+display one.
+
+It belongs in the recap, which is where a note written on a touchline is actually read three weeks
+later, and `HIDDEN_EVENT_TYPES` — `PAUSE`, `RESUME`, `VOID` — correctly does not hide it. **This entry
+first claimed it therefore appeared there automatically, and that was wrong.** The recap builds its
+timeline with its own `describeActors`, not the presenter's, and neither knew about `note`: the line
+rendered « 14’ · Commentaire » with an empty detail, so the 280 characters the coach typed were
+recoverable only from the raw log. The review of the pull request caught it. The fix is one exported
+`noteDetailFr` in `lib/match/presenter.ts` that both call, rather than a second `commented` branch in
+the recap — the duplication was the defect, and a second copy would have hidden the next event type
+just as quietly. The rest of the two builders stays deliberately separate: the recap says « Julien
+Marchal, passe de Karim Benali » and game mode « Julien (passe de Karim) », both pinned by tests, and
+unifying those would be a change of copy dressed up as a refactor.
+
+The lesson is the one decision 097 already states in other words: a claim in a decision entry is not
+evidence. « It appears automatically » was an inference from `HIDDEN_EVENT_TYPES`, and nothing had been
+looked at.
 
 It is also the only step in game mode with a keyboard, so it is the only one that is a form rather than
 a chain of taps — and therefore the only one where the player is a native `<select>` instead of a
