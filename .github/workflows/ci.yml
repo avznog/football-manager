@@ -1,8 +1,23 @@
-# The checks `CLAUDE.md` calls the definition of done, run on every push and pull request.
+# Everything that happens to a pull request, and everything that happens to `main`.
 #
-# The unit job and the end-to-end job are deliberately separate: `npm test` stays Vitest-only and
-# fast, and a browser run — which needs Postgres, the migrations and a production build — never
-# becomes a precondition for it.
+# **This workflow never deploys production, and never creates a tag.** Decision 081 said CI cuts the
+# tag on `main` once the checks and the migration pass. The owner has reversed that half: the tag is
+# now the deliberate act that ships a version, cut by hand, and `release.yml` is what reacts to it.
+# What survives from 081 is the *rule* the job was protecting — a tag must name the version
+# `package.json` claims, on a commit that is on `main`, whose tests and migration passed — and that
+# rule is now a gate in `release.yml` rather than a generator here. Do not re-add a `tag` job: two
+# things cutting tags is how a tag stops meaning anything.
+#
+# Where the `main` deployment comes from: **Vercel's own Git integration**, driven by
+# `vercel.json`'s `git.deploymentEnabled` (decision 080). The Vercel project's production branch is a
+# parked branch, not `main`, so a `main` push is a **Preview** deployment — the one serving
+# `dev.7orteils.bgonzva.fr`. CI does not issue it and does not order itself against it, which is the
+# same seconds-wide window decision 078 documented for production: for a few seconds the new code
+# can be serving against the old schema. The migrations are additive, which is what makes that
+# survivable; the first one that is not is the trigger to revisit it.
+#
+# A branch that is neither `main` nor a tag deploys nowhere: `vercel.json` keeps every other branch
+# off, `pull_request` runs no deploy job below, and `release.yml` only fires on `refs/tags/v*`.
 name: CI
 
 on:
@@ -16,86 +31,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # typecheck · lint · vitest, and the browser run. Both live in `checks.yml` because `release.yml`
+  # needs the identical pair and a second copy of the Postgres service would drift from this one.
   checks:
-    name: typecheck · lint · vitest
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
+    uses: ./.github/workflows/checks.yml
 
-  e2e:
-    name: end-to-end happy path
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: football
-          POSTGRES_PASSWORD: football
-          POSTGRES_DB: football_manager
-        ports: ["5432:5432"]
-        # Without this the first migration can race the server's own start-up.
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      DATABASE_URL: postgres://football:football@127.0.0.1:5432/football_manager
-      # `next start` on a built app rather than `next dev`: see `playwright.config.ts`.
-      E2E_WEB_SERVER: npm run start -- --port 3000
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-
-      # The schema the app expects, from the migrations committed alongside it — never `db:push`.
-      - run: npm run db:migrate
-
-      # Chromium only: the app is mobile-first and the suite runs one emulated phone viewport.
-      - run: npm run test:e2e:install
-
-      - run: npm run build
-      - run: npm run test:e2e
-
-      - if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
-
-  # Production migrations, applied from `main` only, and only once both jobs above have passed:
-  # the schema must never move ahead of a commit that cannot typecheck (decision 078).
+  # Preview migrations, applied from `main` only, and only once every check above has passed: the
+  # schema must never move ahead of a commit that cannot typecheck (decision 078).
   #
-  # This does not order itself against Vercel, which starts building the same push immediately.
-  # See docs/DEPLOY.md §4 — the migrations are written to be safe against the previous version
-  # still serving traffic, and the window is seconds.
-  migrate:
-    name: production migrations
-    needs: [checks, e2e]
+  # This is the *preview* database — `PREVIEW_DATABASE_URL`, a separate Neon string from the
+  # production one, because `dev.7orteils.bgonzva.fr` is a real running copy of the app and pointing
+  # it at the season's real statistics is the hazard decision 080 was written to close. Production's
+  # schema moves in `release.yml`, on the tag, and nowhere else.
+  #
+  # It fails loudly when the secret is absent rather than skipping: a migration that silently did not
+  # happen is the thing being prevented.
+  migrate-preview:
+    name: preview migrations
+    needs: [checks]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     # Deliberately *not* the workflow's cancel-in-progress group: a second push must never
     # interrupt a migration that has already started applying SQL.
     concurrency:
-      group: migrate-production
+      group: migrate-preview
       cancel-in-progress: false
 
     steps:
@@ -108,84 +68,14 @@ jobs:
 
       # The committed SQL, exactly what the end-to-end job just ran against postgres:17 — never
       # `db:push`, and `db:reset` refuses without ALLOW_REMOTE_RESET, which is set nowhere.
-      - name: apply committed migrations to Neon
+      - name: apply committed migrations to the preview database
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
         run: |
           if [ -z "$DATABASE_URL" ]; then
-            echo "::error::The DATABASE_URL repository secret is not set, so the production" \
-                 "schema was not updated. Set it to the pooled Neon string — docs/DEPLOY.md §4."
+            echo "::error::The PREVIEW_DATABASE_URL repository secret is not set, so the preview" \
+                 "schema was not updated. Set it to the pooled Neon string for the preview" \
+                 "database — docs/DEPLOY.md §4."
             exit 1
           fi
           npm run db:migrate
-
-  # One annotated tag per version of the app, cut from `main` once that commit is tested *and*
-  # migrated — so a tag never names a version whose schema change failed to apply (decision 081).
-  #
-  # The version lives in `package.json` and nowhere else. Bump it in the pull request that earns the
-  # bump; this job does the rest, because a convention that needs a human to remember it is one the
-  # next session will not know about. Re-running a push whose tag exists is a no-op, not a failure.
-  tag:
-    name: tag the version
-    needs: [checks, e2e, migrate]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Tags, so the "does it already exist" check can see them.
-          fetch-depth: 0
-
-      - name: tag this commit with the version in package.json
-        id: tag
-        run: |
-          version="v$(node -p 'require("./package.json").version')"
-
-          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
-            echo "$version already exists — nothing to do. Bump package.json to cut a new one."
-            exit 0
-          fi
-
-          git config user.name  'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag -a "$version" -m "$version — $(git log -1 --format=%s)"
-          git push origin "refs/tags/$version"
-          echo "::notice::Tagged $version at $(git rev-parse --short HEAD)."
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      # A tag is a pointer; a release is the thing a human can read. The notes are the squashed
-      # commit subjects since the previous tag — one line per pull request, which is exactly the
-      # granularity this repository merges at. Only ever runs on the push that cut the tag, so a
-      # re-run of an already-tagged commit publishes nothing twice.
-      #
-      # A version with a hyphen in it is a semver pre-release — `1.0.0-beta.1`. It is published as
-      # `--prerelease`, which keeps GitHub's "Latest" badge on the last stable version: a beta that
-      # advertises itself as the current release is worse than no release page at all (decision 110).
-      - name: publish the release for that tag
-        if: steps.tag.outputs.version != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.tag.outputs.version }}
-        run: |
-          previous=$(git describe --tags --abbrev=0 "$VERSION^" 2>/dev/null || true)
-          if [ -n "$previous" ]; then
-            range="$previous..$VERSION"
-            echo "Changes since $previous:" > /tmp/notes.md
-          else
-            range="$VERSION"
-            echo "Everything up to $VERSION:" > /tmp/notes.md
-          fi
-          echo >> /tmp/notes.md
-          git log --format='- %s' "$range" >> /tmp/notes.md
-
-          case "$VERSION" in
-            *-*) prerelease=--prerelease ;;
-            *)   prerelease= ;;
-          esac
-
-          gh release create "$VERSION" --title "$VERSION" --notes-file /tmp/notes.md $prerelease
-          echo "::notice::Published the release $VERSION${prerelease:+ as a pre-release}."

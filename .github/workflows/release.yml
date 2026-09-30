@@ -1,0 +1,243 @@
+# A tag is the act of shipping. This is the only workflow in the repository that touches production.
+#
+# Decision 081 made CI cut the tag from `package.json` after `main` was green and migrated, because
+# "remember to tag after merging" is a convention that survives two sessions. The owner has reversed
+# the direction: pushing `main` now only tests and moves the *preview* (see `ci.yml`), and a tag —
+# cut by a human, on purpose — is what tests again, migrates production and deploys it. The reason
+# 081 gave still holds against the failure it feared, so that failure is caught here instead of being
+# made impossible: the `gate` job below refuses any tag that does not name the version its own commit
+# claims, or that is not on `main`. `CLAUDE.md`'s « never create a release tag by hand » is now
+# « a hand-cut tag is checked before it is believed ».
+#
+# Nothing else deploys. `ci.yml` has no deploy job, `pull_request` builds nothing, and `vercel.json`
+# keeps Vercel's Git integration off every branch but `main` — which is a *Preview* deployment, not
+# production, because the Vercel project's production branch is a parked one (decision 080).
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Deliberately never cancelling: unlike a branch run, a tag run is not superseded by anything, and
+# cancelling one halfway would leave production migrated but not deployed.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Everything a tag has to be true about before a single byte reaches production. All three guards
+  # existed implicitly when CI cut the tag itself — the job only ran on `main`, only after `migrate`,
+  # and read the version out of `package.json` rather than being told one. A human with `git tag` can
+  # violate every one of them by accident, so they are stated.
+  gate:
+    name: is this tag allowed to ship
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    outputs:
+      release_exists: ${{ steps.existing.outputs.exists }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The whole history and every tag: `merge-base` below needs `origin/main`, and the release
+          # notes need the previous tag.
+          fetch-depth: 0
+
+      # The failure decision 081 existed to prevent: a tag that names a version the code does not
+      # claim. `v1.0.0` on a commit whose package.json says `1.0.0-beta.4` would deploy a beta under
+      # the name of the stable release, and the number is the only thing anybody can read afterwards.
+      # Checked at the *tagged commit*, not at `main`, because a tag may name an older commit.
+      - name: the tag must name the version at the tagged commit
+        run: |
+          expected="v$(node -p 'require("./package.json").version')"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME does not match the version at this commit," \
+                 "which package.json says is $expected. Nothing was deployed. Delete the tag" \
+                 "(git push origin :refs/tags/$GITHUB_REF_NAME), then either tag $expected or bump" \
+                 "package.json in a pull request first — the version lives in package.json and" \
+                 "nowhere else (decision 081)."
+            exit 1
+          fi
+          echo "::notice::$GITHUB_REF_NAME matches package.json at $(git rev-parse --short HEAD)."
+
+      # A tag on a side branch must never migrate or deploy production. Only `main` is deployed
+      # (decision 080) and only `main` has been through a pull request, CI and a review at 390 px.
+      - name: the tagged commit must be on main
+        run: |
+          git fetch --no-tags --quiet origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The commit $GITHUB_SHA that $GITHUB_REF_NAME points at is not reachable" \
+                 "from origin/main, so it has not been through a pull request and nothing was" \
+                 "deployed. Merge the branch first, then tag the commit on main. If the tag was a" \
+                 "mistake: git push origin :refs/tags/$GITHUB_REF_NAME."
+            exit 1
+          fi
+
+      # Re-pushing a tag that already has a release is not an error — it is how a failed deploy is
+      # retried. It only means the last job has nothing to publish, so it says so and skips.
+      - name: does a release already exist for this tag
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "::notice::A GitHub release already exists for $GITHUB_REF_NAME — this run will" \
+                 "re-test, re-migrate and re-deploy it, and publish nothing."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The same checks a pull request runs, on the tagged commit. Deliberately *not* skipped on the
+  # grounds that `main` was green when it was pushed: a tag can name a commit from a week ago, and a
+  # green run on that commit's own push does not prove the tag points where the run did.
+  checks:
+    needs: [gate]
+    uses: ./.github/workflows/checks.yml
+
+  # Production's schema moves here and only here. Same shape as the job decision 078 describes, with
+  # the trigger changed from "a push to main" to "a tag that passed the gate".
+  migrate-production:
+    name: production migrations
+    needs: [checks]
+    runs-on: ubuntu-latest
+
+    # Deliberately *not* the workflow's group: two tags pushed close together must never interrupt a
+    # migration that has already started applying SQL.
+    concurrency:
+      group: migrate-production
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # The committed SQL, exactly what the end-to-end job just ran against postgres:17 — never
+      # `db:push`, and `db:reset` refuses without ALLOW_REMOTE_RESET, which is set nowhere.
+      - name: apply committed migrations to Neon
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::The DATABASE_URL repository secret is not set, so the production" \
+                 "schema was not updated. Set it to the pooled Neon string — docs/DEPLOY.md §4."
+            exit 1
+          fi
+          npm run db:migrate
+
+  # Production, issued from here rather than by Vercel's Git integration — which is why this can be
+  # ordered after the migration at all. Decision 078 rejected exactly this trade (a long-lived
+  # deployment token in a repository secret, against a window of seconds) while `main` *was*
+  # production. Now that production is a tag, the token buys something 078 could not: the schema
+  # always arrives before the code that needs it, deterministically, and not "within seconds".
+  deploy-production:
+    name: deploy production
+    needs: [migrate-production]
+    runs-on: ubuntu-latest
+
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Pinned to a major: the CLI ships several times a week and its `build`/`deploy --prebuilt`
+      # contract is what this job depends on. A floating `vercel@latest` means a release can fail on
+      # a day nothing in this repository changed. Bump the major deliberately, with a run to prove it.
+      - run: npm i -g vercel@61
+
+      - name: pull the production environment
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      # Built here rather than on Vercel so that the artifact deployed is the one produced from the
+      # tagged commit, with the migration already applied. `vercel.json` still supplies the region
+      # (decision 111) — it is read from the repository, not from the dashboard.
+      - name: build
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: deploy
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "::notice::Deployed $GITHUB_REF_NAME to production: $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # A green deploy does not prove the app works — `DATABASE_URL` is scoped per environment in
+      # Vercel and the build deliberately does not need it (decision 075), so a production deploy
+      # with the wrong string compiles and then answers every screen with « Un problème est
+      # survenu ». docs/DEPLOY.md §5 is the check that matters.
+      - name: what still has to be looked at
+        run: |
+          echo "::notice::Open https://7orteils.bgonzva.fr and load one page that queries the" \
+               "database — a green deploy is not proof that DATABASE_URL is right (docs/DEPLOY.md §5)."
+
+  # A tag is a pointer; a release is the thing a human can read (decision 108). Last, so a release
+  # page never names a version that failed to migrate or failed to deploy — the same reason 081 put
+  # the tag after `migrate`.
+  release:
+    name: publish the GitHub release
+    needs: [gate, deploy-production]
+    if: needs.gate.outputs.release_exists != 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tags and full history: the notes are a range between two tags.
+          fetch-depth: 0
+
+      # The notes are the squashed commit subjects since the previous tag — one line per pull
+      # request, which is exactly the granularity this repository merges at, and each subject is
+      # written to say *why* the slice exists.
+      #
+      # A version with a hyphen in it is a semver pre-release — `1.0.0-beta.1`. It is published as
+      # `--prerelease`, which keeps GitHub's "Latest" badge on the last stable version: a beta that
+      # advertises itself as the current release is worse than no release page at all (decision 110).
+      #
+      # Idempotent, because a tag can be re-pushed to retry a failed deploy: the gate has already
+      # skipped this job if a release exists, and the check is repeated here so the job is safe on
+      # its own.
+      - name: publish the release for this tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "::notice::A release already exists for $VERSION — publishing nothing."
+            exit 0
+          fi
+
+          previous=$(git describe --tags --abbrev=0 "$VERSION^" 2>/dev/null || true)
+          if [ -n "$previous" ]; then
+            range="$previous..$VERSION"
+            echo "Changes since $previous:" > /tmp/notes.md
+          else
+            range="$VERSION"
+            echo "Everything up to $VERSION:" > /tmp/notes.md
+          fi
+          echo >> /tmp/notes.md
+          git log --format='- %s' "$range" >> /tmp/notes.md
+
+          case "$VERSION" in
+            *-*) prerelease=--prerelease ;;
+            *)   prerelease= ;;
+          esac
+
+          gh release create "$VERSION" --title "$VERSION" --notes-file /tmp/notes.md $prerelease
+          echo "::notice::Published the release $VERSION${prerelease:+ as a pre-release}."
