@@ -705,6 +705,67 @@ test("le banc est une cible : un joueur glissé dessus quitte le terrain", async
   );
 });
 
+/**
+ * The door decision 121 opened: a match played without the phone, closed and typed up without game
+ * mode ever running.
+ *
+ * It is its own test because it needs a match in the **past**, and the fixture the two tests above
+ * share is deliberately dated tomorrow so no screen has to decide whether the kick-off is behind us.
+ * What it guards is the deadlock this used to be: the retro-entry card is gated on `finished`, and
+ * until `finishMatch` existed the only thing that could write that column was a final whistle.
+ */
+test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ page }) => {
+  const fixture = provisionFixture();
+  await login(page, fixture.coach.username, fixture.password);
+
+  await page.getByRole("link", { name: "Nouveau match" }).first().click();
+  await page.getByLabel("Adversaire").fill(OPPONENT);
+  // Three weeks ago: the owner's own case, a match already played that nobody recorded.
+  await page.getByLabel("Coup d’envoi").fill(`${parisDate(threeWeeksAgo())}T15:00`);
+  await page.getByRole("button", { name: "Créer le match" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
+  const matchUrl = new URL(page.url()).pathname;
+
+  // Before this existed there was no way past here without starting a live clock.
+  await expect(page.getByRole("heading", { level: 2, name: "Terminer le match" })).toBeVisible();
+  await page.getByRole("button", { name: "Marquer comme terminé" }).click();
+
+  // The retro card is now reachable, and game mode is not offered for a match with an empty log.
+  await expect(page.getByRole("heading", { level: 2, name: "Saisir le match" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Mode match" })).toHaveCount(0);
+
+  // The undo, which is what lets « Marquer comme terminé » skip a confirmation dialog.
+  await page.getByRole("button", { name: /Rouvrir le match/ }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Terminer le match" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Mode match" })).toBeVisible();
+
+  // And the one-tap shortcut: finish and land on the form, which must not refuse the match.
+  await page.getByRole("button", { name: "Saisir le match" }).click();
+  await expect(page).toHaveURL(new RegExp(`${matchUrl}/saisie$`));
+  await expect(page.getByRole("heading", { level: 1, name: "Saisie du match" })).toBeVisible();
+  await expect(page.getByText("Ce match n’a pas encore eu lieu")).toHaveCount(0);
+
+  // Typing it up derives the score, so the row stops saying « Rien saisi » — and the fact that this
+  // works at all is the whole point: nothing downstream knows the match never had a live clock.
+  // Positionally and by value: the 1-3-2-1 has two slots both captioned « Milieu », and the options
+  // are labelled « 8. Nom » rather than by name alone. Which post each player took is not what this
+  // test is about — that one distinct player lands in each slot is.
+  const slots = page.locator("select");
+  for (const [index, [key]] of STARTERS.entries()) {
+    await slots.nth(index).selectOption(playerOf(fixture, key).membershipId);
+  }
+  await page.getByRole("button", { name: "+ But pour nous" }).click();
+  await page.getByRole("button", { name: "Enregistrer le match" }).click();
+
+  // The action redirects here itself, so wait for *its* navigation rather than starting one: a
+  // `goto` fired in the same tick cancels the POST still in flight, and the recap then truthfully
+  // reports a submission that never landed.
+  await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap\\?saisie=1$`));
+  await expect(page.getByText("rien saisi")).toHaveCount(0);
+  await expect(page.getByText("1 – 0").first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Terminer le match" })).toHaveCount(0);
+});
+
 /* -------------------------------------------------------------------------- */
 /* Steps that are worth a name                                               */
 /* -------------------------------------------------------------------------- */
@@ -768,6 +829,11 @@ async function action(page: Page, tile: string): Promise<void> {
 
 function tomorrow(): Date {
   return new Date(Date.now() + 24 * 60 * MS_PER_MINUTE);
+}
+
+/** A match well and truly played, for the retro door (decision 121). */
+function threeWeeksAgo(): Date {
+  return new Date(Date.now() - 21 * 24 * 60 * MS_PER_MINUTE);
 }
 
 function picker(page: Page, title: string): Locator {
