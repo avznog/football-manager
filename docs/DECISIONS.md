@@ -3454,3 +3454,86 @@ repository can see that a component has gone back to a literal.
 dock covering the whole pitch at the opening scroll, so the screen that says « Appuie sur un joueur puis
 sur un poste » has no post to press — is a layout problem and not an arithmetic one. It stays on the
 roadmap.
+
+## 119 — Merging moves the preview; a tag, cut by hand, is what ships
+
+**2026-09-30** · accepted · supersedes 081 and 078's rejection of a repository `VERCEL_TOKEN` · amends
+080, 108 and 110
+
+Merging a pull request deployed production. That is one act doing two jobs — « this change is good » and
+« the team should be running this now » — and the second one was never anybody's decision, it was a
+side effect of the first. The owner asked for them separated.
+
+**Decision.** A push to `main` runs the checks, applies the committed migrations to the **preview**
+database (`PREVIEW_DATABASE_URL`), and creates no tag. The Preview deployment at
+`dev.7orteils.bgonzva.fr` still comes from Vercel's own Git integration, because the Vercel project's
+production branch is a parked branch rather than `main` — so a merge moves a real running copy of the app
+and nothing the team uses. An annotated tag `v*`, pushed **by hand**, is what ships: `release.yml` gates
+the tag, re-runs the same checks on the tagged commit, migrates **production**, then builds and deploys
+production with the Vercel CLI, then publishes the GitHub release. Nothing else deploys anywhere. The
+checks themselves live once, in `checks.yml`, called by both workflows — with two callers, a second copy
+of forty lines of `postgres:17` service configuration is how the two quietly start testing different
+things.
+
+**What 081 was protecting, and why a gate keeps it.** 081 had CI cut `v<version>` from `package.json`
+once `main` was green, and it argued the point in a sentence that deserves quoting because it is the
+whole ethic of this repository: *« "Remember to tag after merging" is exactly the kind of convention that
+survives two sessions and then quietly stops happening »* — a convention that needs a human to remember
+it is one the next session will not know about. That argument was about the **failure**, not about who
+acts. The failure it named is a tag that names a version nothing verified, and the property it wanted is
+that a tag is a true claim. So the generator becomes a gate, with three guards stated where they used to
+be implicit in *where* the job ran: the tag must equal `v$(package.json version)` **at the commit it
+points at**, the commit must be reachable from `origin/main`, and the same checks must pass on it before
+a byte moves. The error message names the command that deletes a bad tag, because a gate that refuses
+without saying what to do is a gate somebody works around.
+
+**And the honest half: the convention now does need a human to remember it.** 081 is right that it will
+sometimes be forgotten. What matters is what forgetting *costs*, and that is the asymmetry the two
+designs do not share. Forget to tag and the version sits on `main`, tested, migrated on the preview,
+visible at `dev.7orteils.bgonzva.fr` — and production keeps serving the last tag, which is a version that
+went through this whole path. Nothing is broken, nothing is half-deployed, and the repair is to push a
+tag whenever somebody notices. The failure 081 feared was not like that: a tag naming a version nothing
+verified is a false claim already published, and the thing that reads it — a human deciding what is
+live — has no way to tell. A silent omission that leaves production correct is a safe failure; a silent
+lie is not. The bump itself, which is the judgement that cannot be automated, is still reviewed in a pull
+request exactly as 081 left it.
+
+**Why a `VERCEL_TOKEN` is now worth it.** 078 rejected precisely this — a long-lived deployment
+credential in a repository secret — and it weighed it against « a window of seconds », which was the
+right weighing at the time: `main` *was* production, Vercel started building the same push the migration
+ran on, and the two raced by a few seconds. Deploying from CI does not buy a few seconds now, it buys a
+guarantee. Production is deployed by a job that `needs` the migration job, in one workflow, so the schema
+provably arrives before the code that needs it — not « within seconds of », *before*, or the deploy never
+happens at all. 078 also named its own trigger to revisit: « a dropped column, a narrowed type », the
+first migration that is not safe in both directions. PR 3 of the current plan drops a column and narrows
+a type, so that trigger is about to fire regardless; this decision reaches it first. The token is scoped
+to the project, it is never printed, and `vercel.json` is still the source of the region (111) and the
+branch rule, so the deployment is configured from the repository and not from a dashboard.
+
+**080's mechanism survives; two of its sentences do not.** `vercel.json` permitting `main` and nothing
+else is untouched, and it is still what keeps a `feat/<slice>` branch from deploying. But 080 says « a
+push to `main` is a production deploy », and it is now a Preview deploy; and it lists « no preview URL to
+hand somebody » under what is given up, which is no longer given up — there is exactly one, it is
+`dev.7orteils.bgonzva.fr`, and it has its own Neon branch, which is the fix 080 explicitly deferred
+rather than declared unnecessary.
+
+**108 and 110 still hold, one workflow to the left.** Every tag still gets a GitHub release, still cut by
+CI, still with the squashed commit subjects since the previous tag as its notes (108); a hyphenated
+version is still published `--prerelease` on the strength of the hyphen alone (110). What changed is that
+the release step publishes for a tag CI did **not** create, and it runs last for the same reason 108 put
+it after `migrate` — a release page must never name a version that failed to migrate or failed to deploy.
+It is idempotent: re-pushing a tag re-tests, re-migrates and re-deploys, which is how a deploy that
+failed on a bad afternoon is retried, and publishes no second release. 110's closing line, « no hand-cut
+tag — a tag nothing verified is still forbidden », now reads « a hand-cut tag is checked before it is
+believed ».
+
+**What this does not protect, said plainly so nobody assumes it.** The gate compares the tag to
+`package.json`, **not to the tag history**: a tag can be pushed at a commit whose version was never
+bumped past the previous release, so `v1.0.0-beta.3` can be deleted and re-pushed at a later commit that
+still says `1.0.0-beta.3`, and it will gate, migrate and deploy. Nothing enforces that versions increase,
+that a tag is only ever pushed once, or that the commit tagged is the newest on `main` — a tag on a
+commit from last week is allowed on purpose, because rolling back by re-deploying an older verified
+version is a thing a coach may need on a Sunday morning. And re-pushing a tag **re-deploys**, which is
+the retry mechanism and also the sharpest edge here: `git push --force origin v…` at a different commit
+is a production deploy with no pull request in front of it. The guard on that is the same one as on every
+other irreversible act in this repository — it is the owner's own hand, and it is written down here.

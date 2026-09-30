@@ -109,9 +109,12 @@ npm run peer           # what the other sessions changed on origin since last ru
 the page never hydrates, and the suite silently tests the no-JavaScript fallbacks instead. It owns
 its own fixture team and never touches the demo season (decision 044).
 
-`.github/workflows/ci.yml` runs the same checks on every push and pull request: one job for
-typecheck · lint · vitest, and one for the browser run on a `postgres:17` service with the committed
-migrations and a production build.
+`.github/workflows/checks.yml` holds those checks — one job for typecheck · lint · vitest, and one for
+the browser run on a `postgres:17` service with the committed migrations and a production build. It is
+`workflow_call` only and never runs on its own: `ci.yml` calls it for every pull request and every push
+to `main`, and `release.yml` calls it again for a tag, so a tag is tested exactly as the pull request
+was. `ci.yml` then migrates the **preview** database on a `main` push and creates no tag; `release.yml`
+is the only workflow that touches production (decision 119).
 
 `next typegen` has to run before `tsc`, so always go through `npm run typecheck` rather than
 calling `tsc` directly: `PageProps<"/route">` does not exist until the route types are generated.
@@ -137,13 +140,20 @@ calling `tsc` directly: `PageProps<"/route">` does not exist until the route typ
 One branch per slice, named `feat/<slice>`. Open a PR describing what the slice does and how to
 verify it. **Squash-merge** into `main`. Never commit directly to `main`.
 
-Only `main` deploys — a push to any other branch builds nothing on Vercel (decision 080), so the
-preview URL to check a change on is the one CI's browser job builds, or a local `npm run build`.
+Only `main` deploys from git — a push to any other branch builds nothing on Vercel (decision 080), so
+the way to look at a branch is a local `npm run build`. A push to `main` moves the **Preview**
+deployment at `dev.7orteils.bgonzva.fr`, not production: the Vercel project's production branch is a
+parked one (decision 119).
 
-**Versions are the `version` field in `package.json`, and CI turns them into tags.** Bump it in the PR
-that earns the bump and the `tag` job cuts `v<version>` on `main` once the tests and the migration have
-passed (decision 081). Never create a release tag by hand: a tag that does not follow that path is a
-claim about a version nothing verified.
+**Versions are the `version` field in `package.json`, and a tag is the act that ships.** Bump the number
+in the pull request that earns it; then, when the owner decides to ship, the annotated tag is cut **by
+hand** on `main` — and pushing it is what migrates the production database and deploys production
+(decision 119, superseding 081). The `gate` job in `.github/workflows/release.yml` refuses any tag that
+does not equal `v$(package.json version)` **at the commit it points at**, or whose commit is not
+reachable from `origin/main`, and names in its error the command that deletes it. So a hand-cut tag is
+checked before it is believed rather than forbidden — but nothing cuts it for you, and an untagged
+version on `main` means production keeps serving the previous one. `docs/DEPLOY.md` « Shipping a
+version » is the four steps.
 
 **Nothing is done until it is on `origin`.** The whole reason this project keeps its spec, its
 decisions and its migrations in git is that sessions share no memory: work that exists only in a

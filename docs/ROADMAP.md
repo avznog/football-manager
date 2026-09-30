@@ -61,7 +61,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       3 trainings, an event log with a voided goal, ratings
 - [x] Playwright end-to-end happy path (`e2e/happy-path.spec.ts`, `npm run test:e2e`) — the whole
       PLAN scenario driven through the UI on a 390×844 viewport, with a run-scoped fixture team
-      instead of the demo season (decision 044), plus CI in `.github/workflows/ci.yml`
+      instead of the demo season (decision 044), plus CI — the job lives in
+      `.github/workflows/checks.yml`, which `ci.yml` calls for every pull request and every push to
+      `main` and `release.yml` calls again for a tag (decision 119)
 - [x] Playwright first run (`e2e/first-run.spec.ts`) — the state a fresh deployment is in: a super
       admin with no team creates one from `/rejoindre`, lands in the app, sees an empty squad that
       says what to do next, and renames the team. Mutation-tested against the four bugs it covers
@@ -532,9 +534,24 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       not cross a `/`, so a lone `*` would have matched `main` and missed every `feat/<slice>` branch
 - [x] Versions are tagged. There were none — eight milestones and a live deployment with no way to name
       what was running except a commit hash. The version is `package.json`'s `version` field, and the
-      `tag` job cuts `v<version>` on `main` after the tests *and* the migration pass, so a tag never
-      names a version whose schema change failed (decision 081). Bumping is still a human judgement;
-      remembering to tag is not
+      `tag` job cut `v<version>` on `main` after the tests *and* the migration passed, so a tag never
+      named a version whose schema change failed (decision 081). Bumping is still a human judgement —
+      and **so is tagging, since decision 119**: the generator became a gate, and the item below is where
+      that flow is written down
+- [x] Shipping and merging are two acts. A push to `main` now runs the checks, migrates the **preview**
+      database (`PREVIEW_DATABASE_URL`) and moves the Preview deployment at `dev.7orteils.bgonzva.fr`,
+      and cuts **no** tag; a tag `v*` pushed **by hand** is what gates, re-tests, migrates production and
+      deploys it with the Vercel CLI before publishing the release (decision 119, superseding 081 and
+      078's rejection of a repository `VERCEL_TOKEN`). The checks live once, in
+      `.github/workflows/checks.yml`, called by both `ci.yml` and `release.yml`. What this buys that the
+      old flow could not: production's migration provably precedes the code that needs it, and there is a
+      running copy of the app to look at before anything ships
+- [ ] **A question only the owner can answer: does the `PREVIEW_DATABASE_URL` secret really hold the Neon
+      *preview* branch's connection string?** A GitHub secret is write-only and the Vercel values are
+      sensitive, so no session can read it. If it holds the production string instead — pasted before the
+      preview branch existed, or copied from the wrong tab — then every merge to `main` migrates
+      production, silently and green, which is exactly what decision 119 was written to stop. One look at
+      the secret settles it; `docs/DEPLOY.md` §2 « still to verify » says what to compare
 - [ ] `db:bootstrap` — the super admin. This is the last thing between a working deployment and a
       usable one: the schema is there and every screen is reachable, but there is no account to log in
       with, and an invite-only app cannot make one from the browser (decision 052). One command,
@@ -547,9 +564,11 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       both, because it is idempotent and re-hashes the password every time
 - [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6. No longer blocked by the
       login page; it now waits only on an account to log in with
-- [ ] Give Preview its own Neon branch — **before** previews are ever turned back on, not now. Decision
-      080 removed the hazard by removing the previews; this is the fix that would make them safe to
-      have again, and the roadmap keeps it because « we turned it off » is not « we solved it »
+- [x] Preview has its own Neon branch. Decision 080 removed the hazard by removing the previews and this
+      item kept the real fix on the list, because « we turned it off » is not « we solved it ». Decision
+      119 pays it: one preview deployment, `dev.7orteils.bgonzva.fr`, with its own connection string in
+      Vercel's Preview scope and in the `PREVIEW_DATABASE_URL` secret — subject to the verification
+      question above
 
 ## First run and static assets
 

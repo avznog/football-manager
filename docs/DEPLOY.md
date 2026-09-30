@@ -1,7 +1,9 @@
 # Deploying
 
-Vercel for the application, Neon for the database, and git between them: a push to `main` migrates
-the schema and deploys the code.
+Vercel for the application, Neon for the database, and git between them — in two halves (decision 119):
+a push to `main` runs the checks, migrates the **preview** schema and moves the preview deployment at
+`dev.7orteils.bgonzva.fr`; a tag `v*` pushed **by hand** migrates **production** and then deploys it.
+Nothing else deploys anywhere.
 
 This has been done for real — a Neon project and a Vercel project both called `football-manager`,
 the latter under the `avznog-team` scope and connected to `avznog/football-manager` on GitHub. So
@@ -25,13 +27,27 @@ Interactive signup, so the owner does this. **Done** for the live instance.
 
 ## 2. Migrations
 
-**After the first one, CI does this.** The `migrate` job in `.github/workflows/ci.yml` applies the
-committed SQL to Neon on every push to `main`, once typecheck, lint, Vitest and the browser run have
-passed (decision 078). It needs one repository secret, set once — the Vercel copy of the string
-cannot be read back, so it has to be pasted here separately:
+**After the first one, CI does this.** The committed SQL is applied by GitHub Actions — never from the
+Vercel build command, never by hand before a deploy (decision 078) — and *which* database it reaches is
+decided by what was pushed (decision 119):
+
+| What you pushed | Job | Database |
+|---|---|---|
+| a commit to `main` | `migrate-preview` in `.github/workflows/ci.yml` | the preview branch, `PREVIEW_DATABASE_URL` |
+| a tag `v*`, by hand | `migrate-production` in `.github/workflows/release.yml` | production, `DATABASE_URL` |
+
+Both run only once typecheck, lint, Vitest and the browser run have passed on that same commit, both
+have their own concurrency group with `cancel-in-progress: false` so a second push can never interrupt
+SQL that has started applying, and both **fail loudly when their secret is absent** rather than skipping:
+a migration that silently did not happen is the thing being prevented. The production one also runs
+*before* the deploy job in the same workflow, which is the ordering decision 078 could not have.
+
+Two repository secrets, set once each — a string in Vercel cannot be read back, so every place that
+needs one gets its own paste:
 
 ```bash
-gh secret set DATABASE_URL --repo avznog/football-manager   # paste the pooled string at the prompt
+gh secret set DATABASE_URL --repo avznog/football-manager           # the pooled production string
+gh secret set PREVIEW_DATABASE_URL --repo avznog/football-manager   # the pooled string of the Neon preview branch
 ```
 
 This is the *only* way migrations reach production now, including the first one. That was not the
@@ -40,8 +56,8 @@ schema to serve against until it has run — but on the push that merged the `mi
 applied it: `migrations applied`, 41 seconds, against a database that had none. A brand-new Neon
 database needs nothing from a laptop.
 
-Running it by hand is still the way to migrate a database CI does not know about — a Neon branch for
-Preview, or a restored copy:
+Running it by hand is still the way to migrate a database CI does not know about — a restored copy, or a
+scratch Neon branch:
 
 ```bash
 DATABASE_URL='postgres://…-pooler…/neondb?sslmode=require' npm run db:migrate
@@ -53,6 +69,16 @@ and there is no reason to set it.
 
 If the Neon project was attached through Vercel's marketplace rather than created by hand, take the
 string from the **Neon** dashboard: `vercel env pull` hands back an empty value for it, see §4.
+
+### Still to verify — a question for the owner
+
+**Does `PREVIEW_DATABASE_URL` really hold the connection string of the Neon *preview* branch?** No
+session can check: a GitHub secret is write-only and the Vercel copies are sensitive, so the only person
+who can read it is the owner. It matters more than it looks. If that secret holds the **production**
+string — pasted there before the preview branch existed, or copied from the wrong tab — then every push
+to `main` now migrates production, which is precisely the ordering decision 119 was written to stop, and
+nothing anywhere would say so: the job would print `migrations applied` and go green. Please open it once
+and confirm the host and database name are the preview branch's, not production's.
 
 ## 3. Reference data and the first account — `db:bootstrap`
 
@@ -80,11 +106,17 @@ rewrite every team on the instance.
 
 ## 4. Vercel
 
-The project is `avznog-team/football-manager`, connected to `avznog/football-manager`. **Deploys come
-from git, and only from `main`**: a push to `main` is a production deploy, and a push to any other
-branch deploys nothing at all (decision 080). `vercel --prod` from a laptop still works and is the way
-to ship a commit that is not on `main`, but it should stay the exception — the point of decision 078 is
-that the schema and the code move on the same push.
+The project is `avznog-team/football-manager`, connected to `avznog/football-manager`. **Deploys from git
+come only from `main`**, and a push to any other branch deploys nothing at all (decision 080). What a
+`main` push produces is a **Preview** deployment, the one serving `dev.7orteils.bgonzva.fr`, because the
+project's production branch is a **parked branch** rather than `main`.
+
+**Production is not deployed from git at all.** `release.yml` builds it and deploys it with the Vercel
+CLI — `vercel pull` / `vercel build --prod` / `vercel deploy --prebuilt --prod`, the CLI pinned to
+`vercel@61` — on a tag, and only after the production migration has succeeded (decision 119). That is
+what makes the ordering deterministic instead of "within seconds", which is the whole trade decision 078
+had rejected. `vercel --prod` from a laptop still works and is the break-glass route, but it skips the
+gate, the checks and the migration, so it is an incident tool and not a way to ship.
 
 If it ever has to be re-linked:
 
@@ -93,9 +125,11 @@ vercel link --yes --project football-manager
 vercel git connect --yes
 ```
 
-Next.js is detected without configuration. `vercel.json` exists for one reason — the branch rule above
-— and holds nothing else. The build command is the default `npm run build`, and it deliberately does
-not migrate: decision 078 says why.
+Next.js is detected without configuration. `vercel.json` holds two rules and nothing else: the branch
+rule below, and `"regions": ["lhr1"]` so the functions run in the same city as the database (decision
+111). It is read from the repository rather than the dashboard, which is why the CI build honours it too.
+The build command is the default `npm run build`, and it deliberately does not migrate: decision 078 says
+why.
 
 ### Only `main` deploys
 
@@ -116,15 +150,19 @@ This is a `git.deploymentEnabled` rule rather than an `ignoreCommand`, which is 
 `ignoreCommand` starts a build container and then exits early, so it shows a cancelled deployment per
 push and bills for the start-up. `deploymentEnabled` means the deployment is never created.
 
-### The one variable, and the trap in it
+### One variable name, two databases, and the trap in it
 
-`DATABASE_URL`, the pooled Neon string, on Production and Preview, marked **sensitive**. Two
-consequences, and the second one cost three builds:
+The application reads `DATABASE_URL` and nothing else. In Vercel that name is **scoped per
+environment**: the Production scope holds the pooled production string and the Preview scope holds the
+pooled string of the Neon **preview** branch, so the same code reads a different database depending on
+which deployment is answering. That is the whole mechanism behind decision 119's split — CI decides which
+*schema* moves, and Vercel's environment scoping decides which *data* a running copy sees. Both are
+marked **sensitive**, with two consequences, and the second one cost three builds:
 
 - **Nothing can read it back** — not the dashboard, not `vercel env ls`, not `vercel env pull`, which
-  writes `[SENSITIVE]` where the value would be. That is the point of the setting. It is also why the
-  same string has to be pasted independently into the GitHub secret in §2, and why a session that
-  needs to run a migration has to ask for it rather than fetch it.
+  writes `[SENSITIVE]` where the value would be. That is the point of the setting. It is also why both
+  strings have to be pasted independently into the two GitHub secrets in §2, and why a session that
+  needs to run a migration has to ask for one rather than fetch it.
 - **A sensitive variable does not exist during the build.** Vercel exposes it at runtime only. The
   first three deploys failed with `DATABASE_URL is not set` about a variable that was set, correctly,
   for Production — because `db/client.ts` read it at module scope and `next build` imports every
@@ -145,21 +183,26 @@ happened here on the first attempt: both were set on the Vercel project, along w
 for the one account that can read and rewrite every team on the instance, once it has been somewhere
 it did not need to be, is reset rather than reasoned about: run `db:bootstrap` again with a new one.
 
-### Preview deployments, and the gun the branch rule unloaded
+### The preview deployment, and the gun that used to be loaded
 
-`DATABASE_URL` is set for Preview as well as Production, and it is **the same Neon database**. While
-every branch deployed, that meant every pull request previewed against the real season and a Server
-Action tapped in a preview wrote to it — the same hand that opens a preview to check a lineup editor,
-writing to the season the team's statistics come from. Vercel Authentication kept the reachable set to
-the team scope rather than the internet, which made it survivable, not fine.
+`DATABASE_URL` used to be set for Preview with **the same value as Production**. While every branch
+deployed, that meant every pull request previewed against the real season and a Server Action tapped in a
+preview wrote to it — the same hand that opens a preview to check a lineup editor, writing to the season
+the team's statistics come from. Vercel Authentication kept the reachable set to the team scope rather
+than the internet, which made it survivable, not fine.
 
-Decision 080 removes it rather than mitigating it: no branch but `main` deploys, so there is no preview
-to point at the wrong database. The Preview value is now inert — it is left in place because
-`vercel --prod`-style manual deploys and any future preview should find a working variable rather than
-a missing one, but nothing reads it automatically.
+Decision 080 unloaded it by removing the previews: no branch but `main` deploys. Decision 119 brings one
+preview back on purpose and is meant to pay the price 080 deferred — **a separate Neon preview branch**,
+with its own connection string in the Preview scope and in the `PREVIEW_DATABASE_URL` secret. Whether the
+two strings really are two is the open question above, and until it is answered this paragraph describes
+the intent rather than a verified fact. So there is exactly one
+preview deployment, `dev.7orteils.bgonzva.fr`, it is what a merge to `main` moves, and it is a real
+running copy of the app against data nobody's season depends on.
 
-If previews are ever turned back on, give Preview its own Neon branch **first**. That is the fix the
-branch rule let us skip, not one it made unnecessary.
+A `feat/<slice>` branch still gets nothing: `vercel.json` keeps every other branch off, which is 080's
+mechanism, untouched. If per-branch previews are ever wanted, that is a separate change, and it would
+want the same Neon branch this one does — see the question above, which is the one thing about this
+arrangement no session has been able to confirm.
 
 ### Turn Deployment Protection off
 
@@ -224,30 +267,64 @@ test, which is why this step is in the definition of done rather than in a wish 
 
 ## Upgrading later
 
-Squash-merge the pull request. That is the whole procedure: CI typechecks, lints, runs Vitest and the
-browser suite, then applies any new migration to Neon and tags the version, while Vercel builds and
-promotes the same commit. Nothing to run by hand.
+Squash-merge the pull request. That gets the change **tested and onto the preview**, and no further:
+`ci.yml` typechecks, lints, runs Vitest and the browser suite, then applies any new migration to the
+preview database, while Vercel's Git integration builds the same commit as a Preview deployment at
+`dev.7orteils.bgonzva.fr`. Production is untouched and still serving the last tag (decision 119).
 
-Vercel is not ordered against the migration, so for a few seconds the new code may be serving against
-the old schema. Migrations are written to be safe in that direction. One that cannot be — a dropped
-column, a narrowed type — is the case to take out of this flow and do by hand, with the reasoning
-written down.
+Nothing orders Vercel's preview build against the preview migration, so for a few seconds the new code
+may be serving against the old schema — on the preview, which is what makes that acceptable now.
+Production has no such window: `release.yml` migrates and *then* deploys, in one workflow, in that order.
+A migration that is not safe in either direction — a dropped column, a narrowed type — is still worth
+saying out loud in the pull request, because the preview will live through the window even though
+production will not.
 
-### Versions are tags, and CI cuts them
+### Shipping a version
 
-The version of the app is the `version` field in `package.json` and lives nowhere else. **Bump it in
-the pull request that earns the bump**; the `tag` job in `.github/workflows/ci.yml` creates the
-annotated `v<version>` tag on `main` after the tests and the migration have passed, and pushing a
-`main` commit whose version is already tagged does nothing (decision 081). Both halves have now run:
-`v0.1.0` was cut on the merge that added the job, and the next `main` push logged `v0.1.0 already
-exists — nothing to do` and finished green, leaving the tag where it was.
+The version of the app is the `version` field in `package.json` and lives nowhere else. Cutting the tag
+is a **deliberate human act**, four steps:
 
-So: to cut a release, edit one number. To find what a tag contains, `git show v0.1.0`. To see which
-version is live, read `package.json` on `main` — Vercel deploys `main` and nothing else, so they cannot
-disagree.
+1. **Bump `package.json`'s `version` in the pull request that earns it** — a feature is a minor, a fix is
+   a patch, and a hyphen makes it a pre-release (`1.0.0-beta.4`, decision 110). One number, one commit,
+   reviewed with the change that justifies it.
+2. **Squash-merge it and let `ci.yml` finish green.** The preview migration runs here.
+3. **Look at the preview.** `https://dev.7orteils.bgonzva.fr`, at 390 px, in both themes, on the screens
+   the change touches. This is the step the old flow could not offer at all, and it is the point of
+   having a preview: production has not moved yet, so there is still time to find the defect.
+4. **Tag it and push the tag.** From a `main` that is up to date with `origin`:
 
-The tag comes after the migration deliberately. A tag is a claim that a version reached production
-whole, and a version whose schema change failed to apply did not.
+   ```bash
+   git switch main && git pull
+   git tag -a v1.0.0-beta.4 -m "The composition editor refuses a finished match"
+   git push origin v1.0.0-beta.4
+   ```
+
+Then **watch `release.yml`** — `gh run watch` or the Actions tab. It gates the tag, re-runs the same
+checks on the tagged commit, migrates production, builds and deploys production with the Vercel CLI, and
+publishes the GitHub release last, so a release page never names a version that failed to migrate or
+failed to deploy (decisions 108 and 110). A green run is still not proof the app *works*: open
+`https://7orteils.bgonzva.fr` and load one page that queries the database, for the reason in §4.
+
+**If the gate refuses the tag**, nothing was migrated and nothing was deployed — that is the point of
+putting it first. The error names the exact command, and it is always the same shape:
+
+```bash
+git push origin :refs/tags/v1.0.0-beta.4   # delete it on the remote
+git tag -d v1.0.0-beta.4                   # and locally
+```
+
+Then fix the cause and tag again. There are two causes. The tag did not equal `v$(package.json version)`
+**at the commit it points at** — so either tag the version the commit actually claims, or bump
+`package.json` in a pull request first, which is step 1. Or the commit is not reachable from
+`origin/main` — so merge the branch and tag the commit on `main`, because only `main` has been through a
+pull request, CI and a look at 390 px.
+
+Re-pushing a tag that already deployed is not an error: it re-tests, re-migrates and re-deploys, and
+publishes no second release. That is how a release whose deploy job failed on a bad afternoon is retried.
+
+To find what a tag contains, `git show v1.0.0-beta.3`. To see which version is **live**, read the latest
+tag — not `package.json` on `main`, which is now allowed to be ahead of production, and normally is
+between a merge and the decision to ship.
 
 ## Running the whole stack locally with Docker — optional
 
@@ -312,7 +389,10 @@ Notes worth having before something surprises you:
 
 | Variable | Where | Why |
 |---|---|---|
-| `DATABASE_URL` | Vercel production + preview (sensitive), the `DATABASE_URL` GitHub secret, and the shell for `db:*` scripts | The only variable the application itself needs. Unreadable once set in Vercel, so each place gets its own paste. |
+| `DATABASE_URL` | Vercel, **scoped per environment** (sensitive): the production string on Production, the Neon preview branch's on Preview. Also the `DATABASE_URL` GitHub secret — production only — and the shell for `db:*` scripts | The only variable the application itself needs. Unreadable once set in Vercel, so each place gets its own paste. |
+| `PREVIEW_DATABASE_URL` | the GitHub secret of that name, only | What `migrate-preview` in `ci.yml` applies the committed SQL to on a push to `main`. Must be the Neon **preview** branch — see §2's « still to verify ». Nothing in the application reads this name. |
+| `VERCEL_TOKEN` | the GitHub secret of that name, only | Lets `release.yml` deploy production with the CLI *after* the migration, which is the ordering decision 119 bought with it. Scope it to this project and rotate it if it is ever printed. |
+| `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | GitHub repository **variables**, not secrets | Which project `vercel pull` links to. They are identifiers, not credentials, so they are readable on purpose. |
 | `SUPER_ADMIN_USERNAME` | command line, once | The first account, in `db:bootstrap`. |
 | `SUPER_ADMIN_PASSWORD` | command line, once | Its password. Never in Vercel, never in a GitHub secret. |
 | `ALLOW_REMOTE_RESET` | nowhere | Exists so `db:reset` can refuse. Do not set it in production. |

@@ -194,10 +194,14 @@ Check these against the current files rather than trusting this list — it is a
   Your branch will get **no preview deployment**, and no Vercel status check on its pull request.
   That is deliberate, not a broken integration: every preview ran against the _production_ Neon
   database. GitHub Actions is the gate. Do not delete `vercel.json` to "restore previews".
-- **Migrations are applied by CI on `main`** (decision 078), from the `DATABASE_URL` repository
-  secret. Do not run `db:migrate` against production by hand, and never `db:push` or `db:reset` at it.
-- **Versions are tags, cut by CI** from `package.json`'s `version` (decision 081). Bump the number in
-  your pull request if it earns one; **never create a tag by hand.**
+- **Migrations are applied by CI** (decision 078), never by hand. A push to `main` migrates the
+  **preview** database from `PREVIEW_DATABASE_URL`; production's schema moves only on a tag, in
+  `release.yml`, from `DATABASE_URL` (decision 119). Do not run `db:migrate` against either by hand, and
+  never `db:push` or `db:reset` at them.
+- **A version is `package.json`'s `version`, and a tag pushed by hand is what ships it** (decision 119,
+  superseding 081 — CI no longer cuts the tag). Bump the number in your pull request if it earns one;
+  **the tag is the owner's act, not yours** — point 3 of the working agreement — so still never push one
+  from here.
 - The app is **live** at `https://football-manager-avznog-team.vercel.app`. It has a schema and, as of
   this writing, **no user account** — `db:bootstrap` has not been run. So `main` is not a toy.
 
@@ -456,6 +460,20 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   the two figures separately so it can underline ours — use it rather than typing a second « – »
   (decision 064 still holds). Nothing touched in `vercel.json`, `.github/`, `package.json` or the
   deployment. Part 2 is still blocked on the Neon `preview` branch.
+- **2026-09-30 · the owner's machine · `ci/production-on-a-tag`** — **Part 2 has landed: merging no longer
+  deploys production.** A push to `main` runs the checks, migrates the **preview** database
+  (`PREVIEW_DATABASE_URL`) and moves `dev.7orteils.bgonzva.fr`; **no tag is cut**. A tag `v*` pushed **by
+  hand** is what ships — `release.yml` gates it, re-runs the checks on the tagged commit, migrates
+  production and deploys it with the Vercel CLI, then publishes the release. So **the « never create a tag
+  by hand » line in this file and in `CLAUDE.md` is reversed**: a hand-cut tag is now the normal way, and
+  the gate refuses one that does not equal `v$(package.json version)` at the commit it points at or is not
+  reachable from `origin/main`. Decision **119**, superseding 081 and 078's rejection of a repository
+  `VERCEL_TOKEN`, amending 080, 108 and 110 — so the next free number is **120**, and note this branch was
+  cut behind another that had already taken 116–118. The checks moved to
+  `.github/workflows/checks.yml`, called by both `ci.yml` and `release.yml`; `vercel.json` is unchanged.
+  `docs/DEPLOY.md` has a numbered « Shipping a version » and a « still to verify » that is the one real
+  risk here: **only the owner can confirm `PREVIEW_DATABASE_URL` points at the Neon preview branch** — if
+  it holds the production string, a `main` push now migrates production, green and silent.
 
 ### From the other machine
 
