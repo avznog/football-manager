@@ -22,10 +22,10 @@ export type MatchBarProps = {
  * The whole top of game mode: one row, 56 px tall, replacing the app header, the back link and the
  * old `Scoreboard` card — 217 px of chrome down to 64 including the route's padding.
  *
- * What it keeps is what the owner asked for and nothing else: **the time and the live score**. The
- * venue badge, the entry-mode badge and the phase line all said something true and none of them is
- * looked at at 78′; they are one tap away on the match page, which is where a reader who wants them
- * already is. The clock stays `font-mono … tabular-nums` so the digits do not jump as the seconds
+ * What it keeps is what the owner asked for and nothing else: **the time and the live score**
+ * (decision 112). The venue badge, the entry-mode badge and the phase line all said something true and
+ * none of them is looked at at 78′; they are one tap away on the match page, which is where a reader
+ * who wants them already is. The clock stays `font-mono … tabular-nums` so the digits do not jump as the seconds
  * tick, and stays **continuous** (decision 009) — the second half of a 2 × 30 reads 30′ → 60′, and a
  * half running long grows a « +2 » rather than resetting.
  *

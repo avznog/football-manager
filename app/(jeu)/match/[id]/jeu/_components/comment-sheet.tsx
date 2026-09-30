@@ -19,7 +19,7 @@ export type CommentSheetProps = {
 };
 
 /**
- * « Commentaire » — the one action in game mode that is not a fact about the football.
+ * « Commentaire » — the one action in game mode that is not a fact about the football (decision 114).
  *
  * Everything else the menu records is derivable and countable: a goal moves the score, a
  * substitution moves a player. A note is none of those things, which is exactly why it was asked

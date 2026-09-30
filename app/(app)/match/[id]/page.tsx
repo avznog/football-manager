@@ -228,7 +228,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
           at the same time — « Voir le résumé » directly above « Reprendre le mode match » — and the
           summary it opened stated a man of the match and the minutes played of an afternoon that was
           0–0 in its 12th minute. The recap refuses a live match now too; this is the link that should
-          never have offered it. */}
+          never have offered it (decision 113). */}
       {match.status === "finished" ? (
         <Card title="Après le match" as="h2">
           <div className="space-y-3">

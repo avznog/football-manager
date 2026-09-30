@@ -99,7 +99,8 @@ type MenuKey = MatchEventType | typeof MORE;
  * Nine tiles was a list wearing a grid's clothes. The four here are what a Sunday match actually
  * produces — and the fourth is « Commentaire », which is the only one of them that is not a fact
  * about the football and the one the owner asked for. « Autre… » spans the row underneath, because a
- * tile that opens another menu must not be mistakable for a tile that records something.
+ * tile that opens another menu must not be mistakable for a tile that records something
+ * (decision 114).
  */
 const CHOICES: readonly ActionChoice<MenuKey>[] = [
   { type: "GOAL_FOR", label: "But", hint: "buteur, passeur", tone: "accent" },
@@ -114,7 +115,7 @@ const CHOICES: readonly ActionChoice<MenuKey>[] = [
  * nothing reads it, so it stops being offered. It is *not* removed from the vocabulary — `FOUL`
  * stays in `MATCH_EVENT_TYPES`, in `GAME_MODE_EVENT_TYPES` and in the retro-entry screen, because
  * `match_events` is append-only (invariant 1) and the fouls already in a log must still render and
- * still be voidable.
+ * still be voidable (decision 114).
  */
 const MORE_CHOICES: readonly ActionChoice[] = [
   { type: "OWN_GOAL", label: "CSC", hint: "notre joueur", tone: "danger" },
@@ -857,7 +858,7 @@ type ActionBarProps = {
  * the gap the owner saw came from, and it was arithmetic rather than a rendering glitch: 4.5rem is
  * 72 px, `BottomNav` is `min-h-14` — 56 — so 16 px of scrolling page showed through between the two
  * bars at every inset. Game mode has no tab bar any more, so the bar sits at `bottom-0` and the gap
- * has nowhere to be.
+ * has nowhere to be (decision 112).
  *
  * ACTION keeps half the width and its 64 px, because it is the one thing the coach reaches for
  * without looking; the clock button and « Pause » share the other half. `clockLabel` is

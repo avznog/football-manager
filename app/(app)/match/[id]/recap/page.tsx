@@ -76,7 +76,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
    * afternoon still being played — and the match page was offering the link next to « Reprendre le
    * mode match », so both were true at once. The live match is read in game mode; this page opens at
    * the final whistle. Same shape as the `scheduled` refusal above, and the same way out: the one
-   * screen that can actually end the match.
+   * screen that can actually end the match (decision 113).
    */
   if (match.status !== "finished") {
     return (

@@ -6,7 +6,7 @@
  * four-tab bar (56 px plus its inset) were taking 115 px of the 852 a phone has, from the screen that
  * can least afford it. A nested layout cannot remove a parent layout's chrome, so the route lives in
  * its own group instead: route groups do not affect the URL, `/match/<id>/jeu` is unchanged, and the
- * shell is simply never rendered around it (decision NNN).
+ * shell is simply never rendered around it (decision 112).
  *
  * `requireTeamContext()` is kept verbatim: it redirects to `/connexion` without a session and to
  * `/rejoindre` without a team, which is invariant 5. It is `cache()`d, so calling it here costs

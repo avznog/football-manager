@@ -2443,3 +2443,55 @@ the Chromium ones in the previous entry. And headless WebKit renders no browser 
 bar until the page scrolls. That makes the editor's reachable-turf finding an understatement on
 device, not an artefact — the one thing still owed here is a pair of human eyes on a real phone,
 `docs/DEPLOY.md` §6.
+
+## Game mode, one screen instead of a page in a shell
+
+Six things the owner asked for on the touchline screen, and the arithmetic that justified each of
+them. The chrome above the pitch measured **325 px** at 393 × 852 — app header 59, `main` padding 16,
+back-link row 44, scoreboard 98, gap 16, the « Sur le terrain » card header 68, card padding 8 — while
+the pitch is drawn to a fixed 1080/1580 aspect ratio, so at `px-4` inside a card it was 481 px tall
+with **318 of them in the clear band** between the chrome and the sticky ACTION bar. On a real iPhone,
+where Safari's URL bar takes 50–90 px more, that is the « barely visible » the owner reported. It is
+now 64 px above and ~73 below, and the pitch is 540 px against 715 available.
+
+A nested layout cannot remove a parent layout's chrome, so the route moved into its own group:
+`app/(app)/match/[id]/jeu/` → `app/(jeu)/match/[id]/jeu/`. Route groups do not affect the URL, so
+`/match/<id>/jeu` is unchanged and the e2e happy path is the proof of that; `app/(jeu)/layout.tsx`
+repeats `requireTeamContext()` verbatim, which keeps invariant 5, and costs nothing because that
+function is `cache()`d. The scoreboard card, the back-link row and the pitch card's header collapsed
+into one 56 px `MatchBar` holding the time, the live score, the « en cours » dot and the outbox's
+pending count — the venue badge, the entry-mode badge and the phase line went, because nobody reads
+them at 78′ and they are one tap away on the match page (decision 112).
+
+The gap the owner saw between the ACTION bar and the tab bar was never a rendering glitch: the bar was
+pinned at `bottom-[calc(4.5rem+…)]` = 72 px to clear a `min-h-14` = 56 px tab bar, and 72 − 56 = the
+16 px of scrolling page showing through. In game mode the fix was free — there is no tab bar any more,
+so the bar sits at `bottom-0`. `app/globals.css`'s `tabbar-pb` is a **third** number for the same bar
+(4 rem), and the composition editor still has its own copy of this defect; both stay on the roadmap,
+to be fixed with that screen rather than this one.
+
+« Commentaire » is a real event, added end to end: the repo's first `ALTER TYPE … ADD VALUE`
+(`0004_tricky_human_torch.sql`), a `noteSchema` of 280 characters with an optional `memberId`, and a
+reducer branch that deliberately changes nothing — a note moves no score and no player, which is why
+it needed `TimelineEntry.note` to be displayable at all. The menu is four tiles and an « Autre… »
+that opens the same `ActionMenu` over a second list, `ActionChoice` having been made generic over its
+key so there is one component rather than a copy. **« Faute » is no longer offered**, but `FOUL`
+stays in the vocabulary: the log is append-only, so existing fouls must still render and still be
+voidable (decision 114).
+
+The owner's question — how a match can be resumed and have a summary at the same time — was a real
+bug needing no race. « Après le match » and the recap both gated on `status !== "scheduled"`, so a
+match 2–1 in the 20th minute offered a full summary, a man of the match, and a « Victoire » label.
+Both now gate on `status === "finished"`. The subsidiary desync is genuine and is **not** fixed here:
+`matches.status` is a cache of the `FINAL_WHISTLE` in the log, and when `finalizeMatchById` fails
+after the event lands they disagree until somebody opens game mode. Adding the self-heal to the match
+page would have cost `getLiveMatch`'s seven queries on every view, so the roadmap carries
+`hasFinalWhistle(matchId)` — one existence query — and the residual lie is written down rather than
+papered over (decision 113).
+
+**Next:** Part 2 of the approved plan, the preview/production split. It cannot merge before the owner
+creates the Neon `preview` branch and points Vercel's production branch away from `main` — otherwise
+`main` still deploys to production while `migrate-preview` points at a database that does not exist.
+Still owed from before: the super admin password is the literal placeholder `choisis-en-un-vrai`, the
+Neon `neondb_owner` password has been in a transcript and wants rotating, and `docs/DEPLOY.md` §6
+wants a real phone outside in daylight.

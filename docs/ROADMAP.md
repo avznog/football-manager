@@ -226,6 +226,31 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Game mode's list of who can come on is no longer headed « Remplaçants ». Before the kick-off it
       held the whole squad — three substitutes, seven titulaires, two players off the sheet and an
       injured supporter — and the heading claimed all thirteen were substitutes (decision 087)
+- [x] Game mode gets the whole phone (decision 112). The route moved to its own group,
+      `app/(jeu)/match/[id]/jeu/`, which changes no URL and escapes `AppShell`: no team header, no tab
+      bar, one back button. The scoreboard card, the back-link row and the pitch card's header became
+      one 56 px `MatchBar` printing the time and the live score, so 325 px of chrome above the pitch
+      became 64 and the pitch went from 481 px tall with 318 visible to 540 against 715 available. The
+      bottom bar is one line — ACTION on half, « Pause » and the clock button on the other — and the
+      16 px gap the owner reported is gone, because it was `bottom-[4.5rem]` (72) clearing a
+      `min-h-14` (56) tab bar that no longer exists
+- [x] A `COMMENT` action: a free-text note of up to 280 characters, optionally about a player, inert in
+      the reducer and shown in the timeline and the recap. The ACTION menu is four tiles and an
+      « Autre… »; « Faute » is no longer offered, though `FOUL` stays in the vocabulary because the log
+      is append-only (decision 114)
+- [x] A live match no longer offers its own summary. Both « Après le match » and the recap gate on
+      `status === "finished"` rather than « has kicked off », and `resultLabel` stopped printing
+      « Victoire » beside a 2–1 in the 20th minute (decision 113)
+- [ ] `hasFinalWhistle(matchId)` — one existence query, the `hasMatchEvents` shape with
+      `type = 'FINAL_WHISTLE'` and the same not-voided predicate — so the match page can self-heal a
+      stale `matches.status` without paying `getLiveMatch`'s seven queries on every view (decision 113).
+      Until it exists, a match whose log holds a final whistle but whose column still says `live`
+      badges « En cours » on the calendar and hides « Voir le résumé » until somebody opens game mode
+- [ ] `COMMENT` in the retro-entry screen. The owner asked for a comment *during* the match, so
+      `RETRO_FACT_TYPES` was left alone; `retroFactNeedsMember` would need a third case — the note is
+      required, the player is not
+- [ ] Reading the comments attached to a player on that player's own page. The event carries
+      `memberId`, so the data is there the day it is wanted
 
 ## M5 — Stats
 - [x] Player stats: matches, minutes, goals, assists, own goals, fouls
