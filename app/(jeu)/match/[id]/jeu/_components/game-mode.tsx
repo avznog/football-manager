@@ -18,7 +18,7 @@ import {
 import { PitchLayout } from "@/components/pitch/PitchLayout";
 import { Badge, Button, ButtonLink, Card, EmptyState } from "@/components/ui";
 import { positionLabelFr } from "@/db/reference";
-import { entryModeBadgeFr, matchNameFr } from "@/lib/calendar/labels";
+import { matchNameFr } from "@/lib/calendar/labels";
 import type { MatchEventType } from "@/lib/match/events";
 import { createOutbox, toWireEvent, type OutboxRecord, type OutboxState } from "@/lib/match/outbox";
 import {
@@ -45,9 +45,10 @@ import {
   type TimelineLine,
 } from "@/lib/match/presenter";
 import { terrainPayload, type SlotAssignment, type TerrainOrigin } from "@/lib/match/terrain";
+import { CommentSheet } from "./comment-sheet";
 import { EventTimeline } from "./event-timeline";
 import { LineupPrompt } from "./lineup-prompt";
-import { Scoreboard } from "./scoreboard";
+import { MatchBar } from "./match-bar";
 import { useNowMs } from "./use-now";
 
 /* -------------------------------------------------------------------------- */
@@ -60,6 +61,10 @@ import { useNowMs } from "./use-now";
  */
 type Flow =
   | { step: "menu" }
+  /** The second menu, behind « Autre… »: what happens once or twice a season. */
+  | { step: "more" }
+  /** The one step with a keyboard, so the one step that is a form (`comment-sheet.tsx`). */
+  | { step: "comment" }
   | { step: "goal-scorer" }
   | { step: "goal-assist"; scorerId: string }
   | { step: "actor"; type: "OWN_GOAL" | "PENALTY_SCORED" | "PENALTY_MISSED" | "FOUL" | "INJURY" }
@@ -84,17 +89,44 @@ type Flow =
   | { step: "whistle" }
   | { step: "void"; line: TimelineLine };
 
-/** The ACTION menu, in the order a thumb learns: what happens most is at the top. */
-const CHOICES: readonly ActionChoice[] = [
+/** What « Autre… » is keyed as. It records nothing; it opens the second menu. */
+const MORE = "MORE";
+type MenuKey = MatchEventType | typeof MORE;
+
+/**
+ * The ACTION menu: four tiles, and everything else one tap further.
+ *
+ * Nine tiles was a list wearing a grid's clothes. The four here are what a Sunday match actually
+ * produces — and the fourth is « Commentaire », which is the only one of them that is not a fact
+ * about the football and the one the owner asked for. « Autre… » spans the row underneath, because a
+ * tile that opens another menu must not be mistakable for a tile that records something.
+ */
+const CHOICES: readonly ActionChoice<MenuKey>[] = [
   { type: "GOAL_FOR", label: "But", hint: "buteur, passeur", tone: "accent" },
   { type: "GOAL_AGAINST", label: "But encaissé", hint: "enregistré aussitôt", tone: "danger" },
   { type: "SUBSTITUTION", label: "Changement", hint: "qui sort, qui entre" },
-  { type: "POSITION_CHANGE", label: "Changement de poste", hint: "qui, vers quel poste" },
+  { type: "COMMENT", label: "Commentaire", hint: "une note libre" },
+  { type: MORE, label: "Autre…", hint: "CSC, penalty, blessure, poste", wide: true },
+];
+
+/**
+ * The second menu. « Faute » is deliberately not here: it was recorded once in the app's life and
+ * nothing reads it, so it stops being offered. It is *not* removed from the vocabulary — `FOUL`
+ * stays in `MATCH_EVENT_TYPES`, in `GAME_MODE_EVENT_TYPES` and in the retro-entry screen, because
+ * `match_events` is append-only (invariant 1) and the fouls already in a log must still render and
+ * still be voidable.
+ */
+const MORE_CHOICES: readonly ActionChoice[] = [
   { type: "OWN_GOAL", label: "CSC", hint: "notre joueur", tone: "danger" },
   { type: "PENALTY_SCORED", label: "Penalty marqué", hint: "tireur" },
   { type: "PENALTY_MISSED", label: "Penalty manqué", hint: "tireur", tone: "danger" },
-  { type: "FOUL", label: "Faute", hint: "notre joueur" },
   { type: "INJURY", label: "Blessure", hint: "notre joueur", tone: "danger" },
+  {
+    type: "POSITION_CHANGE",
+    label: "Changement de poste",
+    hint: "qui, vers quel poste",
+    wide: true,
+  },
 ];
 
 const EMPTY_QUEUE: OutboxState = {
@@ -368,8 +400,12 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     setTappedAtMs(null);
   }
 
-  function pickAction(type: MatchEventType) {
+  function pickAction(type: MenuKey) {
     switch (type) {
+      case MORE:
+        return setFlow({ step: "more" });
+      case "COMMENT":
+        return setFlow({ step: "comment" });
       case "GOAL_FOR":
         return setFlow({ step: "goal-scorer" });
       case "GOAL_AGAINST":
@@ -399,155 +435,161 @@ export function GameMode({ live, canOperate }: GameModeProps) {
   /* Render                                                                 */
   /* ---------------------------------------------------------------------- */
 
-  const injuryOptions: PlayerOption[] = [...onPitch, ...available];
+  /** On the pitch first, then the bench. A blessure and a comment can both be about either. */
+  const everyone: PlayerOption[] = [...onPitch, ...available];
+
+  /**
+   * The one button that earns a place beside the score, because it is the only one that changes what
+   * the pitch *is*. It used to be the `action` slot of a « Sur le terrain » card header; that header
+   * cost 68 px of the pitch's height to print a heading nobody needs above a drawing of a pitch.
+   */
+  const pitchAction =
+    canOperate && !state.finished ? (
+      // With nobody on the pitch there is nothing to rearrange: the fastest way in is the list of
+      // seven dropdowns. Once a team is playing, the same button opens TERRAIN, where several
+      // changes are arranged at once and confirmed together (`docs/PLAN.md`, screen 5).
+      state.onPitch.length === 0 ? (
+        <Button variant="secondary" size="sm" onClick={() => openFlow({ step: "composer" })}>
+          Composition
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() =>
+            openFlow({
+              step: "terrain",
+              origin: { kind: "pitch" },
+              initial: onPitchAssignments,
+              formationId: currentFormationId,
+            })
+          }
+        >
+          TERRAIN
+        </Button>
+      )
+    ) : null;
 
   return (
-    <div className="space-y-4">
-      <Scoreboard
+    <>
+      <MatchBar
         reading={state.reading}
-        phaseLabel={phaseLabelFr(state)}
         goalsFor={state.goalsFor}
         goalsAgainst={state.goalsAgainst}
+        matchHref={`/match/${matchId}`}
         opponentName={live.match.opponentName}
-        isHome={live.match.isHome}
         pendingLabel={queue.pending.length > 0 ? pendingCountLabelFr(queue.pending.length) : null}
-        // `recorded` is the same test the match page and the recap make: an empty log was not
-        // « saisi après le match », whatever `entry_mode` happens to say (decision 013).
-        entryBadge={entryModeBadgeFr(live.match.entryMode, { recorded: live.events.length > 0 })}
+        action={pitchAction}
       />
 
-      {!canOperate ? (
-        <p className="rounded-xl border border-border/60 bg-surface-2 px-3 py-2 text-sm text-ink-muted">
-          Tu suis le match en direct. Seul l’opérateur du match peut enregistrer les actions.
-        </p>
-      ) : null}
+      {/* `space-y-3` and `py-2`, not the app's `space-y-4` and `py-4`: every gap above the pitch is
+          a gap taken out of it, and the pitch is drawn to a fixed aspect ratio. */}
+      <div className="space-y-3 py-2">
+        {!canOperate ? (
+          <p className="rounded-xl border border-border/60 bg-surface-2 px-3 py-2 text-sm text-ink-muted">
+            Tu suis le match en direct. Seul l’opérateur du match peut enregistrer les actions.
+          </p>
+        ) : null}
 
-      {queue.rejected.length > 0 ? (
-        <RejectedActions
-          records={queue.rejected}
-          onRetry={(id) => void outbox.retry(id)}
-          onDismiss={(id) => void outbox.dismiss(id)}
-        />
-      ) : null}
+        {queue.rejected.length > 0 ? (
+          <RejectedActions
+            records={queue.rejected}
+            onRetry={(id) => void outbox.retry(id)}
+            onDismiss={(id) => void outbox.dismiss(id)}
+          />
+        ) : null}
 
-      {prompt ? (
-        <LineupPrompt
-          view={prompt}
-          slots={promptSlots}
-          kit={live.kit}
-          // Same condition as « Ajuster » below, which was the only one of the two that had it: a
-          // member who may not operate the match must not be handed the button that applies a
-          // composition, because the route handler answers 403 and the tap becomes a rejected action.
-          onApply={
-            canOperate && !state.finished
-              ? () =>
-                  void emit(
-                    "LINEUP_APPLIED",
-                    { lineupId: prompt.lineupId, slots: prompt.slots },
-                    { atMs: Date.now() },
-                  )
-              : null
-          }
-          onAdjust={
-            canOperate && !state.finished
-              ? () =>
-                  openFlow({
-                    step: "terrain",
-                    origin: { kind: "plan", lineupId: prompt.lineupId, title: prompt.title },
-                    initial: prompt.slots,
-                    formationId:
-                      live.lineups.find((lineup) => lineup.id === prompt.lineupId)?.formationId ??
-                      currentFormationId,
-                  })
-              : null
-          }
-          onLater={() => setPostponed((current) => [...current, prompt.lineupId])}
-        />
-      ) : null}
+        {prompt ? (
+          <LineupPrompt
+            view={prompt}
+            slots={promptSlots}
+            kit={live.kit}
+            // Same condition as « Ajuster » below, which was the only one of the two that had it: a
+            // member who may not operate the match must not be handed the button that applies a
+            // composition, because the route handler answers 403 and the tap becomes a rejected
+            // action.
+            onApply={
+              canOperate && !state.finished
+                ? () =>
+                    void emit(
+                      "LINEUP_APPLIED",
+                      { lineupId: prompt.lineupId, slots: prompt.slots },
+                      { atMs: Date.now() },
+                    )
+                : null
+            }
+            onAdjust={
+              canOperate && !state.finished
+                ? () =>
+                    openFlow({
+                      step: "terrain",
+                      origin: { kind: "plan", lineupId: prompt.lineupId, title: prompt.title },
+                      initial: prompt.slots,
+                      formationId:
+                        live.lineups.find((lineup) => lineup.id === prompt.lineupId)?.formationId ??
+                        currentFormationId,
+                    })
+                : null
+            }
+            onLater={() => setPostponed((current) => [...current, prompt.lineupId])}
+          />
+        ) : null}
 
-      {state.finished ? (
-        <Card title="Match terminé" description="Les statistiques du match sont figées.">
-          <ButtonLink href={`/match/${matchId}`} variant="secondary" fullWidth>
-            Revenir au match
-          </ButtonLink>
-        </Card>
-      ) : null}
+        {state.finished ? (
+          <Card title="Match terminé" description="Les statistiques du match sont figées.">
+            <ButtonLink href={`/match/${matchId}`} variant="secondary" fullWidth>
+              Revenir au match
+            </ButtonLink>
+          </Card>
+        ) : null}
 
-      <Card
-        title="Sur le terrain"
-        description={`${state.onPitch.length} joueur${state.onPitch.length > 1 ? "s" : ""} en jeu`}
-        action={
-          canOperate && !state.finished ? (
-            // With nobody on the pitch there is nothing to rearrange: the fastest way in is the list
-            // of seven dropdowns. Once a team is playing, the same button opens TERRAIN, where
-            // several changes are arranged at once and confirmed together (`docs/PLAN.md`, screen 5).
-            state.onPitch.length === 0 ? (
-              <Button variant="secondary" size="sm" onClick={() => openFlow({ step: "composer" })}>
-                Composition
-              </Button>
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  openFlow({
-                    step: "terrain",
-                    origin: { kind: "pitch" },
-                    initial: onPitchAssignments,
-                    formationId: currentFormationId,
-                  })
-                }
-              >
-                TERRAIN
-              </Button>
-            )
-          ) : null
-        }
-      >
+        {/* The pitch, unwrapped. A card around a drawing of a pitch spent 68 px on a heading saying
+            « Sur le terrain » above a picture of the terrain, and 8 px of padding on each side of the
+            only thing on this screen that has to be looked at from arm's length. The heading's one
+            real job — TERRAIN — moved into the top bar; its player count is on the pitch, countable.
+            The empty state still needs a card, because then there is no drawing to speak for itself. */}
         {state.onPitch.length === 0 ? (
-          <EmptyState {...emptyPitch} />
+          <Card title="Sur le terrain">
+            <EmptyState {...emptyPitch} />
+          </Card>
         ) : (
           <PitchLayout slots={pitch} kit={live.kit} pitchLabel="Joueurs sur le terrain" />
         )}
-      </Card>
 
-      {/* Not « Remplaçants »: ten of the thirteen rows under that heading were not (decision NNN). */}
-      <Card title={enterable.titleFr} description={enterable.hintFr ?? undefined} flush>
-        {available.length === 0 ? (
-          <div className="p-4">
-            <EmptyState title={enterable.emptyFr} />
-          </div>
-        ) : (
-          <ul className="space-y-2 p-3">
-            {available.map((option) => (
-              <li key={option.memberId}>
-                <OptionRow
-                  label={option.name}
-                  subtitle={option.subtitle}
-                  warn={option.warn}
-                  leading={option.jerseyNumber ?? undefined}
-                  disabled={!canAct}
-                  onClick={() => openFlow({ step: "sub-out", inId: option.memberId })}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+        {/* Not « Remplaçants »: ten of the thirteen rows under that heading were not (decision NNN). */}
+        <Card title={enterable.titleFr} description={enterable.hintFr ?? undefined} flush>
+          {available.length === 0 ? (
+            <div className="p-4">
+              <EmptyState title={enterable.emptyFr} />
+            </div>
+          ) : (
+            <ul className="space-y-2 p-3">
+              {available.map((option) => (
+                <li key={option.memberId}>
+                  <OptionRow
+                    label={option.name}
+                    subtitle={option.subtitle}
+                    warn={option.warn}
+                    leading={option.jerseyNumber ?? undefined}
+                    disabled={!canAct}
+                    onClick={() => openFlow({ step: "sub-out", inId: option.memberId })}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
-      <EventTimeline
-        lines={timeline}
-        onVoid={
-          canOperate && !state.finished
-            ? (line) => openFlow({ step: "void", line })
-            : null
-        }
-      />
+        <EventTimeline
+          lines={timeline}
+          onVoid={canOperate && !state.finished ? (line) => openFlow({ step: "void", line }) : null}
+        />
+      </div>
 
       {canOperate && !state.finished ? (
         <ActionBar
           actionDisabled={!canAct}
-          clockLabel={clockAction.label}
+          clockLabel={clockAction.shortLabel}
           clockDisabled={clockAction.event === null}
           clockTone={clockAction.event === "FINAL_WHISTLE" ? "danger" : "secondary"}
           onClock={pressClockAction}
@@ -570,6 +612,31 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         />
       ) : null}
 
+      {/* `setFlow`, not `openFlow`, everywhere inside a flow: the action keeps the minute of the tap
+          that opened ACTION (decision 031), and « Autre… » is one more tap inside the same flow. */}
+      {flow?.step === "more" ? (
+        <ActionMenu
+          open
+          onClose={closeFlow}
+          title="Autre action"
+          stampLabel={stampLabel}
+          choices={MORE_CHOICES}
+          onPick={pickAction}
+        />
+      ) : null}
+
+      {flow?.step === "comment" ? (
+        <CommentSheet
+          open
+          onClose={closeFlow}
+          stampLabel={stampLabel}
+          options={everyone}
+          onConfirm={(note, memberId) =>
+            finish("COMMENT", memberId ? { note, memberId } : { note })
+          }
+        />
+      ) : null}
+
       {flow?.step === "goal-scorer" ? (
         <PlayerPicker
           open
@@ -589,9 +656,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           title="Passe décisive ?"
           description={`But de ${players.nameOf(flow.scorerId)} · ${stampLabel}`}
           options={onPitch.filter((option) => option.memberId !== flow.scorerId)}
-          onPick={(memberId) =>
-            finish("GOAL_FOR", { scorerId: flow.scorerId, assistId: memberId })
-          }
+          onPick={(memberId) => finish("GOAL_FOR", { scorerId: flow.scorerId, assistId: memberId })}
           skip={{
             label: "Aucune passe décisive",
             onPick: () => finish("GOAL_FOR", { scorerId: flow.scorerId }),
@@ -605,7 +670,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           onClose={closeFlow}
           title={ACTOR_QUESTIONS[flow.type]}
           description={`${eventLabel(flow.type)} · ${stampLabel}`}
-          options={flow.type === "INJURY" ? injuryOptions : onPitch}
+          options={flow.type === "INJURY" ? everyone : onPitch}
           onPick={(memberId) =>
             finish(
               flow.type,
@@ -718,7 +783,9 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           options={[...onPitch, ...available]}
           initialAssignments={flow.initial ?? onPitchAssignments}
           confirmLabel="Valider"
-          onConfirm={(assignments) => finish("LINEUP_APPLIED", { lineupId: null, slots: assignments })}
+          onConfirm={(assignments) =>
+            finish("LINEUP_APPLIED", { lineupId: null, slots: assignments })
+          }
         />
       ) : null}
 
@@ -733,7 +800,8 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           onConfirm={() => finish("FINAL_WHISTLE", {})}
         >
           <p className="text-sm text-ink">
-            Score final {state.scoreLabel} {matchNameFr(live.match.opponentName, live.match.isHome)}.
+            Score final {state.scoreLabel} {matchNameFr(live.match.opponentName, live.match.isHome)}
+            .
           </p>
         </ConfirmSheet>
       ) : null}
@@ -754,7 +822,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           </p>
         </ConfirmSheet>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -782,12 +850,22 @@ type ActionBarProps = {
 };
 
 /**
- * The bar the whole screen is built around.
+ * The bar the whole screen is built around: one row, ACTION on half of it.
  *
- * ACTION is at the bottom, full width, 64 px tall, because it is the one thing the coach reaches for
- * without looking. The clock button sits above it: it is used four or five times in a match, so it
- * must be obvious but must not be where the thumb lands by accident. `bottom-[4.5rem]` clears the
- * app's fixed tab bar and its safe-area inset.
+ * It used to be two rows, and it used to be pinned at
+ * `bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]` to clear the app's tab bar. That is where
+ * the gap the owner saw came from, and it was arithmetic rather than a rendering glitch: 4.5rem is
+ * 72 px, `BottomNav` is `min-h-14` — 56 — so 16 px of scrolling page showed through between the two
+ * bars at every inset. Game mode has no tab bar any more, so the bar sits at `bottom-0` and the gap
+ * has nowhere to be.
+ *
+ * ACTION keeps half the width and its 64 px, because it is the one thing the coach reaches for
+ * without looking; the clock button and « Pause » share the other half. `clockLabel` is
+ * `clockActionFr().shortLabel` — « Coup de sifflet final » does not fit a quarter of 393 px, and the
+ * short form lives in the same function's return so the two cannot drift.
+ *
+ * Grid, not flex: `Button` is `shrink-0`, so a `fullWidth` button beside another one pushes it off
+ * the right edge of a 390 px screen rather than sharing the row.
  */
 function ActionBar({
   actionDisabled,
@@ -799,35 +877,30 @@ function ActionBar({
   onPause,
 }: ActionBarProps) {
   return (
-    <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] z-30 -mx-4 space-y-2 border-t border-border/60 bg-canvas/95 px-4 pt-2 pb-2 backdrop-blur md:static md:mx-0 md:rounded-2xl md:border md:px-4 md:py-3">
-      {/* Grid, not flex: `Button` is `shrink-0`, so a `w-full` clock button next to « Pause » pushes
-          « Pause » off the right edge of a 390 px screen. */}
-      <div className={onPause ? "grid grid-cols-[1fr_auto] gap-2" : "grid gap-2"}>
+    <div className="safe-pb sticky bottom-0 z-30 -mx-3 mt-3 border-t border-border/60 bg-canvas/95 px-3 py-2 backdrop-blur md:static md:mx-0 md:rounded-2xl md:border md:px-4 md:py-3">
+      <div
+        className={
+          onPause ? "grid grid-cols-[2fr_1fr_1fr] gap-2" : "grid grid-cols-[2fr_1fr] gap-2"
+        }
+      >
         <Button
-          variant={clockTone}
           size="lg"
           fullWidth
-          disabled={clockDisabled}
-          onClick={onClock}
+          disabled={actionDisabled}
+          onClick={onAction}
+          className="text-lg font-bold tracking-wide"
         >
-          {clockLabel}
+          ACTION
         </Button>
         {onPause ? (
-          <Button variant="secondary" size="lg" onClick={onPause} className="shrink-0">
+          <Button variant="secondary" size="lg" fullWidth onClick={onPause}>
             Pause
           </Button>
         ) : null}
+        <Button variant={clockTone} size="lg" fullWidth disabled={clockDisabled} onClick={onClock}>
+          {clockLabel}
+        </Button>
       </div>
-
-      <Button
-        size="lg"
-        fullWidth
-        disabled={actionDisabled}
-        onClick={onAction}
-        className="min-h-16 text-lg font-bold tracking-wide"
-      >
-        ACTION
-      </Button>
     </div>
   );
 }
@@ -848,15 +921,15 @@ function RejectedActions({
   return (
     <Card
       title="Actions refusées"
-      description="Le serveur n’a pas accepté ces actions. Rien n’est perdu : réessayez ou ignorez-les."
+      // Decision 074: the French tutoies, always. This line vouvoyait.
+      description="Le serveur n’a pas accepté ces actions. Rien n’est perdu : réessaie ou ignore-les."
       className="border-danger/50"
     >
       <ul className="space-y-3">
         {records.map((record) => (
           <li key={record.clientEventId} className="space-y-2">
             <p className="text-sm font-semibold text-ink">
-              {eventLabel(record.type)}{" "}
-              <Badge variant="danger">{record.minute}’</Badge>
+              {eventLabel(record.type)} <Badge variant="danger">{record.minute}’</Badge>
             </p>
             <p className="text-sm text-danger">{record.rejectedReason}</p>
             <div className="flex gap-2">
