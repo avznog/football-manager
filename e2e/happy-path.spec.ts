@@ -79,6 +79,16 @@ const MAX_NOTE = 280;
 const MORE_TILE = "Autre… CSC, penalty, blessure, poste";
 
 /**
+ * The clock button's accessible name before kick-off — `clockActionFr().name`, not its `label`.
+ *
+ * The button *shows* « Début », because that is what the thing is called, and it *announces* the
+ * football term; WCAG 2.5.3 wants the visible word to be a word of the accessible name, so the name
+ * carries both. Asserted `exact`, because « Coup d’envoi » alone is also a substring of the second
+ * period's button and this step is about the first.
+ */
+const KICKOFF_NAME = "Début : coup d’envoi";
+
+/**
  * The whole of the ACTION menu, in order, by accessible name — label then hint, which is how a
  * screen reader and a thumb both read a tile. `CHOICES` and `MORE_CHOICES` in `game-mode.tsx`.
  */
@@ -275,9 +285,10 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(scoreboard).toBeVisible();
     await expect(clock).toHaveText("00:00");
     // The bar holds the time and the score and nothing else now (decision 112), so the phase is read
-    // off the clock button — whose accessible name is the full `clockActionFr().label`, from the same
-    // state the deleted « Avant le coup d’envoi » line came from.
-    await expect(page.getByRole("button", { name: "Coup d’envoi", exact: true })).toBeVisible();
+    // off the clock button — whose accessible name is `clockActionFr().name`, from the same state the
+    // deleted « Avant le coup d’envoi » line came from. It carries the visible « Début » as well as the
+    // football term, because WCAG 2.5.3 wants the word on the button to be a word of what it announces.
+    await expect(page.getByRole("button", { name: KICKOFF_NAME, exact: true })).toBeVisible();
 
     // Invariant 3, before a single event exists: the composition is on screen as a proposal, and
     // the pitch is empty until the coach confirms it.
@@ -304,7 +315,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   });
 
   await test.step("a goal with an assist, then a goal conceded", async () => {
-    await page.getByRole("button", { name: "Coup d’envoi", exact: true }).click();
+    await page.getByRole("button", { name: KICKOFF_NAME, exact: true }).click();
     // Period 1 of 2 is running: the only thing the clock button can offer is the end of it.
     await expect(page.getByRole("button", { name: "Mi-temps" })).toBeVisible();
 
@@ -614,6 +625,84 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(about).toContainText("50’");
     await expect(about).toContainText(striker.displayName);
   });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The one gesture the scenario above never makes: a drag                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * **Dragging a player onto the bench takes him off the pitch.**
+ *
+ * A test of its own rather than a step in the scenario above, and worth the second fixture: the
+ * happy path places every player by *tapping* (`place` / `swap` below), which is the documented
+ * equivalent and the path that works in a glove — so it exercises `onTap` and not one line of the
+ * drag. That is why this shipped broken. The bench was a drag *source* only: the dock is `sticky`
+ * with `z-20` over a pitch at `z-auto`, so a finger on the bench is still inside the pitch's
+ * rectangle, `pointOf` answered with a valid point near the goal line and `nearestSlot` put the
+ * player in the nearest defender's slot.
+ *
+ * **The `pointerup` must land a tick after the `pointermove`, and the `expect` between them is what
+ * guarantees it.** `usePitchDrag`'s `end` closes over the `drag` state of the render its handler was
+ * attached to; released in the same task as the move, it would still see `moved: false`, call
+ * `onTap`, and the test would pass or fail for a reason that has nothing to do with dragging.
+ * Waiting on the drop hint is both that tick and the assertion that the dock says it is the target —
+ * which it has to, because `Pitch` is `overflow-hidden` and clips the lifted disc away at the edge
+ * of the turf.
+ */
+test("le banc est une cible : un joueur glissé dessus quitte le terrain", async ({ page }) => {
+  const fixture = provisionFixture();
+  const striker = playerOf(fixture, "st");
+  const sub = playerOf(fixture, "sub");
+
+  await login(page, fixture.coach.username, fixture.password);
+
+  await page.getByRole("link", { name: "Nouveau match" }).first().click();
+  await page.getByLabel("Adversaire").fill(OPPONENT);
+  await page.getByLabel("Coup d’envoi").fill(`${parisDate(tomorrow())}T15:00`);
+  await page.getByRole("button", { name: "Créer le match" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
+
+  await page.getByRole("link", { name: "Feuille de match" }).first().click();
+  for (const [key] of STARTERS) {
+    await segment(page, `role:${playerOf(fixture, key).membershipId}-starter`).click();
+  }
+  await segment(page, `role:${sub.membershipId}-substitute`).click();
+  await page.getByRole("button", { name: "Enregistrer la feuille" }).click();
+  await expect(page.getByText("Feuille enregistrée.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Compositions" }).click();
+  await page.getByRole("link", { name: "Composition de départ" }).click();
+
+  // The attacker, not the goalkeeper: his slot is at the far end of the turf, which is the one end
+  // the dock is guaranteed not to be drawn over. A source the drop target is covering would make
+  // this a test of the stacking order and never reach the gesture.
+  await place(page, striker, "attaquant");
+
+  const disc = page.getByRole("button", { name: `${striker.displayName}, attaquant` });
+  await disc.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  const from = await disc.boundingBox();
+  const bench = page.getByRole("list", { name: /^Banc/ });
+  const onto = await bench.boundingBox();
+  if (!from || !onto) throw new Error("Le disque ou le banc n’est pas à l’écran.");
+
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(onto.x + onto.width / 2, onto.y + onto.height / 2, { steps: 10 });
+  await expect(
+    page.getByText(`Relâche ici : ${striker.displayName} retourne sur le banc.`),
+  ).toBeVisible();
+  await page.mouse.up();
+
+  // He is off the pitch and back on the strip — and the post he was standing on is free again,
+  // which is the half that used to fail: he landed on the nearest defender instead.
+  await expect(page.getByRole("button", { name: "Poste libre : attaquant" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: `${striker.displayName}, numéro`, exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: `${striker.displayName}, attaquant` })).toHaveCount(
+    0,
+  );
 });
 
 /* -------------------------------------------------------------------------- */
