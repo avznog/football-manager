@@ -423,6 +423,20 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   the spread of a player's ratings, kept **inside** the existing visibility gate. No migration and no
   new table: every figure this needs is already in `PlayerSeasonStats`. Part 2, the deployment split,
   is still blocked on the owner creating the Neon `preview` branch.
+- **2026-09-30 · the owner's machine · `feat/best-seven` → PR #105, merged** — **`main` is at
+  `v1.0.0-beta.3`**, tagged and published as a pre-release by CI; no migration in this one, so
+  production's schema is unchanged. Decision **115** is taken and the next free number is **116**.
+  `/stats/equipe-type` exists, and `lib/stats/best-seven.ts` is the file to read before touching any of
+  it: it is pure, it is where the shrinkage and the assignment live, and its rules are numbered. Two
+  things worth knowing if you work near it. **`ShrinkageReport.unmeasurable` names four causes**, and
+  the copy has four sentences because one of them was printing a reason the screen had invented — if
+  you add a fifth exit from `fitShrinkage`, give it a name rather than borrowing `noSpread`. And
+  **`hasBasis` is the all-pitch model alone**, with `goalkeeperHasBasis` beside it, because decision 011
+  fits two models for « invincibilité » and an OR across them credited a keeper with a figure he had
+  not earned. Two follow-ups are written down in `docs/ROADMAP.md`: a `minutes_by_position` table, which
+  is the only thing that would make « meilleur milieu droit » a measurement rather than a declaration,
+  and saving a seven as a real composition. Part 2 is still blocked on the owner creating the Neon
+  `preview` branch, and until it exists every merge to `main` still deploys straight to production.
 
 ### From the other machine
 
