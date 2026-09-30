@@ -299,6 +299,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       designed from the arithmetic alone: « TERRAIN » is the word the owner's team uses out loud, and an
       icon for « ajuster le terrain » is not obvious. At 375 px the typical row still has 30 px spare, so
       this is a tail case and not a phone size
+- [ ] Ask the team whether anybody reads the underline. Decision 117 replaced the « Nous » caption with a
+      mark on our own numeral, and the mark is **unlabelled**: the fact is in the `aria-label` and in
+      decision 061's ours-first ordering, but nothing on screen says an underline means « nous ». The
+      question is not answerable from a desk — one match watched over somebody's shoulder settles it. If it
+      reads as decoration, the 34 px have to come from somewhere else, and the candidate is the item
+      above: a shorter action word buys more than the caption cost
 - [ ] `hasFinalWhistle(matchId)` — one existence query, the `hasMatchEvents` shape with
       `type = 'FINAL_WHISTLE'` and the same not-voided predicate — so the match page can self-heal a
       stale `matches.status` without paying `getLiveMatch`'s seven queries on every view (decision 113).
@@ -372,6 +378,21 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       of them moved out of `page.tsx` into `best-seven-copy.ts` to be testable at all. `NO_FORMATION_FR`
       lost « ou choisis une forme toi-même **ci-dessus** », which the move turned from misplaced into
       false (decision 116)
+- [ ] `sevenQuestionKey` carries the question and not the data. If the server ever recomputes a different
+      optimum for the same competition · criterion · direction · formation — a `revalidate`, a
+      `router.refresh()`, a rating or a final whistle landing while the page is open — the pitch would keep
+      the old seven while the list and the notes below it update: decision 116's defect in the one input the
+      key omits. Nothing on this route calls `refresh()` today, so it is latent rather than live; the cheap
+      belt is to fold a signature of the computed optimum, or `stats.matchesConsidered`, into the key
+- [ ] A desktop keyboard stepping through one of those selects navigates on **every arrow key**. A closed
+      native `<select>` fires `change` per keypress in most desktop browsers, so « Buts » → « Sans
+      encaisser » costs two server renders and two history entries where the chips it replaced cost one.
+      iOS — the target — commits once when the picker closes, which is why this is a follow-up and not a
+      fix. The shape of one is to commit on `blur` or `Enter` for keyboard interaction without breaking the
+      pointer path that already works
+- [ ] The four-up grid at `sm` has never been seen with four selects in it: the demo team has one played
+      formation, so the formation select is absent and the row is three. `grid-cols-2 sm:grid-cols-4` is
+      asserted in the class list and nowhere in a browser. A fixture with two played shapes would settle it
 - [ ] **Minutes by position, so « meilleur milieu droit » becomes a measurement.** There is exactly
       one positional figure anywhere in the database — `match_player_stats.gkMinutes` — and the
       reducer's `positionSpells` are in-memory match state that the freeze path never writes down. So

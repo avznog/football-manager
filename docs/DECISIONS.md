@@ -3243,13 +3243,22 @@ was never run:
 - without it, the surrounding `<form method="get">` submits the four selects itself, with a `<noscript>`
   button as the only thing that can trigger it.
 
-**And that second path forces a tolerance the first one hid.** A GET form submits every control it holds,
-so it sends `?critere=` — an empty value — for anything left at its default, which `equipeTypeHref` has
-never written and the parsers had therefore never been given. Two of the four parsers did not even exist
-as functions: they were inline in `page.tsx`, unreachable by Vitest, so `parseCompetitionId` and
-`resolveFormationOverride` moved into `lib/stats/best-seven-copy.ts` to be testable at all. All four now
-have a test for the empty string. This is the same shape as decision 097's rule in a new place: a path
-nothing exercises is a claim, and the no-JS path is the one nobody looks at.
+**And that second path made a tolerance load-bearing that had until then been an accident.** A GET form
+submits every control it holds, so it sends `?critere=` — an empty value — for anything left at its
+default, which `equipeTypeHref` has never written and the parsers had therefore never been given. Two of
+the four parsers did not even exist as functions: they were inline in `page.tsx`, unreachable by Vitest,
+so `parseCompetitionId` and `resolveFormationOverride` moved into `lib/stats/best-seven-copy.ts` to be
+testable at all. All four now have a test for the empty string.
+
+**Said precisely, because the first draft of this entry overstated it: no parser's behaviour changed.**
+`parseCriterion("")` and `parseDirection("")` already fell through to their defaults, and the inline
+`competitions.find((c) => c.id === "")` already found nothing — so the four new empty-string tests pass
+verbatim against the code as it was, and they are regression guards rather than proofs of a fix. What the
+form actually changed is the *status* of that behaviour: an incidental property of four `find`s and two
+`??`s became a requirement of a path a reader can reach with JavaScript off, and a requirement nothing
+states is one the next refactor is free to delete. That is decision 097's rule in a new place — a path
+nothing exercises is a claim — with the correction that the claim here was about who is allowed to change
+it, not about whether it worked.
 
 `scroll={false}` (decision 100) still matters, and now means the opposite thing. It was added so that
 sorting from halfway down `/stats` did not throw the reader back to the title; here the controls are
@@ -3364,6 +3373,19 @@ What was lost with the caption and is not recoverable from the figures is the *o
 in the back button's accessible name and one tap away on the match page — the same trade decision 112
 made for the venue badge and the phase line, stated again rather than assumed.
 
+**One claim above is weaker than it reads, and the review of this entry was right to say so.** « The
+reader is still owed the fact; only the word is gone » is true of what the *screen* now contains: the
+`aria-label` still says « Score 1 nous, 0 Courges », and a mark on the left-hand numeral is where the fact
+went. But the mark is **unlabelled** — nothing on screen says that an underline means « nous » — so for a
+sighted reader meeting it for the first time it is a convention to infer, not a fact stated, and the
+entry should not claim otherwise. It is kept rather than reversed because the alternative was measured and
+does not fit (370 of 369 px with the caption, before kick-off) and because the convention is learnable in
+one match from a score the reader watched go up. What makes it acceptable is that it is never the *only*
+statement of the fact: decision 061's ours-first ordering holds on every screen in the app, `scoreLineFr`
+is still the one function that writes a scoreline, and the announced name is unabbreviated. A follow-up on
+`docs/ROADMAP.md` asks the question this entry cannot settle from a desk — whether anybody actually reads
+the underline — because the answer is a coach on a touchline, not an argument.
+
 **« Envoi » → « Début », and why the accessible name is what gave way.** The owner asked for the clock
 button's short label to say « Début ». He is right — « Envoi » is a word a coach has to translate, and
 the button starts the match — and the rename immediately broke **WCAG 2.5.3
@@ -3408,6 +3430,14 @@ does not repair the number.
 So **`--tabbar-h` in `app/globals.css` is the one source, and all three read it**: `BottomNav`'s
 `min-h-[var(--tabbar-h)]`, the `tabbar-pb` utility, and the dock's
 `bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom,0px))]`. A token cannot disagree with itself.
+
+**With one honest qualification: `tabbar-pb` has no callers.** Its only other mention in the repository is
+the comment in `AppShell` explaining why that component deliberately does *not* use it, so of the « three
+places » above, two are live consumers and the third is an unused utility whose value moved from 4 rem to
+the token with no effect on any screen. It is kept rather than deleted because it is the right utility for
+the next screen that needs to clear the bar exactly, and because a wrong number left in a utility is how
+this defect propagated the first time — but nobody should read the count of three as three places that
+were rendering.
 Two things about its definition are deliberate and are written at its declaration rather than left to be
 rediscovered: the **home indicator is not included**, because `BottomNav` pads itself with `safe-pb` so
 the inset is *inside* the bar and anything positioned against the bar must add `env()` itself; and
