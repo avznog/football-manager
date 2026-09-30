@@ -171,9 +171,14 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
             <span className="font-mono text-3xl font-bold text-ink tabular-nums">
               {scoreLineFr(score.goalsFor, score.goalsAgainst)}
             </span>
-            <span className="text-sm font-medium text-ink-muted">
-              {resultLabel(score.goalsFor, score.goalsAgainst)}
-            </span>
+            {/* The score of a live match is true — it is counted from the log — but « Victoire » is
+                not a thing anybody knows in the 20th minute. The result waits for the final whistle;
+                the « En cours » badge above already says what state the match is in. */}
+            {match.status === "finished" ? (
+              <span className="text-sm font-medium text-ink-muted">
+                {resultLabel(score.goalsFor, score.goalsAgainst)}
+              </span>
+            ) : null}
           </p>
         ) : null}
 
@@ -215,10 +220,16 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
           player sees the availability grid above and nothing else. */}
       {isCoach ? <CompositionCard team={team} match={match} /> : null}
 
-      {/* The reading half of the match, once it has been played: the recap for everybody, and the
-          rating flow for whoever still owes notes. A player who has finished is told so, because a
-          link that silently disappears reads as a bug. */}
-      {match.status !== "scheduled" ? (
+      {/* The reading half of the match, once it is **over**: the recap for everybody, and the rating
+          flow for whoever still owes notes. A player who has finished is told so, because a link that
+          silently disappears reads as a bug.
+
+          `finished`, not « has kicked off ». A live match had this card and « Mode match » on screen
+          at the same time — « Voir le résumé » directly above « Reprendre le mode match » — and the
+          summary it opened stated a man of the match and the minutes played of an afternoon that was
+          0–0 in its 12th minute. The recap refuses a live match now too; this is the link that should
+          never have offered it. */}
+      {match.status === "finished" ? (
         <Card title="Après le match" as="h2">
           <div className="space-y-3">
             {ratingDuty && !ratingDuty.complete ? (

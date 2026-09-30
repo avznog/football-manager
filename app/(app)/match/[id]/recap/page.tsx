@@ -70,6 +70,31 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
     );
   }
 
+  /**
+   * A match that has kicked off but has no final whistle has no result to celebrate either. The page
+   * below would state a man of the match, minutes played and a score under « Victoire » about an
+   * afternoon still being played — and the match page was offering the link next to « Reprendre le
+   * mode match », so both were true at once. The live match is read in game mode; this page opens at
+   * the final whistle. Same shape as the `scheduled` refusal above, and the same way out: the one
+   * screen that can actually end the match.
+   */
+  if (match.status !== "finished") {
+    return (
+      <div className="space-y-6">
+        <RecapHeader match={match} kickoff={kickoff} recorded={recap.recorded} />
+        <EmptyState
+          title="Le match n’est pas terminé"
+          description="Le résumé s’ouvre au coup de sifflet final. En attendant, tu suis le match en direct dans le mode match."
+          action={
+            <ButtonLink href={`/match/${match.id}/jeu`} variant="secondary">
+              Reprendre le mode match
+            </ButtonLink>
+          }
+        />
+      </div>
+    );
+  }
+
   // Invariant 4: the permission comes from `can()`, and the sheet decides the rest (decision 007).
   const canSubmit = can(actor, "rating:submit", { teamId: team.id });
   const [results, window] = await Promise.all([
