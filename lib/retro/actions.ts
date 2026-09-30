@@ -85,7 +85,16 @@ export async function submitRetroMatch(
 
   const kickoffAtMs = new Date(live.match.kickoffAt).getTime();
   if (Number.isNaN(kickoffAtMs)) return { error: "Ce match n’a pas de date exploitable." };
-  if (kickoffAtMs > Date.now()) {
+  /*
+   * The same rule as the screen: the clock decides, unless the coach has declared the match over
+   * himself, which decision 121 lets him do at any moment. Refusing here what the page offers is how
+   * a form comes to have a button that cannot work.
+   *
+   * For a future-dated match the log `buildRetroLog` produces therefore carries `occurredAt` values
+   * in the future. That is inert — the reducer works from `clockMs` and `period`, and the timeline
+   * displays minutes — and it is the honest record of what the coach said happened.
+   */
+  if (kickoffAtMs > Date.now() && live.match.status !== "finished") {
     return { error: "Ce match n’a pas encore eu lieu : il n’y a rien à saisir." };
   }
 

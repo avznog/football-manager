@@ -59,7 +59,14 @@ export default async function SaisiePage({ params, searchParams }: PageProps<"/m
 
   const kickoff = new Date(view.match.kickoffAt);
   const now = new Date();
-  const played = kickoff.getTime() <= now.getTime();
+  /*
+   * The clock, unless the coach has overruled it. `status === "finished"` is now something he can
+   * declare himself, at any moment and including before the kick-off (decision 121) — and refusing
+   * to open the form for a match the app itself calls terminé would be the app contradicting its
+   * own match page. The clock still answers for a match nobody has closed, which is the case the
+   * EmptyState below was written for: somebody arriving early on next Sunday's fixture.
+   */
+  const played = view.match.status === "finished" || kickoff.getTime() <= now.getTime();
   const corrected = query.corrige === "1";
 
   return (

@@ -22,7 +22,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
@@ -38,7 +38,8 @@ import {
 } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
 import { buildReminderMessage, tallyAvailability, type Responder } from "@/lib/calendar/timeline";
-import { getMatch, getMatchAnswers, getMatchScore } from "@/lib/match/queries";
+import { finishMatch, reopenMatch } from "@/lib/match/actions";
+import { getMatch, getMatchAnswers, getMatchScore, hasMatchEvents } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
 import { ratingDeadlineFr } from "@/lib/rating/window";
 import { getSquad } from "@/lib/team/queries";
@@ -59,11 +60,19 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   const match = await getMatch(team.id, id);
   if (!match) notFound();
 
-  const [answers, squad, score] = await Promise.all([
+  const [answers, squad, score, logged] = await Promise.all([
     getMatchAnswers(match.id),
     getSquad(team.id),
     // A scheduled match has nothing in its log yet, so do not even ask.
     match.status === "scheduled" ? Promise.resolve(null) : getMatchScore(match.id),
+    /*
+     * Asked for every status, unlike the score: it is what the two cards about *declaring* a match
+     * over are gated on, and one of them appears on a scheduled match. It is also the stricter
+     * question — `score === null` ignores voided events, so a match whose every action was
+     * corrected away reads as empty there and as logged here. Declaring is the case that must not
+     * get it wrong, because it is what decides whether the déroulé can still be contradicted.
+     */
+    hasMatchEvents(match.id),
   ]);
 
   /**
@@ -267,6 +276,49 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         </Card>
       ) : null}
 
+      {/* Declaring the match over without running game mode for an afternoon that is already gone
+          (decision 121). The card the coach actually wants is the retro-entry one just below, and it
+          is gated on `finished` — so before this existed the only key to it was a final whistle, and
+          the only thing that appends one is game mode.
+
+          Two buttons for one destination: the primary finishes *and* opens the form, because that is
+          what the coach is here for, and the secondary just closes the match for somebody who will
+          type it up later. Plain forms, no confirmation dialog: « Rouvrir le match » in the card
+          below is the undo, and it is a better answer than a dialog to a mis-tap. */}
+      {mayAmend && match.status !== "finished" && !logged ? (
+        <Card title="Terminer le match" as="h2">
+          <div className="space-y-3">
+            <p className="text-sm text-ink-muted">
+              Pas besoin du mode match pour un match joué sans le téléphone. Termine-le ici, puis
+              renseigne qui a joué et les buts : le score, les minutes et les clean sheets se
+              déduisent.
+            </p>
+            {/* Said out loud rather than forbidden: closing a match that has not kicked off is
+                allowed on purpose, and an app that does it silently looks broken. */}
+            {kickoff.getTime() > now.getTime() ? (
+              <p className="text-sm text-ink-muted">
+                Le coup d’envoi n’a pas encore eu lieu : ce match passera dans l’historique.
+              </p>
+            ) : null}
+            <form action={finishMatch}>
+              <input type="hidden" name="teamId" value={team.id} />
+              <input type="hidden" name="matchId" value={match.id} />
+              <input type="hidden" name="then" value="saisie" />
+              <Button type="submit" fullWidth>
+                Saisir le match
+              </Button>
+            </form>
+            <form action={finishMatch}>
+              <input type="hidden" name="teamId" value={team.id} />
+              <input type="hidden" name="matchId" value={match.id} />
+              <Button type="submit" variant="secondary" fullWidth>
+                Marquer comme terminé
+              </Button>
+            </form>
+          </div>
+        </Card>
+      ) : null}
+
       {/* « Saisie rétroactive » (`docs/PLAN.md`, screen 8). A match played without the phone is typed
           up here and becomes an ordinary event log; a match that already has one is corrected action
           by action. `score === null` means not one event was ever recorded. */}
@@ -285,6 +337,18 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
             >
               {score === null ? "Saisir le match" : "Corriger une action"}
             </ButtonLink>
+            {/* The undo for « Marquer comme terminé », and the reason that button needs no dialog.
+                Only while the log is empty: once there is a déroulé, going back to `scheduled` would
+                mean voiding events to stay coherent, which is a different feature (decision 121). */}
+            {!logged ? (
+              <form action={reopenMatch}>
+                <input type="hidden" name="teamId" value={team.id} />
+                <input type="hidden" name="matchId" value={match.id} />
+                <Button type="submit" variant="ghost" fullWidth>
+                  Terminé par erreur ? Rouvrir le match
+                </Button>
+              </form>
+            ) : null}
           </div>
         </Card>
       ) : null}

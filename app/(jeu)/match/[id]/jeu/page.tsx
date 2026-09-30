@@ -17,7 +17,7 @@
  *   POST and its response leaves behind.
  */
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
@@ -48,6 +48,21 @@ export default async function GameModePage({ params }: PageProps<"/match/[id]/je
   if (live.match.status !== "finished" && reduceLive(live, [], null).finished) {
     await finalizeMatchById(team.id, id);
     live = (await getLiveMatch(team.id, id)) ?? live;
+  }
+
+  /*
+   * A match that is over with nothing in its log has no game mode to show. The reducer reads an empty
+   * log as "not started", so this screen would draw a 0-0 scoreboard and a « Coup d'envoi » button
+   * for an afternoon the coach has already declared finished — and recording a kick-off from here is
+   * precisely what would make `getMatchScores` start printing « 0 – 0 » for it.
+   *
+   * Until decision 121 that state was the seed's J6 alone and no link led to it. Now the coach can
+   * create it with one tap, so the match page is where he belongs: its « Saisir le match » card is
+   * the real next action, and it is the same `score === null` signal that already hides the « Mode
+   * match » card there.
+   */
+  if (live.match.status === "finished" && live.events.length === 0) {
+    redirect(`/match/${id}`);
   }
 
   const canOperate = can(actor, "match:operate", {
