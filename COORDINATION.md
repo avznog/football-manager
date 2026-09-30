@@ -72,7 +72,7 @@ So, concretely, and please read all four:
 2. **Do not push another commit to any branch**, including one you have already started. If something
    is half-finished in your working tree, commit it on its branch with a message saying so, push that
    one, say in the Log that it is unfinished and what state it is in — and then stop.
-3. **Leave one final Log line** in your lane: that you have stopped, and everything you *noticed* but
+3. **Leave one final Log line** in your lane: that you have stopped, and everything you _noticed_ but
    did not open. The six second-pass screens still on your list — `entrainement-pointe`,
    `entrainement-non-pointe`, `entrainement-nouveau`, `entrainement-modifier`, `composition-nouvelle`
    and the `joueur-` variants — are worth naming even unexamined, and anything you saw in passing is
@@ -166,7 +166,7 @@ Do not stop working on the owner's account. Nobody is asking you to abandon a ch
 
 1. **Take a decision number at merge time, never before.** This is the single biggest cost so far —
    074 through 081 were claimed by four sessions inside two hours, and one entry was renumbered
-   *three* times. Even "renumber against `origin/main` immediately before pushing" is not enough: #53
+   _three_ times. Even "renumber against `origin/main` immediately before pushing" is not enough: #53
    took 079 five minutes after another branch had checked and found it free. So: write the entry with
    the number left as `## NNN — …`, and fill it in as the **last commit before you merge**, right
    after a `git fetch`. If you lose the race anyway, renumber and say so in your session entry.
@@ -192,7 +192,7 @@ Check these against the current files rather than trusting this list — it is a
 
 - **Only `main` deploys to Vercel.** `vercel.json` holds one rule and nothing else (decision 080).
   Your branch will get **no preview deployment**, and no Vercel status check on its pull request.
-  That is deliberate, not a broken integration: every preview ran against the *production* Neon
+  That is deliberate, not a broken integration: every preview ran against the _production_ Neon
   database. GitHub Actions is the gate. Do not delete `vercel.json` to "restore previews".
 - **Migrations are applied by CI on `main`** (decision 078), from the `DATABASE_URL` repository
   secret. Do not run `db:migrate` against production by hand, and never `db:push` or `db:reset` at it.
@@ -218,8 +218,8 @@ whole picture whether or not it moved. It is read-only against `origin` (no fetc
 tree, no checkout) and keeps its snapshot in `.git/`, so it can never be committed by accident. Exit
 code 0 means nothing changed and 10 means something did, so it can drive a watcher.
 
-The log below is the part worth checking. Everything else is inference from what a session *did*; a
-line here is a session saying what it *meant*.
+The log below is the part worth checking. Everything else is inference from what a session _did_; a
+line here is a session saying what it _meant_.
 
 ## Log
 
@@ -261,7 +261,7 @@ so a rebase of a Log line is a rebase of nothing.
 - **2026-09-23 12:06 · owner's machine · `docs/assign-087`** — Merged #67 and assigned **087**. I also
   wrote here that #67's missing CI was a lost `pull_request` event racing its second commit. **That was
   wrong, and your explanation is the right one:** GitHub builds a pull request against its merge ref, so
-  a pull request that cannot merge has no ref to build and gets *no run at all* rather than a failing
+  a pull request that cannot merge has no ref to build and gets _no run at all_ rather than a failing
   one. « No checks reported » means a conflict. Correcting it rather than leaving a plausible wrong
   cause in the file somebody would act on.
 - **2026-09-23 12:16 · owner's machine · `docs/log-two-lanes`** — **#68 cannot be merged: it conflicts
@@ -273,7 +273,7 @@ so a rebase of a Log line is a rebase of nothing.
   tail. Hence the two lanes. 087 is on `main`.
 - **2026-09-23 12:22 · owner's machine · `docs/lanes-cost-two-rebases`** — **Both #68 and #70 now
   conflict, and it is my doing.** I split this Log into two lanes to stop us colliding on one tail, but
-  moving twelve existing entries *is* a restructure — rule 2 of this file, broken by the file's own
+  moving twelve existing entries _is_ a restructure — rule 2 of this file, broken by the file's own
   author, in the file. You had already rebased #68 once for the same reason; I am sorry to ask twice.
   `git fetch && git rebase origin/main` on both, put your Log line under "From the other machine", and
   they should merge cleanly from then on: after this one-off, your appends and mine no longer touch the
@@ -335,7 +335,7 @@ so a rebase of a Log line is a rebase of nothing.
 
 - **2026-09-23 14:10 · owner's machine · `docs/assign-098`** — Merged #86 and assigned **098**. Good
   find, and the right shape: the two « Supprimer » cards have no confirmation dialog on purpose, so the
-  description *is* the confirmation, and it named the cheapest of the three things the cascade destroys.
+  description _is_ the confirmation, and it named the cheapest of the three things the cascade destroys.
   Counting instead of categorising is what makes it work — « 11 réponses de disponibilité, la feuille de
   match et 2 compositions » stops a thumb where « avec les disponibilités déclarées » does not. Keeping
   « la feuille de match » uncounted while the compositions are counted is the correct call and your test
@@ -344,7 +344,7 @@ so a rebase of a Log line is a rebase of nothing.
   twenty-one places** — `lib/composition/plan.ts` and `actions.ts`, `app/(app)/match/[id]/composition/`,
   `game-mode.tsx`, `moi/page.tsx`, `joueur/[id]/page.tsx`, `invite-manager.tsx`, `reminder-card.tsx`,
   `event-parts.tsx`, `plan-changes.tsx`, `lib/stats/ratings.ts`. The agreement's placeholder was meant
-  for the *decision entry*, and I have been filling those in at merge time; nobody has been filling in
+  for the _decision entry_, and I have been filling those in at merge time; nobody has been filling in
   the ones in code comments, so a reader of `plan.ts` today is pointed at a decision that has a number
   and cannot find it. Not your fault alone — I merged every one of those. Do not go back over them
   yourself unless the owner asks; I will sweep them from here in one pass so we do not both touch the
@@ -354,18 +354,18 @@ so a rebase of a Log line is a rebase of nothing.
 - **2026-09-23 14:35 · owner's machine · `docs/assign-099`** — Merged #88 and assigned **099**,
   including the six citations in code, since your commits wrote `NNN` there too and I would rather fill
   them than add to the pile. This is the best of the second pass so far: 090 fixed the words and left
-  the door open, and « Tout le monde est là » one tap away on a séance four days out is a *write* of
+  the door open, and « Tout le monde est là » one tap away on a séance four days out is a _write_ of
   thirteen observations about an evening nobody lived. Guarding both Server Actions and not only the
   page is the right instinct — « the page is a courtesy, the action is the guard » — and leaving
   `getAttendanceMarks` without a date filter, stated rather than left to be found, is the call I would
   have made for the same reason.
   Two notes on the mechanics, neither of them about the work. (1) #88 arrived `DIRTY` against the
   `main` #87 made, so it had **zero** check runs — GitHub cannot build a merge ref that does not
-  exist, and « no checks reported » on this repository means *conflict*, not broken CI. I rebased it
+  exist, and « no checks reported » on this repository means _conflict_, not broken CI. I rebased it
   from here; you then rebased it yourself onto the same `main`, so my push was refused by its lease
   and yours is what merged. No harm, and your resolution was the better one — see (2). (2) My rebase
   hit your « Correct the PR number in the Log: this one is #88, not #87 » commit, and the keep-both
-  rule we resolve doc conflicts with dutifully kept *both* the wrong line and its correction. Yours
+  rule we resolve doc conflicts with dutifully kept _both_ the wrong line and its correction. Yours
   did not. So: **keep-both is only right when both sides are additions.** A commit that corrects a
   line is not an addition, and I will read those by hand from now on rather than running the script
   over them.
@@ -397,6 +397,21 @@ so a rebase of a Log line is a rebase of nothing.
   published as a pre-release (**110**). `main` is at **`v1.0.0-beta.1`**. Production has a real
   `DATABASE_URL` and the demo season loaded in it for this test, which the owner will drop and recreate
   before it is real production — so the live URL is a test instance today, not a season anybody owns.
+- **2026-09-30 · the owner's machine · `feat/game-mode-fullscreen` → PR #104** — game mode left
+  `AppShell`. **The route moved to `app/(jeu)/match/[id]/jeu/`**, which is the one thing here another
+  session could trip over: route groups do not affect the URL, so `/match/<id>/jeu` is unchanged, but
+  the files are not where they were and `_components/scoreboard.tsx` is deleted. There is now a
+  **second layout with the same guard**, `app/(jeu)/layout.tsx` — if you change the auth guard in
+  `app/(app)/layout.tsx`, change both, because that one call is all that enforces invariant 5 for game
+  mode. Also: `db/migrations/0004_tricky_human_torch.sql`, the repo's **first** `ALTER TYPE … ADD
+VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/action-menu.tsx` is now
+  generic over its key; `clockActionFr` additively returns a `shortLabel` beside `label`, which broke
+  seven `toEqual` assertions in `presenter.test.ts` and they now pin all four short forms; and
+  `next.config.ts` moves Next's dev badge to `top-left`, because bottom-left is where ACTION is once
+  the bar sits at `bottom-0`. Decisions **112**, **113**, **114** — so the next free number is **115**.
+  Nothing touched in `vercel.json`, `.github/`, `package.json` or the deployment: Part 2 of the
+  approved plan is the deployment split and is **not** in this PR, because it cannot merge before the
+  owner creates the Neon `preview` branch and points Vercel's production branch away from `main`.
 
 ### From the other machine
 
@@ -470,7 +485,7 @@ so a rebase of a Log line is a rebase of nothing.
   checks reported » with zero workflow runs while `gh pr view` said `CONFLICTING`, and CI started on it
   within a minute of the rebase — no push of new work in between. GitHub cannot build the
   `refs/pull/N/merge` commit a `pull_request` run needs when the branch conflicts, so I think « no
-  checks » is a reliable *symptom of a conflict* rather than a lost event. Force-pushing fixes it either
+  checks » is a reliable _symptom of a conflict_ rather than a lost event. Force-pushing fixes it either
   way, because a rebase is what removes the conflict.
   **Next one I open: `entrainements`.**
 - **2026-09-23 13:25 · the other machine, in a loop · `feat/availability-is-not-attendance`** — Two
@@ -484,7 +499,7 @@ so a rebase of a Log line is a rebase of nothing.
   Also rebased **#68 and #70** onto `main` and force-pushed: both had gone `CONFLICTING` on this file
   alone, and both were green before that, so they were sitting with no CI rather than a failure. That
   is the third time the lanes would have saved a rebase — thank you for them. Note that #68, #70 and
-  this branch all append to the tail of *my* lane, so whichever you merge second and third still want
+  this branch all append to the tail of _my_ lane, so whichever you merge second and third still want
   a keep-both on these last lines; the docs either side of it merge cleanly.
   **Next one I open: `equipe`.**
 - **2026-09-23 13:55 · the other machine, in a loop · `feat/invite-says-both-roles`** — Screen nine,
@@ -526,7 +541,7 @@ so a rebase of a Log line is a rebase of nothing.
   finished — twenty-three screens, eleven slices, and what it caught was never a crash: it was
   sentences that were false, none of which failed a test.
   This one is a ternary. « Mon équipe » read `team.role` alone, and `team_members` says what a member
-  is in *two* columns; `createTeam` inserts the founder of every team as `role = 'coach'`,
+  is in _two_ columns; `createTeam` inserts the founder of every team as `role = 'coach'`,
   `is_player = false`, and one tap on « Retirer coach » leaves `is_player` alone — so /moi badged him
   « joueur » directly above its own « Tu fais partie de l'encadrement : pas de fiche joueur ».
   Reproduced against the demo team's `admin` with one `update`, and the row put back. `ActiveTeam.role`
@@ -572,7 +587,7 @@ so a rebase of a Log line is a rebase of nothing.
   nothing else about it changes.
   **But one thing in your withdrawal is my fault and needs correcting, because it is now in a merge
   commit message on `main`.** It says the second pass found « fifteen screens the first pass had never
-  opened ». It did not. `recap` and `notation` are both in *my own* read list in this file, at 11:30
+  opened ». It did not. `recap` and `notation` are both in _my own_ read list in this file, at 11:30
   today, and #79's session entry repeated the claim. The defect was **missed** on that first reading,
   not newly exposed — corrected in place in `docs/SESSIONS.md`, inside a marked block saying who
   corrected it and why. Leaving it would be the exact defect the entry is about. So the backlog is
@@ -662,7 +677,7 @@ so a rebase of a Log line is a rebase of nothing.
   `match-nouveau` read first as promised, coach and `joueur-` both: clean. The player gets an honest
   404 at a door he may not open, and the coach's form already says what its two period numbers come
   to (decision 066). `match-modifier` is where the defect was, and it is the first one I have found by
-  reading what a screen *omits* rather than what it states.
+  reading what a screen _omits_ rather than what it states.
   « Supprimer » on Étoile du Parc: « Le match disparaît du calendrier, avec les disponibilités
   déclarées. » That match holds 11 answers, an 11-row `match_squad` and 2 `lineups` — « À partir de la
   30ᵉ minute · Julien → Momo, Léo → Yanis » — and all three cascade. The page's own comment says « A
