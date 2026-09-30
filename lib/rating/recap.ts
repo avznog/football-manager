@@ -37,6 +37,7 @@
 import type { SquadRole } from "@/db/schema";
 import { pluralize, resultLabel, scoreLineFr } from "@/lib/calendar/labels";
 import { VOIDED_SUFFIX_FR } from "@/lib/match/events";
+import { noteDetailFr } from "@/lib/match/presenter";
 import type { MatchState, PlayerMatchState, TimelineEntry } from "@/lib/match/reducer";
 
 /** What this module needs to know about a person: how to write their name. */
@@ -156,8 +157,7 @@ export function buildRecap(
 ): MatchRecap {
   const directory = new Map(members.map((member) => [member.memberId, member]));
   const unknownName = options.unknownName ?? UNKNOWN_MEMBER_NAME;
-  const nameOf = (memberId: string): string =>
-    directory.get(memberId)?.displayName ?? unknownName;
+  const nameOf = (memberId: string): string => directory.get(memberId)?.displayName ?? unknownName;
 
   return {
     goalsFor: state.goalsFor,
@@ -253,21 +253,29 @@ export function buildTimeline(
   entries: readonly TimelineEntry[],
   nameOf: (memberId: string) => string,
 ): RecapTimelineEntry[] {
-  return entries
-    .filter((entry) => !HIDDEN_EVENT_TYPES.has(entry.type))
-    // The starting eleven, applied at 0’, is the composition — not seven changes.
-    .filter((entry) => !(entry.type === "LINEUP_APPLIED" && entry.clockMs === 0))
-    .map((entry) => ({
-      eventId: entry.eventId,
-      minuteLabel: entry.minuteLabel,
-      label: entry.voided ? `${entry.labelFr} — ${VOIDED_SUFFIX_FR}` : entry.labelFr,
-      detail: describeActors(entry, nameOf) ?? missingScorerNote(entry),
-      voided: entry.voided,
-      scoreAfter: entry.scoreAfter
-        ? scoreLineFr(entry.scoreAfter.goalsFor, entry.scoreAfter.goalsAgainst)
-        : null,
-      tone: toneOf(entry),
-    }));
+  // `detail` asks `noteDetailFr` first: a note is the whole point of the event that carries it, and
+  // that formatter is shared with game mode's timeline — see its comment for why the *rest* of this
+  // description is deliberately phrased differently on the two screens.
+  const detailOf = (entry: TimelineEntry): string | null =>
+    noteDetailFr(entry, nameOf) ?? describeActors(entry, nameOf) ?? missingScorerNote(entry);
+
+  return (
+    entries
+      .filter((entry) => !HIDDEN_EVENT_TYPES.has(entry.type))
+      // The starting eleven, applied at 0’, is the composition — not seven changes.
+      .filter((entry) => !(entry.type === "LINEUP_APPLIED" && entry.clockMs === 0))
+      .map((entry) => ({
+        eventId: entry.eventId,
+        minuteLabel: entry.minuteLabel,
+        label: entry.voided ? `${entry.labelFr} — ${VOIDED_SUFFIX_FR}` : entry.labelFr,
+        detail: detailOf(entry),
+        voided: entry.voided,
+        scoreAfter: entry.scoreAfter
+          ? scoreLineFr(entry.scoreAfter.goalsFor, entry.scoreAfter.goalsAgainst)
+          : null,
+        tone: toneOf(entry),
+      }))
+  );
 }
 
 /** Types of our goals: the ones where a missing name is worth stating rather than leaving blank. */
@@ -298,6 +306,9 @@ function toneOf(entry: TimelineEntry): RecapTimelineTone {
  *
  * Built from the reducer's `actors` rather than from the raw payload, so there is one definition of
  * "who was involved in this event" in the repository.
+ *
+ * It does **not** handle a `COMMENT`: an event carrying free text is described by `noteDetailFr`,
+ * which the recap and game mode share, and `buildTimeline` calls that first.
  */
 export function describeActors(
   entry: TimelineEntry,

@@ -30,6 +30,7 @@ import {
   type PendingEvent,
   type PendingLineupView,
 } from "./presenter";
+import type { MatchState } from "./reducer";
 
 /* -------------------------------------------------------------------------- */
 /* Fixtures                                                                   */
@@ -285,7 +286,12 @@ describe("the pitch", () => {
   it("leaves an empty slot empty rather than shifting the others", () => {
     const seven = STARTING_SEVEN.filter((entry) => entry.slotId !== SLOT.at);
     const state = reduceLive(
-      live(log([{ type: "KICKOFF", min: 0 }, { type: "LINEUP_APPLIED", min: 0, payload: lineupPayload(seven) }])),
+      live(
+        log([
+          { type: "KICKOFF", min: 0 },
+          { type: "LINEUP_APPLIED", min: 0, payload: lineupPayload(seven) },
+        ]),
+      ),
       [],
       T0 + 5 * MIN,
     );
@@ -470,9 +476,17 @@ describe("the timeline", () => {
     const state = reduceLive(live(events), [], T0 + 30 * MIN);
     const lines = timelineLines(state, index);
 
-    expect(lines[0]).toMatchObject({ title: "Changement", detail: "Léo → Yanis", minuteLabel: "25’" });
+    expect(lines[0]).toMatchObject({
+      title: "Changement",
+      detail: "Léo → Yanis",
+      minuteLabel: "25’",
+    });
     expect(lines[1]).toMatchObject({ title: "But encaissé", scoreLabel: "1 – 1" });
-    expect(lines[2]).toMatchObject({ title: "But", detail: "Julien (passe de Karim)", scoreLabel: "1 – 0" });
+    expect(lines[2]).toMatchObject({
+      title: "But",
+      detail: "Julien (passe de Karim)",
+      scoreLabel: "1 – 0",
+    });
   });
 
   it("offers « annuler » only on an event that can be annulled and has reached the server", () => {
@@ -791,7 +805,9 @@ describe("what the big button says", () => {
     const played = [...secondHalf, { type: "PERIOD_END" as const, min: 60, period: 2 }];
     expect(clockActionFr(at(played, 62))).toEqual({
       label: "Coup de sifflet final",
-      shortLabel: "Fin",
+      // Not « Fin »: it is a word of « final » rather than a word of the label, so voice control
+      // could not activate the button that ends the match (WCAG 2.5.3 — see below).
+      shortLabel: "Sifflet",
       event: "FINAL_WHISTLE",
     });
 
@@ -800,6 +816,110 @@ describe("what the big button says", () => {
       label: "Match terminé",
       shortLabel: "Terminé",
       event: null,
+    });
+  });
+
+  /**
+   * WCAG 2.5.3 Label in Name, over every shape of the state machine rather than over the pairs
+   * somebody thought to list.
+   *
+   * Game mode prints `shortLabel` on the button and announces `label` as its `aria-label`, so voice
+   * control looks for the visible word inside the accessible name: « Fin » against « Coup de sifflet
+   * final » matches no word at all, only the inside of *final*, and that is the button that ends the
+   * match. Nothing in the suite pinned `shortLabel` before this — it could have rendered empty and
+   * stayed green — so the assertion walks every reachable phase, for every number of periods a match
+   * can be configured with, and also checks that all five phases really were reached.
+   */
+  describe("the short label on the button", () => {
+    /** Accent- and punctuation-insensitive words: « Coup d’envoi » is three, « Mi-temps » is two. */
+    const words = (text: string): string[] =>
+      text
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .toLowerCase()
+        .split(/[^\p{Letter}\p{Number}]+/u)
+        .filter(Boolean);
+
+    /** True when `short` occurs in `long` as a run of whole words — not inside one. */
+    const containsWords = (long: string, short: string): boolean => {
+      const haystack = words(long);
+      const needle = words(short);
+      if (needle.length === 0) return false;
+      return haystack.some((_, start) => needle.every((word, i) => haystack[start + i] === word));
+    };
+
+    /** Every clock state a match can be in: kicked off, paused, between periods, over. */
+    const everyState = (): { where: string; state: MatchState }[] => {
+      const found: { where: string; state: MatchState }[] = [];
+
+      for (const periodsCount of [1, 2, 3]) {
+        const match = { ...live([]).match, periodsCount, periodMinutes: 30 };
+        const at = (fixtures: Fixture[], nowMin: number) =>
+          reduceLive(live(log(fixtures), { match }), [], T0 + nowMin * MIN);
+        const where = (what: string) => `${periodsCount} × 30, ${what}`;
+
+        let played: Fixture[] = [];
+        found.push({ where: where("avant le coup d’envoi"), state: at(played, 0) });
+
+        for (let period = 1; period <= periodsCount; period += 1) {
+          const start = (period - 1) * 30;
+          played = [...played, { type: "KICKOFF", min: start, period }];
+          if (period === 1) {
+            played = [
+              ...played,
+              { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_SEVEN) },
+            ];
+          }
+          found.push({ where: where(`période ${period} en cours`), state: at(played, start + 5) });
+
+          const paused = [...played, { type: "PAUSE" as const, min: start + 10, period }];
+          found.push({ where: where(`période ${period} arrêtée`), state: at(paused, start + 12) });
+
+          played = [
+            ...paused,
+            { type: "RESUME", min: start + 12, period },
+            { type: "PERIOD_END", min: start + 30, period },
+          ];
+          found.push({
+            where: where(`fin de la période ${period}`),
+            state: at(played, start + 31),
+          });
+        }
+
+        played = [
+          ...played,
+          { type: "FINAL_WHISTLE", min: periodsCount * 30, period: periodsCount },
+        ];
+        found.push({ where: where("match terminé"), state: at(played, periodsCount * 30 + 5) });
+      }
+
+      return found;
+    };
+
+    it("is always a whole word of the name the button announces", () => {
+      for (const { where, state } of everyState()) {
+        const { label, shortLabel } = clockActionFr(state);
+
+        expect(shortLabel, where).not.toBe("");
+        expect(
+          containsWords(label, shortLabel),
+          `${where} : « ${shortLabel} » n’est pas un mot de « ${label} »`,
+        ).toBe(true);
+      }
+    });
+
+    it("reaches every phase, so the sweep above means something", () => {
+      expect(new Set(everyState().map(({ state }) => state.phase))).toEqual(
+        new Set(["before-kickoff", "running", "paused", "break", "finished"]),
+      );
+    });
+
+    it("rejects a label that only contains the short one inside a longer word", () => {
+      // The defect this sweep exists for: « Fin » against « Coup de sifflet final ».
+      expect(containsWords("Coup de sifflet final", "Fin")).toBe(false);
+      expect(containsWords("Coup de sifflet final", "Sifflet")).toBe(true);
+      expect(containsWords("Coup d’envoi 2e période", "Envoi")).toBe(true);
+      expect(containsWords("Mi-temps", "Mi-temps")).toBe(true);
     });
   });
 

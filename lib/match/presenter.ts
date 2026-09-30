@@ -205,7 +205,9 @@ export function mergeEvents(
 }
 
 /** `matches.periods_count` / `periods_minutes`, coerced. 2 × 30 by default (decision 009). */
-export function periodsOf(match: Pick<LiveMatchRow, "periodsCount" | "periodMinutes">): PeriodsConfig {
+export function periodsOf(
+  match: Pick<LiveMatchRow, "periodsCount" | "periodMinutes">,
+): PeriodsConfig {
   return periodsConfig(match);
 }
 
@@ -267,11 +269,7 @@ export type EventStamp = {
  * 2. **Everything else takes the clock as it reads.** Including a pause: the pause *is* the event
  *    that stops the clock, so it is stamped at the time it happens.
  */
-export function nextEventStamp(
-  state: MatchState,
-  type: MatchEventType,
-  nowMs: number,
-): EventStamp {
+export function nextEventStamp(state: MatchState, type: MatchEventType, nowMs: number): EventStamp {
   const projected = projectClockMs(state.clock, nowMs);
 
   if (type === "KICKOFF") {
@@ -359,9 +357,7 @@ export function pitchView(
     [...occupied].map((id) => byId.get(id)?.formationId).find((id): id is string => Boolean(id)) ??
     null;
 
-  const shown = slots.filter(
-    (slot) => slot.formationId === formationId || occupied.has(slot.id),
-  );
+  const shown = slots.filter((slot) => slot.formationId === formationId || occupied.has(slot.id));
 
   const result: GamePitchSlot[] = shown
     .slice()
@@ -417,7 +413,10 @@ export function proposedPitchView(
   assignments: readonly { slotId: string; memberId: string }[],
   slots: readonly LiveSlot[],
   players: PlayerIndex,
-  options: { onPitchMemberIds?: readonly string[]; flags?: readonly { memberId: string; reason: PlannedLineupFlagReason }[] } = {},
+  options: {
+    onPitchMemberIds?: readonly string[];
+    flags?: readonly { memberId: string; reason: PlannedLineupFlagReason }[];
+  } = {},
 ): GamePitchSlot[] {
   const byId = slotIndex(slots);
   const onPitch = new Set(options.onPitchMemberIds ?? []);
@@ -425,8 +424,9 @@ export function proposedPitchView(
 
   return assignments
     .map((assignment) => ({ assignment, slot: byId.get(assignment.slotId) }))
-    .filter((entry): entry is { assignment: { slotId: string; memberId: string }; slot: LiveSlot } =>
-      Boolean(entry.slot),
+    .filter(
+      (entry): entry is { assignment: { slotId: string; memberId: string }; slot: LiveSlot } =>
+        Boolean(entry.slot),
     )
     .sort((a, b) => a.slot.sort - b.slot.sort)
     .map(({ assignment, slot }) => {
@@ -473,8 +473,8 @@ export function onPitchOptions(
   return state.onPitch
     .slice()
     .sort((a, b) => {
-      const left = a.slotId ? byId.get(a.slotId)?.sort ?? 999 : 999;
-      const right = b.slotId ? byId.get(b.slotId)?.sort ?? 999 : 999;
+      const left = a.slotId ? (byId.get(a.slotId)?.sort ?? 999) : 999;
+      const right = b.slotId ? (byId.get(b.slotId)?.sort ?? 999) : 999;
       return left - right;
     })
     .map((entry) => {
@@ -500,16 +500,23 @@ export function onPitchOptions(
  * first, then the rest of the squad, then players the sheet does not mention — and the subtitle
  * says which is which, so nothing is hidden and nothing is silently equivalent.
  */
-export function availableOptions(state: MatchState, players: readonly LivePlayer[]): PlayerOption[] {
+export function availableOptions(
+  state: MatchState,
+  players: readonly LivePlayer[],
+): PlayerOption[] {
   const onPitch = new Set(state.onPitch.map((entry) => entry.memberId));
 
   return players
     .filter((player) => player.isPlayer && !onPitch.has(player.memberId))
     .slice()
-    .sort((a, b) => optionRank(a) - optionRank(b) || a.displayName.localeCompare(b.displayName, "fr"))
+    .sort(
+      (a, b) => optionRank(a) - optionRank(b) || a.displayName.localeCompare(b.displayName, "fr"),
+    )
     .map((player) => {
       const playerState = stateOf(state, player.memberId);
-      const bits: string[] = [player.squadRole ? squadRoleLabelFr(player.squadRole) : "hors feuille"];
+      const bits: string[] = [
+        player.squadRole ? squadRoleLabelFr(player.squadRole) : "hors feuille",
+      ];
       if (playerState?.playedMatch) bits.push(`déjà joué ${playerState.minutes}’`);
       if (player.isInjured) bits.push("blessé");
 
@@ -639,14 +646,37 @@ export function timelineLines(
 }
 
 /**
- * The line under the title: who the event was about, and the free text it carries if it has any.
- * A comment attached to nobody is its note alone; attached to a player it reads « Karim : trop
- * haut sur le côté », the same « name : text » idiom as `labelledFr`.
+ * The detail line of an event that carries free text — today only a `COMMENT` (decision 114).
+ *
+ * **Shared with the recap** (`lib/rating/recap.ts`), which is why it is exported. The two timelines
+ * in the app phrase everything *else* differently on purpose: the recap says « Julien Marchal, passe
+ * de Karim Benali » and game mode says « Julien (passe de Karim) », because one is read afterwards
+ * and the other at arm's length while the match is going on. A note is not one of those differences
+ * — it is the coach's own 280 characters either way — and when each module had its own detail
+ * builder only this one knew about `note` and the `commented` role, so a comment rendered in the
+ * recap as « 14’ · Commentaire » with nothing under it: the one screen the note exists for was the
+ * one screen that dropped it. One formatter, called by both, means the next event type that carries
+ * text costs one branch rather than two that can disagree.
+ *
+ * It lives in this file rather than in a third one because `lib/rating` already depends on
+ * `lib/match` and the reverse would invert that.
+ *
+ * A comment attached to nobody is its note alone; attached to a player it reads « Karim : trop haut
+ * sur le côté », the same « name : text » idiom as `labelledFr`. Returns null for an entry with no
+ * note — which is every other event — so the caller falls through to its own actor phrasing.
  */
+export function noteDetailFr(
+  entry: Pick<TimelineEntry, "note" | "actors">,
+  nameOf: (memberId: string) => string,
+): string | null {
+  if (!entry.note) return null;
+  const about = entry.actors.find((actor) => actor.role === "commented");
+  return about ? `${nameOf(about.memberId)} : ${entry.note}` : entry.note;
+}
+
+/** The line under the title: the free text the event carries, or who it was about. */
 function detailFr(entry: TimelineEntry, players: PlayerIndex): string | null {
-  const actors = describeActorsFr(entry.type, entry.actors, players);
-  if (!entry.note) return actors;
-  return actors ? `${actors} : ${entry.note}` : entry.note;
+  return noteDetailFr(entry, players.nameOf) ?? describeActorsFr(entry.type, entry.actors, players);
 }
 
 /** Who an event was about, phrased the way a coach reads it out. */
@@ -750,7 +780,9 @@ export function pendingLineupView(
      * arrivals included: this diff is against the *pitch*, which may be down to six.
      */
     changes: pending.isInitial ? [] : describeLineupDiffFr(pending.diff, players.nameOf),
-    warnings: flags.map((flag) => `${players.nameOf(flag.memberId)} est ${flagLabelFr(flag.reason)}`),
+    warnings: flags.map(
+      (flag) => `${players.nameOf(flag.memberId)} est ${flagLabelFr(flag.reason)}`,
+    ),
     flags,
     slots: lineup.slots,
     isEmpty: pending.diff.isEmpty,
@@ -759,8 +791,7 @@ export function pendingLineupView(
 
 /** Either the ordered list of changes, or the one sentence that stands in for it. */
 export type PendingLineupChanges =
-  | { kind: "list"; lines: readonly string[] }
-  | { kind: "sentence"; text: string };
+  { kind: "list"; lines: readonly string[] } | { kind: "sentence"; text: string };
 
 /**
  * What the prompt says about what would happen — and why « aucun changement » is not always it.
@@ -899,6 +930,15 @@ export function pendingCountLabelFr(count: number): string {
  * gives this button a quarter of a 393 px screen, where « Coup de sifflet final » does not fit.
  * It stays in this function rather than a second one so that the two labels of one action cannot
  * drift apart, and it is purely additive — every caller reading `label` is untouched.
+ *
+ * **Every pair has to satisfy WCAG 2.5.3 Label in Name**: game mode prints `shortLabel` and
+ * announces `label` as the `aria-label`, so the visible text must appear in the accessible name as a
+ * *whole word*, or « clique sur Fin » activates nothing. Six pairs did; the final whistle did not —
+ * « Fin » occurs in « Coup de sifflet final » only inside *final*, and that is the button that ends
+ * the match and freezes `match_player_stats`. The short label is what changed, to « Sifflet »: it is
+ * a whole word of the long label, it is unambiguous beside Envoi / Mi-temps / Reprendre, and `label`
+ * has other callers whose text would otherwise have moved. `presenter.test.ts` now walks every
+ * reachable phase and asserts the containment, because nothing pinned `shortLabel` at all.
  */
 export function clockActionFr(state: MatchState): {
   label: string;
@@ -914,7 +954,7 @@ export function clockActionFr(state: MatchState): {
   if (phase === "paused") return { label: "Reprendre", shortLabel: "Reprendre", event: "RESUME" };
   if (phase === "break") {
     return state.periodsStarted >= state.periods.periodsCount
-      ? { label: "Coup de sifflet final", shortLabel: "Fin", event: "FINAL_WHISTLE" }
+      ? { label: "Coup de sifflet final", shortLabel: "Sifflet", event: "FINAL_WHISTLE" }
       : {
           label: `Coup d’envoi ${ordinalPeriodFr(state.periodsStarted + 1)}`,
           shortLabel: "Envoi",
@@ -937,7 +977,9 @@ const HALF_TIME_FR = "Mi-temps";
 function periodEndLabelFr(state: MatchState): string {
   const isLast = state.clock.period >= state.periods.periodsCount;
   if (isLast) return "Fin du match";
-  return state.periods.periodsCount === 2 ? HALF_TIME_FR : `Fin de la ${ordinalPeriodFr(state.clock.period)}`;
+  return state.periods.periodsCount === 2
+    ? HALF_TIME_FR
+    : `Fin de la ${ordinalPeriodFr(state.clock.period)}`;
 }
 
 function ordinalPeriodFr(period: number): string {
