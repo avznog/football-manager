@@ -591,6 +591,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         <ActionBar
           actionDisabled={!canAct}
           clockLabel={clockAction.shortLabel}
+          clockName={clockAction.label}
           clockDisabled={clockAction.event === null}
           clockTone={clockAction.event === "FINAL_WHISTLE" ? "danger" : "secondary"}
           onClock={pressClockAction}
@@ -842,6 +843,8 @@ const ACTOR_QUESTIONS = {
 type ActionBarProps = {
   actionDisabled: boolean;
   clockLabel: string;
+  /** The full `clockActionFr().label`, which is what a screen reader hears. */
+  clockName: string;
   clockDisabled: boolean;
   clockTone: "secondary" | "danger";
   onClock: () => void;
@@ -861,9 +864,15 @@ type ActionBarProps = {
  * has nowhere to be (decision 112).
  *
  * ACTION keeps half the width and its 64 px, because it is the one thing the coach reaches for
- * without looking; the clock button and « Pause » share the other half. `clockLabel` is
- * `clockActionFr().shortLabel` — « Coup de sifflet final » does not fit a quarter of 393 px, and the
- * short form lives in the same function's return so the two cannot drift.
+ * without looking; the clock button and « Pause » share the other half.
+ *
+ * The clock button is the one place in the app where what is written and what is announced differ, and
+ * on purpose: `clockLabel` is `clockActionFr().shortLabel`, because « Coup de sifflet final » does not
+ * fit a quarter of 393 px, while `clockName` is the full label, because « Fin » on its own does not say
+ * whether it ends the half or the match. Both come from the same function's return so they cannot
+ * drift, and every short form is contained in its long one — « Envoi » in « Coup d'envoi 2e période »,
+ * « Fin » in « Fin du match » — which is what WCAG 2.5.3 asks of a visible label inside an accessible
+ * name, so a voice-control user saying what they can read still hits the button.
  *
  * Grid, not flex: `Button` is `shrink-0`, so a `fullWidth` button beside another one pushes it off
  * the right edge of a 390 px screen rather than sharing the row.
@@ -871,6 +880,7 @@ type ActionBarProps = {
 function ActionBar({
   actionDisabled,
   clockLabel,
+  clockName,
   clockDisabled,
   clockTone,
   onClock,
@@ -898,7 +908,14 @@ function ActionBar({
             Pause
           </Button>
         ) : null}
-        <Button variant={clockTone} size="lg" fullWidth disabled={clockDisabled} onClick={onClock}>
+        <Button
+          variant={clockTone}
+          size="lg"
+          fullWidth
+          disabled={clockDisabled}
+          onClick={onClock}
+          aria-label={clockName}
+        >
           {clockLabel}
         </Button>
       </div>

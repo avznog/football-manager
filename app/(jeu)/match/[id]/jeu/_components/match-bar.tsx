@@ -35,6 +35,9 @@ export type MatchBarProps = {
  *
  * The back button is the only way out other than the final whistle, so it is an icon with an accessible
  * name rather than « ← Courges »: at 393 px the opponent's name is the width the score needs.
+ *
+ * It keeps the old `Scoreboard`'s `region` and its name: this is still the one part of the screen a
+ * screen reader wants to be able to jump to, and « Chrono et score » is now literally all it holds.
  */
 export function MatchBar({
   reading,
@@ -46,7 +49,11 @@ export function MatchBar({
   action,
 }: MatchBarProps) {
   return (
-    <div className="safe-pt sticky top-0 z-40 -mx-3 border-b border-border/60 bg-canvas/95 px-3 backdrop-blur md:-mx-6 md:px-6">
+    <div
+      role="region"
+      aria-label="Chrono et score"
+      className="safe-pt sticky top-0 z-40 -mx-3 border-b border-border/60 bg-canvas/95 px-3 backdrop-blur md:-mx-6 md:px-6"
+    >
       <div className="flex min-h-14 items-center gap-2">
         <Link
           href={matchHref}

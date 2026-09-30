@@ -63,7 +63,6 @@ const STARTERS: readonly (readonly [FixturePlayerKey, string])[] = [
   ["st", "attaquant"],
 ];
 
-
 test("le parcours complet : match, composition, mode match, notation, résumé", async ({ page }) => {
   const fixture = provisionFixture();
 
@@ -215,7 +214,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 
   const scoreboard = page.getByRole("region", { name: "Chrono et score" });
   const clock = scoreboard.locator('span[aria-label^="Chrono"]');
-  const score = scoreboard.locator("span").filter({ hasText: /^\d+ – \d+$/ });
+  const score = scoreboard.locator('p[aria-label^="Score"]');
   const onPitch = pitch(page, "Joueurs sur le terrain");
 
   await test.step("game mode opens with the composition proposed, not applied", async () => {
@@ -227,7 +226,10 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 
     await expect(scoreboard).toBeVisible();
     await expect(clock).toHaveText("00:00");
-    await expect(scoreboard).toContainText("Avant le coup d’envoi");
+    // The bar holds the time and the score and nothing else now (decision 112), so the phase is read
+    // off the clock button — whose accessible name is the full `clockActionFr().label`, from the same
+    // state the deleted « Avant le coup d’envoi » line came from.
+    await expect(page.getByRole("button", { name: "Coup d’envoi", exact: true })).toBeVisible();
 
     // Invariant 3, before a single event exists: the composition is on screen as a proposal, and
     // the pitch is empty until the coach confirms it.
@@ -254,8 +256,9 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   });
 
   await test.step("a goal with an assist, then a goal conceded", async () => {
-    await page.getByRole("button", { name: "Coup d’envoi" }).click();
-    await expect(scoreboard).toContainText("1re période");
+    await page.getByRole("button", { name: "Coup d’envoi", exact: true }).click();
+    // Period 1 of 2 is running: the only thing the clock button can offer is the end of it.
+    await expect(page.getByRole("button", { name: "Mi-temps" })).toBeVisible();
 
     await page.clock.setFixedTime(at(11));
     await expect(clock).toHaveText("11:00");
@@ -277,16 +280,17 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(clock).toHaveText("30:00");
 
     await page.getByRole("button", { name: "Mi-temps" }).click();
-    await expect(scoreboard).toContainText("Mi-temps");
+    await expect(page.getByRole("button", { name: "Coup d’envoi 2e période" })).toBeVisible();
 
     await page.clock.setFixedTime(at(35));
     await page.getByRole("button", { name: "Coup d’envoi 2e période" }).click();
 
     // Decision 009 and `CLAUDE.md`: match minutes are continuous. A reset would read 00:00 here.
     await expect(clock).toHaveText("30:00");
-    await expect(clock).toHaveAttribute("aria-label", "Chrono 30’");
+    await expect(clock).toHaveAttribute("aria-label", /^Chrono 30’/);
     await expect(clock).not.toHaveText("00:00");
-    await expect(scoreboard).toContainText("2e période");
+    // The last period is running, so the button is now the final whistle rather than another break.
+    await expect(page.getByRole("button", { name: "Fin du match" })).toBeVisible();
   });
 
   await test.step("the planned change is applied only once the coach confirms it", async () => {
@@ -494,7 +498,9 @@ function picker(page: Page, title: string): Locator {
  * chosen number was visibly chosen.
  */
 async function rateEveryone(page: Page, fixture: Fixture, best: FixturePlayer): Promise<void> {
-  await expect(page.getByRole("heading", { level: 1, name: "Noter mes coéquipiers" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Noter mes coéquipiers" }),
+  ).toBeVisible();
 
   const cards = page.locator("form > ul > li:not([hidden])");
   // Pagination starts at hydration: one card at a time is the sign the client has taken over.
@@ -530,7 +536,9 @@ async function rateEveryone(page: Page, fixture: Fixture, best: FixturePlayer): 
     }
   }
 
-  await expect(page.getByText(`${fixture.players.length} / ${fixture.players.length} notés`)).toBeVisible();
+  await expect(
+    page.getByText(`${fixture.players.length} / ${fixture.players.length} notés`),
+  ).toBeVisible();
   await expect(page.getByText("Prêt à envoyer")).toBeVisible();
 }
 
