@@ -14,6 +14,7 @@ import {
   periodsLabel,
   resultLabel,
   resultLetter,
+  SCORE_SEPARATOR_FR,
   scoreLineFr,
   unmarkedSessionNoteFr,
   venueFieldHintFr,
@@ -72,6 +73,16 @@ describe("the labels the match header shares with the calendar", () => {
     // An en dash, not a hyphen: it is a score, not a range of two numbers.
     expect(scoreLineFr(1, 1)).toContain("–");
     expect(scoreLineFr(1, 1)).not.toContain("-");
+  });
+
+  /*
+   * Game mode's bar underlines our own figure, so it cannot print the whole string and joins the two
+   * goals with this constant instead. The point of exporting it is that there is still one separator
+   * in the app; the point of this test is that it is still the separator `scoreLineFr` uses.
+   */
+  it("joins the two figures with the separator it exports", () => {
+    expect(SCORE_SEPARATOR_FR).toBe(" – ");
+    expect(scoreLineFr(3, 2)).toBe(`3${SCORE_SEPARATOR_FR}2`);
   });
 });
 

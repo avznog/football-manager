@@ -928,38 +928,65 @@ export function pendingCountLabelFr(count: number): string {
  *
  * `shortLabel` is the same decision in as few letters as it can be said: the game-mode bottom bar
  * gives this button a quarter of a 393 px screen, where « Coup de sifflet final » does not fit.
- * It stays in this function rather than a second one so that the two labels of one action cannot
- * drift apart, and it is purely additive — every caller reading `label` is untouched.
+ * It stays in this function rather than a second one so that the labels of one action cannot drift
+ * apart, and it was purely additive — every caller reading `label` was untouched.
  *
  * **Every pair has to satisfy WCAG 2.5.3 Label in Name**: game mode prints `shortLabel` and
- * announces `label` as the `aria-label`, so the visible text must appear in the accessible name as a
- * *whole word*, or « clique sur Fin » activates nothing. Six pairs did; the final whistle did not —
- * « Fin » occurs in « Coup de sifflet final » only inside *final*, and that is the button that ends
- * the match and freezes `match_player_stats`. The short label is what changed, to « Sifflet »: it is
- * a whole word of the long label, it is unambiguous beside Envoi / Mi-temps / Reprendre, and `label`
- * has other callers whose text would otherwise have moved. `presenter.test.ts` now walks every
- * reachable phase and asserts the containment, because nothing pinned `shortLabel` at all.
+ * announces `name` as the `aria-label`, so the visible text must appear in the accessible name as a
+ * *whole word*, or « clique sur Début » activates nothing. The final whistle is where that was first
+ * found: « Fin » occurs in « Coup de sifflet final » only inside *final*, and that is the button that
+ * ends the match and freezes `match_player_stats`. There the **short** label changed, to « Sifflet ».
+ *
+ * `name` exists because the second failure could not be fixed that way. « Envoi » is a word a coach
+ * has to translate — the button starts the match, and « Début » is what the thing is called — so the
+ * short label of both kick-off branches is « Début », and « Début » is not a word of « Coup d’envoi ».
+ * The football term is the right `label` and the visible word is the right `shortLabel`, so the
+ * accessible name is the one that gives way: it carries both, « Début : coup d’envoi », and voice
+ * control saying what it can read still hits the button. Everywhere else `name` *is* `label`, and it
+ * stays in this function rather than being assembled at the call site so that the three strings of one
+ * action cannot drift apart. `presenter.test.ts` walks every reachable phase and asserts the
+ * containment against `name`.
  */
 export function clockActionFr(state: MatchState): {
   label: string;
   shortLabel: string;
+  /** What the button announces — `label`, unless the visible short label is not a word of it. */
+  name: string;
   event: "KICKOFF" | "PERIOD_END" | "PAUSE" | "RESUME" | "FINAL_WHISTLE" | null;
 } {
   const { phase } = state;
 
-  if (phase === "finished") return { label: "Match terminé", shortLabel: "Terminé", event: null };
-  if (phase === "before-kickoff") {
-    return { label: "Coup d’envoi", shortLabel: "Envoi", event: "KICKOFF" };
+  if (phase === "finished") {
+    return { label: "Match terminé", shortLabel: "Terminé", name: "Match terminé", event: null };
   }
-  if (phase === "paused") return { label: "Reprendre", shortLabel: "Reprendre", event: "RESUME" };
+  if (phase === "before-kickoff") {
+    return {
+      label: KICKOFF_FR,
+      shortLabel: KICKOFF_SHORT_FR,
+      name: kickoffNameFr(KICKOFF_FR),
+      event: "KICKOFF",
+    };
+  }
+  if (phase === "paused") {
+    return { label: "Reprendre", shortLabel: "Reprendre", name: "Reprendre", event: "RESUME" };
+  }
   if (phase === "break") {
-    return state.periodsStarted >= state.periods.periodsCount
-      ? { label: "Coup de sifflet final", shortLabel: "Sifflet", event: "FINAL_WHISTLE" }
-      : {
-          label: `Coup d’envoi ${ordinalPeriodFr(state.periodsStarted + 1)}`,
-          shortLabel: "Envoi",
-          event: "KICKOFF",
-        };
+    if (state.periodsStarted >= state.periods.periodsCount) {
+      const finalWhistle = "Coup de sifflet final";
+      return {
+        label: finalWhistle,
+        shortLabel: "Sifflet",
+        name: finalWhistle,
+        event: "FINAL_WHISTLE",
+      };
+    }
+    const nextKickoff = `${KICKOFF_FR} ${ordinalPeriodFr(state.periodsStarted + 1)}`;
+    return {
+      label: nextKickoff,
+      shortLabel: KICKOFF_SHORT_FR,
+      name: kickoffNameFr(nextKickoff),
+      event: "KICKOFF",
+    };
   }
   // Running: the period has to be closed before anything else can happen.
   const periodEnd = periodEndLabelFr(state);
@@ -968,8 +995,22 @@ export function clockActionFr(state: MatchState): {
     // « Mi-temps » is already as short as it gets; « Fin du match » and « Fin de la 2e période »
     // are not, and in a bar where the clock is right there, « Fin » says the same thing.
     shortLabel: periodEnd === HALF_TIME_FR ? periodEnd : "Fin",
+    name: periodEnd,
     event: "PERIOD_END",
   };
+}
+
+const KICKOFF_FR = "Coup d’envoi";
+
+/**
+ * The visible word on the button that starts a period. « Envoi » is half of a term; « Début » is what
+ * a coach would say out loud, and it is four letters either way.
+ */
+const KICKOFF_SHORT_FR = "Début";
+
+/** « Début : coup d’envoi 2e période » — the visible word first, so it is a word of the name. */
+function kickoffNameFr(label: string): string {
+  return `${KICKOFF_SHORT_FR} : ${label.toLocaleLowerCase("fr-FR")}`;
 }
 
 const HALF_TIME_FR = "Mi-temps";
