@@ -19,6 +19,7 @@ import {
   DEFAULT_DIRECTION,
   DIRECTION_PARAM,
   FORMATION_PARAM,
+  aggregationLabelFr,
   cleanSheetReadingsFr,
   declaredPostsFr,
   emptySlotsFr,
@@ -38,6 +39,7 @@ import {
   resetLabelFr,
   sevenHeadingFr,
   shrinkageSentenceFr,
+  squadMeanStandInFr,
   swapAnnouncementFr,
   viewerRelativeRatingsFr,
 } from "./best-seven-copy";
@@ -46,6 +48,7 @@ const report = (overrides: Partial<ShrinkageReport> = {}): ShrinkageReport => ({
   squadMean: 0.5,
   priorStrength: 4,
   measured: 4,
+  unmeasurable: null,
   clamp: [2, 10],
   unit: "ratings",
   withinPlayerVariance: 1,
@@ -124,6 +127,16 @@ describe("printing a figure", () => {
 
   it("prints a dash, never a zero, for a figure nobody has", () => {
     expect(formatCriterionValue("goals", null)).toBe("—");
+  });
+
+  it("labels the team figure with the number of discs it actually used", () => {
+    // « Moyenne des sept » under a mean of five is the label lying about its own denominator; a squad
+    // short of the shape is the legitimate case (`emptySlotsFr` says so above the figure).
+    expect(aggregationLabelFr("sum", 7)).toBe("Total des sept");
+    expect(aggregationLabelFr("mean", 7)).toBe("Moyenne des sept");
+    expect(aggregationLabelFr("mean", 5)).toBe("Moyenne sur 5 postes");
+    expect(aggregationLabelFr("sum", 5)).toBe("Total sur 5 postes");
+    expect(aggregationLabelFr("mean", 1)).toBe("Moyenne sur 1 poste");
   });
 
   it("carries the denominator beside the raw figure", () => {
@@ -251,9 +264,6 @@ describe("honesty 3 — what the shrinkage did", () => {
       shrinkageSentenceFr("goals", report({ unit: "sixtyMinutes", priorStrength: 3, measured: 3 })),
     ).toContain("à hauteur de 3,0 heures de jeu");
     expect(
-      shrinkageSentenceFr("goals", report({ unit: "sixtyMinutes", priorStrength: 1, measured: 1 })),
-    ).toContain("1,0 heure de jeu");
-    expect(
       shrinkageSentenceFr(
         "cleanSheet",
         report({ unit: "minutes", priorStrength: 120, measured: 120 }),
@@ -261,14 +271,104 @@ describe("honesty 3 — what the shrinkage did", () => {
     ).toContain("à hauteur de 120′");
   });
 
+  it("pluralises the hour from two, the way French does", () => {
+    // The guard used to be `> 1`, which printed « 1,6 heures » on the clamp's own floor and « 1,0
+    // heures » at exactly one. And the plural follows the *printed* decimal, so 1,96 — which rounds to
+    // « 2,0 » on screen — does not come out as « 2,0 heure ».
+    const hours = (priorStrength: number) =>
+      shrinkageSentenceFr("goals", report({ unit: "sixtyMinutes", priorStrength, measured: priorStrength }));
+
+    expect(hours(1)).toContain("à hauteur de 1,0 heure de jeu");
+    expect(hours(1.6)).toContain("à hauteur de 1,6 heure de jeu");
+    expect(hours(1.9)).toContain("à hauteur de 1,9 heure de jeu");
+    expect(hours(1.96)).toContain("à hauteur de 2,0 heures de jeu");
+    expect(hours(2)).toContain("à hauteur de 2,0 heures de jeu");
+    expect(hours(6)).toContain("à hauteur de 6,0 heures de jeu");
+  });
+
   it("prints no number at all when the prior strength could not be measured", () => {
     // The clamp's ceiling is not a measurement, and printing it would make the screen quote a number
     // it cannot justify — the one thing rule 3 returns `measured` separately in order to avoid.
-    const sentence = shrinkageSentenceFr("ratings", report({ measured: null, priorStrength: 10 }));
+    const sentence = shrinkageSentenceFr(
+      "ratings",
+      report({ measured: null, unmeasurable: "noSpread", priorStrength: 10 }),
+    );
 
     expect(sentence).toContain("le plus fort possible");
     expect(sentence).toContain("ne peut pas te dire de combien");
     expect(sentence).not.toMatch(/\d/);
+  });
+
+  it("gives the real reason, one sentence per cause, and never invents an écart", () => {
+    const because = (unmeasurable: ShrinkageReport["unmeasurable"]) =>
+      shrinkageSentenceFr("ratings", report({ measured: null, priorStrength: 10, unmeasurable }));
+
+    // Nobody has a figure. « Les écarts entre les joueurs sont trop petits » was a reason the screen
+    // made up: there are no joueurs with a figure to be close together.
+    expect(because("noData")).toBe(
+      "Les notes sont ramenées vers la moyenne de l’équipe — sauf qu’il n’y a pas de moyenne : " +
+        "personne n’a encore le moindre chiffre sur ce critère dans cette sélection.",
+    );
+    expect(because("noData")).not.toContain("écart");
+
+    // One player, so there is no écart at all rather than a small one.
+    expect(because("onePlayer")).toBe(
+      "Les notes sont ramenées vers la moyenne de l’équipe le plus fort possible : un seul joueur a " +
+        "un chiffre sur ce critère, donc il n’y a aucun écart entre joueurs à mesurer.",
+    );
+    expect(because("onePlayer")).not.toContain("trop petits");
+
+    // The one case the old wording was true of.
+    expect(because("noSpread")).toContain("les écarts entre les joueurs sont trop petits");
+
+    // Nobody rated twice. The écarts may be the widest the scale allows, so this must not claim they
+    // are small: what is missing is how much one player's own note moves.
+    expect(because("noRepeat")).toBe(
+      "Les notes sont ramenées vers la moyenne de l’équipe le plus fort possible : personne n’a " +
+        "encore été noté deux fois, donc l’appli ne peut pas mesurer de combien la note d’un joueur " +
+        "bouge d’un match à l’autre — et c’est ce qu’il lui faudrait pour savoir combien de poids " +
+        "donner à une note isolée.",
+    );
+    expect(because("noRepeat")).not.toContain("trop petits");
+    expect(because("noRepeat")).not.toMatch(/\d/);
+
+    // Four different sentences, not one with four names.
+    expect(
+      new Set([
+        because("noData"),
+        because("onePlayer"),
+        because("noSpread"),
+        because("noRepeat"),
+      ]).size,
+    ).toBe(4);
+  });
+
+  it("names the keepers, not the team, under the keepers' own model", () => {
+    // Decision 011 fits two models and `CLEAN_SHEET_READINGS_FR` promises « les gardiens ne sont
+    // comparés qu’entre eux », so « la moyenne de l’équipe » would name the wrong twelve people.
+    const keeper = (unmeasurable: ShrinkageReport["unmeasurable"]) =>
+      goalkeeperShrinkageSentenceFr(
+        "cleanSheet",
+        report({
+          unit: "minutes",
+          measured: unmeasurable === null ? 300 : null,
+          priorStrength: 300,
+          source: "goalkeeper",
+          unmeasurable,
+        }),
+      );
+
+    // Finding 4's own case: no minute was ever attributed to the goal, while the outfielders have a
+    // full season. « Personne n’a de chiffre sur ce critère » would be false here.
+    expect(keeper("noData")).toBe(
+      "Pour le gardien, les minutes sans encaisser dans les buts sont ramenées vers la moyenne des " +
+        "gardiens — sauf qu’il n’y a pas de moyenne : personne n’a de minutes comptées dans les buts, " +
+        "et l’appli ne les compte que si une composition confirmée dit qui gardait.",
+    );
+    expect(keeper("onePlayer")).toContain("un seul joueur a gardé les buts");
+    expect(keeper("onePlayer")).toContain("aucun écart entre gardiens");
+    expect(keeper("noSpread")).toContain("vers la moyenne des gardiens");
+    expect(keeper(null)).toContain("vers la moyenne des gardiens, à hauteur de 300′");
   });
 
   it("states the keepers' own model in the same words, and only when there is one", () => {
@@ -279,6 +379,35 @@ describe("honesty 3 — what the shrinkage did", () => {
     );
     expect(sentence).toContain("Pour le gardien");
     expect(sentence).toContain("à hauteur de 90′");
+  });
+});
+
+describe("honesty 3b — a disc showing the squad's figure, not the man's", () => {
+  it("says nothing when every man on the pitch has a figure of his own", () => {
+    expect(squadMeanStandInFr(0)).toBeNull();
+    expect(squadMeanStandInFr(-1)).toBeNull();
+  });
+
+  it("says how many, and that such a man can be in either seven", () => {
+    // Decision 115 says a no-data player « heads neither the best seven nor the worst », which is true
+    // and not the whole truth: he is regularly *in* one of them, at the squad's own average.
+    const one = squadMeanStandInFr(1) as string;
+    expect(one).toBe(
+      "1 des sept n’a aucun chiffre cette saison sur ce critère : il est affiché à la moyenne de " +
+        "l’équipe, donc ni flatté ni puni pour ne pas avoir joué — il peut donc apparaître dans la " +
+        "meilleure comme dans la pire équipe.",
+    );
+
+    const three = squadMeanStandInFr(3) as string;
+    expect(three).toBe(
+      "3 des sept n’ont aucun chiffre cette saison sur ce critère : ils sont affichés à la moyenne de " +
+        "l’équipe, donc ni flattés ni punis pour ne pas avoir joué — ils peuvent donc apparaître dans " +
+        "la meilleure comme dans la pire équipe.",
+    );
+
+    // The count is the denominator of the claim, and rule 2 of `aggregate.ts` forbids one without it.
+    expect(one).toContain("1 des sept");
+    expect(three).toContain("3 des sept");
   });
 });
 
@@ -304,11 +433,21 @@ describe("honesty 4 — which invincibilité", () => {
 
 describe("the shape and the squad", () => {
   it("never names a formation without the matches behind it", () => {
+    // « sur les 8 matchs terminés » said « matchs » twice; French puts the number alone after « sur les ».
     expect(formationUsageFr({ label: "1-3-2-1", matches: 7, matchesConsidered: 8 })).toBe(
-      "1-3-2-1, utilisée dans 7 matchs sur les 8 matchs terminés de cette sélection.",
+      "1-3-2-1, utilisée dans 7 matchs sur les 8 terminés de cette sélection.",
     );
-    expect(formationUsageFr({ label: "1-3-2-1", matches: 8, matchesConsidered: 8 })).toContain(
-      "tous ceux de cette sélection",
+    expect(formationUsageFr({ label: "1-3-2-1", matches: 1, matchesConsidered: 4 })).toBe(
+      "1-3-2-1, utilisée dans 1 match sur les 4 terminés de cette sélection.",
+    );
+  });
+
+  it("does not say « tous ceux » about a single match", () => {
+    expect(formationUsageFr({ label: "1-3-2-1", matches: 8, matchesConsidered: 8 })).toBe(
+      "1-3-2-1, utilisée dans 8 matchs — tous ceux de cette sélection.",
+    );
+    expect(formationUsageFr({ label: "1-3-2-1", matches: 1, matchesConsidered: 1 })).toBe(
+      "1-3-2-1, utilisée dans 1 match — le seul de cette sélection.",
     );
   });
 
@@ -358,7 +497,18 @@ describe("the tutoiement (decision 074)", () => {
       CLEAN_SHEET_READINGS_FR,
       viewerRelativeRatingsFr("ratings"),
       shrinkageSentenceFr("ratings", report()),
-      shrinkageSentenceFr("ratings", report({ measured: null })),
+      shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "noData" })),
+      shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "onePlayer" })),
+      shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "noSpread" })),
+      shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "noRepeat" })),
+      goalkeeperShrinkageSentenceFr(
+        "cleanSheet",
+        report({ unit: "minutes", measured: null, unmeasurable: "noData", source: "goalkeeper" }),
+      ),
+      squadMeanStandInFr(1),
+      squadMeanStandInFr(3),
+      formationUsageFr({ label: "1-3-2-1", matches: 1, matchesConsidered: 1 }),
+      formationUsageFr({ label: "1-3-2-1", matches: 1, matchesConsidered: 4 }),
       outOfPositionNoteFr(2),
       excludedFromSquadFr({ departedWithData: 2, nonPlayers: 1 }),
       emptySlotsFr(2),

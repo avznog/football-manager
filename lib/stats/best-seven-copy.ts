@@ -18,6 +18,8 @@
  * 2. `viewerRelativeRatingsFr` — a ratings seven is one reader's (decisions 007 and 021).
  * 3. `shrinkageSentenceFr` — what the shrinkage did, in the unit it measured (rule 3).
  * 4. `CLEAN_SHEET_READINGS_FR` — which of decision 011's two invincibilités is being read.
+ * 5. `squadMeanStandInFr` — a disc whose number is the squad's average and not that man's (rule 2,
+ *    and the part of decision 115 that was overstated).
  *
  * And none of them is a `title`: there is no hover on a phone (decision 072), so every one of these
  * is printed under the pitch.
@@ -123,9 +125,15 @@ export const CRITERION_SUBJECT_FR: Readonly<Record<BestSevenCriterion, string>> 
   cleanSheet: "la part des minutes jouées sans encaisser",
 };
 
-/** What the team figure under the pitch is, so the label never lies about a sum or a mean. */
-export function aggregationLabelFr(aggregation: "sum" | "mean"): string {
-  return aggregation === "sum" ? "Total des sept" : "Moyenne des sept";
+/**
+ * What the team figure under the pitch is, so the label never lies about a sum or a mean — **nor about
+ * how many figures went into it**. It used to say « des sept » whatever was on the pitch, so a squad of
+ * five labelled a mean of five as a mean of seven. `filledCount` is how many slots the figure actually
+ * averaged or totalled; only seven of them earns the word « sept ».
+ */
+export function aggregationLabelFr(aggregation: "sum" | "mean", filledCount: number): string {
+  const verb = aggregation === "sum" ? "Total" : "Moyenne";
+  return filledCount === 7 ? `${verb} des sept` : `${verb} sur ${plural(filledCount, "poste")}`;
 }
 
 /**
@@ -327,13 +335,26 @@ const SHRUNK_SUBJECT_FR: Readonly<Record<BestSevenCriterion, string>> = {
   cleanSheet: "Les minutes sans encaisser sont ramenées",
 };
 
-/** `priorStrength` with its noun: « 4 notes », « 3 heures de jeu », « 120′ ». */
+/**
+ * `priorStrength` with its noun: « 4 notes », « 3,0 heures de jeu », « 120′ ».
+ *
+ * The plural is decided on the **printed** decimal, not on the raw float, and at 2 rather than above 1.
+ * French pluralises from two: « 1,6 heure », « 1,9 heure », « 2,0 heures ». The old rule was
+ * `priorStrength > 1`, which printed « 1,6 heures » on the clamp's own floor and « 1,0 heures » at
+ * exactly one — and reading the raw value would print « 2,0 heure » for 1,96, which rounds up on screen.
+ */
+function pluralFromPrinted(printed: string, singular: string, many = `${singular}s`): string {
+  return Number(printed.replace(",", ".")) >= 2 ? many : singular;
+}
+
 function priorStrengthFr(report: ShrinkageReport): string {
   switch (report.unit) {
     case "ratings":
       return plural(Math.round(report.priorStrength), "note");
-    case "sixtyMinutes":
-      return `${formatDecimal(report.priorStrength, 1)} ${report.priorStrength > 1 ? "heures" : "heure"} de jeu`;
+    case "sixtyMinutes": {
+      const printed = formatDecimal(report.priorStrength, 1);
+      return `${printed} ${pluralFromPrinted(printed, "heure")} de jeu`;
+    }
     case "minutes":
       return formatMinutes(Math.round(report.priorStrength));
   }
@@ -350,6 +371,13 @@ function priorStrengthFr(report: ShrinkageReport): string {
  *
  * `subject` overrides the criterion's own, so the goalkeeper's model can be stated in the same words
  * without a second copy of this sentence (decision 011 fits two of them, one per pair).
+ *
+ * **When it could not be measured, the sentence says which of the four reasons it was.** It used to
+ * give one reason — « les écarts entre les joueurs sont trop petits, ou la saison trop courte » — for
+ * all of them, which made it a sentence the screen invented: it was printed with a single keeper in the
+ * squad, where there are no écarts at all, and with nobody rated at all, where the truth is that
+ * nobody has a figure. `ShrinkageReport.unmeasurable` carries the distinction `fitShrinkage` already
+ * knew, and the four branches below are the four truths.
  */
 export function shrinkageSentenceFr(
   criterion: BestSevenCriterion,
@@ -357,17 +385,49 @@ export function shrinkageSentenceFr(
   subject?: string,
 ): string {
   const who = subject ?? SHRUNK_SUBJECT_FR[criterion];
-  if (report.measured === null) {
-    return (
-      `${who} vers la moyenne de l’équipe le plus fort possible : les écarts entre les joueurs sont ` +
-      "trop petits, ou la saison trop courte, pour les distinguer vraiment. L’écran est donc " +
-      "volontairement prudent, et ne peut pas te dire de combien."
-    );
+  // Whose mean it is. The keepers are their own population (rule 4 of `best-seven.ts`), so « la
+  // moyenne de l’équipe » would name the wrong twelve people under the goalkeeper's own model.
+  const keepers = report.source === "goalkeeper";
+  const towards = keepers ? "vers la moyenne des gardiens" : "vers la moyenne de l’équipe";
+
+  switch (report.unmeasurable) {
+    case "noData":
+      return (
+        `${who} ${towards} — sauf qu’il n’y a pas de moyenne : ` +
+        (keepers
+          ? "personne n’a de minutes comptées dans les buts, et l’appli ne les compte que si une " +
+            "composition confirmée dit qui gardait."
+          : "personne n’a encore le moindre chiffre sur ce critère dans cette sélection.")
+      );
+    case "onePlayer":
+      return (
+        `${who} ${towards} le plus fort possible : ` +
+        (keepers
+          ? "un seul joueur a gardé les buts, donc il n’y a aucun écart entre gardiens à mesurer."
+          : "un seul joueur a un chiffre sur ce critère, donc il n’y a aucun écart entre joueurs à " +
+            "mesurer.")
+      );
+    case "noRepeat":
+      // Ratings only, and deliberately not folded into `noSpread`: what is missing here is not the
+      // spread between players — it may be wide — but the spread *within* one player, which needs him
+      // to have been rated twice. Naming the wrong missing thing is the same defect as inventing one.
+      return (
+        `${who} ${towards} le plus fort possible : personne n’a encore été noté deux fois, donc ` +
+        "l’appli ne peut pas mesurer de combien la note d’un joueur bouge d’un match à l’autre — et " +
+        "c’est ce qu’il lui faudrait pour savoir combien de poids donner à une note isolée."
+      );
+    case "noSpread":
+      return (
+        `${who} ${towards} le plus fort possible : les écarts entre les joueurs sont trop petits, ou ` +
+        "la saison trop courte, pour les distinguer vraiment. L’écran est donc volontairement prudent, " +
+        "et ne peut pas te dire de combien."
+      );
+    case null:
+      return (
+        `${who} ${towards}, à hauteur de ${priorStrengthFr(report)} : un chiffre bâti sur presque ` +
+        "rien pèse donc moins qu’un chiffre bâti sur une saison."
+      );
   }
-  return (
-    `${who} vers la moyenne de l’équipe, à hauteur de ${priorStrengthFr(report)} : un chiffre bâti ` +
-    "sur presque rien pèse donc moins qu’un chiffre bâti sur une saison."
-  );
 }
 
 /** The keepers' own model (rule 4), in the same words. Null when there is no second model. */
@@ -380,6 +440,35 @@ export function goalkeeperShrinkageSentenceFr(
     criterion,
     report,
     "Pour le gardien, les minutes sans encaisser dans les buts sont ramenées",
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Honesty sentence 3b — a figure that is the squad's, under one man's name     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * « 2 des sept n’ont aucun chiffre cette saison… »
+ *
+ * A player with no exposure lands **exactly** on the squad mean — `n = 0` in rule 2's formula — which is
+ * the right arithmetic and, unannounced, a lie by omission: his disc prints a real number that is not
+ * about him, and `observed.rate` beside it is a dash. Decision 115 says such a player « heads neither
+ * the best seven nor the worst », which is true and not enough: he is regularly *in* one of them, and a
+ * slot with two candidates goes to him whenever the squad's average beats the other man's real figure —
+ * or, in the worst seven, falls below it. So the count is printed, never hidden (rule 2 of
+ * `aggregate.ts`: no figure without its denominator), and `hasOwnExposure` in `best-seven.ts` is what
+ * the screen counts with.
+ *
+ * Null when every pick has a figure of his own, in which case there is nothing to warn about.
+ */
+export function squadMeanStandInFr(count: number): string | null {
+  if (count <= 0) return null;
+  const many = count > 1;
+  return (
+    `${count} des sept ${many ? "n’ont" : "n’a"} aucun chiffre cette saison sur ce critère : ` +
+    `${many ? "ils sont affichés" : "il est affiché"} à la moyenne de l’équipe, donc ` +
+    `${many ? "ni flattés ni punis" : "ni flatté ni puni"} pour ne pas avoir joué — ` +
+    `${many ? "ils peuvent" : "il peut"} donc apparaître dans la meilleure comme dans la pire équipe.`
   );
 }
 
@@ -414,6 +503,10 @@ export function cleanSheetReadingsFr(criterion: BestSevenCriterion): string | nu
  *
  * A shape without its count is a tactical opinion dressed as a fact, which is why
  * `formation-usage.ts` never returns one without the other.
+ *
+ * Two French defects lived in the two branches. The noun was repeated — « dans 6 matchs sur les 7
+ * matchs terminés » — where French says the number alone after « sur les ». And the « all of them »
+ * branch read « utilisée dans 1 match — tous ceux de cette sélection », a plural about a single match.
  */
 export function formationUsageFr(input: {
   label: string;
@@ -421,9 +514,10 @@ export function formationUsageFr(input: {
   matchesConsidered: number;
 }): string {
   if (input.matches >= input.matchesConsidered) {
-    return `${input.label}, utilisée dans ${matchCount(input.matches)} — tous ceux de cette sélection.`;
+    const all = input.matches > 1 ? "tous ceux de cette sélection" : "le seul de cette sélection";
+    return `${input.label}, utilisée dans ${matchCount(input.matches)} — ${all}.`;
   }
-  return `${input.label}, utilisée dans ${matchCount(input.matches)} sur les ${matchCount(input.matchesConsidered)} terminés de cette sélection.`;
+  return `${input.label}, utilisée dans ${matchCount(input.matches)} sur les ${input.matchesConsidered} terminés de cette sélection.`;
 }
 
 /** The shape the reader chose himself: no count to quote, and it must not pretend to one. */

@@ -14,6 +14,7 @@ import {
   bestSeven,
   evaluateSquad,
   fitShrinkage,
+  hasOwnExposure,
   shrink,
   solveAssignment,
 } from "./best-seven";
@@ -74,6 +75,16 @@ function pickedName(result: ReturnType<typeof bestSeven>, slotId: string): strin
   return pick?.player?.displayName ?? null;
 }
 
+/**
+ * The adjusted figure where the test has already asserted there is one. `adjusted` is `number | null`
+ * on purpose (rule 1b), and a test that silently coerced the null away is how the « 0,0 » defect
+ * survived a green suite — so the coercion is one named helper, used only after a non-null assertion.
+ */
+function figure(value: number | null): number {
+  expect(value).not.toBeNull();
+  return value as number;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Rule 2 — a thin figure is shrunk, not gated                                */
 /* -------------------------------------------------------------------------- */
@@ -100,7 +111,7 @@ describe("shrinkage", () => {
     const adjustedOf = (name: string) =>
       evaluation.cells[candidates.findIndex((c) => c.displayName === name)][0].adjusted;
 
-    expect(adjustedOf("Éclair")).toBeLessThan(adjustedOf("Régulier"));
+    expect(adjustedOf("Éclair")).toBeLessThan(figure(adjustedOf("Régulier")));
     // And the raw figure is still there to print next to it (decision 072).
     const flashCell = evaluation.cells[candidates.indexOf(flash)][0];
     expect(flashCell.observed).toMatchObject({ rate: 9, denominator: 1, denominatorUnit: "ratings" });
@@ -153,6 +164,36 @@ describe("shrinkage", () => {
     expect(pickedName(worst, "s")).toBe("Faible");
   });
 
+  it("gives a no-data player no figure of his own, and says which discs those are", () => {
+    // The other half of the sentence decision 115 overstates: he does not *head* either seven, but a
+    // slot with two candidates gives it to him whenever the squad's mean beats the other man's figure.
+    const ghost = player({ displayName: "Fantôme", jerseyNumber: 1, declarations: { AT: "primary" } });
+    const belowAverage = player({
+      displayName: "En dessous",
+      jerseyNumber: 2,
+      ratingAverage: 4,
+      ratingCount: 9,
+      ratingVariance: 1,
+      declarations: { AT: "primary" },
+    });
+    const candidates = [...ordinary(), ghost, belowAverage];
+    const one = [slot("s", "AT")];
+
+    const worst = bestSeven({ criterion: "ratings", direction: "worst", slots: one, candidates });
+    expect(pickedName(worst, "s")).toBe("En dessous");
+
+    // Only those two declared the post, so the slot is theirs to share: the squad mean stands in for
+    // the ghost, beats a real 4,0, and puts him *in* the best seven on a figure that is not his.
+    const best = bestSeven({ criterion: "ratings", direction: "best", slots: one, candidates });
+    expect(pickedName(best, "s")).toBe("Fantôme");
+    expect(hasOwnExposure(best.picks[0].observed)).toBe(false);
+    expect(best.picks[0].adjusted).toBe(best.shrinkage.squadMean);
+    expect(best.picks[0].observed.rate).toBeNull();
+
+    // And the predicate is true of anybody who has actually been rated.
+    expect(hasOwnExposure(worst.picks[0].observed)).toBe(true);
+  });
+
   it("protects the worst seven from twenty minutes and three conceded", () => {
     // Twenty minutes, the sheet broken immediately: a raw 0 % invincibility.
     const cameo = player({ displayName: "Cameo", minutes: 20, cleanMinutes: 0 });
@@ -181,10 +222,10 @@ describe("shrinkage", () => {
 
   it("is continuous: no exposure makes a figure appear or jump", () => {
     const model = { squadMean: 0.5, priorStrength: 120 };
-    let previous = shrink(1, 0, model);
+    let previous = figure(shrink(1, 0, model));
     expect(previous).toBe(0.5);
     for (let minutes = 1; minutes <= 900; minutes += 1) {
-      const current = shrink(1, minutes, model);
+      const current = figure(shrink(1, minutes, model));
       expect(current).toBeGreaterThan(previous);
       // A single extra minute never moves the figure by a percentage point: there is no threshold.
       expect(current - previous).toBeLessThan(0.01);
@@ -254,8 +295,103 @@ describe("the measured prior strength", () => {
     expect(result.hasBasis).toBe(false);
     expect(result.shrinkage.squadMean).toBeNull();
     expect(result.aggregate).toBeNull();
+    expect(result.shrinkage.unmeasurable).toBe("noData");
     // The seven is still named — on declared positions and the tie-breaks alone.
     expect(result.picks.every((pick) => pick.player !== null)).toBe(true);
+    // And **every disc says « — »**, not « 0,00/h ». This is the assertion that was missing: the old
+    // suite checked only the aggregate, so seven discs printing a fabricated zero passed it.
+    expect(result.picks.map((pick) => pick.adjusted)).toEqual([...Array(7)].map(() => null));
+    expect(result.values.every((value) => value === null)).toBe(true);
+  });
+
+  it("prints no figure at all on a selection where nobody has a rating to show (rule 1b)", () => {
+    // Decision 021 can hide every rating in a competition from a reader who has not voted, which is
+    // how this used to reach a real screen: seven discs, « 0,0 » each, on a 0–10 scale, under a team
+    // figure that correctly said « — ».
+    const result = bestSeven({
+      criterion: "ratings",
+      direction: "best",
+      slots: CLASSIC_SEVEN,
+      candidates: Array.from({ length: 9 }, () =>
+        player({ minutes: 480, goals: 2, declarations: everywhere() }),
+      ),
+    });
+
+    expect(result.shrinkage.squadMean).toBeNull();
+    expect(result.hasBasis).toBe(false);
+    expect(result.picks.every((pick) => pick.adjusted === null)).toBe(true);
+    expect(result.aggregate).toBeNull();
+    // `shrink` itself, since that is where the zero was written.
+    expect(shrink(9, 5, { squadMean: null, priorStrength: 4 })).toBeNull();
+    expect(shrink(null, 0, { squadMean: null, priorStrength: 4 })).toBeNull();
+  });
+
+  it("names which of the four reasons it could not measure anything", () => {
+    // Nobody at all: there is no mean either, and the honest sentence is « personne n’a de chiffre ».
+    const noData = fitShrinkage([player(), player()], "ratings", "allPitch");
+    expect(noData.squadMean).toBeNull();
+    expect(noData.unmeasurable).toBe("noData");
+
+    // One rated player among unrated ones: a mean, and nothing whatever to compare it to. The old copy
+    // called this « les écarts entre les joueurs sont trop petits », which invents an écart.
+    const onePlayer = fitShrinkage([rated(6), player(), player()], "ratings", "allPitch");
+    expect(onePlayer.squadMean).toBeCloseTo(6, 10);
+    expect(onePlayer.unmeasurable).toBe("onePlayer");
+
+    // Several players, and nothing but noise between them: the one case the old sentence was true of.
+    const noSpread = fitShrinkage([rated(6), rated(6), rated(6)], "ratings", "allPitch");
+    expect(noSpread.unmeasurable).toBe("noSpread");
+
+    // Ratings everywhere but never two for one man, so decision 021's variance is nowhere. Its own
+    // cause, and 4 against 8 is why: the écart between these two is as wide as the scale allows, so
+    // « les écarts sont trop petits » would be flatly false. What is missing is the other moment.
+    const noRepeat = fitShrinkage(
+      [
+        player({ ratingAverage: 4, ratingCount: 1 }),
+        player({ ratingAverage: 8, ratingCount: 1 }),
+      ],
+      "ratings",
+      "allPitch",
+    );
+    expect(noRepeat.squadMean).toBeCloseTo(6, 10);
+    expect(noRepeat.unmeasurable).toBe("noRepeat");
+    // And it is reachable for ratings alone: the other three criteria model their within-player noise
+    // from the squad mean, so they never need a second observation of one player.
+    expect(fitShrinkage([player({ goals: 1, minutes: 60 })], "goals", "allPitch").unmeasurable).toBe(
+      "onePlayer",
+    );
+
+    // A single keeper is `onePlayer` on the keepers' model, whatever the outfielders did.
+    const oneKeeper = fitShrinkage(
+      [
+        player({ minutes: 600, cleanMinutes: 300, gkMinutes: 600, gkCleanMinutes: 400 }),
+        player({ minutes: 600, cleanMinutes: 300 }),
+      ],
+      "cleanSheet",
+      "goalkeeper",
+    );
+    expect(oneKeeper.unmeasurable).toBe("onePlayer");
+  });
+
+  it("carries a cause exactly when it carries no measurement", () => {
+    const squads: BestSevenCandidate[][] = [
+      [],
+      [player()],
+      [rated(6)],
+      [rated(6), rated(6)],
+      [rated(5), rated(7)],
+      [rated(5), rated(6), rated(6), rated(7)],
+      [player({ minutes: 300, goals: 2 }), player({ minutes: 600, goals: 9 })],
+      [player({ minutes: 300, cleanMinutes: 100 }), player({ minutes: 600, cleanMinutes: 500 })],
+    ];
+    for (const squad of squads) {
+      for (const criterion of BEST_SEVEN_CRITERIA) {
+        for (const source of ["allPitch", "goalkeeper"] as const) {
+          const report = fitShrinkage(squad, criterion, source);
+          expect(report.unmeasurable === null).toBe(report.measured !== null);
+        }
+      }
+    }
   });
 
   it("carries the prior strength out to the screen, in its own unit", () => {
@@ -330,6 +466,77 @@ describe("the goalkeeper's clean-sheet pair (decision 011)", () => {
     }
   });
 
+  it("refuses a GB figure when no minute was ever attributed to the goal", () => {
+    // Reachable on real data: `gkMinutes` is written only when a confirmed composition tells the reducer
+    // which slot is the goal, so a season run in game mode without one leaves every `gkMinutes` at 0
+    // while `minutes` and `cleanMinutes` are real. `hasBasis` used to be an OR across the two models, so
+    // the field model vouched for the GB disc and it printed « 0 % » — averaged in with six real figures.
+    const candidates = Array.from({ length: 8 }, (_, index) =>
+      player({
+        minutes: 500,
+        cleanMinutes: 200 + index * 20,
+        gkMinutes: 0,
+        gkCleanMinutes: 0,
+        declarations: everywhere(),
+      }),
+    );
+    const result = bestSeven({
+      criterion: "cleanSheet",
+      direction: "best",
+      slots: CLASSIC_SEVEN,
+      candidates,
+    });
+
+    expect(result.hasBasis).toBe(true);
+    expect(result.goalkeeperHasBasis).toBe(false);
+    expect(result.goalkeeperShrinkage?.squadMean).toBeNull();
+    expect(result.goalkeeperShrinkage?.unmeasurable).toBe("noData");
+    // The GB slot is still filled — a seven has to be complete — with no figure under it.
+    expect(result.picks[0].player).not.toBeNull();
+    expect(result.picks[0].adjusted).toBeNull();
+    // And the team figure refuses to average six real proportions as though they were seven.
+    expect(result.picks.slice(1).every((pick) => pick.adjusted !== null)).toBe(true);
+    expect(result.aggregate).toBeNull();
+  });
+
+  it("gates the two models apart: no field data, a real keeper", () => {
+    // The mirror case, and the reason `hasBasis` is not an AND either.
+    const candidates = Array.from({ length: 8 }, (_, index) =>
+      player({
+        minutes: 0,
+        cleanMinutes: 0,
+        gkMinutes: index < 2 ? 300 : 0,
+        gkCleanMinutes: index < 2 ? 100 * (index + 1) : 0,
+        declarations: everywhere(),
+      }),
+    );
+    const result = bestSeven({
+      criterion: "cleanSheet",
+      direction: "best",
+      slots: CLASSIC_SEVEN,
+      candidates,
+    });
+
+    expect(result.hasBasis).toBe(false);
+    expect(result.goalkeeperHasBasis).toBe(true);
+    expect(result.picks[0].adjusted).not.toBeNull();
+    expect(result.picks.slice(1).every((pick) => pick.adjusted === null)).toBe(true);
+    expect(result.aggregate).toBeNull();
+  });
+
+  it("reports no second gate for a criterion with no second model", () => {
+    for (const criterion of ["goals", "assists", "ratings"] as const) {
+      const result = bestSeven({
+        criterion,
+        direction: "best",
+        slots: CLASSIC_SEVEN,
+        candidates: keeperSquad(),
+      });
+      // Null means « not applicable », and must never be read as false.
+      expect(result.goalkeeperHasBasis).toBeNull();
+    }
+  });
+
   it("lands an outfielder who never kept goal on the keepers' mean, not on zero", () => {
     const candidates = keeperSquad();
     const evaluation = evaluateSquad(candidates, CLASSIC_SEVEN, "cleanSheet");
@@ -365,7 +572,8 @@ function greedyAssignment(cells: readonly (readonly SquadCell[])[], slotCount: n
       const incumbent = cells[best][slotIndex];
       if (
         rank[cell.fit] > rank[incumbent.fit] ||
-        (rank[cell.fit] === rank[incumbent.fit] && cell.adjusted > incumbent.adjusted)
+        (rank[cell.fit] === rank[incumbent.fit] &&
+          (cell.adjusted ?? 0) > (incumbent.adjusted ?? 0))
       ) {
         best = candidate;
       }
@@ -440,7 +648,8 @@ describe("choosing the seven", () => {
     const exact = solveAssignment(evaluation.cells, candidates, slots.length);
     const totalOf = (assignment: readonly number[]) =>
       assignment.reduce(
-        (total, candidate, slotIndex) => total + evaluation.cells[candidate][slotIndex].adjusted,
+        (total, candidate, slotIndex) =>
+          total + figure(evaluation.cells[candidate][slotIndex].adjusted),
         0,
       );
 
@@ -551,7 +760,7 @@ describe("tie-breaks", () => {
     });
     const candidates = [occasional, regular];
     const evaluation = evaluateSquad(candidates, slots, "goals");
-    expect(evaluation.cells[0][0].adjusted).toBeCloseTo(evaluation.cells[1][0].adjusted, 12);
+    expect(evaluation.cells[0][0].adjusted).toBeCloseTo(figure(evaluation.cells[1][0].adjusted), 12);
 
     const result = bestSeven({ criterion: "goals", direction: "best", slots, candidates });
     expect(pickedName(result, "at")).toBe("Régulier");
@@ -602,7 +811,7 @@ describe("the worst seven", () => {
     const candidates = squad();
     const evaluation = evaluateSquad(candidates, CLASSIC_SEVEN, "goals");
     const negated = evaluation.cells.map((row) =>
-      row.map((cell) => ({ ...cell, adjusted: -cell.adjusted })),
+      row.map((cell) => ({ ...cell, adjusted: cell.adjusted === null ? null : -cell.adjusted })),
     );
     const viaNegation = solveAssignment(negated, candidates, CLASSIC_SEVEN.length, "best");
     const worst = bestSeven({
@@ -632,7 +841,7 @@ describe("the worst seven", () => {
       candidates,
     });
 
-    expect(worst.values.every((value) => value > 0)).toBe(true);
+    expect(worst.values.every((value) => value !== null && value > 0)).toBe(true);
     expect(worst.aggregate).toBeGreaterThan(0);
     expect(worst.aggregate as number).toBeLessThan(best.aggregate as number);
   });
@@ -656,6 +865,17 @@ describe("aggregateSeven", () => {
     }
   });
 
+  it("refuses to total a partial seven", () => {
+    // Five of seven summed and labelled as seven is the defect this returns null for, not a workaround
+    // for the nulls: it is a number about a team that was never on a pitch.
+    expect(aggregateSeven([1, 2, null, 4, 5, 6, 7], "goals")).toBeNull();
+    expect(aggregateSeven([6, 7, null], "ratings")).toBeNull();
+    expect(aggregateSeven([null], "cleanSheet")).toBeNull();
+    // Skipping them would have produced these, and neither is a figure about the seven drawn.
+    expect(aggregateSeven([1, 2, 4, 5, 6, 7], "goals")).toBe(25);
+    expect(aggregateSeven([6, 7], "ratings")).toBe(6.5);
+  });
+
   it("is what the result reports, so a client swap needs no shrinkage of its own", () => {
     const candidates = Array.from({ length: 9 }, (_, index) =>
       player({
@@ -677,7 +897,7 @@ describe("aggregateSeven", () => {
     const swapped = [...result.values];
     swapped[2] = 0.123;
     expect(aggregateSeven(swapped, "goals")).toBeCloseTo(
-      (result.aggregate as number) - result.values[2] + 0.123,
+      (result.aggregate as number) - figure(result.values[2]) + 0.123,
       12,
     );
   });
@@ -777,8 +997,9 @@ describe("property: an average performance can only move a figure towards the sq
       for (const candidate of candidates) {
         const before = figureOf(candidate, criterion);
         const after = figureOf(addAverageStint(candidate, criterion, mean), criterion);
-        const distanceBefore = Math.abs(shrink(before.rate, before.exposure, model) - mean);
-        const distanceAfter = Math.abs(shrink(after.rate, after.exposure, model) - mean);
+        // The model has a mean here (checked above), so neither shrink can be null.
+        const distanceBefore = Math.abs(figure(shrink(before.rate, before.exposure, model)) - mean);
+        const distanceAfter = Math.abs(figure(shrink(after.rate, after.exposure, model)) - mean);
 
         expect(distanceAfter).toBeLessThanOrEqual(distanceBefore + 1e-12);
         // And strictly towards it whenever there was anywhere to move from.

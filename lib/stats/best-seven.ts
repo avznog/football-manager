@@ -18,6 +18,15 @@
  *    to win it. The corollary is that this file divides, and therefore that it has to answer for the
  *    thin denominators that division exposes — rules 2 and 3.
  *
+ * 1b. **A figure the models cannot produce is `null`, never `0`.** Everything below divides by a squad
+ *    mean, and there are real selections where no squad mean exists at all — a competition filter
+ *    where nobody the reader can see has a rating, a `cleanSheet` seven on matches run in game mode
+ *    without a confirmed composition, so that not one minute was ever attributed to the goal. In those
+ *    cases the adjusted figure is `null` (rule 1 of `aggregate.ts`: « a number nobody has yet is
+ *    `null`, never `0` »), and `aggregateSeven` refuses to total a partial seven. A `0` here is not a
+ *    cautious answer: on a 0–10 rating scale it is the worst mark the app can print, and it was
+ *    printed on seven discs at once.
+ *
  * 2. **A thin figure is shrunk towards the squad, never gated.** `/stats` protects its rating
  *    leaderboard with a hard threshold (`MIN_RATINGS = 3`), which is the right answer for a table
  *    whose rows are independent. It is the wrong answer here: the owner asked for the figures to be
@@ -30,9 +39,14 @@
  *    with `n` the player's exposure and `m` a prior strength in the same unit. Three properties then
  *    fall out of the arithmetic instead of out of special cases, and each has a test:
  *      - a player with **no data lands exactly on the squad mean** (`n = 0` leaves `m × mean / m`), so
- *        he heads neither the best nor the worst seven. That is the rule `comparePlayers` states in
+ *        he *heads* neither the best nor the worst seven. That is the rule `comparePlayers` states in
  *        `aggregate.ts` — « unknown is not "worst" — but it cannot head a ranking either » — obtained
- *        here by division rather than by a `null` branch;
+ *        here by division rather than by a `null` branch. It is worth being exact about what that does
+ *        **not** say, because decision 115 overstates it: he is routinely *in* both sevens. A slot with
+ *        two candidates gives it to him whenever the squad mean beats the other man's real figure, and
+ *        in the worst seven whenever it falls below it. So the screen owes a sentence saying the figure
+ *        under his disc is the squad's and not his — `squadMeanStandInFr` in `best-seven-copy.ts`, and
+ *        `hasOwnExposure` below is how the screen knows which discs it is about;
  *      - the **worst** seven is protected by the same line: twenty minutes and three conceded is
  *        pulled most of the way back to the mean, so it does not crown a worst defender;
  *      - it is **continuous**: nothing appears or disappears as an exposure crosses a value.
@@ -269,6 +283,24 @@ export type ShrinkageReport = {
   priorStrength: number;
   /** What it measured before the clamp, or null when the squad was too thin to measure it. */
   measured: number | null;
+  /**
+   * **Why** it could not be measured, `null` exactly when `measured` is a number. Four causes, and
+   * the screen has to tell them apart: the sentence it used to print — « les écarts entre les joueurs
+   * sont trop petits, ou la saison trop courte » — is true of `noSpread` only, and was a fabricated
+   * reason under `onePlayer` (there is one player, so there are no écarts at all) and under `noData`
+   * (where the truth is that nobody has a figure). Distinguishing them here rather than at the copy
+   * boundary is the point: this function already knows, and threw it away.
+   *
+   * - `noData` — not one candidate has any exposure, so there is no squad mean either.
+   * - `onePlayer` — exactly one candidate has exposure: a mean, but nothing to compare it to.
+   * - `noSpread` — several candidates, and what separates them is entirely explained by how little
+   *   they have played (τ² ≤ 0).
+   * - `noRepeat` — ratings only, and the fourth was the one worth separating: there are several rated
+   *   players and real écarts between them, but **nobody has been rated twice**, so the *within*-player
+   *   half of the ratio has no estimate at all. Saying « les écarts sont trop petits » there is false
+   *   twice over — the écarts may be large, and what is missing is the other moment entirely.
+   */
+  unmeasurable: "noData" | "onePlayer" | "noSpread" | "noRepeat" | null;
   /** The bounds it was clamped into — `PRIOR_STRENGTH_CLAMP` for this criterion. */
   clamp: readonly [number, number];
   /** The unit `priorStrength` is counted in. */
@@ -287,8 +319,12 @@ export type BestSevenPick = {
   player: { id: string; displayName: string; jerseyNumber: number | null } | null;
   /** `"none"` is the « pas son poste » badge (rule 5). */
   fit: SlotFit;
-  /** The shrunken figure the seven was ranked on. `0` when nobody has any exposure at all. */
-  adjusted: number;
+  /**
+   * The shrunken figure the seven was ranked on. **Null when the model behind this slot has no squad
+   * mean at all** — there is then no basis for a figure here, and rule 1b says so with a `null` the
+   * screen prints as « — », not with a `0` that reads as the worst mark on the scale.
+   */
+  adjusted: number | null;
   /** The same figure un-shrunk, with its denominator, for printing next to it. */
   observed: ObservedFigure;
   /** Which of decision 011's pairs `observed` and `adjusted` used (rule 4). */
@@ -305,8 +341,12 @@ export type BestSevenResult = {
    * `aggregateSeven(values, criterion)` after a swap instead of reimplementing the shrinkage — the
    * whole point of publishing the adjusted figure per slot.
    */
-  values: number[];
-  /** `aggregateSeven(values, criterion)`. Null when no slot could be filled or nothing is known. */
+  values: (number | null)[];
+  /**
+   * `aggregateSeven(values, criterion)`. Null when no slot could be filled, and null as soon as **one**
+   * filled slot has no figure: a total over five of seven discs, printed as though it were seven, is a
+   * number about a team that never existed.
+   */
   aggregate: number | null;
   /** `"sum"` or `"mean"`, so the screen can label the team figure honestly. */
   aggregation: "sum" | "mean";
@@ -319,8 +359,21 @@ export type BestSevenResult = {
   goalkeeperShrinkage: ShrinkageReport | null;
   /** How many slots went to somebody who never declared them — the badge count. */
   outOfPositionCount: number;
-  /** False when not one candidate has any exposure: the seven is then positions and tie-breaks. */
+  /**
+   * False when not one candidate has any exposure **on the all-pitch model**: the six field slots are
+   * then positions and tie-breaks. Deliberately *not* an OR across the two models — it used to be, and
+   * a `cleanSheet` seven with real field minutes and no `gkMinutes` anywhere passed the gate on the
+   * field model's mean while the GB disc printed a fabricated `0 %` and averaged it in with six real
+   * figures. That is reachable on real data: `gkMinutes` is only written when a confirmed composition
+   * tells the reducer which slot is the goal, so a match run in game mode without one leaves every
+   * `gkMinutes` at 0 while `minutes` and `cleanMinutes` are real.
+   */
   hasBasis: boolean;
+  /**
+   * The same question for the keepers' own model (rule 4), and `null` for the three criteria that have
+   * no second model — `null` here means « not applicable », never « false ».
+   */
+  goalkeeperHasBasis: boolean | null;
   candidatesConsidered: number;
 };
 
@@ -329,11 +382,22 @@ export type BestSevenResult = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * `(n × observed + m × mean) / (n + m)`, with the one branch that matters: no exposure means the
- * squad mean, exactly, by arithmetic — `n = 0` reduces the fraction to `m × mean / m` (rule 2).
+ * `(n × observed + m × mean) / (n + m)`, with the two branches that matter:
+ *
+ * - **no squad mean, no figure.** There is nothing to shrink towards, so the answer is `null` and not
+ *   a number (rule 1b). This branch used to return `0`, and on a competition filter where nobody the
+ *   reader may see has a rating, seven discs printed « 0,0 » out of ten — the worst possible mark, for
+ *   the whole squad, while the team figure beside them correctly said « — ».
+ * - **no exposure, the squad mean exactly**, by arithmetic rather than by a special case: `n = 0`
+ *   reduces the fraction to `m × mean / m` (rule 2). The caller must therefore not read the returned
+ *   number as this player's own — `hasOwnExposure` is how it tells the two apart.
  */
-export function shrink(observed: number | null, exposure: number, prior: ShrinkageModel): number {
-  if (prior.squadMean === null) return 0;
+export function shrink(
+  observed: number | null,
+  exposure: number,
+  prior: ShrinkageModel,
+): number | null {
+  if (prior.squadMean === null) return null;
   if (exposure <= 0 || observed === null) return prior.squadMean;
   return (
     (exposure * observed + prior.priorStrength * prior.squadMean) / (exposure + prior.priorStrength)
@@ -342,6 +406,23 @@ export function shrink(observed: number | null, exposure: number, prior: Shrinka
 
 /** Just enough of a `ShrinkageReport` to shrink with. */
 export type ShrinkageModel = { squadMean: number | null; priorStrength: number };
+
+/**
+ * Whether this figure is the player's **own**, rather than the squad's standing in for it.
+ *
+ * `shrink` returns the squad mean exactly for a man with no exposure (rule 2), which is the right
+ * arithmetic and an unreadable disc: the number under his name is a real number, and it is not about
+ * him. `observed.rate` is null there, so the distinction exists in the output — but a screen reading
+ * `rate === null` is re-deriving a rule this file owns, and decision 072 gives it nowhere to hide the
+ * answer anyway. So the predicate is published, and the copy that goes with it is
+ * `squadMeanStandInFr`.
+ *
+ * Takes the `ObservedFigure` rather than a whole pick so it serves `SquadCell.observed` too — the swap
+ * sheet needs the same badge on candidates who are not on the pitch yet.
+ */
+export function hasOwnExposure(observed: ObservedFigure): boolean {
+  return observed.exposure > 0 && observed.rate !== null;
+}
 
 /** One player's raw contribution to a model, in the criterion's own units. */
 type Sample = {
@@ -438,12 +519,16 @@ export function fitShrinkage(
     measured: number | null,
     within: number | null,
     between: number | null,
+    unmeasurable: ShrinkageReport["unmeasurable"] = null,
   ): ShrinkageReport => ({
     squadMean,
     // Nothing measurable means maximum scepticism, which is the top of the clamp: with two Sundays
     // played, believing the squad is the only defensible position.
     priorStrength: measured === null ? clampBounds[1] : clamp(measured, clampBounds),
     measured,
+    // The two travel together by construction: a cause without a failure, or a failure without its
+    // cause, would be the copy boundary guessing again. Pinned by a test over every branch.
+    unmeasurable: measured === null ? unmeasurable : null,
     clamp: clampBounds,
     unit: BEST_SEVEN_EXPOSURE_UNIT[criterion],
     withinPlayerVariance: within,
@@ -456,14 +541,16 @@ export function fitShrinkage(
     .filter((sample) => sample.exposure > 0 && sample.rate !== null);
 
   const totalExposure = samples.reduce((total, sample) => total + sample.exposure, 0);
-  if (totalExposure <= 0) return report(null, null, null, null);
+  if (totalExposure <= 0) return report(null, null, null, null, "noData");
 
   // The pooled rate, not the mean of the rates: one man's 1-in-10 and another's 3-in-90 make a squad
   // that scores 4 in 100, and that is the number a player with no data should be credited with.
   const squadMean = samples.reduce((total, sample) => total + sample.numerator, 0) / totalExposure;
 
-  // Fewer than two players with exposure: there is no "between players" to measure.
-  if (samples.length < 2) return report(squadMean, null, null, null);
+  // Fewer than two players with exposure: there is no "between players" to measure. Not the same thing
+  // as a spread too small to see, which is why the screen is told which of the two happened — one
+  // keeper in the whole season used to be reported as « les écarts entre les joueurs sont trop petits ».
+  if (samples.length < 2) return report(squadMean, null, null, null, "onePlayer");
 
   const weightOf = (sample: Sample) => sample.exposure / totalExposure;
 
@@ -482,7 +569,10 @@ export function fitShrinkage(
       // team agrees perfectly about a man exactly one person has judged.
       const withSpread = samples.filter((sample) => sample.withinVariance !== null);
       const spreadExposure = withSpread.reduce((total, sample) => total + sample.exposure, 0);
-      if (spreadExposure <= 0) return report(squadMean, null, null, null);
+      // Ratings exist, but not one player has the two decision 021's variance needs: the within-player
+      // noise is unknown, so the ratio cannot be formed. Its own cause, not `noSpread` — the écarts
+      // between these players may be wide, and it is the other moment that is missing.
+      if (spreadExposure <= 0) return report(squadMean, null, null, null, "noRepeat");
       withinVariance =
         withSpread.reduce(
           (total, sample) => total + sample.exposure * (sample.withinVariance as number),
@@ -516,7 +606,7 @@ export function fitShrinkage(
   const betweenVariance = observedVariance - expectedNoise;
   if (!(betweenVariance > 0) || !Number.isFinite(betweenVariance)) {
     // The squad's differences are entirely explained by how little it has played. Believe the squad.
-    return report(squadMean, null, withinVariance, betweenVariance);
+    return report(squadMean, null, withinVariance, betweenVariance, "noSpread");
   }
 
   let measured: number;
@@ -536,7 +626,7 @@ export function fitShrinkage(
   }
 
   if (!Number.isFinite(measured) || measured <= 0) {
-    return report(squadMean, null, withinVariance, betweenVariance);
+    return report(squadMean, null, withinVariance, betweenVariance, "noSpread");
   }
   return report(squadMean, measured, withinVariance, betweenVariance);
 }
@@ -548,7 +638,8 @@ export function fitShrinkage(
 /** One cell of the assignment problem: what putting this candidate in this slot is worth. */
 export type SquadCell = {
   fit: SlotFit;
-  adjusted: number;
+  /** Null when the model this slot is scored against has no squad mean (rule 1b). */
+  adjusted: number | null;
   observed: ObservedFigure;
   figureSource: FigureSource;
 };
@@ -560,7 +651,10 @@ export type SquadEvaluation = {
   cells: SquadCell[][];
   shrinkage: ShrinkageReport;
   goalkeeperShrinkage: ShrinkageReport | null;
+  /** The all-pitch model's gate, and only that one. See `BestSevenResult.hasBasis`. */
   hasBasis: boolean;
+  /** The keepers' model's gate; null when there is no second model to gate. */
+  goalkeeperHasBasis: boolean | null;
 };
 
 /**
@@ -607,8 +701,10 @@ export function evaluateSquad(
     cells: candidates.map((candidate) => slots.map((slot) => cellFor(candidate, slot))),
     shrinkage: fieldModel,
     goalkeeperShrinkage: keeperModel,
-    hasBasis:
-      fieldModel.squadMean !== null || (keeperModel !== null && keeperModel.squadMean !== null),
+    // One gate per model. An OR would let the field model's mean vouch for a GB disc the keepers' model
+    // cannot produce a figure for at all — see `BestSevenResult.hasBasis`.
+    hasBasis: fieldModel.squadMean !== null,
+    goalkeeperHasBasis: keeperModel === null ? null : keeperModel.squadMean !== null,
   };
 }
 
@@ -641,7 +737,19 @@ const EMPTY_OBJECTIVE: Objective = {
   jerseyRank: 0,
 };
 
-/** Positive when `a` is the better team. Lexicographic, in the order `Objective` declares. */
+/**
+ * Positive when `a` is the better team. Lexicographic, in the order `Objective` declares.
+ *
+ * The ε on `score` is there for float noise and nothing else: two sums of the same seven values added
+ * in two different orders can differ in their last bits, and letting that pick a seven would make the
+ * answer depend on the DP's traversal. The honest cost of it is that ε-equality is **not transitive**,
+ * so this is not a total order in the strict sense — a, b within ε and b, c within ε with a, c further
+ * apart would make the winner depend on the comparison order. At `SCORE_EPSILON = 1e-9`, against marks
+ * out of ten, proportions and goals per hour, nothing real reaches it: a chain would need two adjusted
+ * figures a billionth of a goal apart, and the shrinkage divides by exposures that never produce them.
+ * Restructuring the comparator to be provably total would mean ranking on integers scaled by 1e9, which
+ * buys nothing and hides the arithmetic. So the limit is stated rather than papered over.
+ */
 function compareObjectives(a: Objective, b: Objective): number {
   if (a.filled !== b.filled) return a.filled - b.filled;
   if (a.declared !== b.declared) return a.declared - b.declared;
@@ -703,7 +811,11 @@ export function solveAssignment(
           filled: from.objective.filled + 1,
           declared: from.objective.declared + FIT_IS_DECLARED[cell.fit],
           primary: from.objective.primary + FIT_IS_PRIMARY[cell.fit],
-          score: from.objective.score + sign * cell.adjusted,
+          // A null figure contributes nothing rather than blocking the slot: nullity is a property of
+          // the *model* behind the slot, never of the player (rule 1b), so when one cell is null every
+          // candidate's cell in that slot is null and they all add the same 0. The slot is then decided
+          // by the positional objective and the tie-breaks, which is what `hasBasis` promises.
+          score: from.objective.score + sign * (cell.adjusted ?? 0),
           minutes: from.objective.minutes + minutes,
           jerseyRank: from.objective.jerseyRank + jerseyRank,
         };
@@ -739,14 +851,23 @@ export function solveAssignment(
  * screen replaces one number in `values` and calls this, instead of shipping the shrinkage to the
  * browser and giving the same claim two implementations to disagree in. Null on an empty list, the
  * house rule that a figure nobody has is not a zero (`aggregate.ts` rule 1).
+ *
+ * **One `null` among the values makes the whole figure null**, and that is not a workaround for the
+ * nulls rule 1b introduced — it is the defect being fixed. Skipping them would print the total of five
+ * discs under a pitch of seven, labelled « Total des sept »; averaging them as zeros would print a
+ * number nobody's football produced. A team figure is a claim about the team that is drawn, so either
+ * every filled slot has a figure or the team has none. `aggregationLabelFr` names the count it did
+ * average, for the legitimate case of a squad too small to fill the shape.
  */
 export function aggregateSeven(
-  values: readonly number[],
+  values: readonly (number | null)[],
   criterion: BestSevenCriterion,
 ): number | null {
   if (values.length === 0) return null;
-  const total = values.reduce((sum, value) => sum + value, 0);
-  return BEST_SEVEN_AGGREGATION[criterion] === "mean" ? total / values.length : total;
+  const figures = values.filter((value): value is number => value !== null);
+  if (figures.length !== values.length) return null;
+  const total = figures.reduce((sum, value) => sum + value, 0);
+  return BEST_SEVEN_AGGREGATION[criterion] === "mean" ? total / figures.length : total;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -805,7 +926,9 @@ export function bestSeven(input: BestSevenInput): BestSevenResult {
         positionCode: slot.positionCode,
         player: null,
         fit: "none",
-        adjusted: 0,
+        // No player, no figure. It is left out of `values` anyway, but a `0` sitting in a pick is a `0`
+        // some future caller will average in.
+        adjusted: null,
         observed: {
           rate: null,
           numerator: empty.numerator,
@@ -840,12 +963,15 @@ export function bestSeven(input: BestSevenInput): BestSevenResult {
     direction: input.direction,
     picks,
     values,
-    aggregate: evaluation.hasBasis ? aggregateSeven(values, input.criterion) : null,
+    // No `hasBasis` gate in front of it any more: with no basis every value is null and `aggregateSeven`
+    // already answers null, per model and per slot rather than per screen.
+    aggregate: aggregateSeven(values, input.criterion),
     aggregation: BEST_SEVEN_AGGREGATION[input.criterion],
     shrinkage: evaluation.shrinkage,
     goalkeeperShrinkage: evaluation.goalkeeperShrinkage,
     outOfPositionCount: picks.filter((pick) => pick.player !== null && pick.fit === "none").length,
     hasBasis: evaluation.hasBasis,
+    goalkeeperHasBasis: evaluation.goalkeeperHasBasis,
     candidatesConsidered: candidates.length,
   };
 }
