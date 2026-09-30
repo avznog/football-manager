@@ -10,6 +10,7 @@ import {
   buildReminderMessage,
   byStartAscending,
   countsOf,
+  isFinishedEvent,
   isLiveEvent,
   isOngoing,
   isPast,
@@ -110,6 +111,15 @@ describe("isLiveEvent", () => {
   });
 });
 
+describe("isFinishedEvent", () => {
+  it("is true only for a match that is over", () => {
+    expect(isFinishedEvent(match("2026-09-27T08:00:00Z", "finished"))).toBe(true);
+    expect(isFinishedEvent(match("2026-09-27T08:00:00Z", "live"))).toBe(false);
+    expect(isFinishedEvent(match("2026-09-27T08:00:00Z"))).toBe(false);
+    expect(isFinishedEvent(training("2026-09-27T08:00:00Z"))).toBe(false);
+  });
+});
+
 describe("isOngoing and isPast", () => {
   const kickoff = "2026-09-27T08:00:00Z";
   const scheduled = match(kickoff); // window ends 10:15Z
@@ -135,6 +145,21 @@ describe("isOngoing and isPast", () => {
     const wayLater = new Date("2026-09-28T00:00:00Z");
     expect(isPast(live, wayLater)).toBe(false);
     expect(isOngoing(live, wayLater)).toBe(true);
+  });
+
+  // Decision 121: the coach declares a match over, so the column outranks the clock.
+  it("treats a match declared over as past, even before its own kick-off", () => {
+    const declared = match("2026-10-11T08:00:00Z", "finished");
+    const beforeKickoff = new Date("2026-09-27T12:00:00Z");
+    expect(isPast(declared, beforeKickoff)).toBe(true);
+    expect(isOngoing(declared, beforeKickoff)).toBe(false);
+  });
+
+  it("treats a match that ended early as past, without waiting for its window", () => {
+    const early = match(kickoff, "finished");
+    const duringTheWindow = new Date("2026-09-27T09:00:00Z");
+    expect(isPast(early, duringTheWindow)).toBe(true);
+    expect(isOngoing(early, duringTheWindow)).toBe(false);
   });
 
   it("keeps a training that just started in the present, for attendance marking", () => {
@@ -190,6 +215,18 @@ describe("splitTimeline", () => {
     const live = [match("2026-09-27T08:00:00Z", "live"), match("2026-10-11T08:00:00Z")];
     const timeline = splitTimeline(live, new Date("2026-09-30T08:00:00Z"));
     expect(timeline.next?.id).toBe("match-2026-09-27T08:00:00Z");
+  });
+
+  it("never pins a match the coach has declared over, and files it under the past", () => {
+    // Typed up in advance: the 11th of October, entered on the 25th of September (decision 121).
+    const declared = [
+      match("2026-10-11T08:00:00Z", "finished"),
+      training("2026-10-01T17:00:00Z"),
+    ];
+    const timeline = splitTimeline(declared, new Date("2026-09-25T12:00:00Z"));
+    expect(timeline.next?.id).toBe("training-2026-10-01T17:00:00Z");
+    expect(timeline.upcoming).toEqual([]);
+    expect(timeline.past.map((item) => item.id)).toEqual(["match-2026-10-11T08:00:00Z"]);
   });
 
   it("has no next event when the season is over", () => {

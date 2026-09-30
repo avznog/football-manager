@@ -22,7 +22,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
@@ -38,10 +38,12 @@ import {
 } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
 import { buildReminderMessage, tallyAvailability, type Responder } from "@/lib/calendar/timeline";
-import { getMatch, getMatchAnswers, getMatchScore } from "@/lib/match/queries";
+import { reopenMatch } from "@/lib/match/actions";
+import { getMatch, getMatchAnswers, getMatchScore, hasMatchEvents } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
 import { ratingDeadlineFr } from "@/lib/rating/window";
 import { getSquad } from "@/lib/team/queries";
+import { FinishMatchCard } from "./_components/finish-match-card";
 import { CompositionCard } from "./composition/_components/composition-card";
 import { AvailabilityControl } from "../../calendrier/_components/availability-control";
 import { AvailabilityGrid } from "../../calendrier/_components/availability-grid";
@@ -59,11 +61,19 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   const match = await getMatch(team.id, id);
   if (!match) notFound();
 
-  const [answers, squad, score] = await Promise.all([
+  const [answers, squad, score, logged] = await Promise.all([
     getMatchAnswers(match.id),
     getSquad(team.id),
     // A scheduled match has nothing in its log yet, so do not even ask.
     match.status === "scheduled" ? Promise.resolve(null) : getMatchScore(match.id),
+    /*
+     * Asked for every status, unlike the score: it is what the two cards about *declaring* a match
+     * over are gated on, and one of them appears on a scheduled match. It is also the stricter
+     * question — `score === null` ignores voided events, so a match whose every action was
+     * corrected away reads as empty there and as logged here. Declaring is the case that must not
+     * get it wrong, because it is what decides whether the déroulé can still be contradicted.
+     */
+    hasMatchEvents(match.id),
   ]);
 
   /**
@@ -113,6 +123,16 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
     ratingDuty !== null && notation !== null
       ? ratingDeadlineFr(notation.window.closesAtMs, now.getTime())
       : null;
+  /**
+   * Whether the « Terminer le match » card is offered, and which of its two slots it goes in.
+   *
+   * `!logged` is the line decision 121 draws: a match with a déroulé is `live` or `finished`
+   * already, and a `live` one has a correct way to end — game mode's own final whistle, which
+   * derives the minute from the reducer instead of inventing one out here.
+   */
+  const mayFinish = mayAmend && match.status !== "finished" && !logged;
+  /** The kick-off has come round. Only the card's placement and its extra sentence depend on it. */
+  const played = kickoff.getTime() <= now.getTime();
   const declarable = team.isPlayer && match.status === "scheduled";
   const myAnswer =
     answers.find((answer) => answer.teamMemberId === team.membershipId)?.status ?? null;
@@ -191,6 +211,14 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         ) : null}
       </header>
 
+      {/* A match already played, with nothing in its log, is on this page for exactly one reason:
+          the coach is here to type it up (decision 121). So it leads — above the availability grid
+          and the « relancer » message, which are both a record of a question that closed. The same
+          argument the comment below makes for moving « Après le match » up. */}
+      {mayFinish && played ? (
+        <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff={false} />
+      ) : null}
+
       {declarable ? (
         <Card title="Ta réponse" description="Un seul appui. Tu peux changer d’avis jusqu’au coup d’envoi.">
           <AvailabilityControl
@@ -267,6 +295,13 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         </Card>
       ) : null}
 
+      {/* The second of the two slots `mayFinish` can fill: a fixture still to come. Low on the page,
+          because closing one before its kick-off is a rare deliberate act and must not push « Ta
+          réponse » and the composition down the screen. */}
+      {mayFinish && !played ? (
+        <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff />
+      ) : null}
+
       {/* « Saisie rétroactive » (`docs/PLAN.md`, screen 8). A match played without the phone is typed
           up here and becomes an ordinary event log; a match that already has one is corrected action
           by action. `score === null` means not one event was ever recorded. */}
@@ -285,6 +320,18 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
             >
               {score === null ? "Saisir le match" : "Corriger une action"}
             </ButtonLink>
+            {/* The undo for « Marquer comme terminé », and the reason that button needs no dialog.
+                Only while the log is empty: once there is a déroulé, going back to `scheduled` would
+                mean voiding events to stay coherent, which is a different feature (decision 121). */}
+            {!logged ? (
+              <form action={reopenMatch}>
+                <input type="hidden" name="teamId" value={team.id} />
+                <input type="hidden" name="matchId" value={match.id} />
+                <Button type="submit" variant="ghost" fullWidth>
+                  Terminé par erreur ? Rouvrir le match
+                </Button>
+              </form>
+            ) : null}
           </div>
         </Card>
       ) : null}

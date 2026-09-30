@@ -2934,3 +2934,57 @@ belongs to it — a pressed state renders before hydration, a router pending sta
 `<Suspense>` on `/stats` (finding 4); and the auth prefix joins (finding 1) described as what they
 are. The cold start (finding 2) is the largest number here and the least code: it is
 infrastructure — the owner's lane — so it is written down and not touched.
+
+## Typing up a match that was played without the phone
+
+The owner asked for one thing: mark a game as over at any time, and then edit it, because backfilling
+the season currently forces him through game mode for afternoons that finished weeks ago. Tracing it
+found a genuine deadlock rather than a missing button. `/match/[id]/saisie` — the retro-entry screen,
+shipped in M7 and working — is reachable only from a card gated on `status === "finished"`;
+`finalizeMatch` was the only writer of that column and refuses without a `FINAL_WHISTLE` in the log;
+and the only thing that appends one is game mode. The single match in the repository in the wanted
+state is the seed's J6, which exists only because the seed writes the column by hand.
+
+Four product answers shaped it: two entry points (« Saisir le match » finishes *and* opens the form,
+« Marquer comme terminé » finishes and stays), no chronology gate at all, the retro form exactly as it
+is, and a « Rouvrir le match » undo. Decision **121** records the whole thing, and the part worth
+repeating here is the mechanism *not* used: a bare `FINAL_WHISTLE` would have been one line and is
+wrong, because `getMatchScores` counts `match_events` rows — so one whistle turns « nobody recorded
+this » into « 0 – 0 » on the calendar, the wave-3 untruth `CLAUDE.md` names, and makes
+`submitRetroMatch` refuse the whole-match form. Setting the column and leaving the log empty is the
+J6 state every screen already renders correctly.
+
+Both actions refuse once the log is non-empty, which is where the scope line falls honestly: a match
+with a déroulé is `live` or `finished` already, and a `live` one has a correct ending in game mode's
+own whistle, which derives the minute from the reducer. Reimplementing that outside the reducer to
+save a tap would trade invariant 2 for nothing.
+
+**Three ripple effects of « any time, including a future date », two of which were only visible by
+looking.** `lib/calendar/timeline.ts` split past from future on `endsAt` with `isLiveEvent` the only
+status override, so a match dated next Sunday and declared over sat under « À venir » while its own
+page called it finished — one screen contradicting another. It has the mirror now, `isFinishedEvent`,
+and a match ended early leaves « À venir » at the whistle rather than at `endsAt`. Game mode drew a
+0-0 scoreboard and a « Coup d'envoi » button for a finished match with an empty log, because the
+reducer reads an empty log as « not started »; that state used to be seed-only and unlinked, and is
+now one tap away, so the page redirects. And the first draft put the new card ~1 500 px down the match
+page, below the availability grid and the « relancer » message — a screenshot at 390 px is what caught
+it, and the fix was a component rendered in one of two slots: leading for a match already played,
+because that is the only reason the coach is on the page, and low for a fixture still to come.
+
+**Two things about the checks.** The e2e test passed alone and failed in the full suite, reporting
+« rien saisi » on a recap after a successful submission. It looked exactly like a revalidation race
+and was not one: a probe that visited the recap *before* entry to poison the tab's cache, then
+navigated four different ways afterwards, found all four correct. The real cause was the test's own
+`page.goto` to the recap fired in the same tick as the save — `submitRetroMatch` redirects there
+itself, so the `goto` was redundant, and it cancelled the POST still in flight. Waiting for the
+action's own navigation is shorter and actually asserts the submission landed. The lesson generalises:
+**after clicking a Server Action's submit, never navigate — wait for where it takes you.** Second,
+`toHaveCount` re-queries a locator but never reloads the document, so a genuinely stale page burns the
+full timeout instead of settling; an assertion that polls for twenty seconds and never changes is
+evidence about the page, not about timing.
+
+Left as a roadmap line rather than fixed, because it is a product call: a match in the past that
+nobody has declared over still shows « Ta réponse » with « Tu peux changer d'avis jusqu'au coup
+d'envoi », and still offers the coach a « relancer » message. Both gate on `status === "scheduled"`,
+which was a fair proxy for « still to come » until this change; the untruth is older than the change
+and merely easier to reach now.

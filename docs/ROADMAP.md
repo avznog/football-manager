@@ -453,6 +453,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet
       (`lib/retro/log.ts`, `app/(app)/match/[id]/saisie/`) — minutes are optional and stamped,
       see decision 048
+- [x] …and reachable without running game mode for a match already over. That screen shipped behind a
+      deadlock nobody had walked into until the owner tried to backfill a season: its card is gated on
+      `status === "finished"`, the only writer of that column refused without a `FINAL_WHISTLE`, and
+      the only thing that appends one is game mode. « Terminer le match » on the match page now writes
+      the column and appends nothing, « Rouvrir le match » undoes it, and both refuse once there is a
+      déroulé (decision 121)
 - [x] Amend a finished match by appending corrections (`lib/retro/amend.ts`,
       `amendMatchEvents`) — a `VOID` plus a replacement, keeping the target's minute (decision 049)
 - [x] Recompute frozen stats after an amendment — `amendMatchEvents` re-freezes
@@ -803,6 +809,14 @@ the reachable-turf finding below an **under**-statement on device rather than an
       the archive decision is indistinguishable from the grey prose either side of it, while
       « Renommer » right above is a bordered secondary button. It also omits `pending`, alone among the
       card's four controls (`app/(app)/equipe/competition-manager.tsx:158`)
+- [ ] A match whose kick-off is behind us but which nobody has declared over still asks the question
+      that closed: « Ta réponse » on the match page says « Tu peux changer d'avis jusqu'au coup
+      d'envoi » under a kick-off three weeks old, and the coach is still offered a « relancer » message
+      for the players who never answered. Both gate on `status === "scheduled"`, which was a fair proxy
+      for « still to come » until decision 121 made *finished* something the coach declares rather than
+      something the clock produces — so the untruth is older than that change and merely easier to
+      reach now. Whether a player may still answer after the kick-off is the owner's call, which is why
+      this is a line here and not a patch
 - [ ] The « Forme récente » score strip runs together — « 2 – 0 3 – 2 2 – 2 1 – 3 2 – 1 » at 10 px
       mono, where the gap between two matches is no wider than the gap inside one score
       (`team-summary.tsx:141`). The same 10 px floor shows up across `/moi`'s stat captions; 11 px for
