@@ -111,18 +111,39 @@ export async function updatePlayerPositions(
 
   const rows = toPositionRows(primary, secondary);
 
-  await db.transaction(async (tx) => {
-    await tx.delete(playerPositions).where(eq(playerPositions.teamMemberId, memberId));
-    if (rows.length > 0) {
-      await tx.insert(playerPositions).values(
-        rows.map((row) => ({
-          teamMemberId: memberId,
-          positionCode: row.code,
-          preference: row.preference,
-        })),
-      );
-    }
-  });
+  // Only the write is guarded. The schema parse and `assertCanActFor` stay outside on purpose:
+  // a malformed form is already a `FormState` the picker can render, and a `ForbiddenError` must
+  // keep reaching the error boundary rather than being flattened into a polite French sentence —
+  // somebody trying to edit a teammate's wishes is a bug or an attack, not a failed save, and we
+  // want it loud and visible in the logs exactly as it is today.
+  try {
+    await db.transaction(async (tx) => {
+      await tx.delete(playerPositions).where(eq(playerPositions.teamMemberId, memberId));
+      if (rows.length > 0) {
+        await tx.insert(playerPositions).values(
+          rows.map((row) => ({
+            teamMemberId: memberId,
+            positionCode: row.code,
+            preference: row.preference,
+          })),
+        );
+      }
+    });
+  } catch (error) {
+    // The Postgres `code` is read off the object rather than logged as a stringified error because
+    // the code is the diagnosis and the message is not: `23503` means the `positions` table has no
+    // such row — an unseeded database, not this player's doing — while `23505` would mean two rows
+    // for the same position got past `toPositionRows`. Those are different bugs with different
+    // fixes, and a stringified error buries the one digit that separates them.
+    const pg = error as { code?: string; constraint?: string };
+    console.error("updatePlayerPositions: write failed", {
+      code: pg.code,
+      constraint: pg.constraint,
+      memberId,
+      positionCodes: rows.map((row) => row.code),
+    });
+    return { error: "Tes postes n’ont pas été enregistrés. Réessaie." };
+  }
 
   revalidateMember(memberId);
   return undefined;
