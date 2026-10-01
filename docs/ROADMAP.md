@@ -922,3 +922,13 @@ the reachable-turf finding below an **under**-statement on device rather than an
       unrecorded until a probe drove it. `scripts/probe-composition.mjs` now does, read-only, and it
       never submits: the screens past a save (the pending button, `state.error`, `minuteClash`,
       `shapeProblems`) remain unaudited because the only database to drive is the owner's production one
+- [ ] `tabbar-pb` in `app/globals.css` is used by nothing — zero occurrences in any `.tsx`, because
+      `components/nav/app-shell.tsx:142` writes the value inline so the `md:` variant is reliable, as
+      its own comment at `:131` explains. It is not the `safe-px` cascade bug (a lone `padding-bottom`
+      has no shorthand competitor) and its old `4rem`-versus-`3.5rem` disagreement is already fixed by
+      the tokenisation commit. What is left is a dead utility that differs from the live inline value
+      by `+1rem`: delete it, or give it the one user it was written for
+- [ ] `isUuid()` in `lib/player/validation.ts:17-25` is a lax regex while the actions use `z.uuid()`,
+      which in Zod 4 enforces the RFC variant nibble — so a page can load for an id the action then
+      silently rejects. Latent only: every real row is a `gen_random_uuid()` v4, which is exactly what
+      hides it

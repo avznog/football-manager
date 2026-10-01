@@ -3881,3 +3881,49 @@ repository already relies on `active:` the same way, so if this did not work the
 than the tab bar would be silently inert. That is an argument, not an observation. **Only the owner's
 iPhone can confirm that the fill actually paints under his thumb**, and until he says so that is
 expected behaviour rather than verified behaviour.
+
+## 124 — A gutter is one utility, because `safe-px px-5` silently is not one
+
+**2026-10-01** · **accepted** · Supersedes nothing; it fixes three screens that thought they had a
+side gutter and did not.
+
+**Decision.** A screen that is its own page — `app/error.tsx`, `app/not-found.tsx`,
+`app/(auth)/layout.tsx` — gets `gutter-px`, a single utility in `app/globals.css` that is
+`max(env(safe-area-inset-*, 0px), calc(var(--spacing) * 5))` on the physical longhands. The pattern
+`safe-px px-5` is not to be written again. `safe-px` keeps its one correct user, `BottomNav`.
+
+**Why.** `safe-px` sets the longhands `padding-left` / `padding-right`; `px-5` compiles to the
+`padding-inline` shorthand; a longhand after a shorthand overrides it unconditionally, with no
+specificity contest to win. Both land in `@layer utilities`, and Tailwind v4 sorts custom `@utility`
+after its own built-ins — verified in the compiled stylesheet, `.px-5` at byte 34764 and `.safe-px` at
+36004 — so **moving the block earlier in `globals.css` cannot fix it**, which is the first thing
+anyone will try. On an upright phone both insets are 0 and the pair therefore resolves to a gutter of
+zero.
+
+Measured, before: `/connexion` and `/rejoindre` ran **0 → 375 of a 375 px viewport**, the form card
+flush against both bezels, in both themes — the first two screens any new user sees. `not-found.tsx`
+ran 0 → 390, worse, because its text has no `max-w`. At 390 px the card is capped by `max-w-sm` at 384
+and leaves 3 px, **which is why this was never noticed: the bug is invisible at the width we test and
+visible at the width the phone is.** After: 20px/20px, card 20 → 355 at 375 and 20 → 370 at 390.
+
+**The fix that was rejected, and this is the part worth keeping.** Redefining `safe-px` itself as a
+`max()` looks smaller — one declaration, every site fixed at once. But its one remaining user is
+`components/nav/bottom-nav.tsx`, a `fixed inset-x-0` bar whose `border-t` is meant to run bezel to
+bezel and whose tabs divide the full width. Measured with a four-tab replica, a 20 px base gutter
+takes each tab from 97.5 to 87.5 px at 390 and 93.8 to 83.8 at 375. **Nothing clips, nothing drops
+under 44 px, every check stays green** — it would have silently inset a deliberately edge-to-edge bar
+and shrunk four tap targets, a design change smuggled in by a bug fix. That the single
+`safe-px`-with-no-`px` site is the one place the utility is used *correctly* is what makes a new
+utility right rather than merely safer.
+
+**Consequences.** `max()` rather than a flat padding keeps what the pair was reaching for: in
+landscape the notch inset exceeds 20 px and wins, which is why `safe-px` was on these elements at all
+and which a plain `px-5` would have discarded. Longhands rather than `padding-inline` mean a stray
+`safe-px` left on the same element cannot reintroduce the bug — the two can no longer disagree, which
+is the standard decision 118 set for the tab bar's height. The padding stays on the three page shells
+and **not** on `components/errors/error-screen.tsx`: `app/(app)/error.tsx` renders that same component
+inside `app-shell`'s `px-4`, so a gutter on the component double-pads one parent while fixing the
+other — padding that is correct for one parent and wrong for another is padding living in the wrong
+place. And `tabbar-pb` was checked for the same shape and is clean: it is a lone `padding-bottom` with
+no shorthand competitor, it now reads `var(--tabbar-h)`, and it is used nowhere at all because
+`app-shell.tsx:142` writes the value inline for the `md:` variant.

@@ -3115,3 +3115,44 @@ in that entry, the least code, and the owner's lane. Two device-only checks are 
 `docs/ROADMAP.md` instead of being guessed at here — iOS Safari's own toolbar possibly eating the first
 tap under `viewportFit: "cover"`, and `html { overflow-x: hidden }` against a `fixed` bar — because
 neither can be settled from Linux.
+
+## 2026-10-01 — The side padding that was never applied
+
+`/connexion` and `/rejoindre` had no side padding. Measured at 375 × 667, both themes, the form card
+ran **0 → 375 of the viewport** — flush against both bezels, on the first two screens any new user
+sees. `app/not-found.tsx` was worse at 0 → 390, having no `max-w` to accidentally save it. All three
+carried `safe-px px-5`, and the `px-5` was dead: `safe-px` sets the longhands `padding-left` /
+`padding-right`, `px-5` compiles to the `padding-inline` shorthand, and a longhand after a shorthand
+wins unconditionally. Tailwind v4 sorts custom `@utility` after its own built-ins inside
+`@layer utilities`, so reordering `globals.css` — the first thing anyone tries — cannot help.
+
+Fixed with one new utility, `gutter-px`, on the three page shells. After: 20px/20px, card 20 → 355 at
+375 and 20 → 370 at 390. The decision entry records the fix that was **rejected**, which is the part
+worth reading: redefining `safe-px` itself looked smaller, but its one remaining user is `BottomNav`, a
+`fixed inset-x-0` bar meant to run bezel to bezel, and a base gutter there would have taken four tap
+targets from 97.5 to 87.5 px with nothing clipping, nothing under 44 px and every check green.
+
+**Why this survived this long is the useful finding.** At 390 px the card is capped by `max-w-sm` at
+384 and leaves 3 px, so the bug is invisible at the width we test and visible at the width the phone
+is. Eyeballing at 390 could never have found it; the measurement was the whole of the work.
+
+Also this session: **the deployment-skew theory died**, killed by the owner's own test — a force-quit
+is a document navigation and always comes from the newest deployment, so a stale action id cannot
+survive one, and his positions crash recurred after a force-quit. The crash was then **reproduced**
+locally: `updatePlayerPositions` has no `try/catch`, so a thrown Postgres error is a 500 into
+`app/(app)/error.tsx`, the transaction rolls back and nothing is written — which is why production's
+`player_positions` is empty. The leading explanation is a foreign-key violation on `positions.code`,
+because **nothing in a migration seeds `positions`**: `seedReference()` is reachable only by hand and
+no workflow runs it, while `ci.yml` and `release.yml` both run `db:migrate` and stop. Two owner-side
+facts would settle it, and a third needs no query at all — `seedReference()` writes the positions and
+the built-in formations in one call, so an unseeded table shows up as a composition editor offering no
+formations.
+
+**Merged:** #117, the outbox drain before the happy path's two reloads, found because a docs-only
+branch failed the e2e job — the one branch whose diff could not be the cause. #115, the
+`COORDINATION.md` NOW rewrite. **Held:** #114, whose `<Suspense>` boundary on `/stats` removed the
+no-JavaScript path that decisions 100 and 116 both defend — the fallback HTML is what ships and the
+swap to real content is an inline script, so with JS off the reader sits on a skeleton announcing
+« Chargement… » for ever while the figures sit hidden in the same document. It only engages when the
+query outruns the shell flush, which is the premise of the change, so the normal case on a phone was
+the broken case.
