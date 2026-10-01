@@ -13,9 +13,12 @@ import { ErrorScreen } from "@/components/errors/error-screen";
 export default function AppError({
   error,
   reset,
+  retry,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
+  /** Next's third boundary prop. `ErrorScreen` takes it and explains why it does not use it. */
+  retry: () => void;
 }) {
-  return <ErrorScreen digest={error.digest} reset={reset} />;
+  return <ErrorScreen error={error} reset={reset} retry={retry} />;
 }
