@@ -9,31 +9,6 @@
 import { scoreLineFr } from "@/lib/calendar/labels";
 
 /**
- * « Aucun changement : les 7 titulaires choisis ci-dessus ont fini le match. »
- *
- * The card used to say « les sept titulaires ont fini le match » unconditionally, on a form whose
- * composition was seven empty `— personne —` selects and whose own footer said « 0 joueurs avec
- * des minutes ». Seven players who had finished a match nobody had named: the same defect as
- * decision 060, where « ne change rien sur le terrain » was printed over an empty pitch.
- *
- * So the sentence counts what the coach has actually filled in, and when he has filled in nothing
- * it says what to do instead of describing a match. « ci-dessus » points at the composition card,
- * which is where the number comes from.
- */
-export function retroChangesEmptyFr(startersChosen: number): string {
-  if (startersChosen <= 0) {
-    return (
-      "Aucun changement. La composition de départ est vide : sans titulaire, il n’y a personne à " +
-      "remplacer."
-    );
-  }
-  if (startersChosen === 1) {
-    return "Aucun changement : le titulaire choisi ci-dessus a fini le match.";
-  }
-  return `Aucun changement : les ${startersChosen} titulaires choisis ci-dessus ont fini le match.`;
-}
-
-/**
  * « Rien pour l'instant. Un 0 – 0 sans rien à signaler, ça existe. »
  *
  * Deliberately not « sans carton » : this app records no cards at all (`docs/PLAN.md`), so naming
@@ -46,6 +21,33 @@ export function retroChangesEmptyFr(startersChosen: number): string {
  */
 export const RETRO_NO_FACTS_FR =
   `Rien pour l’instant. Un ${scoreLineFr(0, 0)} sans rien à signaler, ça existe.`;
+
+/**
+ * The one empty state of the one « Actions du match » list — buts, changements and the rest in a
+ * single card, now that a substitution is just another thing that happened in the match.
+ *
+ * It replaces two sentences that each described one of the two cards, and it keeps the only thing
+ * that distinguished them: **before the starting seven is named, the list has nothing it can
+ * usefully hold.** « X sort, Y entre » needs somebody on the pitch to take off, which is what
+ * `retroChangesEmptyFr` used to say — so the empty state points at the composition card above
+ * instead of inviting an action that cannot be filled in yet.
+ *
+ * A boolean and not a count, unlike the sentence it descends from: this one claims no number, so it
+ * needs none. The number it used to print (« les 3 titulaires choisis ci-dessus ont fini le match »)
+ * was a statement about the *match* — who finished it — and decision 083 is exactly that a card with
+ * no rows in it may not make one. A list that holds goals as well as substitutions cannot say it
+ * anyway: no rows here means nothing was typed up at all, not that seven players played ninety
+ * minutes without incident.
+ */
+export function retroActionsEmptyFr(startersChosen: boolean): string {
+  if (!startersChosen) {
+    return (
+      "Aucune action pour l’instant. Commence par la composition de départ ci-dessus : sans " +
+      "titulaire, personne ne peut marquer ni sortir du terrain."
+    );
+  }
+  return RETRO_NO_FACTS_FR;
+}
 
 /**
  * The sentence the Score card prints when there is no scoreline to print yet.
@@ -94,8 +96,8 @@ export function retroScoreLineFr(input: {
  * « 3 joueurs avec des minutes · 2 actions sans minute précise, placées au mieux »
  *
  * UX audit D52: the component built this by hand and printed « 1 joueurs », with an
- * `action${s > 1 ? "s" : ""}` chain for the second clause — one line from `retroChangesEmptyFr`,
- * which exists because of that exact string. So it moves in beside its neighbour.
+ * `action${s > 1 ? "s" : ""}` chain for the second clause — one line from the empty states above,
+ * which exist because of that exact string. So it moves in beside them.
  *
  * Both counts come from the preview the reducer produced, so this sentence is a summary of a
  * derived state and never of a match: at zero it says there are no minutes yet rather than that

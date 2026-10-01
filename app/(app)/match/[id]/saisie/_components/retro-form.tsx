@@ -15,9 +15,13 @@
  * - **The starting seven is pre-filled** from the composition the coach planned before the match,
  *   when there was one. It is a default he can change, not a fact — invariant 3's courtesy applied to
  *   a screen that is not game mode.
+ * - **One card, one list, the add button underneath.** Everything that happened — buts, changements,
+ *   fautes, blessures — is one `<ul>` in the order the coach typed it, because a substitution is just
+ *   another thing that happened in the match and he should not have to decide which card a row
+ *   belongs in. The control that starts the next row sits under the list, where the thumb left off.
  * - **The empty states describe the form, not a match.** With no planned composition the seven slots
  *   open on « — personne — », and a card saying « les sept titulaires ont fini le match » is then
- *   describing a match nobody has entered. So those sentences live in `lib/retro/labels.ts`, count
+ *   describing a match nobody has entered. So those sentences live in `lib/retro/labels.ts`, read
  *   what is actually filled in, and are tested (decision 083).
  * - **The warnings are live.** `findRetroIssues` runs on every keystroke, so « Momo n'était pas sur
  *   le terrain à cette minute » appears next to the row rather than after a round trip.
@@ -39,9 +43,8 @@ import { regulationMinutes } from "@/lib/match/clock";
 import { reduceMatch } from "@/lib/match/reducer";
 import { submitRetroMatch } from "@/lib/retro/actions";
 import {
-  RETRO_NO_FACTS_FR,
   RETRO_SCORE_EMPTY_FR,
-  retroChangesEmptyFr,
+  retroActionsEmptyFr,
   retroRecordedSummaryFr,
   retroScoreLineFr,
 } from "@/lib/retro/labels";
@@ -70,6 +73,17 @@ export type RetroFormProps = {
 let rowSeq = 0;
 const nextKey = (prefix: string) => `${prefix}${(rowSeq += 1)}`;
 
+/**
+ * What the one type `<select>` offers, in the order of the domain's own list.
+ *
+ * `RETRO_ACTION_TYPES` minus `POSITION_CHANGE`, written out rather than filtered: that type is
+ * enterable in principle but `RetroAction` has no arm for it yet, so `readActionFields` drops it, and
+ * offering it would be a row the server throws away without saying so. When the arm lands this list
+ * is one of the places it has to appear — a filter would have quietly offered it a slice too early.
+ */
+const RETRO_ROW_TYPES = [...RETRO_FACT_TYPES, "SUBSTITUTION"] as const;
+type RetroRowType = (typeof RETRO_ROW_TYPES)[number];
+
 export function RetroForm({ teamId, view }: RetroFormProps) {
   const [state, action, pending] = useActionState(submitRetroMatch, undefined);
 
@@ -81,15 +95,14 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
     Object.fromEntries(view.slots.map((slot) => [slot.id, planned.get(slot.id) ?? ""])),
   );
   /**
-   * **One list of rows, substitutions included**, in the order the coach added them.
+   * **One list of rows, substitutions included**, in the order the coach added them — which is the
+   * order one card now renders.
    *
-   * Still rendered as two cards, because merging the two cards into one list on screen is the next
-   * slice and this one is meant to be invisible. What changed is underneath: both cards read from and
-   * write to this array, and both post one `action-*` family of field names.
+   * Never sorted by minute. A row would jump out from under the thumb the moment a minute is typed,
+   * and the common case is no minute at all (decision 048), which has no defined place in such an
+   * order anyway.
    */
   const [actions, setActions] = useState<readonly ActionRow[]>([]);
-  const changes = actions.filter(isSubstitutionRow);
-  const facts = actions.filter(isFactRow);
 
   const regulation = regulationMinutes({
     periodsCount: view.match.periodsCount,
@@ -110,18 +123,34 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
       starters: view.slots
         .map((slot) => ({ slotId: slot.id, memberId: starters[slot.id] ?? "" }))
         .filter((starter) => starter.memberId !== ""),
-      // A substitution with a side still unchosen is left out of the *preview* — the reducer cannot
-      // replay « sort personne » — while the server keeps it and reports it. Unchanged behaviour.
-      actions: actions
-        .filter((row) => !isSubstitutionRow(row) || (row.outId !== "" && row.inId !== ""))
-        .map(toRetroAction),
+      // Every row, half-filled substitutions included: this is the sheet as typed, and it is what
+      // `findRetroIssues` has to judge for « il faut dire qui est entré » to appear beside the row
+      // rather than only on submit (UX audit D22).
+      actions: actions.map(toRetroAction),
     }),
     [actions, starters, view.match, view.slots],
   );
 
+  /**
+   * The same sheet minus the rows the reducer cannot replay.
+   *
+   * A substitution with a side still unchosen is « sort personne » — there is no such event, so it is
+   * left out of the *preview* only. It stays in `entry`, where it is a problem to report, and the
+   * server keeps it too.
+   */
+  const previewEntry: RetroEntry = useMemo(
+    () => ({
+      ...entry,
+      actions: entry.actions.filter(
+        (action) => action.type !== "SUBSTITUTION" || (action.outId !== "" && action.inId !== ""),
+      ),
+    }),
+    [entry],
+  );
+
   /** The score and the minutes this sheet implies — asked of the reducer, never counted here. */
   const preview = useMemo(() => {
-    const built = buildRetroLog(entry);
+    const built = buildRetroLog(previewEntry);
     return {
       state: reduceMatch(retroEventRecords(built.events), [], {
         periodsCount: view.match.periodsCount,
@@ -134,7 +163,7 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
       }),
       guessedStamps: built.guessedStamps,
     };
-  }, [entry, view.match.periodsCount, view.match.periodMinutes, view.slots]);
+  }, [previewEntry, view.match.periodsCount, view.match.periodMinutes, view.slots]);
 
   const issues = useMemo(
     () =>
@@ -182,12 +211,40 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
       ? view.plannedLineupId
       : "";
 
-  function addGoal(type: RetroFactType) {
+  /**
+   * A new row at the **end** of the list, which is where the coach is looking: the two Score buttons
+   * and « + Ajouter une action » all land here, and the add button sits under the list for the same
+   * reason (the owner's own remark, typing up a match without his phone).
+   */
+  function addFactRow(type: RetroFactType) {
     setActions((rows) => [
       ...rows,
       { key: nextKey("f"), type, memberId: "", assistId: "", minute: "" },
     ]);
   }
+
+  /**
+   * Changing a row's type changes its shape: a substitution carries two players and a fact carries a
+   * player and an assister. The minute survives, because it is the one thing the coach typed that is
+   * still true, and a fact's player survives a fact-to-fact change (a goal retyped as a foul is the
+   * same man).
+   */
+  const retypeRow = (key: string, type: RetroRowType) =>
+    setActions((rows) =>
+      rows.map((row) => {
+        if (row.key !== key || row.type === type) return row;
+        if (type === "SUBSTITUTION") {
+          return { key: row.key, type, outId: "", inId: "", minute: row.minute };
+        }
+        return {
+          key: row.key,
+          type,
+          memberId: isFactRow(row) ? row.memberId : "",
+          assistId: isFactRow(row) ? row.assistId : "",
+          minute: row.minute,
+        };
+      }),
+    );
 
   /** Narrowed updaters: a substitution row and a fact row have no fields in common but `key`. */
   const patchChange = (key: string, values: Partial<SubRow>) =>
@@ -232,10 +289,10 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
             <p className="text-center text-sm text-ink-muted">{RETRO_SCORE_EMPTY_FR}</p>
           )}
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant="secondary" onClick={() => addGoal("GOAL_FOR")}>
+            <Button type="button" variant="secondary" onClick={() => addFactRow("GOAL_FOR")}>
               + But pour nous
             </Button>
-            <Button type="button" variant="secondary" onClick={() => addGoal("GOAL_AGAINST")}>
+            <Button type="button" variant="secondary" onClick={() => addFactRow("GOAL_AGAINST")}>
               + But encaissé
             </Button>
           </div>
@@ -288,190 +345,176 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
         </ul>
       </Card>
 
-      {/* ---- Substitutions ------------------------------------------------ */}
+      {/* ---- Everything that happened, in one list ------------------------ */}
 
-      <Card
-        title="Changements"
-        description="Qui est sorti, qui est entré. La minute est facultative."
-        action={
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              setActions((rows) => [
-                ...rows,
-                { key: nextKey("c"), type: "SUBSTITUTION", outId: "", inId: "", minute: "" },
-              ])
-            }
-          >
-            + Ajouter
-          </Button>
-        }
-      >
-        {changes.length === 0 ? (
-          // `entry.starters` is the filled slots only, so the sentence cannot claim seven players on
-          // a sheet where nobody has been named yet (decision 083).
-          <p className="text-sm text-ink-muted">{retroChangesEmptyFr(entry.starters.length)}</p>
-        ) : (
-          <ul className="space-y-3">
-            {changes.map((row) => (
-              <li key={row.key} className="space-y-1.5 rounded-xl border border-border/60 p-3">
-                {/*
-                  The row's kind, posted rather than inferred from which controls arrived: one decoder
-                  reads every row now, and `action-type` is the discriminant it switches on. A hidden
-                  field because the card above the « Actions du match » one offers no choice of type —
-                  that is the next slice's job, and this one must not change what is on screen.
-                */}
-                <input type="hidden" name={`action-type:${row.key}`} value="SUBSTITUTION" />
-                <div className="flex items-center gap-2">
-                  <Select
-                    aria-label="Joueur sortant"
-                    name={`action-out:${row.key}`}
-                    value={row.outId}
-                    onChange={(event) => patchChange(row.key, { outId: event.target.value })}
-                    className="min-h-11"
-                  >
-                    <option value="">Sort…</option>
-                    {view.players.map((player) => (
-                      <option key={player.memberId} value={player.memberId}>
-                        {playerLabel(player)}
-                      </option>
-                    ))}
-                  </Select>
-                  <span aria-hidden="true" className="text-ink-muted">
-                    →
-                  </span>
-                  <Select
-                    aria-label="Joueur entrant"
-                    name={`action-in:${row.key}`}
-                    value={row.inId}
-                    onChange={(event) => patchChange(row.key, { inId: event.target.value })}
-                    className="min-h-11"
-                  >
-                    <option value="">Entre…</option>
-                    {view.players.map((player) => (
-                      <option key={player.memberId} value={player.memberId}>
-                        {playerLabel(player)}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+      {/*
+        One card, one list, the add button underneath — the owner's remark on typing up a match he had
+        played without his phone. A substitution is just another thing that happened in the match, so
+        « Changements » and « Actions du match » were two cards for one question, and the coach had to
+        decide which one a row belonged in before he could type it.
 
-                <div className="flex items-center gap-2">
-                  <MinuteInput
-                    name={`action-minute:${row.key}`}
-                    label="Minute du changement"
-                    value={row.minute}
-                    regulation={regulation}
-                    onChange={(minute) => patchChange(row.key, { minute })}
-                  />
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(row.key)}>
-                    Retirer
-                  </Button>
-                </div>
-
-                <RowIssues issues={issuesOfRow(row.key)} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* ---- Everything else that happened -------------------------------- */}
-
+        The description names changements because the list now holds them; leaving « Buts, penalties,
+        fautes, blessures » under a card that also takes substitutions would be the card describing
+        something it no longer is.
+      */}
       <Card
         title="Actions du match"
-        description="Buts, penalties, fautes, blessures."
-        action={
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => addGoal("GOAL_FOR")}
-          >
-            + Ajouter
-          </Button>
-        }
+        description="Buts, changements, fautes, blessures. La minute est facultative."
       >
-        {facts.length === 0 ? (
-          <p className="text-sm text-ink-muted">{RETRO_NO_FACTS_FR}</p>
-        ) : (
-          <ul className="space-y-3">
-            {facts.map((row) => (
-              <li key={row.key} className="space-y-1.5 rounded-xl border border-border/60 p-3">
-                <div className="flex items-center gap-2">
+        <div className="space-y-3">
+          {actions.length === 0 ? (
+            // `entry.starters` is the filled slots only, so « sans titulaire » is asked of what the
+            // coach has actually named and not of the seven slots on screen (decision 083).
+            <p className="text-sm text-ink-muted">
+              {retroActionsEmptyFr(entry.starters.length > 0)}
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {actions.map((row) => (
+                <li key={row.key} className="space-y-1.5 rounded-xl border border-border/60 p-3">
+                  {/*
+                    The row's kind, chosen here and posted as data: one decoder reads every row, and
+                    `action-type` is the discriminant it switches on. A substitution used to post it
+                    from a hidden input because the card it lived in offered no choice of type.
+
+                    On its own line, and that is a measurement and not a preference. It shared one
+                    with the minute until « Changement » joined the list: at 390 px that row is the
+                    select, an 80 px number field and « minute inconnue » wrapped over two lines, which
+                    left the select 138 px and printed « Changemer ». The minute moves down beside
+                    « Retirer », where the substitution card already had it, so the row is no taller.
+                  */}
                   <Select
                     aria-label="Type d’action"
                     name={`action-type:${row.key}`}
                     value={row.type}
-                    onChange={(event) =>
-                      patchFact(row.key, { type: event.target.value as RetroFactType })
-                    }
+                    onChange={(event) => retypeRow(row.key, event.target.value as RetroRowType)}
                     className="min-h-11"
                   >
-                    {RETRO_FACT_TYPES.map((type) => (
+                    {RETRO_ROW_TYPES.map((type) => (
                       <option key={type} value={type}>
                         {EVENT_LABELS_FR[type]}
                       </option>
                     ))}
                   </Select>
-                  <MinuteInput
-                    name={`action-minute:${row.key}`}
-                    label="Minute de l’action"
-                    value={row.minute}
-                    regulation={regulation}
-                    onChange={(minute) => patchFact(row.key, { minute })}
-                  />
-                </div>
 
-                {retroFactTakesMember(row.type) ? (
-                  <Select
-                    aria-label={retroFactNeedsMember(row.type) ? "Joueur" : "Buteur"}
-                    name={`action-member:${row.key}`}
-                    value={row.memberId}
-                    onChange={(event) => patchFact(row.key, { memberId: event.target.value })}
-                    className="min-h-11"
-                  >
-                    <option value="">
-                      {retroFactNeedsMember(row.type) ? "Qui ?" : "Buteur inconnu"}
-                    </option>
-                    {view.players.map((player) => (
-                      <option key={player.memberId} value={player.memberId}>
-                        {playerLabel(player)}
-                      </option>
-                    ))}
-                  </Select>
-                ) : null}
+                  {isSubstitutionRow(row) ? (
+                    <div className="flex items-center gap-2">
+                      <Select
+                        aria-label="Joueur sortant"
+                        name={`action-out:${row.key}`}
+                        value={row.outId}
+                        onChange={(event) => patchChange(row.key, { outId: event.target.value })}
+                        className="min-h-11"
+                      >
+                        <option value="">Sort…</option>
+                        {view.players.map((player) => (
+                          <option key={player.memberId} value={player.memberId}>
+                            {playerLabel(player)}
+                          </option>
+                        ))}
+                      </Select>
+                      <span aria-hidden="true" className="text-ink-muted">
+                        →
+                      </span>
+                      <Select
+                        aria-label="Joueur entrant"
+                        name={`action-in:${row.key}`}
+                        value={row.inId}
+                        onChange={(event) => patchChange(row.key, { inId: event.target.value })}
+                        className="min-h-11"
+                      >
+                        <option value="">Entre…</option>
+                        {view.players.map((player) => (
+                          <option key={player.memberId} value={player.memberId}>
+                            {playerLabel(player)}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  ) : (
+                    <>
+                      {retroFactTakesMember(row.type) ? (
+                        <Select
+                          aria-label={retroFactNeedsMember(row.type) ? "Joueur" : "Buteur"}
+                          name={`action-member:${row.key}`}
+                          value={row.memberId}
+                          onChange={(event) => patchFact(row.key, { memberId: event.target.value })}
+                          className="min-h-11"
+                        >
+                          <option value="">
+                            {retroFactNeedsMember(row.type) ? "Qui ?" : "Buteur inconnu"}
+                          </option>
+                          {view.players.map((player) => (
+                            <option key={player.memberId} value={player.memberId}>
+                              {playerLabel(player)}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : null}
 
-                {retroFactTakesAssist(row.type) ? (
-                  <Select
-                    aria-label="Passeur"
-                    name={`action-assist:${row.key}`}
-                    value={row.assistId}
-                    onChange={(event) => patchFact(row.key, { assistId: event.target.value })}
-                    className="min-h-11"
-                  >
-                    <option value="">Sans passe décisive</option>
-                    {view.players.map((player) => (
-                      <option key={player.memberId} value={player.memberId}>
-                        {playerLabel(player)}
-                      </option>
-                    ))}
-                  </Select>
-                ) : null}
+                      {retroFactTakesAssist(row.type) ? (
+                        <Select
+                          aria-label="Passeur"
+                          name={`action-assist:${row.key}`}
+                          value={row.assistId}
+                          onChange={(event) => patchFact(row.key, { assistId: event.target.value })}
+                          className="min-h-11"
+                        >
+                          <option value="">Sans passe décisive</option>
+                          {view.players.map((player) => (
+                            <option key={player.memberId} value={player.memberId}>
+                              {playerLabel(player)}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : null}
+                    </>
+                  )}
 
-                <div className="flex justify-end">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(row.key)}>
-                    Retirer
-                  </Button>
-                </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <MinuteInput
+                      name={`action-minute:${row.key}`}
+                      label={isSubstitutionRow(row) ? "Minute du changement" : "Minute de l’action"}
+                      value={row.minute}
+                      regulation={regulation}
+                      onChange={(minute) =>
+                        isSubstitutionRow(row)
+                          ? patchChange(row.key, { minute })
+                          : patchFact(row.key, { minute })
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeRow(row.key)}
+                    >
+                      Retirer
+                    </Button>
+                  </div>
 
-                <RowIssues issues={issuesOfRow(row.key)} />
-              </li>
-            ))}
-          </ul>
-        )}
+                  <RowIssues issues={issuesOfRow(row.key)} />
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/*
+            **Under the list, not in the card header.** Typing up a match is a loop: add a row, fill
+            it, add the next. The `Card` `action` prop renders in the `<header>`, so an « + Ajouter »
+            there walks backwards up the screen on every row added, away from the thumb that is about
+            to press it again. Placed as a child of this one card rather than by giving `Card` a
+            `footer` prop — one call site needs it, and no other card in the app does.
+          */}
+          <Button
+            type="button"
+            variant="secondary"
+            fullWidth
+            onClick={() => addFactRow("GOAL_FOR")}
+          >
+            + Ajouter une action
+          </Button>
+        </div>
       </Card>
 
       {/* ---- What the app will record ------------------------------------- */}

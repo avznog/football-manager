@@ -860,12 +860,25 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   // And the row the tap creates has to exist and be rendered — UX audit D6 as a test. Today it is
   // created 487 px below the fold in the « Actions du match » card, which is the defect; what this
   // pins is that the tap produces an editable goal row at all, wherever that row ends up living.
-  // `action-type:` since the two row families share one field prefix. A `<select>` with that name is
-  // still only ever a fact row: a substitution row posts its type in a hidden input, because the card
-  // it lives in offers no choice of type.
-  const goalRows = page.locator('select[name^="action-type:"]');
-  await expect(goalRows).toHaveCount(1);
-  await expect(goalRows.first()).toBeVisible();
+  // `action-type:` is now every row of the sheet, substitutions included: one card holds one list and
+  // each row chooses its own type, so a `<select>` with that name is one action and nothing else.
+  const actionRows = page.locator('select[name^="action-type:"]');
+  await expect(actionRows).toHaveCount(1);
+  await expect(actionRows.first()).toBeVisible();
+
+  // A substitution is added exactly like a goal — a row, then its type — which is the whole point of
+  // merging the two cards. The add button is under the list, where the thumb left off.
+  await page.getByRole("button", { name: "+ Ajouter une action" }).click();
+  await expect(actionRows).toHaveCount(2);
+  await actionRows.nth(1).selectOption("SUBSTITUTION");
+  // Choosing the type swaps the row's fields: two players instead of a scorer and an assister.
+  await expect(page.getByLabel("Joueur sortant")).toHaveCount(1);
+  await expect(page.getByLabel("Buteur")).toHaveCount(1); // the goal row's, not this one's
+  await page
+    .getByLabel("Joueur sortant")
+    .selectOption(playerOf(fixture, "cm2").membershipId);
+  await page.getByLabel("Joueur entrant").selectOption(playerOf(fixture, "sub").membershipId);
+  await page.getByLabel("Minute du changement").fill("30");
 
   await page.getByRole("button", { name: "Enregistrer le match" }).click();
 
@@ -875,6 +888,9 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap\\?saisie=1$`));
   await expect(page.getByText("rien saisi")).toHaveCount(0);
   await expect(page.getByText("1 – 0").first()).toBeVisible();
+  // The substitution typed in the merged list reached the log: without this, a row the new type
+  // `<select>` failed to post would simply be dropped and the save would still look like a success.
+  await expect(timelineLine(page, playerOf(fixture, "sub").displayName).first()).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Terminer le match" })).toHaveCount(0);
 });
 

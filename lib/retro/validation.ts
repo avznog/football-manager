@@ -270,6 +270,8 @@ export type RetroIssueCode =
   | "unknown-slot"
   | "unknown-member"
   | "missing-scorer"
+  | "missing-substitute-out"
+  | "missing-substitute-in"
   | "change-same-player"
   | "change-out-not-on"
   | "change-in-already-on"
@@ -395,6 +397,34 @@ export function findRetroIssues(input: {
   const everOn = (memberId: string): boolean => (pitch.spells.get(memberId) ?? []).length > 0;
 
   const addChangeIssues = (change: RetroChange): void => {
+    /*
+     * A row the coach opened and left half-filled (UX audit D22), reported by name and **before every
+     * other substitution rule**. The order is not cosmetic: an empty `<select>` is not a player who
+     * left the squad, and two empty ones are not a player replacing himself, so `unknown-member` and
+     * `change-same-player` would both say something false about a row whose only problem is that it is
+     * unfinished. The row is deliberately kept rather than dropped (`readActionFields`), which is the
+     * whole of D22 — a substitution that vanishes on submit is a match saved as if it had never been
+     * typed.
+     */
+    const missingSide = change.outId === "" || change.inId === "";
+    if (change.outId === "") {
+      add({
+        code: "missing-substitute-out",
+        rowKey: change.key,
+        messageFr: "Il faut dire qui est sorti du terrain.",
+        blocking: true,
+      });
+    }
+    if (change.inId === "") {
+      add({
+        code: "missing-substitute-in",
+        rowKey: change.key,
+        messageFr: "Il faut dire qui est entré sur le terrain.",
+        blocking: true,
+      });
+    }
+    if (missingSide) return;
+
     const resolved = pitch.changes.find((candidate) => candidate.key === change.key);
     for (const memberId of [change.outId, change.inId]) {
       if (!byId.has(memberId)) {

@@ -332,6 +332,64 @@ describe("findRetroIssues", () => {
     ).toEqual(["change-same-player"]);
   });
 
+  /* ---- the half-filled substitution row (UX audit D22) ------------------- */
+
+  it("names the missing side of a substitution rather than the row's other problems", () => {
+    const issues = findRetroIssues({
+      entry: entry({
+        actions: [{ key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: "", minute: 38 }],
+      }),
+      members: MEMBERS,
+      slots: SLOTS,
+    });
+
+    expect(issues.map((issue) => issue.code)).toEqual(["missing-substitute-in"]);
+    expect(issues[0].messageFr).toBe("Il faut dire qui est entré sur le terrain.");
+    expect(issues[0].rowKey).toBe("c1");
+    expect(blockingRetroIssues(issues)).toHaveLength(1);
+  });
+
+  it("blocks a substitution whose outgoing player was never chosen", () => {
+    const issues = findRetroIssues({
+      entry: entry({
+        actions: [{ key: "c1", type: "SUBSTITUTION", outId: "", inId: P.sub1, minute: 38 }],
+      }),
+      members: MEMBERS,
+      slots: SLOTS,
+    });
+
+    expect(issues.map((issue) => issue.code)).toEqual(["missing-substitute-out"]);
+    expect(issues[0].messageFr).toBe("Il faut dire qui est sorti du terrain.");
+  });
+
+  it("asks for both players of a row the coach has only just added", () => {
+    // The state a fresh « + Ajouter une action » row typed as a substitution is in. Both sides are
+    // reported, and neither « ce joueur ne fait plus partie de l’effectif » nor « il ne peut pas se
+    // remplacer lui-même » — which is what an empty-string id used to produce.
+    expect(
+      codes(
+        entry({
+          actions: [{ key: "c1", type: "SUBSTITUTION", outId: "", inId: "", minute: null }],
+        }),
+      ),
+    ).toEqual(["missing-substitute-out", "missing-substitute-in"]);
+  });
+
+  it("judges the other rows of a sheet holding a half-filled substitution", () => {
+    // The unfinished row must not swallow the sheet: a goal by somebody who never played is still
+    // reported, which is what tells the coach the two problems are two.
+    expect(
+      codes(
+        entry({
+          actions: [
+            { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: "", minute: null },
+            { key: "f1", type: "GOAL_FOR", memberId: P.sub2, assistId: null, minute: 12 },
+          ],
+        }),
+      ),
+    ).toEqual(["missing-substitute-in", "player-not-on-pitch"]);
+  });
+
   it("blocks a minute that does not exist in this match", () => {
     const issues = findRetroIssues({
       entry: entry({

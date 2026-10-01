@@ -5,49 +5,43 @@ import { SCORE_SEPARATOR_FR, scoreLineFr } from "@/lib/calendar/labels";
 import {
   RETRO_NO_FACTS_FR,
   RETRO_SCORE_EMPTY_FR,
-  retroChangesEmptyFr,
+  retroActionsEmptyFr,
   retroRecordedSummaryFr,
   retroScoreLineFr,
 } from "./labels";
 
-describe("retroChangesEmptyFr", () => {
-  it("does not claim any titulaire when none has been chosen", () => {
-    const text = retroChangesEmptyFr(0);
+describe("retroActionsEmptyFr", () => {
+  it("sends the coach to the composition card while nobody has been named", () => {
+    const text = retroActionsEmptyFr(false);
 
-    expect(text).toContain("Aucun changement");
-    expect(text).toContain("composition de départ est vide");
-    expect(text).not.toContain("titulaires");
-    expect(text).not.toContain("ont fini le match");
+    expect(text).toContain("composition de départ");
+    expect(text).toContain("ci-dessus");
+    // Adding a substitution before anybody is on the pitch is the thing it is talking the coach out
+    // of, so it has to say why rather than just « rien ici ».
+    expect(text).toContain("sortir du terrain");
   });
 
-  it("says what to do next when the sheet is empty, instead of describing a match", () => {
-    expect(retroChangesEmptyFr(0)).toContain("personne à remplacer");
+  it("claims nothing about a match nobody has entered (decision 083)", () => {
+    const text = retroActionsEmptyFr(false);
+
+    expect(text).not.toContain("fini le match");
+    // No scoreline either: the Score card says « Aucun but saisi » in that same state, and a
+    // « 0 – 0 » here would be the only figure on a screen that knows none.
+    expect(text).not.toContain(scoreLineFr(0, 0));
+    expect(text).not.toContain(SCORE_SEPARATOR_FR);
   });
 
-  it("never claims seven titulaires when fewer are filled in", () => {
-    expect(retroChangesEmptyFr(3)).toContain("les 3 titulaires");
-    expect(retroChangesEmptyFr(3)).not.toContain("sept");
+  it("says something else once the starting seven is on the sheet", () => {
+    expect(retroActionsEmptyFr(true)).not.toBe(retroActionsEmptyFr(false));
+    // An empty sheet under a filled composition is a legitimate match, not a missing step.
+    expect(retroActionsEmptyFr(true)).toBe(RETRO_NO_FACTS_FR);
   });
 
-  it("agrees in number for a single titulaire", () => {
-    const text = retroChangesEmptyFr(1);
-
-    expect(text).toContain("le titulaire choisi");
-    expect(text).not.toContain("titulaires");
-  });
-
-  it("counts the seven of a full sheet", () => {
-    expect(retroChangesEmptyFr(7)).toBe(
-      "Aucun changement : les 7 titulaires choisis ci-dessus ont fini le match.",
-    );
-  });
-
-  it("treats a negative count like an empty sheet rather than printing it", () => {
-    expect(retroChangesEmptyFr(-1)).toBe(retroChangesEmptyFr(0));
-  });
-
-  it("points at the composition card above, which is where the number comes from", () => {
-    expect(retroChangesEmptyFr(7)).toContain("ci-dessus");
+  it("tutoies in both states, and never vouvoies (decision 074)", () => {
+    for (const text of [retroActionsEmptyFr(false), retroActionsEmptyFr(true)]) {
+      expect(text).not.toMatch(/\bvous\b|\bvotre\b|\bvos\b/i);
+    }
+    expect(retroActionsEmptyFr(false)).toContain("Commence");
   });
 });
 
