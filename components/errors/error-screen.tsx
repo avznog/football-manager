@@ -91,11 +91,18 @@ export function ErrorScreen({
   const skew = isDeploymentSkew(error);
 
   return (
-    // `px-5` here and not on the callers: `app/error.tsx` asks for it, but `safe-px` is declared
-    // after `px` in `globals.css` and sets `padding-inline` to `env(safe-area-inset-*, 0px)`, so on
-    // a phone held upright it wins and the gutter is 0. Measured: with two buttons in the row, the
-    // pair ran 4 → 386 of a 390 px viewport. This component owns its own gutter instead.
-    <div className="flex flex-col items-center justify-center gap-4 px-5 py-16 text-center">
+    // No horizontal padding here, deliberately, even though `app/error.tsx` has none that works:
+    // its `safe-px px-5` pair cancels itself, because `safe-px` sets the *longhands*
+    // `padding-left`/`padding-right` (`globals.css:158-161`) while `px-5` compiles to the
+    // `padding-inline` shorthand, and a longhand after a shorthand always wins. Upright on a phone
+    // the gutter is therefore 0 — measured, the button row ran 4 → 386 of 390 px. Moving the block
+    // in `globals.css` does not help: Tailwind v4 sorts custom `@utility` after its own built-ins.
+    //
+    // The gutter belongs to the three standalone page shells carrying that clash (`app/error.tsx`,
+    // `app/not-found.tsx`, `app/(auth)/layout.tsx`) rather than here, because `app/(app)/error.tsx`
+    // renders this same component inside `app-shell`'s own `px-4`: padding it here would double-pad
+    // that one and still leave the other three bare. One slice owns all four.
+    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
       <span
         aria-hidden="true"
         className="flex size-12 items-center justify-center rounded-full bg-danger/10 text-danger"
