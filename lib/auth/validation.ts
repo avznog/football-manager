@@ -77,3 +77,31 @@ export function toFormState(error: z.ZodError): NonNullable<FormState> {
   }
   return { fieldErrors };
 }
+
+/**
+ * Every message whose key is one of `keys`, or an element of one (`secondary.1`).
+ *
+ * For an array field, Zod reports the offending element: `issue.path` is `["secondary", 1]`, so
+ * `toFormState` keys the message `secondary.1` and a reader looking up `secondary` finds nothing.
+ * That is a *correct* description of the issue and `toFormState` is shared by every form in the
+ * app — collapsing the index onto the parent key there would silently merge messages for other
+ * array fields and change screens nobody is looking at. So the flattening belongs in the consumer:
+ * a form whose array is not per-item addressable (the positions picker posts taps on a pitch
+ * diagram — there is no "second secondary" input to annotate) asks for everything under the field
+ * and renders it as one block.
+ *
+ * Only a trailing index is stripped, and the key must match in full: `secondaryThing` is a
+ * different field, not an element of `secondary`.
+ */
+export function fieldErrorsUnder(
+  fieldErrors: NonNullable<FormState>["fieldErrors"],
+  ...keys: string[]
+): string[] {
+  if (!fieldErrors) return [];
+
+  const messages: string[] = [];
+  for (const [key, values] of Object.entries(fieldErrors)) {
+    if (keys.includes(key.replace(/\.\d+$/, ""))) messages.push(...values);
+  }
+  return messages;
+}

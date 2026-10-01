@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  fieldErrorsUnder,
   inviteCodeSchema,
   joinWithNewAccountSchema,
   loginSchema,
@@ -76,5 +77,47 @@ describe("toFormState", () => {
       "username",
     ]);
     expect(state.fieldErrors?.code?.[0]).toMatch(/trop court/);
+  });
+});
+
+describe("fieldErrorsUnder", () => {
+  it("collects the per-element keys an array field produces, in order", () => {
+    // What `toFormState` writes for `z.array(...)` when elements 1 and 2 are bad: the index is
+    // part of the key, so a reader looking up `secondary` alone sees nothing.
+    expect(
+      fieldErrorsUnder(
+        { "secondary.1": ["Deuxième poste inconnu."], "secondary.2": ["Troisième poste inconnu."] },
+        "secondary",
+      ),
+    ).toEqual(["Deuxième poste inconnu.", "Troisième poste inconnu."]);
+  });
+
+  it("collects the flat key too — the array itself can be rejected", () => {
+    expect(fieldErrorsUnder({ secondary: ["Trop de postes."] }, "secondary")).toEqual([
+      "Trop de postes.",
+    ]);
+  });
+
+  it("collects a plain field", () => {
+    expect(fieldErrorsUnder({ primary: ["Ce poste n’existe pas."] }, "primary")).toEqual([
+      "Ce poste n’existe pas.",
+    ]);
+  });
+
+  it("leaves out a field that was not asked for, so hidden ids stay out of a visible block", () => {
+    expect(
+      fieldErrorsUnder(
+        { teamId: ["Identifiant invalide."], primary: ["Ce poste n’existe pas."] },
+        "primary",
+      ),
+    ).toEqual(["Ce poste n’existe pas."]);
+  });
+
+  it("matches the whole key, not a prefix of it", () => {
+    expect(fieldErrorsUnder({ secondaryThing: ["Autre champ."] }, "secondary")).toEqual([]);
+  });
+
+  it("gives nothing when the form has no field errors at all", () => {
+    expect(fieldErrorsUnder(undefined, "primary", "secondary")).toEqual([]);
   });
 });

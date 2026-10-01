@@ -22,6 +22,7 @@ import { PositionPicker } from "@/components/pitch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FieldError } from "@/components/ui/field-error";
+import { fieldErrorsUnder } from "@/lib/auth/validation";
 import {
   type PositionSelection,
   primaryPosition,
@@ -98,7 +99,7 @@ export function PositionsEditor({
             {state.error}
           </p>
         ) : null}
-        <FieldError>{state?.fieldErrors?.secondary ?? state?.fieldErrors?.primary}</FieldError>
+        <FieldError>{fieldErrorsUnder(state?.fieldErrors, "primary", "secondary")}</FieldError>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" disabled={!dirty || pending}>
