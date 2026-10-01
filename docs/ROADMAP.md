@@ -731,18 +731,21 @@ the reachable-turf finding below an **under**-statement on device rather than an
 
 ### The French
 
-- [ ] Two shipped vouvoiements, which decision 074 forbids without exception.
-      `lib/match/presenter.ts:787` « Renseign**ez**-la avant le coup d'envoi » — and on the player's
+- [x] Two shipped vouvoiements, which decision 074 forbids without exception.
+      `lib/match/presenter.ts:868` « Renseign**ez**-la avant le coup d'envoi » — the line was `:787` when
+      this was written and the comments added since moved it — and on the player's
       game-mode screen that sentence orders him to fill in a composition the banner above it says only
       the operator may touch, so the copy is the coach's, served to everyone.
       `components/action-sheet/terrain-sheet.tsx:206` « Appu**yez** sur un poste pour le placer » is a
       live-region announcement, which is why no screenshot caught it — and `CLAUDE.md` quotes
       « Appuie sur un poste » as the correct form. A `grep` for the `-ez` imperative belongs in the
       review checklist: « vous » and « votre » were already clean, and these two hid behind that.
-      **A third has since been found and fixed** — « Réessay**ez** ; si cela se reproduit, pass**ez** par
-      un autre écran » on the shared error screen, two vouvoiements in one sentence, on the one screen a
-      user only ever reads when something has already gone wrong (decision 127). Three for three behind
-      the `-ez` imperative is the argument for the grep, not a coincidence
+      **A third was found after this item was written, and all three are fixed now.** « Réessay**ez** ; si
+      cela se reproduit, pass**ez** par un autre écran » on the shared error screen was two vouvoiements in
+      one sentence, on the one screen a user only ever reads when something has already gone wrong
+      (decision 127). Three for three behind the `-ez` imperative rather than behind « vous » is the
+      argument for the grep, not a coincidence — and the grep this item asked for is a **test** now, not a
+      line in a review checklist: see the two items at the end of this section
 - [ ] « À **Les** grosses courges », on every away fixture whose opponent's name opens with an
       article. `lib/calendar/labels.ts:111` is `` `${isHome ? "contre" : "à"} ${opponentName}` `` with
       no elision, so « à » never contracts to « aux » or « au », and « à FC des Deux-Ponts » claims to
@@ -764,6 +767,38 @@ the reachable-turf finding below an **under**-statement on device rather than an
       `components/composition/composition-editor.tsx:960` interpolates the position bare, when
       `atPositionFr` in `db/reference` exists for this and is used forty lines earlier
 - [ ] « 1 csc » is the one abbreviation on a screen that spells everything else out in a sentence
+- [x] **Decision 074 is a test now, not a convention** — `tutoiement.test.ts` at the repository root
+      walks `app/`, `components/`, `lib/` and `db/` as text with `node:fs` and fails on « vous »,
+      « votre », « vos » and a curated list of `vous` imperatives in any line that is not a comment. It
+      is at the root because that is where `vitest.config.ts` collects it from, while what it *reads* is
+      four directories Vitest collects nothing out of — `include` governs collection, never what a test
+      may open. **Eight live breaches fixed in the same change**: `terrain-sheet.tsx:176`, `:206`,
+      `:301`; `lineup-composer.tsx:102`; `presenter.ts:569`, `:570`, `:868`, `:882`. Two more, in
+      `components/errors/error-screen.tsx:50`–`:51`, are baselined by their text until #118 merges, and
+      a third test fails the moment an entry stops matching. The uncomfortable half is in the decision
+      entry: `lib/match/presenter.test.ts:428` was asserting « Touchez un joueur pour le faire entrer. »
+      verbatim, so a test was holding one of the eight in place
+- [ ] **16 unit-test assertions are incidental verbatim tripwires on French copy.** Each pins a whole
+      French user-facing string with `toBe`, so any future copy fix — a tutoiement fix included — breaks
+      a test that was never about copy. That is not hypothetical: it is exactly how
+      `lib/match/presenter.test.ts:428` came to be pinning « Touchez un joueur pour le faire entrer. »
+      All sixteen were checked against the source and all sixteen still point at such an assertion;
+      **three of the paths first written down were wrong and are corrected here**.
+      `lib/match/presenter.test.ts:428`, `:439` (« En dehors du terrain »), `:446` (« Tous les joueurs
+      sont sur le terrain. »), `:756` (« Personne n'est encore sur le terrain. »);
+      **`lib/calendar/timeline.test.ts`** (not `lib/match/`) `:463` (« Relancer ceux qui n'ont pas
+      répondu »), `:465`; **`lib/composition/plan.test.ts`** (there is no `lib/match/plan.test.ts`)
+      `:328` (« Il reste 3 postes à pourvoir. »), `:543`, `:601`, `:603`; **`lib/match/terrain.test.ts`**
+      (not `lib/composition/`) `:364` (« 8 joueurs placés : il n'en faut que 7. ») and `:388`, which is a
+      `toEqual` on a two-element array of whole sentences; `lib/retro/validation.test.ts:328`,
+      `lib/rating/flow.test.ts:51`, `lib/player/validation.test.ts:102`, `lib/team/labels.test.ts:9`.
+      Beside them, `e2e/` carries roughly 160 French-text sites of which about 54 are assertion-shaped
+      (`toHaveText`, `toContainText`) rather than selectors — those stay, per the argument in
+      `tutoiement.test.ts` for leaving `e2e/` out of the scan. The mitigation is mechanical: downgrade
+      the 16 from `toBe` to `toContain` on the one fragment that discriminates the case. Not done in the
+      pull request that added the guard, because it is a separate concern — the guard is about copy the
+      app ships, this is about how the suite is written — and sixteen files of churn would have buried a
+      change whose point is one new test file and eight corrected sentences
 
 ### The phone
 

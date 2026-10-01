@@ -3395,3 +3395,68 @@ Playwright suite, 5/5 in 1.2 min**, because the change touches a Server Action's
 themes looked at at 390 × 844 across all **five** states of the screen: generic and skew copy, with and
 without a `digest`, and with and without the home link. The tone was modelled on
 `app/(jeu)/match/[id]/jeu/error.tsx`, which decision 058 already got right and which was left untouched.
+
+## The convention that was obeyed in review and decayed anyway
+
+Decision 074 — the French tutoies, always — has been in `CLAUDE.md` for months, with the examples
+spelled out and « never « votre », never « vous » » in bold. It was quoted in review. Sessions adopted
+it without being asked. And it was broken in **eight live places** when somebody finally counted:
+`components/action-sheet/terrain-sheet.tsx` at `:176`, `:206` and `:301`,
+`components/action-sheet/lineup-composer.tsx:102`, and `lib/match/presenter.ts` at `:569`, `:570`,
+`:868` and `:882`. The terrain-sheet three are the pitch sheet, which is copy a coach reads mid-match
+with the clock running; `:206` is a live-region announcement, so it exists in no screenshot and the
+hundred captures of `npm run audit:screens` could not have held it.
+
+**What caught them was not a sharper reviewer.** It was `tutoiement.test.ts`, a `node:fs` walk of
+`app/`, `components/`, `lib/` and `db/` that reads every non-comment line as text and fails on « vous »,
+« votre », « vos » and a curated list of `vous` imperatives. The reason it can exist is a distinction
+that is easy to get backwards: `vitest.config.ts`'s `include` — `lib/**/*.test.ts`,
+`db/**/*.test.ts`, `*.test.ts` — decides which files are *collected as tests*, and decides nothing at all
+about which files a test may *read*. So the file sits at the repository root, where it is collected, and
+reads two directories Vitest collects nothing out of. Being text rather than a module, it also reaches
+the shape no import can: JSX text, `<p>Réessayez</p>`, in no string literal and the return value of
+nothing. Decision 097 had already made this move once, for `lib/composition/copy.test.ts`.
+
+**The most uncomfortable finding is that a test was holding one of the breaches in place.** Five tests
+already asserted the word's absence — `lib/composition/hints.test.ts:59`,
+`lib/match/presenter.test.ts:762`, `lib/player/shirt.test.ts:78`,
+`lib/stats/best-seven-copy.test.ts:741`, `lib/team/membership.test.ts:76` — all five under `lib/`, each
+asserting about the return value of a function it imports. **One of those five files was also the one
+pinning a breach.** In the same `lib/match/presenter.test.ts` whose `:762` checks a description for
+« votre », line `:428` asserted « Touchez un joueur pour le faire entrer. » **verbatim**, with `toBe`.
+The suite was therefore not merely silent about that breach: it was pinning it, and a session
+that had fixed the sentence would have been shown a red test and told it had broken something. A rule
+about every string cannot be checked one string at a time, because the author of such a test picks the
+string he was already thinking about.
+
+Two things stated out loud rather than left to be discovered. The imperative rule is a **curated list**
+of verb forms and not a `-ez` pattern — the pattern was written and thrown away, because « assurez » in a
+quotation and half the vocabulary of a form label end in those letters without addressing anybody, and a
+check that cries wolf weekly is a check somebody turns off; `allez` is off the list on the same ground,
+being this team's interjection before it is an imperative. And `\b` is unusable for this: it is ASCII, so
+`/\bfaites\b/` matches inside « **Dé**faites », the label over the losses on `/stats`, which was the very
+first thing the rule flagged. Every rule goes through `wholeWords` and a `\p{L}` lookaround instead.
+
+Two breaches are **baselined rather than fixed**: `components/errors/error-screen.tsx:50`–`:51`, « Cet
+écran n'a pas pu s'afficher. Réessayez ; si cela se reproduit, passez par un autre écran et revenez. »,
+which another session has already rewritten on #118. The alternative was to hold the guard until that
+merges — no guard during precisely the days when sentences are being rewritten. The baseline is keyed on
+the **trimmed, comment-stripped line text and never on a line number**, because a line number goes stale
+on the first edit above it and then excuses a line nobody chose, which is worse than a wrong failure
+because it is a silence. And a third test fails, naming the entry to delete, the moment one of those two
+sentences changes, so the list shrinks under pressure or not at all. The guard's own review caught that
+this left the *other* direction open: an allow-list with no ceiling is defeated by the same edit that
+would appease it, since appending an entry excuses a new breach and reads in a diff exactly like deleting
+one. The length is now asserted to be at most two. The same review found the file floor loose in the same
+way — the scan sees 232 files and asserted only « more than 200 », so one string added to the skip list
+could have hidden `(jeu)`, the whole of game mode, or `[id]`, 32 files, with every test still green. It is
+counted per root now.
+
+**Next**, written up in `docs/ROADMAP.md` rather than done here: **16 assertions elsewhere in the suite
+are incidental verbatim tripwires on French copy**, `toBe` on a whole sentence, so any future copy fix
+breaks a test that was never about copy — `presenter.test.ts:428` is only the one that happened to
+collide with this slice. All sixteen were checked against the source, and three of the paths first
+written down were wrong: the timeline pair is `lib/calendar/timeline.test.ts`, the plan four are
+`lib/composition/plan.test.ts` (there is no `lib/match/plan.test.ts`), and the terrain pair is
+`lib/match/terrain.test.ts`. The fix is mechanical — `toContain` on the one discriminating fragment —
+and it is a separate concern from the guard, which is why it is a roadmap line.

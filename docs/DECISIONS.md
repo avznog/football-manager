@@ -4124,3 +4124,83 @@ a coach is noise.
 
 The tone was modelled on `app/(jeu)/match/[id]/jeu/error.tsx`, which decision 058 already got right,
 already tutoies, and was left untouched.
+
+## NNN — The tutoiement is a test, because a convention nothing checks is a convention that decays
+
+**2026-10-01** · accepted · enforces 074
+
+**Decision.** Decision 074's rule — the French tutoies, always — is now enforced by a test,
+`tutoiement.test.ts`, at the repository root. It reads `app/`, `components/`, `lib/` and `db/` as text
+with `node:fs` and fails, on any line that is not a comment, on two things: the pronouns « vous »,
+« votre », « vos », and a curated list of second-person-plural imperatives — « Appuyez », « Touchez »,
+« Réessayez ». A small hard-coded baseline excuses two known breaches by their text, and a third test
+fails if a baseline entry stops matching anything.
+
+**Why a test and not a convention.** 074 was prose in `CLAUDE.md` for months, it was quoted in reviews,
+and eight breaches accumulated under it anyway: three in `components/action-sheet/terrain-sheet.tsx`
+(`:176`, `:206`, `:301`, which now read « relâche-le … utilise », « Appuie » and « Fais glisser …
+appuie »), one in `components/action-sheet/lineup-composer.tsx:102` (« Place au moins un joueur. »), and
+four in `lib/match/presenter.ts` (`:569` and `:570`, now « Touche un joueur pour le faire entrer. »,
+`:868` « Renseigne-la » and `:882` « ouvre-la »). The terrain-sheet three are copy a coach reads
+mid-match with the clock running, and `:206` is a live-region announcement, which is why no screenshot
+in the `audit/` passes could ever have caught it. A rule nothing checks is a rule that decays, and the
+rate of decay is invisible until something counts.
+
+**And a test was holding one of those breaches in place, which is the sharpest point here.** Five tests
+already asserted the *absence* of the word before this change — `lib/composition/hints.test.ts:59`,
+`lib/match/presenter.test.ts:762`, `lib/player/shirt.test.ts:78`,
+`lib/stats/best-seven-copy.test.ts:741` and `lib/team/membership.test.ts:76` — and every one of them
+lives under `lib/`, asserting about the return value of a function it imports. Meanwhile
+`lib/match/presenter.test.ts:428` asserted « Touchez un joueur pour le faire entrer. » **verbatim**,
+with `toBe`. So the suite was not merely failing to catch that breach: it was *pinning* it, and a
+session that had fixed the sentence would have been told it had broken something. That is the whole
+argument against guarding a house rule with per-module assertions on hand-picked return values — the
+author of such a test picks the string he was already thinking about, and a rule about every string
+cannot be checked one string at a time.
+
+**Why a `node:fs` walk and not a Vitest glob, and why the file sits at the root.**
+`vitest.config.ts`'s `include` is `lib/**/*.test.ts`, `db/**/*.test.ts`, `*.test.ts`. That governs which
+files are **collected as tests**, and it says nothing whatever about which files a test may **read**.
+Confusing the two is what made the hole look unpluggable, and separating them is the reason this guard
+can exist at all: the file is at the repository root so that it *is* collected, and it scans `app/` and
+`components/`, out of which Vitest collects nothing, because reading a directory needs no glob's
+permission. Decision 097 made the same move for `lib/composition/copy.test.ts`. Being text rather than a
+module, the scan also reaches the one shape no import can: **JSX text**, `<p>Réessayez</p>`, which is
+inside no string literal and is the return value of nothing.
+
+**Why a small hard-coded baseline rather than a clean sweep.** Two of the ten breaches the imperative
+rule found are in `components/errors/error-screen.tsx:50`–`:51` — « Cet écran n’a pas pu s’afficher.
+Réessayez ; si cela se reproduit, passez par un autre écran et revenez. », wrapped across two lines and
+therefore two baseline entries. That file is another session's, already rewritten on open pull request
+#118, so correcting it here would be a conflict for nothing. The alternative was to hold the whole guard
+until #118 merges — that is, to have no guard during exactly the days when sentences are being
+rewritten, which is when it earns its keep.
+
+The hazard is named rather than hoped away: **an allow-list is a place a future breach can be hidden**,
+and a baseline fails in two directions, each with its own test. Downwards: « has no stale entry left in
+the known-breach baseline » goes red, naming the entry to delete, the moment one of those two sentences
+is rewritten, so the list shrinks under pressure or not at all. Upwards, which is the direction that
+actually silences a guard: « cannot grow its known-breach baseline » asserts the length is at most two,
+because an allow-list with no ceiling is defeated by the same edit that would appease it — append a line
+and the new breach is excused, and nobody reading a diff on that array can tell an added line from a
+deleted one. Raising the ceiling is then a deliberate act, in writing, that a reviewer sees. Two entries
+pinned from both sides is a different object from an allow-list that grows quietly.
+
+**The baseline is keyed on the trimmed, comment-stripped line text, never on a line number.** A line
+number goes stale on the first edit anywhere above it, and the entry then excuses a line nobody chose —
+which is worse than a wrong failure, because it is a *silence*. The text cannot drift that way: rewrite
+the sentence and the entry simply stops matching, which is the condition the staleness test reports.
+
+**Consequences.** The imperative rule is a curated list and deliberately **not** a `-ez` pattern: the
+pattern was written and thrown away because « assurez » in a quotation, a third-person sentence and half
+the vocabulary of a form label all end in those letters without addressing anybody, and a check with a
+false positive a week is a check somebody turns off. The list is meant to grow; an entry is only wrong
+if it is *ambiguous*, and `allez` was dropped on exactly that ground, being this team's interjection
+before it is an imperative. `e2e/` is out of scope on the argument written into the file: its French
+mirrors the UI's, so a flag there is the same finding twice, and a spec is free to assert a word's
+absence, which a scan cannot tell from its presence. `db/` is in, for `db/seed.ts`, because the demo
+season is read on a screen; `db/migrations/` is out, because a finding there is one nobody is allowed to
+fix. And `\b` is unusable for French text in this repository: it is ASCII, so `/\bfaites\b/` matches
+inside « **Dé**faites », the label over the losses on `/stats`, which was the first thing the imperative
+rule flagged. Every rule goes through `wholeWords`, which spells the boundary out as a lookaround on
+`\p{L}`.
