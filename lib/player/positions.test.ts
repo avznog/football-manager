@@ -33,6 +33,26 @@ describe("sortPreferredPositions", () => {
     sortPreferredPositions(input);
     expect(input.map((row) => row.code)).toEqual(["AT", "GB"]);
   });
+
+  it("puts a code the reference data does not know last, without throwing", () => {
+    // Two or more rows on purpose: `Array.prototype.sort` skips the comparator entirely for a
+    // one-element array, so a single bad row never reaches `rankOf` and a one-row fixture would
+    // pass while the real crash lives further down, in `positionsSummaryFr`.
+    const sorted = sortPreferredPositions(
+      rows(["AT", "secondary"], ["LIBERO", "secondary"], ["DC", "secondary"]),
+    );
+    expect(sorted.map((row) => row.code)).toEqual(["DC", "AT", "LIBERO"]);
+  });
+
+  it("is deterministic with two unknown codes", () => {
+    // `Number.MAX_SAFE_INTEGER` rather than `Infinity` keeps the comparator from returning `NaN`,
+    // which would leave the order implementation-defined and `positionsSignature` unstable.
+    const input = rows(["LIBERO", "secondary"], ["TRQ", "secondary"], ["MC", "primary"]);
+    const once = sortPreferredPositions(input).map((row) => row.code);
+    expect(once).toEqual(["MC", "LIBERO", "TRQ"]);
+    expect(sortPreferredPositions(input).map((row) => row.code)).toEqual(once);
+    expect(positionsSignature(input)).toBe(positionsSignature(input));
+  });
 });
 
 describe("toSelection", () => {
@@ -112,8 +132,30 @@ describe("positionsSignature and selectionsEqual", () => {
   });
 
   it("is stable for the same wishes", () => {
-    expect(positionsSignature(rows(["AT", "secondary"], ["MC", "primary"]))).toBe(
-      positionsSignature(rows(["MC", "primary"], ["AT", "secondary"])),
+    expect(positionsSignature(rows(["MC", "primary"], ["AT", "secondary"]))).toBe(
+      positionsSignature(rows(["AT", "secondary"], ["MC", "primary"])),
+    );
+  });
+
+  it("pins the order of the whole known vocabulary", () => {
+    // The profile page uses this string as the React `key` of the positions editor, so a change in
+    // the order of *known* codes would remount every profile once. Spelled out rather than derived
+    // so that any such change has to be made here on purpose.
+    const every = rows(
+      ["AD", "secondary"],
+      ["AT", "secondary"],
+      ["AG", "secondary"],
+      ["MOC", "secondary"],
+      ["MD", "secondary"],
+      ["MC", "primary"],
+      ["MG", "secondary"],
+      ["DD", "secondary"],
+      ["DC", "secondary"],
+      ["DG", "secondary"],
+      ["GB", "secondary"],
+    );
+    expect(positionsSignature(every)).toBe(
+      "MC:primary|GB:secondary|DG:secondary|DC:secondary|DD:secondary|MG:secondary|MD:secondary|MOC:secondary|AG:secondary|AT:secondary|AD:secondary",
     );
   });
 });
@@ -133,6 +175,17 @@ describe("positionsSummaryFr", () => {
 
   it("capitalises the first part when there is no primary", () => {
     expect(positionsSummaryFr(rows(["AT", "secondary"]))).toBe("Poste secondaire : Attaquant");
+  });
+
+  it("prints the raw code of a position the reference data does not know", () => {
+    // The convention `positionLabelFr` already owns, rather than a second French wording to keep
+    // in sync. A bad `player_positions` row used to throw here instead.
+    expect(positionsSummaryFr(rows(["LIBERO", "primary"], ["AT", "secondary"]))).toBe(
+      "Poste principal : LIBERO · poste secondaire : Attaquant",
+    );
+    expect(positionsSummaryFr(rows(["LIBERO", "secondary"], ["TRQ", "secondary"]))).toBe(
+      "Postes secondaires : LIBERO, TRQ",
+    );
   });
 
   it("says so when nothing was chosen", () => {

@@ -10,12 +10,19 @@
  * Who may do what, from `lib/auth/can.ts`:
  *  - `injury:declare` is in **both** the coach set and the self set, so a coach acts for anyone
  *    and a player only for themselves. Nothing else to arrange.
- *  - `profile:editPositions` is self-only. A coach editing a teammate's wishes therefore falls
- *    back to `member:update`, their permission over the squad record that `player_positions`
- *    belongs to. Both branches are `can()` decisions; neither is an ad-hoc role check.
- *  - `profile:editShirtName` is self-only in the same way, with the same `member:update` fallback.
- *    The **number** on the maillot is deliberately not: it is `member:update` alone, because it has
- *    to be unique in the squad. Same garment, two permissions — see `updateShirtName`.
+ *  - `profile:editPositions` is self-only and has **no fallback**: where a player would like to
+ *    play is not a squad-administration field, so a coach cannot set it for them. The check is a
+ *    bare `assertCan`, and the profile page renders the card read-only to match.
+ *  - `profile:editShirtName` is self-only *with* a `member:update` fallback — hence
+ *    `assertCanActFor`, which now has that one caller. The **number** on the maillot is deliberately
+ *    neither: it is `member:update` alone, because it has to be unique in the squad. Same garment,
+ *    two permissions — see `updateShirtName`.
+ *
+ * Two classes of failure, two exits, on purpose: a refused **permission** throws a `ForbiddenError`
+ * to the error boundary, because it is a bug or an attack rather than a failed save, while a refused
+ * **database write** returns a `FormState` the form can render. `updatePlayerPositions` has both.
+ * `updateShirtName` and `declareInjury` still write unguarded, so a database failure there is a 500
+ * — known and not yet worth the noise, not overlooked.
  */
 
 import { and, eq, isNull } from "drizzle-orm";
@@ -39,6 +46,9 @@ import {
 /**
  * A self-scoped action, or a coach doing it on somebody's behalf. Tries the self action first,
  * then the coach's `member:update`; `assertCan` throws if neither holds.
+ *
+ * One caller, `updateShirtName`. The preferred positions used to be the other and deliberately are
+ * not any more: a flocage a coach types for a teammate is a favour, a wish they type is a lie.
  */
 function assertCanActFor(
   actor: Actor,
@@ -101,7 +111,9 @@ export async function updatePlayerPositions(
   if (!parsed.success) return toFormState(parsed.error);
   const { teamId, memberId, primary, secondary } = parsed.data;
 
-  assertCanActFor(actor, "profile:editPositions", teamId, memberId);
+  // Not `assertCanActFor`: there is no coach fallback here. A player's wishes are the player's, so
+  // `profile:editPositions` — self-only — is the whole check.
+  assertCan(actor, "profile:editPositions", { teamId, targetMemberId: memberId });
 
   const member = await findActiveMember(teamId, memberId);
   if (!member) return { error: UNKNOWN_MEMBER };
@@ -111,18 +123,39 @@ export async function updatePlayerPositions(
 
   const rows = toPositionRows(primary, secondary);
 
-  await db.transaction(async (tx) => {
-    await tx.delete(playerPositions).where(eq(playerPositions.teamMemberId, memberId));
-    if (rows.length > 0) {
-      await tx.insert(playerPositions).values(
-        rows.map((row) => ({
-          teamMemberId: memberId,
-          positionCode: row.code,
-          preference: row.preference,
-        })),
-      );
-    }
-  });
+  // Only the write is guarded. The schema parse and `assertCan` stay outside on purpose:
+  // a malformed form is already a `FormState` the picker can render, and a `ForbiddenError` must
+  // keep reaching the error boundary rather than being flattened into a polite French sentence —
+  // somebody trying to edit a teammate's wishes is a bug or an attack, not a failed save, and we
+  // want it loud and visible in the logs exactly as it is today.
+  try {
+    await db.transaction(async (tx) => {
+      await tx.delete(playerPositions).where(eq(playerPositions.teamMemberId, memberId));
+      if (rows.length > 0) {
+        await tx.insert(playerPositions).values(
+          rows.map((row) => ({
+            teamMemberId: memberId,
+            positionCode: row.code,
+            preference: row.preference,
+          })),
+        );
+      }
+    });
+  } catch (error) {
+    // The Postgres `code` is read off the object rather than logged as a stringified error because
+    // the code is the diagnosis and the message is not: `23503` means the `positions` table has no
+    // such row — an unseeded database, not this player's doing — while `23505` would mean two rows
+    // for the same position got past `toPositionRows`. Those are different bugs with different
+    // fixes, and a stringified error buries the one digit that separates them.
+    const pg = error as { code?: string; constraint?: string };
+    console.error("updatePlayerPositions: write failed", {
+      code: pg.code,
+      constraint: pg.constraint,
+      memberId,
+      positionCodes: rows.map((row) => row.code),
+    });
+    return { error: "Tes postes n’ont pas été enregistrés. Réessaie." };
+  }
 
   revalidateMember(memberId);
   return undefined;
@@ -172,9 +205,8 @@ export async function updateJerseyNumber(
  * somebody is doing them a favour rather than administering a squad.
  *
  * So this is a self action first (`profile:editShirtName`, in `SELF_ACTIONS`) with the coach's
- * `member:update` as the fallback — the same `assertCanActFor` shape as the preferred positions,
- * which are the other field of the squad record that belongs to the player. One consequence worth
- * stating: a member with `isPlayer = false` fails the self branch, because `can()` refuses every
+ * `member:update` as the fallback — the only remaining caller of `assertCanActFor`, now that the
+ * preferred positions are the player's alone. One consequence worth stating: a member with `isPlayer = false` fails the self branch, because `can()` refuses every
  * `SELF_ACTIONS` entry to a non-player, so a member of the encadrement cannot invent a flocage for a
  * maillot they do not have — only a coach can, which is the same asymmetry the jersey number has.
  */

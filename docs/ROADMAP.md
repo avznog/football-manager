@@ -112,6 +112,43 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       other and `updateMember` already refuses one already worn. `shirt_name`, 12 characters checked
       in the column, uppercased at display time and never stored uppercased, shown on the fiche and on
       the `/equipe` row a coach reads when he orders the shirts (decision 104)
+- [x] **The positions editor no longer 500s, and the save is the player's alone.** Two defects under
+      the owner's « saving my postes crashes »: nothing in any migration had ever inserted the eleven
+      `positions` rows, so a migrated-never-bootstrapped database had the foreign key and none of its
+      targets and every save raised `23503` — fixed by `db/migrations/0006_seed_positions.sql`,
+      `ON CONFLICT DO NOTHING` so `seedReference()` keeps owning every later change — and the coach
+      could edit a teammate's wishes at all, through `assertCanActFor`'s `member:update` fallback,
+      which is now a bare `assertCan` on the self-only `profile:editPositions`. The read-only card
+      says « Chaque joueur choisit ses postes lui-même. », a failed write says « Tes postes n'ont pas
+      été enregistrés. Réessaie. » instead of throwing, and a `ForbiddenError` still reaches the
+      error boundary on purpose
+- [x] The picker offers the eight codes the team's two usual shapes actually use, recomputed in the
+      test from `BUILTIN_FORMATIONS` so the list cannot drift from the formations it is drawn from. A
+      chip row lets a player remove a stored `MOC`/`AG`/`AD`, one way only, and `POSITION_CODES` stays
+      at eleven: the composition editor is not narrowed
+- [x] `POSITION_BY_CODE` is `Partial<Record<…>>` rather than a cast, so an unknown code is
+      `undefined` at the type level instead of a `TypeError` that could 500 four screens from one bad
+      row; the honest type found 16 errors across 5 files, one of them in `db/reference.ts` itself
+- [x] The field errors a positions form rejects are rendered. Zod reports the offending *element*, so
+      `toFormState` keys it `secondary.1` while the form read `fieldErrors.secondary` and displayed
+      nothing at all. `fieldErrorsUnder` in `lib/auth/validation.ts`, fixed in the consumer rather
+      than in the `toFormState` every other form shares. Every message on that path is French now; one
+      of the English Zod defaults had been leaking the internal position codes to the player
+- [ ] **Nothing tests the positions editor — not one unit test, not one Playwright step.** No spec
+      mentions `updatePlayerPositions`, `PositionsEditor`, `PositionPicker` or any string the card
+      prints; `lib/player/positions.test.ts` covers the pure helpers and stops short of the action.
+      That absence is why a 500 on the most ordinary save in the app reached the owner's phone, and
+      the permission fix above is held up only by `can()`'s own assertions — which are narrower than
+      they look: `lib/auth/can.test.ts:79` pins a *player* out of somebody else's positions and `:126`
+      a *non-playing* coach out of his own, while the `playerCoach` fixture at `:27` — the actor the
+      old fallback actually let through — is never once asked about a foreign `targetMemberId`
+- [ ] The **second** field-error defect on the same form, which the first fix does not cover:
+      `teamId` and `memberId` are rendered nowhere. `positions-editor.tsx:101` asks
+      `fieldErrorsUnder` for `"primary", "secondary"` only, so a rejected identifier — « Ce formulaire
+      est invalide, recharge la page. », which is what a stale or forged form produces — leaves the
+      screen completely silent while « Modifications non enregistrées. » at `:113` still claims the
+      work is pending. It looks exactly like a lost tap, which is the complaint the owner already has
+      about this app, and the remedy the message names is one the player will never read
 
 ## M2 — Calendar
 - [x] Matches CRUD (opponent, kick-off, home/away, venue, competition, periods)
@@ -639,6 +676,19 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       outstanding owner action across three sessions' notes and is **done**. Note it is no longer
       load-bearing: with the Git integration off for every branch, it is a second thing that would have to
       be wrong before a push could reach production, not the thing that keeps `main` off production
+- [ ] **Decide whether `formations` and `formation_slots` get seeded by a migration too — the owner's
+      call, deliberately not taken.** The eleven `positions` now are, because
+      `player_positions.position_code` and `formation_slots.position_code` both reference
+      `positions.code` (`db/migrations/0000_wealthy_radioactive_man.sql:264` and `:239`) and no
+      migration had ever inserted a single row. **Measured on a fresh database after `db:migrate`
+      alone: `positions` was 0 before migration 0006, and `formations` / `formation_slots` are 0
+      either way** — both are written only by the same hand-run `seedReference()`, so a migrated but
+      never bootstrapped database can **plan no composition at all**, with an empty Formation select
+      and nothing to drag onto the turf. That half was kept out on purpose: the seven templates are
+      editable content, a team may fork them into its own `formations` rows (decision 005), and a
+      migration inserting them would quietly decide what the shapes are and what becomes of a team
+      that has already edited one. Either seed them, or make `db:bootstrap` a required step that
+      something checks — but it should be a decision rather than a side effect
 
 ## First run and static assets
 

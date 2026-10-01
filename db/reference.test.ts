@@ -13,20 +13,37 @@ import {
   POSITIONS,
   POSITION_BY_CODE,
   POSITION_CODES,
+  PREFERRED_POSITIONS,
+  PREFERRED_POSITION_CODES,
+  type FormationTemplate,
   type PositionCode,
+  type PositionDefinition,
   DEFAULT_FORMATION_LABEL,
   formationByLabel,
   formationDistribution,
   formationLabelOf,
   isPositionCode,
+  isPreferredPositionCode,
   atPositionFr,
   positionLabelFr,
+  positionRankOf,
 } from "./reference";
 import {
   MIN_MARKER_DISTANCE,
   isValidPitchPoint,
   pitchDistance,
 } from "@/lib/pitch/geometry";
+
+/**
+ * `POSITION_BY_CODE` is honestly typed `Partial<Record<…>>`, so a test that wants a definition has
+ * to assert it is there. That assertion is the point rather than a formality: it is what the
+ * « every code has a definition » test below proves for the whole vocabulary.
+ */
+function definitionOf(code: PositionCode): PositionDefinition {
+  const definition = POSITION_BY_CODE[code];
+  expect(definition, `${code} has no definition`).toBeDefined();
+  return definition as PositionDefinition;
+}
 
 describe("positions", () => {
   it("is exactly the seven-a-side vocabulary, and nothing more", () => {
@@ -60,7 +77,7 @@ describe("positions", () => {
     expect(POSITIONS.map((position) => position.sort)).toEqual(
       [...POSITIONS].map((_, index) => index + 1),
     );
-    const lineRank = (code: PositionCode) => LINE_ORDER.indexOf(POSITION_BY_CODE[code].line);
+    const lineRank = (code: PositionCode) => LINE_ORDER.indexOf(definitionOf(code).line);
     for (let i = 1; i < POSITIONS.length; i += 1) {
       expect(lineRank(POSITIONS[i].code)).toBeGreaterThanOrEqual(lineRank(POSITIONS[i - 1].code));
     }
@@ -100,8 +117,8 @@ describe("positions", () => {
       ["AG", "AD"],
     ];
     for (const [left, right] of pairs) {
-      const l = POSITION_BY_CODE[left];
-      const r = POSITION_BY_CODE[right];
+      const l = definitionOf(left);
+      const r = definitionOf(right);
       expect(l.defaultX).toBeLessThan(500);
       expect(r.defaultX).toBeGreaterThan(500);
       expect(l.defaultY).toBe(r.defaultY);
@@ -116,11 +133,11 @@ describe("positions", () => {
       expect(position.labelFr[0]).toBe(position.labelFr[0].toUpperCase());
     }
     expect(positionLabelFr("MOC")).toBe("Milieu offensif central");
-    expect(POSITION_BY_CODE.DG.labelFr).toBe("Défenseur gauche");
-    expect(POSITION_BY_CODE.DC.labelFr).toBe("Défenseur central");
+    expect(positionLabelFr("DG")).toBe("Défenseur gauche");
+    expect(positionLabelFr("DC")).toBe("Défenseur central");
   });
 
-  it("never lets two canonical positions overlap — the picker shows all eleven at once", () => {
+  it("never lets two canonical positions overlap — the eleven are one layout", () => {
     for (let i = 0; i < POSITIONS.length; i += 1) {
       for (let j = i + 1; j < POSITIONS.length; j += 1) {
         const a = POSITIONS[i];
@@ -141,6 +158,105 @@ describe("positions", () => {
     expect(isPositionCode("MOC")).toBe(true);
     expect(isPositionCode("CF")).toBe(false);
     expect(positionLabelFr("CF")).toBe("CF");
+  });
+
+  it("has a definition for every code in the vocabulary", () => {
+    // Asserted rather than assumed: `POSITION_BY_CODE` used to claim this through a cast.
+    for (const code of POSITION_CODES) {
+      expect(POSITION_BY_CODE[code], `${code} has no definition`).toBeDefined();
+      expect(POSITION_BY_CODE[code]?.code).toBe(code);
+    }
+    expect(Object.keys(POSITION_BY_CODE)).toHaveLength(POSITION_CODES.length);
+  });
+});
+
+/**
+ * The narrower list the preference picker offers. Its definition is « the union of the slots of the
+ * two shapes this team really plays », so the union is **recomputed here from the formation data**
+ * rather than compared with a hand-typed list: change either formation and this fails, which is the
+ * only way the stated rule and the shipped constant cannot drift apart.
+ */
+describe("preferred positions", () => {
+  const USUAL_SHAPES = ["1-3-2-1", "1-2-3-1"] as const;
+
+  function slotCodesOf(label: string): PositionCode[] {
+    const formation = formationByLabel(label);
+    expect(formation, `${label} is not a built-in formation`).toBeDefined();
+    return (formation as FormationTemplate).slots.map((slot) => slot.positionCode);
+  }
+
+  it("is exactly the union of the slots of the two shapes the team plays", () => {
+    const union = new Set(USUAL_SHAPES.flatMap(slotCodesOf));
+    // Seven on the pitch in each, eight distinct codes across the two.
+    expect(union.size).toBe(8);
+    expect(new Set(PREFERRED_POSITION_CODES)).toEqual(union);
+    for (const label of USUAL_SHAPES) {
+      expect(slotCodesOf(label)).toHaveLength(FORMATION_SLOT_COUNT);
+    }
+  });
+
+  it("has eight entries, no duplicate, and is a subset of the wide vocabulary", () => {
+    expect(PREFERRED_POSITION_CODES).toHaveLength(8);
+    expect(new Set(PREFERRED_POSITION_CODES).size).toBe(PREFERRED_POSITION_CODES.length);
+    for (const code of PREFERRED_POSITION_CODES) {
+      expect(POSITION_CODES).toContain(code);
+    }
+  });
+
+  it("excludes exactly MOC, AG and AD", () => {
+    const excluded = POSITION_CODES.filter((code) => !isPreferredPositionCode(code));
+    expect(excluded).toEqual(["MOC", "AG", "AD"]);
+  });
+
+  it("keeps the wide vocabulary at eleven: the composition editor is not narrowed with it", () => {
+    // Deliberate, not an oversight. All seven built-in formations stay shippable, so the three
+    // excluded codes are still fieldable — which is why the picker never says they do not exist.
+    expect(POSITION_CODES).toHaveLength(11);
+    expect(slotCodesOf("1-3-3-0")).toContain("MOC");
+    expect(slotCodesOf("1-2-1-3")).toContain("AG");
+    expect(slotCodesOf("1-2-1-3")).toContain("AD");
+  });
+
+  it("carries the matching definitions, in canonical sort order", () => {
+    expect(PREFERRED_POSITIONS.map((position) => position.code)).toEqual([
+      ...PREFERRED_POSITION_CODES,
+    ]);
+    const sorts = PREFERRED_POSITIONS.map((position) => position.sort);
+    expect([...sorts]).toEqual([...sorts].sort((a, b) => a - b));
+    for (const position of PREFERRED_POSITIONS) {
+      expect(position).toBe(POSITION_BY_CODE[position.code]);
+    }
+  });
+
+  it("agrees with its own narrowing function", () => {
+    for (const code of POSITION_CODES) {
+      expect(isPreferredPositionCode(code)).toBe(
+        (PREFERRED_POSITION_CODES as readonly string[]).includes(code),
+      );
+    }
+    expect(isPreferredPositionCode("GB")).toBe(true);
+    expect(isPreferredPositionCode("MOC")).toBe(false);
+    expect(isPreferredPositionCode("LIBERO")).toBe(false);
+  });
+});
+
+describe("positionRankOf", () => {
+  it("returns the display rank of a known code", () => {
+    expect(positionRankOf("GB")).toBe(1);
+    expect(positionRankOf("AD")).toBe(POSITION_CODES.length);
+  });
+
+  it("sorts an unknown code after every known one", () => {
+    for (const code of POSITION_CODES) {
+      expect(positionRankOf("LIBERO")).toBeGreaterThan(positionRankOf(code));
+    }
+  });
+
+  it("gives two unknown codes the same finite rank, so a comparator stays deterministic", () => {
+    // Not `Infinity`: `Infinity - Infinity` is `NaN` and a `NaN` comparator orders arbitrarily.
+    expect(positionRankOf("LIBERO")).toBe(positionRankOf("TRQ"));
+    expect(positionRankOf("LIBERO") - positionRankOf("TRQ")).toBe(0);
+    expect(Number.isFinite(positionRankOf("LIBERO"))).toBe(true);
   });
 });
 
@@ -213,7 +329,7 @@ describe("built-in formations", () => {
       const ordered = [...formation.slots].sort((a, b) => a.sort - b.sort);
       expect(ordered[0].positionCode).toBe("GB");
       for (let i = 1; i < ordered.length; i += 1) {
-        const rank = (code: PositionCode) => LINE_ORDER.indexOf(POSITION_BY_CODE[code].line);
+        const rank = (code: PositionCode) => LINE_ORDER.indexOf(definitionOf(code).line);
         expect(rank(ordered[i].positionCode)).toBeGreaterThanOrEqual(
           rank(ordered[i - 1].positionCode),
         );

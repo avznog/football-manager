@@ -234,9 +234,23 @@ the same.
 
 ### `PositionPicker` — `'use client'`
 
-The player profile picker: all eleven canonical positions as tappable targets on the turf. Each
-tap cycles **non souhaité → secondaire → principal → non souhaité**, i.e.
-`player_positions.preference` (no row / `secondary` / `primary`).
+The player profile picker: the eight positions of `PREFERRED_POSITIONS` — the union of the slots of
+the two shapes this team really plays, `1-3-2-1` and `1-2-3-1` — as tappable targets on the turf.
+Each tap cycles **non souhaité → secondaire → principal → non souhaité**, i.e.
+`player_positions.preference` (no row / `secondary` / `primary`). The composition editor is *not*
+narrowed with it and still places any of the eleven.
+
+A record written before the list narrowed may hold `MOC`, `AG` or `AD` — after a `db:reset`, half the
+demo squad does. Nothing drops such a code — the profile posts the selection's own keys — so the
+picker renders those as a small row of removable chips under the legend, derived from `value` like
+the grid. One-way: a chip removes, nothing adds one back, and `cyclePosition` is not involved.
+Removing the primary leaves the player with no primary rather than promoting a secondary nobody
+chose.
+
+A chip prints the position **in full** (« Ailier gauche »), not its code: it is the control that ends
+the wish, and WCAG 2.5.3 Label in Name (decision 117) wants its visible text inside « Retirer Ailier
+gauche de tes postes souhaités ». Three full names wrap onto several rows at 320 px and overflow
+nothing.
 
 ```ts
 type PositionSelection = Partial<Record<PositionCode, "primary" | "secondary">>;
@@ -245,22 +259,31 @@ type PositionPickerProps = {
   value: PositionSelection;                      // missing key = « non souhaité »
   onChange: (next: PositionSelection) => void;   // full next selection; persisting is yours
   singlePrimary?: boolean;                       // default true — demotes the previous primary
-  disabled?: boolean;                            // read-only, labels kept
+  readOnly?: boolean;                            // not this reader's to change: copy says so
+  disabled?: boolean;                            // a save is in flight: inert, copy unchanged
   className?: string;
 };
 ```
 
+Under the pitch, when the wishes **are** the reader's (`readOnly` false), one line says what is
+currently chosen — `positionsSummaryFr` over the live selection, the very sentence a read-only card
+prints as its description, so a player and a coach read the same prose rather than the player reading
+a diagram. On a `readOnly` picker the line is omitted: the card above it already carries it, and
+printing both said the primary twice, adjacently.
+
 Fully controlled: no state, no database, no Server Action — the profile page owns the value and
 saves it through its own `actions.ts`. Real `<button>` elements, so Tab/Enter/Space work, with a
 visible focus ring. French `aria-label`s spell out both the current state and what a tap will do
-(« Attaquant, poste secondaire — appuyer pour en faire votre poste principal »).
+(« Attaquant, poste secondaire — appuyer pour en faire le poste principal »).
 
 Primary and secondary are distinguishable **without colour**: primary is filled with an inner
 ring, secondary is hollow with a solid outline, unwanted is a dashed outline — plus a visible
 legend. The three shapes read the same for a colour-blind user and in direct sunlight.
 
 The eleven canonical coordinates in `db/reference.ts` are spaced so that the closest pair
-(`MC`/`MOC`) is 240 units apart — about 71 px on a 320 px pitch, comfortable for 48 px targets.
+(`MC`/`MOC`) is 240 units apart — about 71 px on a 320 px pitch, comfortable for 48 px targets. That
+rule is kept for the whole eleven even though the picker now draws eight of them: the composition
+editor can place a slot anywhere on the list.
 
 ---
 

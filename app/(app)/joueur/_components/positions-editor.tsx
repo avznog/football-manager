@@ -11,9 +11,11 @@
  * The selection is posted as an ordinary set of hidden fields (`primary`, then one `secondary`
  * per position), not a JSON body, so the Server Action reads a plain `FormData`.
  *
- * Read-only mode renders the very same picker with `disabled`: a teammate sees the identical
+ * Read-only mode renders the very same picker with `readOnly`: a teammate sees the identical
  * shapes and legend, just no save button. Worth the client bundle — a second, static rendering
- * of the pitch would be one more thing to keep visually in sync.
+ * of the pitch would be one more thing to keep visually in sync. It is also the **coach's** view
+ * now that positions are the player's alone, so it has to say why it cannot be touched: a disabled
+ * pitch with no explanation reads as a bug.
  */
 
 import { useActionState, useState } from "react";
@@ -22,6 +24,7 @@ import { PositionPicker } from "@/components/pitch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FieldError } from "@/components/ui/field-error";
+import { fieldErrorsUnder } from "@/lib/auth/validation";
 import {
   type PositionSelection,
   primaryPosition,
@@ -42,8 +45,6 @@ export type PositionsEditorProps = {
   /** What is stored today. The parent keys this component on it, so a save resets the state. */
   positions: PreferredPosition[];
   canEdit: boolean;
-  /** Changes the wording between « tes postes » and « ses postes ». */
-  isSelf: boolean;
 };
 
 export function PositionsEditor({
@@ -51,7 +52,6 @@ export function PositionsEditor({
   memberId,
   positions,
   canEdit,
-  isSelf,
 }: PositionsEditorProps) {
   // Computed once per mount: the parent remounts us with `key={positionsSignature(...)}` when the
   // server value changes, which is cheaper to reason about than syncing state in an effect.
@@ -69,7 +69,13 @@ export function PositionsEditor({
         title="Postes préférés"
         description={positionsSummaryFr(positions)}
       >
-        <PositionPicker value={saved} onChange={() => {}} disabled />
+        {/* `readOnly`, not `disabled`: these positions are not this reader's to change, which is a
+            different fact from « a save is in flight » and is what the picker's copy follows. */}
+        <PositionPicker value={saved} onChange={() => {}} readOnly />
+        {/* Why the pitch is dead, said once, under it: this is the coach's view of a card he used
+            to be able to edit, and « Chaque joueur choisit ses postes lui-même. » is the whole
+            reason the targets do not respond. Same styling as the editor's own status line. */}
+        <p className="mt-3 text-sm text-ink-muted">Chaque joueur choisit ses postes lui-même.</p>
       </Card>
     );
   }
@@ -77,11 +83,7 @@ export function PositionsEditor({
   return (
     <Card
       title="Postes préférés"
-      description={
-        isSelf
-          ? "Appuie sur un poste : non souhaité, secondaire, puis principal."
-          : "Appuie sur un poste pour modifier les souhaits de ce joueur."
-      }
+      description="Appuie sur un poste : non souhaité, secondaire, puis principal."
     >
       <form action={action} className="space-y-3">
         <input type="hidden" name="teamId" value={teamId} />
@@ -98,7 +100,7 @@ export function PositionsEditor({
             {state.error}
           </p>
         ) : null}
-        <FieldError>{state?.fieldErrors?.secondary ?? state?.fieldErrors?.primary}</FieldError>
+        <FieldError>{fieldErrorsUnder(state?.fieldErrors, "primary", "secondary")}</FieldError>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" disabled={!dirty || pending}>
