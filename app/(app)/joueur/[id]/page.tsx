@@ -45,13 +45,13 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
 
   const isSelf = team.membershipId === profile.membershipId;
   const context = { teamId: team.id, targetMemberId: profile.membershipId };
-  // Positions belong to the squad record, so a coach reaches them through `member:update`;
-  // the player reaches their own through `profile:editPositions`. Both are `can()` decisions.
-  const canEditPositions =
-    can(actor, "profile:editPositions", context) || can(actor, "member:update", context);
+  // A player's wishes are the player's: `profile:editPositions` is self-only and has no coach
+  // fallback, so a coach sees the card read-only and the editor says why.
+  const canEditPositions = can(actor, "profile:editPositions", context);
   const canEditJersey = can(actor, "member:update", context);
   // The flocage is not the number: « MOMO » agrees with nothing and nobody, so the player owns his
-  // own, and the coach may still type one for a teammate. Same shape as the positions above.
+  // own, and the coach may still type one for a teammate — unlike the positions above, which are
+  // nobody else's to choose.
   const canEditShirtName =
     can(actor, "profile:editShirtName", context) || can(actor, "member:update", context);
   const canManageInjuries = can(actor, "injury:declare", context);
@@ -113,7 +113,6 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
           memberId={profile.membershipId}
           positions={profile.positions}
           canEdit={canEditPositions}
-          isSelf={isSelf}
         />
       ) : null}
 
