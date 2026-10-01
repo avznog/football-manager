@@ -19,13 +19,16 @@ import { ErrorScreen } from "@/components/errors/error-screen";
 export default function RootError({
   error,
   reset,
+  retry,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
+  /** Next's third boundary prop. `ErrorScreen` takes it and explains why it does not use it. */
+  retry: () => void;
 }) {
   return (
     <main className="gutter-px flex min-h-svh flex-col items-center justify-center">
-      <ErrorScreen digest={error.digest} reset={reset} withHomeLink />
+      <ErrorScreen error={error} reset={reset} retry={retry} withHomeLink />
     </main>
   );
 }
