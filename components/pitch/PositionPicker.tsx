@@ -9,7 +9,12 @@
  * A record written before the list narrowed may still hold `MOC`, `AG` or `AD`. Nothing deletes
  * such a code — the form posts the selection's own keys — so without the chip row below it would be
  * invisible *and* unremovable. The chips are derived from `value`, exactly like the grid, which is
- * what keeps `cyclePosition` and the whole write path out of this: a chip only ever removes.
+ * what keeps `cyclePosition` and the whole write path out of this: a chip only ever removes. Each one
+ * prints its position **in full** — it is the control that ends the wish, so it names it.
+ *
+ * `readOnly` and `disabled` are two props because they are two facts: « these wishes are not yours »
+ * decides the **copy**, « a save is in flight » decides only the **interactivity**. One prop for both
+ * made the sentence flicker to the coach's wording for the duration of a Server Action.
  *
  * A **controlled** component: it holds no state, never talks to the database and defines no
  * Server Action. The page above it owns the selection and persists it — which is what makes it
@@ -35,7 +40,11 @@ import {
   nextPreference,
   preferenceLabelFr,
   primaryPosition,
+  selectedPositions,
 } from "@/lib/pitch/preferences";
+// Pure, no database, no React: the words a player's wishes are said in, and the *same* words the
+// read-only card's description uses — so the player and the coach read one sentence, not two.
+import { fromSelection, positionsSummaryFr } from "@/lib/player/positions";
 import { Pitch, PitchPoint } from "./Pitch";
 import { DISC_SIZES } from "./sizes";
 
@@ -49,7 +58,16 @@ export type PositionPickerProps = {
    * (`docs/DATA_MODEL.md`). Default `true`.
    */
   singlePrimary?: boolean;
-  /** Read-only rendering: the targets stay visible and keep their labels, but cannot be tapped. */
+  /**
+   * These wishes are not this reader's to change — a teammate's or the coach's view of the card.
+   * The targets stay visible and keep their labels, and the copy says so: a retired wish is shown
+   * but offers no removal.
+   */
+  readOnly?: boolean;
+  /**
+   * Temporarily inert — a save is in flight. Interactivity only: the copy still describes what the
+   * reader *may* do, because the permission has not changed, only the moment.
+   */
   disabled?: boolean;
   className?: string;
 };
@@ -86,9 +104,14 @@ export function PositionPicker({
   value,
   onChange,
   singlePrimary = true,
+  readOnly = false,
   disabled = false,
   className,
 }: PositionPickerProps) {
+  // Two reasons not to respond to a tap, and only one of them is a reason to change what the copy
+  // says: « ces postes ne sont pas les tiens » is permanent for this reader, « on enregistre » is a
+  // second. Mixing them made the sentence flicker to the coach's wording mid-save.
+  const inert = readOnly || disabled;
   const primary = primaryPosition(value);
   // Wishes the picker no longer offers. Kept rather than dropped: they are in the database, and the
   // player is the only one who may decide they are over.
@@ -100,9 +123,9 @@ export function PositionPicker({
    * Removal only, never addition — hence no `cyclePosition`.
    *
    * If the code being removed was the primary the player is simply left with no primary, which the
-   * summary line below already states (« Aucun poste principal choisi. ») and the form already
-   * posts as an empty `primary`. Promoting a secondary in its place would invent a wish nobody
-   * expressed, and picking *which* secondary would be arbitrary.
+   * summary line below already states on an editable card (« Aucun poste principal choisi. ») and
+   * the form already posts as an empty `primary`. Promoting a secondary in its place would invent
+   * a wish nobody expressed, and picking *which* secondary would be arbitrary.
    */
   function removeRetired(code: PositionCode): void {
     const next = { ...value };
@@ -121,17 +144,17 @@ export function PositionPicker({
               <PitchPoint key={position.code} x={position.defaultX} y={position.defaultY}>
                 <button
                   type="button"
-                  disabled={disabled}
+                  disabled={inert}
                   aria-label={`${position.labelFr}, ${preferenceLabelFr(preference)}${
-                    disabled ? "" : ` — ${actionLabelFr(preference)}`
+                    readOnly ? "" : ` — ${actionLabelFr(preference)}`
                   }`}
                   data-preference={state}
                   onClick={() => onChange(cyclePosition(value, position.code, { singlePrimary }))}
                   className={cn(
                     "relative flex items-center justify-center rounded-full font-bold uppercase shadow-md transition-transform",
                     "focus-visible:ring-4 focus-visible:ring-accent focus-visible:outline-none",
-                    !disabled && "hover:scale-105 active:scale-95",
-                    disabled && "cursor-default",
+                    !inert && "hover:scale-105 active:scale-95",
+                    inert && "cursor-default",
                     STATE_STYLE[state],
                   )}
                   style={{
@@ -163,30 +186,38 @@ export function PositionPicker({
           className="flex flex-col gap-1.5"
         >
           <p className="text-sm text-ink-muted">
-            {disabled
+            {readOnly
               ? "Ces postes ne sont plus proposés."
               : "Ces postes ne sont plus proposés. Tu peux les retirer, pas les remettre."}
           </p>
           <ul className="flex flex-wrap items-center gap-2">
             {retired.map((code) => (
               <li key={code}>
-                {disabled ? (
-                  <span className={cn(CHIP, "px-3 py-1")}>
-                    {code}
-                    <span className="sr-only"> — {positionLabelFr(code)}</span>
-                  </span>
+                {/* The chip prints the position **in full**, not its code. It is the control that
+                    ends the wish, and the player being asked to end it is owed the name of the thing
+                    — the coach's read-only card spells it out in `positionsSummaryFr`, so two letters
+                    here was the one reader who owns the wish getting the least of it. It is also
+                    WCAG 2.5.3 Label in Name (decision 117): the visible text has to occur in the
+                    accessible name, and « AG » occurs nowhere in « Retirer Ailier gauche … ».
+                    `positionLabelFr` returns the raw code for anything it does not know, so a code
+                    outside the vocabulary still renders as itself rather than blank. */}
+                {readOnly ? (
+                  <span className={cn(CHIP, "px-3 py-1")}>{positionLabelFr(code)}</span>
                 ) : (
                   <button
                     type="button"
+                    disabled={disabled}
                     onClick={() => removeRetired(code)}
                     aria-label={`Retirer ${positionLabelFr(code)} de tes postes souhaités`}
                     className={cn(
                       CHIP,
                       "min-h-11 px-3",
-                      "hover:bg-surface focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+                      disabled
+                        ? "cursor-default"
+                        : "hover:bg-surface focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
                     )}
                   >
-                    {code}
+                    {positionLabelFr(code)}
                     <span aria-hidden className="text-base leading-none">
                       ×
                     </span>
@@ -198,11 +229,18 @@ export function PositionPicker({
         </div>
       ) : null}
 
-      <p className="text-sm text-ink-muted">
-        {primary
-          ? `Poste principal : ${positionLabelFr(primary)}.`
-          : "Aucun poste principal choisi."}
-      </p>
+      {/* Only where the reader is choosing. A read-only card carries the same sentence as its
+          description, and printing it again four lines under said the primary twice, adjacently.
+          On an editable card there is no such description — it is the tap instruction instead — so
+          without this line a player decodes their own secondary wishes from the shapes of a diagram
+          while the coach reads them in prose. Same `positionsSummaryFr` as the coach's, plus the one
+          fact a summary cannot state on its own: that no primary has been chosen yet. */}
+      {readOnly ? null : (
+        <p className="text-sm text-ink-muted">
+          {`${positionsSummaryFr(fromSelection(value))}.`}
+          {!primary && selectedPositions(value).length > 0 ? " Aucun poste principal choisi." : ""}
+        </p>
+      )}
     </div>
   );
 }

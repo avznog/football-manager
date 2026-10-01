@@ -11,7 +11,7 @@
  * The selection is posted as an ordinary set of hidden fields (`primary`, then one `secondary`
  * per position), not a JSON body, so the Server Action reads a plain `FormData`.
  *
- * Read-only mode renders the very same picker with `disabled`: a teammate sees the identical
+ * Read-only mode renders the very same picker with `readOnly`: a teammate sees the identical
  * shapes and legend, just no save button. Worth the client bundle — a second, static rendering
  * of the pitch would be one more thing to keep visually in sync. It is also the **coach's** view
  * now that positions are the player's alone, so it has to say why it cannot be touched: a disabled
@@ -69,7 +69,9 @@ export function PositionsEditor({
         title="Postes préférés"
         description={positionsSummaryFr(positions)}
       >
-        <PositionPicker value={saved} onChange={() => {}} disabled />
+        {/* `readOnly`, not `disabled`: these positions are not this reader's to change, which is a
+            different fact from « a save is in flight » and is what the picker's copy follows. */}
+        <PositionPicker value={saved} onChange={() => {}} readOnly />
         {/* Why the pitch is dead, said once, under it: this is the coach's view of a card he used
             to be able to edit, and « Chaque joueur choisit ses postes lui-même. » is the whole
             reason the targets do not respond. Same styling as the editor's own status line. */}
