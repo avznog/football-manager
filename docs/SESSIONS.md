@@ -3163,3 +3163,69 @@ the change. The peer's answer was not to patch it but to **revert the boundary e
 restored byte-identical to `main` — so what #114 ships is the tab-tap half alone, and the hairline it
 adds now paints on `/stats` precisely because there is no boundary to let the route commit early. It
 merged as decision 123; the gutter is 124.
+
+## 2026-10-01 — a UX audit of the deployed preview, and what it cost to do it honestly
+
+**What ran.** Eight parallel audits against `dev.7orteils.bgonzva.fr` — not a local dev server — at
+390×844 and 320 px, light and dark, Chromium and WebKit, as the coach `karim` and as the player `hugo`.
+Lanes: authentication and arrival · calendar and availability · trainings and attendance · match hub,
+sheet and composition · team, roster, profiles and invites · statistics · game mode, ratings, recap and
+retroactive entry · and one cross-cutting pass over the whole set, because consistency is a property of
+the set and no single lane can see it. **Result: `docs/UX_AUDIT_2026-10-01.md`** (#122), 52 defects ranked
+by harm, 11 scope questions, 8 absences, 24 properties worth protecting, 13 stated limits. Folded into
+`docs/PLAN.md` § Amendments as ten slices, and into `docs/ROADMAP.md` as the matching checklist.
+
+**The owner's « deux secondes avant que quelque chose se passe » on iPhone is diagnosed, and it was not
+speed.** TTFB is 3–27 ms across twelve routes; the `iad1`→`lhr1` pin (decision 111) genuinely worked and
+genuinely did not help. Instrumented with a `MutationObserver` started at `pointerdown`, **"first DOM
+change after tap" and "new screen content" are the same number in all eighteen throttled samples** — the
+first thing that changes on screen after a tap *is* the arrival of the next screen. Walking every
+`cssRules` in every same-origin stylesheet, stripping `:active`/`:hover` from each selector and testing
+`matches()`, found **no `:active` rule anywhere outside a `pointer-events` utility block**. Tailwind v4's
+preflight zeroes `-webkit-tap-highlight-color` globally, so the app opted out of the one acknowledgement
+iOS gives for free and put something back only where a developer happened to reach for the shared
+`components/ui` button: **survivors, not coverage.** #114 is therefore the first acknowledged surface in
+the app rather than the last unacknowledged one.
+
+**The worst defect is on a documented happy path and fails no existing test.** `D1`: « Tout le monde est
+là » writes 13 présent rows and says so, leaves all 13 radios reading « — », and the next save deletes
+eleven of them. Uncontrolled `defaultChecked` in a Server Component is not reset by reconciliation after
+`revalidatePath`, so the next submit posts `unset` and `markTrainingAttendance` DELETEs those rows — it
+cannot tell « the coach cleared this » from « the DOM is stale ». Three more defects have that exact
+shape, which is why the amendment to « Verification » is its own slice: nothing in the suite submits a
+form twice after the server has re-rendered it.
+
+**Writes on the preview were authorised, and they earned their keep.** Seven of the defects — `D1`, `D3`,
+`D12`, `D14`, `D15`, `D19`, `D42` — are invisible to a read-only audit. The cost: the audit polluted the
+data it was auditing. A test member was created and removed through the UI (and running the removal is
+what produced the evidence for `D29`, `D32` and `D33`); team colours and name were recorded before being
+changed and restored; created trainings and one composition were deleted and the four seeded sessions
+verified byte-identical to the first read. **Two residues need the owner and a manual `DELETE`:** an
+orphaned `users` row for `auditg`, and three matches named « UX Audit H »/« retro »/« retro 2 ». Those
+matches cannot be removed through the UI and should not be — `deleteMatch` refuses once an event log
+exists — which is invariant 1 working, and is now `S11`: **a match played in the app can never be
+deleted, and nobody chose that explicitly.**
+
+**Five findings were raised and then disproved, and they are in the report on purpose.** `/equipe`
+appeared 69 px taller in dark than in light and was being written up as theme drift — re-measured with
+both arms in the *same pass*, the delta is zero; seven browsers shared one preview database and a
+concurrent write looks exactly like a layout bug. An arithmetic contradiction on `/stats/equipe-type`
+turned out to be a documented shrinkage estimator with a 1.6-hour prior, explained on the page itself.
+A literal `<button>` string in a text node was a `<noscript>` fallback, invisible and 0×0 — evidence of
+*good* no-JS support. And two contrast blockers reported by a lane were rejected and withdrawn: the
+helper compared text against `oklab(… / 0.15)` as though opaque instead of compositing 15 % alpha,
+producing 1.00:1 and 1.02:1 for elements plainly legible in the screenshots. **The method that produced
+those five is the same method that produced the other 52**, so a reader needs to see where it failed.
+One method lesson is worth keeping: a vouvoiement sweep matching only `vous|votre|vos|veuillez` is blind
+to « Réessayez » and « passez » — a second-person-plural imperative *is* the vouvoiement, with no pronoun
+in the sentence. That hole in the audit's own harness is why decision 074's one surviving violation had
+been live the whole time, and why slice 10 asks for a unit test rather than a convention.
+
+**Cross-session.** The report was handed to the session holding #114 rather than filed over it, and two
+of its corrections were checked against `origin` before being accepted — both held, and one of them
+struck a caveat this session had written (`/stats` would supposedly stop reproducing after #114; the
+`<Suspense>` boundary was withdrawn, so it reproduces exactly as measured). The login-button pressed
+state was deliberately *not* filed as its own defect and remains that session's work. `docs/ROADMAP.md`
+and `docs/SESSIONS.md` were being edited concurrently in another worktree; both appends here are at the
+very end of each file, by agreement, because two appends at the end conflict cleanly whereas an insertion
+above someone else's insertion point silently drops a paragraph.

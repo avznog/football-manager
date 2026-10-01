@@ -934,3 +934,47 @@ the reachable-turf finding below an **under**-statement on device rather than an
       unrecorded until a probe drove it. `scripts/probe-composition.mjs` now does, read-only, and it
       never submits: the screens past a save (the pending button, `state.error`, `minuteClash`,
       `shapeProblems`) remain unaudited because the only database to drive is the owner's production one
+
+## From the UX audit of 2026-10-01
+
+Evidence and reasoning: `docs/UX_AUDIT_2026-10-01.md`. Slices and ranking:
+`docs/PLAN.md` § Amendments → « UX audit of the preview deployment ». The identifiers below (`D1`, `S4`,
+`A1`) are the report's, and each one there carries the measurement, the screenshot and the file and line.
+
+Ordered by harm, which is not the order they are cheapest to fix.
+
+- [ ] **Slice 1 — attendance stops losing data.** `D1`: « Tout le monde est là » writes 13 présent rows,
+      leaves all 13 radios reading « — », and the next save deletes eleven of them. Also `D4` (offline
+      pointage discarded, « Réessayer » cannot work), `A3`, `A4`
+- [ ] **Slice 2 — one tap-acknowledgement token, applied everywhere.** `D2`: no `:active` rule exists in
+      the served stylesheet outside a `pointer-events` utility block, and in all 18 throttled samples the
+      first thing that changes after a tap *is* the next screen. #114 is the first surface, not the last
+      gap — « survivors, not coverage »
+- [ ] **Slice 3 — match sheet and composition editor.** `D3` (6 or 8 starters save silently and empty
+      composition slots), `D14` (the editor opens with zero of seven slots tappable), `D15`, `D19`, `D20`,
+      `D51`
+- [ ] **Slice 4 — guard the live match.** `D5` (« Fin du match » ends only the period, unconfirmed),
+      `D6` (the scorer field is created 487 px below the button), `D18`, `D22`, `D34`, `D41`, `D52`
+- [ ] **Slice 5 — one rule for when availability is open.** `D9`, `D10`, `D11`, `D37` are four faces of
+      decision 121 meeting `isPast`: « finished » and « played » are different facts
+- [ ] **Slice 6 — ratings.** `D7` (both controls below the fold, progress lost on navigation), `D13` (the
+      recap says « entré en jeu » for men who never came on, and `playedLabelFr` already fixes it on
+      `/notation`), `D21`
+- [ ] **Slice 7 — the way in.** `D16` (the invite link is never built), `D17`, `D30`, `D31`, `A6`, `A7`
+- [ ] **Slice 8 — roster and profiles.** `D8` (a coach can demote himself out of the app with one tap),
+      `D29`, `D32`, `D33`, `D35`, `D36`, `D43`, `D44`, `D45`
+- [ ] **Slice 9 — errors, readability, copy.** `D24` (HTTP 500 on a malformed id), `D48` (the last
+      vouvoiement in the app), `D38`, `D39`, `D40`, `D42`, `D46`, `D49`, `D50`
+- [ ] **Slice 10 — amend « Verification ».** A test for a second submit after `revalidatePath`; a unit
+      test asserting no second-person-plural imperative in the French strings; a `uuid` shape guard on
+      every `[id]` route
+- [ ] **Eight absences**, roadmap rather than bugs: `A1` no way to change a password anywhere and no admin
+      reset — decide this one first · `A2` man of the match computed and never surfaced · `A5` « parti »
+      unexplained · `A8` no « (toi) » in the leaderboards (`A3`, `A4`, `A6`, `A7` ride with the slices
+      above)
+- [ ] **Eleven questions for the owner** (`S1`–`S11`) are open and must not be answered by a developer.
+      They are listed in the plan's amendment batch, unresolved and named as unresolved
+- [ ] **Owner-side cleanup, not a code task:** an orphaned `users` row for `auditg` and three matches
+      named « UX Audit H »/« retro »/« retro 2 » on the preview database. Ids in the report's last
+      section. The matches cannot be deleted through the UI and should not be — `deleteMatch` refuses once
+      an event log exists, which is invariant 1 working
