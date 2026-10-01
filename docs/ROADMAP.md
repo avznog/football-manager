@@ -436,6 +436,18 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       the reader was comparing two shapes of the same fact. The year is unconditional now — a season
       crosses 1 January — and `MONTHS_FR`, `formatDayMonthFr` and three format constants go with their
       last callers (decision 109)
+- [x] …and the five native pickers, which 109 had written off as « not ours », now say underneath them
+      what they hold: « 14/03/2026 », « 14/03/2026 à 20:05 ». `<input type="date">` and
+      `<input type="datetime-local">` render in the *browser's* locale, so on a phone set to English the
+      owner was picking a kick-off in `MM/DD/YYYY` off an AM/PM clock inside an app that writes
+      `27/09/2026` everywhere else. 109 offered him a control of our own and he declined; the answer he
+      came back with keeps the native control — still the best thing under a thumb — and echoes its value
+      in the app's shape. `components/ui/date-input.tsx` wraps all five, `formatInputValueFr` reads the
+      parts of the `YYYY-MM-DD` string and never builds a `Date` (UTC midnight west of Greenwich is the
+      day before, and an off-by-one echo is worse than no echo), an empty or unreadable value renders no
+      element rather than « --/--/---- », and the line is `aria-hidden` because the defect is what the eye
+      sees. `lib/player/injury.ts` delegates to the same digits so the app still has one definition of
+      `DD/MM/YYYY` (decision NNN, which supersedes 109's carve-out — the number is assigned on merge)
 - [x] **« L'équipe type » — a pitch that names the best (or worst) seven for one chosen criterion**, at
       `/stats/equipe-type`. Buts, passes, notes and invincibilité, all as rates, each figure shrunk
       toward the squad by a **measured** amount rather than gated behind a minimum number of matches —

@@ -3609,3 +3609,67 @@ sentence under it is still true. The `player_positions` line already read « Set
 profile by tapping a pitch diagram », which was the invariant this branch enforced rather than one it
 changed: the document has been describing the intended ownership all along, and the code had drifted
 away from it.
+
+## The five pickers the app's own formatter could never reach
+
+**2026-10-01** · `feat/echo-native-date-values`
+
+The owner, from his iPhone: every date `DD/MM/YYYY`, every clock 24-hour. The first thing done was the
+audit rather than the fix, and it found the remark much narrower than it sounds — **decision 109 had
+already done it**. `lib/calendar/time.ts` and `lib/player/injury.ts` are the only two formatters in the
+repository, every screen goes through one of them, the 24-hour clock is pinned twice (the `fr-FR` locale
+*and* an explicit `hour12: false`), and the unit tests hold the literal French strings instead of
+re-deriving them. Nothing of that was changed. Anybody arriving here with the same report should re-run
+that audit before believing there is a formatter to fix.
+
+What a formatter cannot reach is the five native pickers — the match form, the séance form, the two dates
+of an injury declaration and « Guéri le » — because `<input type="date">` and
+`<input type="datetime-local">` render in the **browser's** locale. On a phone set to English the owner
+picks a kick-off in `MM/DD/YYYY` off an AM/PM clock, in the one place the app has no say. Decision 109 saw
+this, offered him a control of our own, and he declined; he has come back to it with a third answer, and
+it is better than either option that was on the table then. **Keep the native control — it is still the
+best thing under a thumb — and print underneath it the date the app would have printed.**
+`components/ui/date-input.tsx` wraps all five and renders one quiet line: « 14/03/2026 », or
+« 14/03/2026 à 20:05 » with the « à » `formatWhen` already uses. An empty or unreadable value renders **no
+element at all** rather than a placeholder, because « --/--/---- » is a screen stating something and this
+one has nothing to state. The new decision entry (left as `## NNN`, see below) records the whole of it,
+including that it supersedes 109's carve-out.
+
+Two things to know before touching it. **The echo never builds a `Date`**: `formatIsoDay` reads the parts
+of the `YYYY-MM-DD` string, because `new Date("2026-03-14")` is UTC midnight and a formatter west of
+Greenwich would render the 13th — an off-by-one-day echo would be worse than no echo, since the reader
+would have no way to tell which of the two lines held the day he picked. And **`lib/player/injury.ts` was
+a settled file, touched for exactly one reason**: it already owned this arithmetic, and the fix for a
+wrong date format must not become a third way to format a date, so `formatDateFr` delegates to
+`formatIsoDay` and a test asserts the echo and `formatDate` agree on the same calendar day. The echo is
+`aria-hidden` and deliberately **not** in `aria-describedby`: the defect is what the eye sees, a screen
+reader already speaks the control's value, and appending the French digits to the control's description
+would make it announce one date twice in two formats — decisions 116 and 117 arriving from the other
+direction.
+
+**Verified at 390×844 in both themes with the browser forced to `en-US` and `America/New_York`**, which
+reproduces the owner's phone: the picker reads `10/01/2026` and the line underneath reads `01/10/2026`.
+The echo is present in the server-rendered HTML, and with `javaScriptEnabled: false` the five forms still
+post their original fields — without hydration the echo is simply the one the server rendered from
+`defaultValue` and stops following the picker. `npm run typecheck`, `npm run lint` and `npm test` pass:
+**1329 unit tests, five of them new** in `lib/calendar/time.test.ts`, every assertion about a string with
+no timezone in it.
+
+**`npm run test:e2e` was read and not run.** The only contact the suite has with these inputs is four
+`getByLabel("Coup d’envoi").fill(...)` calls — `e2e/happy-path.spec.ts:162`, `:733`, `:795` and
+`e2e/offline.spec.ts:83` — which resolve through the `<label for>` / `id` pairing `Field` emits and which
+this change does not touch; no spec creates a séance or declares an injury. That is a reading of the
+locators, not a green run, and it is written down as such rather than claimed as a pass.
+
+**Two things deliberately left alone**, so the next session does not read them as oversights.
+`formatDateFr` still returns a non-ISO value **untouched** and still accepts `2026-02-30` as a calendar
+day: tightening either would change a test that pins the current behaviour, the callers genuinely want a
+column holding prose to show the prose, and a native picker cannot produce 30 February in the first
+place — so the validation would be paid for and never used. And
+`app/(app)/entrainements/nouveau/page.tsx` still opens with an **empty** picker rather than a plausible
+next slot (the coming Tuesday at 19:00, say), which would be a real convenience on a phone but is a
+product change about what the app assumes a séance is, not a date-format fix.
+
+**Next:** nothing is blocked. The decision entry is deliberately headed `## NNN` — 123 is spoken for by a
+decision already written on `perf/acknowledge-tab-taps`, so the merging session assigns the number, as
+`COORDINATION.md` asks.
