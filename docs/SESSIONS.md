@@ -3485,3 +3485,33 @@ note ten lines below saying it was empty. And `lib/match/presenter.ts:868` was q
 text at a line that now holds the fix. The fifth change is not a correction: the `db/` file floor goes
 from 8 to 5, because nine files with `db/migrations/` skipped left no room, and a floor that fails when
 somebody deletes two files reports a hidden directory that nobody hid.
+
+## The owner says no three times, and that is the end of a loop
+
+**2026-10-01** · `docs/the-owner-closes-three-live-items`
+
+Three items had been carried in every session report for weeks — wipe the preview and production
+databases, reset the super admin's password, rotate the Neon `neondb_owner` password. The owner has
+decided against all three. Decision **132** records it, and the point of recording it is narrow and worth
+being explicit about: none of the three was waiting on information. Every fact behind them is true and is
+**rediscoverable from the repository**, which is why each new session found them again, correctly, and
+raised them again. Writing « not doing this » where decisions live is the only thing that stops a session
+with no memory from restarting the loop in good faith. A `## NOW` line would have rotted; a roadmap item
+would have read as pending.
+
+What the entry does not do is soften what follows. The transcript-exposed database password stays valid,
+the super-admin credential keeps its reach over every team, and production keeps its rows — so the
+standing prohibitions are no longer belt-and-braces, they are the whole of the protection, and they are
+restated in the entry for that reason. Two items that had travelled alongside the wipe are **not** closed
+by it and are still open: the `check (username = btrim(lower(username)))` constraint, which exists only in
+Zod and is how a trailing TAB once reached the `username` column, and the owner's confirmation that
+Preview and Production `DATABASE_URL` are two different strings. Neither needs a wipe. And one genuinely
+separate production defect is untouched by any of this: `formations` and `formation_slots` are empty on
+production, so no composition can be planned there at all.
+
+The number is **132**, not 129. The other machine said it is taking 129, 130 and 131 for PR #125's three
+placeholders on its own rebase, so skipping them leaves a gap rather than risking a collision — which
+cost a renumbering across four files earlier the same day.
+
+**Verified**: typecheck clean, 1347 unit tests green, no source file touched — `docs/DECISIONS.md`,
+`docs/ROADMAP.md`, `docs/SESSIONS.md` and `COORDINATION.md` only.
