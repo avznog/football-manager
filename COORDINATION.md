@@ -97,12 +97,14 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   « `<Suspense>` on `/stats` » one is **withdrawn and must not be re-opened** — it removes the no-JS path
   that decisions 100 and 116 built, see #114 — and the auth prefix joins are untouched and still a
   tidiness item.
-- **In flight · the iphone-analyser worktree** — `feat/iphone-trace-sink`, a diagnostic sink so the owner's
+- **Open for review, not mine to merge · PR #134** — `feat/iphone-trace-sink`, a diagnostic sink so the owner's
   iPhone 16 can be watched live against preview. In these files and no others: `lib/dev/trace.ts` (+ test),
   `app/api/dev/trace/route.ts`, `proxy.ts` (one `PUBLIC_PATHS` line), `scripts/iphone-trace/*`. No schema
   change, no migration, no infrastructure, and **nothing in the client bundle** — the capture is a
   bookmarklet, which is what keeps decision 127 and `audit:screens` true. Left open for the gatekeeper,
-  per rule 1. The files I am staying out of are the ones
+  per rule 1. **It stays dead after merging until the owner sets `TRACE_SECRET` in Vercel's preview
+  environment**, which is his by rule 3 — so `404` from `/api/dev/trace` is the correct answer, not a
+  regression to chase. The files I am staying out of are the ones
   **`feat/a-dock-of-players-and-buttons`** holds in the main checkout: that branch is two commits ahead of
   `origin/main` and **unpushed**, so `git fetch` does not reveal it. One of those commits edits this file.
 
@@ -1245,6 +1247,33 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
 A third lane, opened for the same mechanical reason the first two were split: two sessions appending to
 one tail conflict on that tail. If this worktree is folded back into another machine's lane later,
 nothing here needs rewriting — it is dated history either way.
+
+- **2026-10-01 18:10 · iphone-analyser worktree** — **`feat/iphone-trace-sink` is open as PR #134 and is
+  not mine to merge.** Six commits, HEAD `8191499`, rebased onto `1bcd754` and verified an ancestor of
+  `origin/main`. Gates: typecheck and lint clean, **1446 tests across 66 files** (32 new), `npm run build`
+  compiling with `ƒ /api/dev/trace` in the route list. `npm run test:e2e` was **not** run, and the honest
+  reason is the server rather than the database — `reuseExistingServer: !process.env.CI`, and ports 3000
+  and 3451 belong to other sessions here, so a green run would be a green run against someone else's code.
+  **Three things the next session needs from this and should not have to read the PR to find.**
+  First: a **fresh worktree's `node_modules` is an empty directory**, and Node resolution walks *up* to the
+  main checkout's, so `typecheck`, `lint` and `vitest` all pass from a worktree that has nothing installed.
+  Turbopack refuses to, by design, which is why `npm run build` is the only one of the four that catches it.
+  `npm ci` inside the worktree is the fix. In a repository worked from thirteen worktrees this is the
+  cheapest hour anyone will save all week.
+  Second: **the sink is dead until the owner sets `TRACE_SECRET` in Vercel's *preview* environment**, which
+  is his by rule 3 and deliberately not done here. Unset, empty and whitespace-only all mean dead; off,
+  unconfigured and wrong-key all answer one `404` with no distinguishing body; `VERCEL_ENV === "production"`
+  means dead unconditionally. `Trace KO` on the phone with no `TRACE_SECRET` set is the designed behaviour
+  of an unconfigured sink, not a bug to debug.
+  Third: `lib/dev/capture-source.ts` is **generated and committed**, because `scripts/` is not in Vercel's
+  serverless bundle — reading `capture.js` from disk works locally and 500s in preview. So **editing
+  `scripts/iphone-trace/capture.js` without re-running `build-bookmarklet.mjs` changes nothing in preview.**
+  The drift test is a backstop, not a gate; making it a gate means wiring the generator into `npm run build`,
+  and `package.json` is the owner's, so it is proposed in #134 rather than done.
+  `c301a50` in this branch rewrites the pinned-domain note below as a command plus the limit of its
+  evidence rather than as a claim — the alias is observed, the mechanism is still inferred. The two-piece
+  `COORDINATION.md` / `docs/DEPLOY.md` promotion once this lands belongs to
+  `preview-production-deploy-split-status`, which has been told so directly.
 
 - **2026-10-01 17:37 · iphone-analyser worktree · `feat/iphone-trace-sink`** — Building a diagnostic
   sink so the owner's iPhone 16 can be watched live against preview. **Files I am in, so nobody else
