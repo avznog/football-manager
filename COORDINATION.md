@@ -20,8 +20,10 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `646b830`, tagged `v1.0.0-beta.6`. Managed from **the owner's machine**, the gatekeeper:
-  it reviews and squash-merges, including work pushed from the other machine.
+- **`main`** — at `f13f27e`. The newest tag, `v1.0.0-beta.6`, is on `646b830`, one commit behind, so
+  **preview is ahead of production** by that commit and will stay ahead until the next tag — which is
+  normal and is what the split is for, not a thing to fix. Managed from **the owner's machine**, the
+  gatekeeper: it reviews and squash-merges, including work pushed from the other machine.
 - **Last shipped** — **`v1.0.0-beta.6`**, on `646b830`: the `REMARK` event and the drawn action tiles.
   A version is `package.json`'s `version`; the annotated tag, cut **by hand** on `main`, is the act
   that ships it and the only thing that migrates and deploys production (decision 119). Nothing cuts a
@@ -51,8 +53,10 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   from here**; treat it as a warning rather than as a fact, and assume preview is a shared instance with
   real-looking data in it rather than a scratch pad.
 - **Open pull requests** — **#114**, `perf/acknowledge-tab-taps` (the other machine: the tap
-  acknowledgement, branched off `646b830`, CI green, unmerged by its own request) and **#115**, the
-  rewrite of this section. Neither of the other machine's is mine to merge until it says it is ready.
+  acknowledgement, branched off `646b830`, CI green, released for merge with decision **123** by its own
+  session) and **#115**, the rewrite of this section. Neither of the other machine's is mine to merge
+  until it says it is ready. **#117 merged** (`f13f27e`): both of the happy path's reloads were racing
+  the outbox flush, which is why a docs-only branch could fail the e2e job.
 - **In flight · the owner's machine** — nothing committed. Next is **PR 3, the ratings rebuild**, the
   largest piece of work left in the repository; ahead of it in priority is the **owner-side database
   wipe**, which is live work and needs its own plan before anything is run.
@@ -719,6 +723,33 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   and then the `admin`/`admin` super admin, the
   Neon `neondb_owner` rotation, the `btrim(lower(username))` constraint, and the stale
   `.claude/worktrees/agent-*`.
+- **2026-10-01 · the owner's machine · `docs/coordination-now-beta6`** — **the deployment-skew theory is
+  dead as the explanation of the owner's positions crash, and the owner's own test is what killed it.**
+  The theory predicted that a force-quit cures it, because a force-quit is a document navigation and
+  Vercel always serves one from the newest deployment, so a stale Server Action id cannot survive it. The
+  owner force-quit and the crash came back. So whatever it is, it is **deterministic for a given database
+  state**; skew is at most a rarer second cause and nothing should be built on it. Two things do survive
+  the reversal. First, the other machine's error-screen slice, **because it was specified to detect
+  nothing**: it may not claim it fixes this crash, but « a reload is the only recovery » and « 42
+  `useActionState` sites are exposed » are both true regardless. Had the affordance been branched on skew
+  detection, the diagnosis collapsing would have taken the fix with it — worth remembering next time a
+  detector looks cheaper than an unconditional cure. Second, the research is settled and need not be
+  redone: `deploymentId` fixes nothing (Next 16.3.6 sends `x-deployment-id` on the action POST and never
+  routes on it), `reset()` and the 16.3.6 `retry` prop are both structurally incapable, and **Skew
+  Protection is Pro/Enterprise only while the owner is on the free plan**, so no host-level protection is
+  available at all. The `visibilitychange` reload-on-resume cure is therefore **not being built**: it was
+  priced against skew, and without skew it buys a round trip on every resume against no evidence.
+  **Merged #117** (`f13f27e`): both of the happy path's reloads raced the outbox flush, found because a
+  **docs-only** branch failed the e2e job — the one branch where the diff could not be the cause. That is
+  the bad kind of flake, since every assertion before the reload reads the same React state the queue
+  renders from, so a green run could stop proving the thing the step exists to prove. Honest limit: three
+  local `--repeat-each=3` runs pass with the wait and passed without it, so CI contention is the only
+  place it shows. **And a finding for the other machine's lane, from its own query:** `player_positions`
+  on dev holds all eleven codes including `MOC`, `AG` and `AD` — the three its picker narrowing would
+  drop — in rows belonging to real players, while production's table is **empty**. That makes the
+  narrowing a migration question rather than a narrowing, and production being empty is a reason to get
+  it right **cheaply**, not a reason to skip it: dev's rows are the only real test data either machine
+  will ever have for it.
 
 ### From the other machine
 
