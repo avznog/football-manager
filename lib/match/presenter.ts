@@ -23,7 +23,7 @@ import {
   projectClockMs,
   type PeriodsConfig,
 } from "./clock";
-import { EVENT_LABELS_FR, canBeVoided, type MatchEventType } from "./events";
+import { EVENT_LABELS_FR, canBeVoided, remarkLabelFr, type MatchEventType } from "./events";
 import { describeLineupDiffFr, type SlotInfo } from "./lineup";
 import {
   reduceMatch,
@@ -674,9 +674,40 @@ export function noteDetailFr(
   return about ? `${nameOf(about.memberId)} : ${entry.note}` : entry.note;
 }
 
+/**
+ * The detail line of a `REMARK`: « Bel effort — Karim ».
+ *
+ * The kind comes first because it is the news; the title above it only says « Remarque », so
+ * without this line the entry would state nothing at all. **Shared with the recap** for the reason
+ * `noteDetailFr` spells out: a remark is one of the things the shared match summary exists to show,
+ * and a second formatter is how one screen ends up dropping it.
+ *
+ * Returns null for a remark whose kind this build does not know, so the caller falls through to its
+ * own actor phrasing, which names the player alone: the reducer keeps the `remarked` actor of any
+ * remark that parsed at all, precisely so that an unfamiliar word costs the word and not the name
+ * (decision 122). « Remarque — Karim » says less than « Bel effort — Karim » and nothing untrue.
+ *
+ * The fallback to the label alone, for a kind with no actor beside it, is belt and braces: the
+ * reducer never produces one, since a payload without a `memberId` does not parse and therefore has
+ * no kind either. It is one branch rather than a judgement about what a hand-built entry may hold.
+ */
+export function remarkDetailFr(
+  entry: Pick<TimelineEntry, "remarkKind" | "actors">,
+  nameOf: (memberId: string) => string,
+): string | null {
+  if (!entry.remarkKind) return null;
+  const about = entry.actors.find((actor) => actor.role === "remarked");
+  const label = remarkLabelFr(entry.remarkKind);
+  return about ? `${label} — ${nameOf(about.memberId)}` : label;
+}
+
 /** The line under the title: the free text the event carries, or who it was about. */
 function detailFr(entry: TimelineEntry, players: PlayerIndex): string | null {
-  return noteDetailFr(entry, players.nameOf) ?? describeActorsFr(entry.type, entry.actors, players);
+  return (
+    noteDetailFr(entry, players.nameOf) ??
+    remarkDetailFr(entry, players.nameOf) ??
+    describeActorsFr(entry.type, entry.actors, players)
+  );
 }
 
 /** Who an event was about, phrased the way a coach reads it out. */
@@ -721,7 +752,8 @@ function describeActorsFr(
     find("moved") ??
     find("foul") ??
     find("injured") ??
-    find("commented");
+    find("commented") ??
+    find("remarked");
   return single ? players.nameOf(single.memberId) : null;
 }
 

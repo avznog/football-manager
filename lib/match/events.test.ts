@@ -7,6 +7,8 @@ import {
   MATCH_EVENT_PAYLOAD_SCHEMAS,
   MATCH_EVENT_TYPES,
   MAX_CLOCK_MS,
+  REMARK_KINDS,
+  REMARK_LABELS_FR,
   canBeVoided,
   compareMatchEvents,
   eventLabelFr,
@@ -131,6 +133,37 @@ describe("payload parsing", () => {
     expect(
       parseMatchEventPayload("COMMENT", { note: "Trop haut", memberId: "karim" }, { strict: true }).ok,
     ).toBe(false);
+  });
+
+  it("requires a remark to name the player it is about, unlike a comment", () => {
+    expect(parseMatchEventPayload("REMARK", { kind: "GOOD_EFFORT", memberId: "karim" })).toEqual({
+      ok: true,
+      payload: { kind: "GOOD_EFFORT", memberId: "karim" },
+    });
+    // The deliberate difference from COMMENT: « bel effort » about nobody is not a remark.
+    expect(parseMatchEventPayload("REMARK", { kind: "GOOD_EFFORT" }).ok).toBe(false);
+    expect(parseMatchEventPayload("REMARK", { memberId: "karim" }).ok).toBe(false);
+    expect(
+      parseMatchEventPayload("REMARK", { kind: "GOOD_EFFORT", memberId: UUID_B }, { strict: true })
+        .ok,
+    ).toBe(true);
+  });
+
+  it("refuses a remark kind it does not know at the boundary, and keeps the player past it", () => {
+    const unknown = { kind: "GOOD_HAIRCUT", memberId: UUID_B };
+    // Nothing the API accepts carries a kind this build cannot name.
+    expect(parseMatchEventPayload("REMARK", unknown, { strict: true }).ok).toBe(false);
+    // The reducer's set is lenient about the kind on purpose: the row is already in the log, and
+    // the `memberId` beside the unfamiliar word is perfectly good (decision 122).
+    expect(parseMatchEventPayload("REMARK", unknown)).toEqual({ ok: true, payload: unknown });
+    // Lenient about the kind is not lenient about the shape: a remark still has to name somebody.
+    expect(parseMatchEventPayload("REMARK", { kind: "GOOD_HAIRCUT" }).ok).toBe(false);
+    expect(parseMatchEventPayload("REMARK", { kind: "", memberId: "karim" }).ok).toBe(false);
+    // Every kind the array declares parses, so adding one cannot forget the schema.
+    for (const kind of REMARK_KINDS) {
+      expect(parseMatchEventPayload("REMARK", { kind, memberId: "karim" }).ok).toBe(true);
+      expect(REMARK_LABELS_FR[kind]).toBeTruthy();
+    }
   });
 
   it("exposes one schema per event type, so nothing can be added without a payload definition", () => {

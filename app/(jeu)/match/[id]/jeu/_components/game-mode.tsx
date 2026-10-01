@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  ACTION_ICONS,
   ActionMenu,
   ConfirmSheet,
   LineupComposer,
   OptionRow,
   PlayerPicker,
+  REMARK_ICONS,
   SlotPicker,
   TerrainSheet,
   type ActionChoice,
@@ -19,7 +21,12 @@ import { PitchLayout } from "@/components/pitch/PitchLayout";
 import { Badge, Button, ButtonLink, Card, EmptyState } from "@/components/ui";
 import { positionLabelFr } from "@/db/reference";
 import { entryModeBadgeFr, matchNameFr } from "@/lib/calendar/labels";
-import type { MatchEventType } from "@/lib/match/events";
+import {
+  REMARK_KINDS,
+  remarkLabelFr,
+  type MatchEventType,
+  type RemarkKind,
+} from "@/lib/match/events";
 import { createOutbox, toWireEvent, type OutboxRecord, type OutboxState } from "@/lib/match/outbox";
 import {
   availableOptions,
@@ -49,6 +56,7 @@ import { CommentSheet } from "./comment-sheet";
 import { EventTimeline } from "./event-timeline";
 import { LineupPrompt } from "./lineup-prompt";
 import { MatchBar } from "./match-bar";
+import { RemarkSheet } from "./remark-sheet";
 import { useNowMs } from "./use-now";
 
 /* -------------------------------------------------------------------------- */
@@ -65,6 +73,14 @@ type Flow =
   | { step: "more" }
   /** The one step with a keyboard, so the one step that is a form (`comment-sheet.tsx`). */
   | { step: "comment" }
+  /**
+   * « Remarque »: the sheet of six, then the one question a remark cannot skip — about whom.
+   *
+   * One shape and not two, with `kind` unset while the grid of six is open and set once one is
+   * tapped, because it is one flow stamped at one minute: the second screen is this step one tap
+   * further, exactly as « Autre… » is the menu one tap further. Closing either closes the flow.
+   */
+  | { step: "remark"; kind?: RemarkKind }
   | { step: "goal-scorer" }
   | { step: "goal-assist"; scorerId: string }
   | { step: "actor"; type: "OWN_GOAL" | "PENALTY_SCORED" | "PENALTY_MISSED" | "FOUL" | "INJURY" }
@@ -94,41 +110,125 @@ const MORE = "MORE";
 type MenuKey = MatchEventType | typeof MORE;
 
 /**
- * The ACTION menu: four tiles, and everything else one tap further.
+ * The ACTION menu: four tiles, two doors, and everything else one tap further.
  *
- * Nine tiles was a list wearing a grid's clothes. The four here are what a Sunday match actually
- * produces — and the fourth is « Commentaire », which is the only one of them that is not a fact
- * about the football and the one the owner asked for. « Autre… » spans the row underneath, because a
- * tile that opens another menu must not be mistakable for a tile that records something
- * (decision 114).
+ * Nine tiles was a list wearing a grid's clothes. The four square ones here are what a Sunday match
+ * actually produces — and the fourth is « Commentaire », which is the only one of them that is not a
+ * fact about the football and the one the owner asked for. Each carries a 16 px glyph, so the thumb
+ * finds « But » by its shape and its corner before the word is read.
+ *
+ * « Remarque » and « Autre… » each span the row underneath, because a tile that opens another menu
+ * must not be mistakable for a tile that records something (decision 114) — and neither of those two
+ * records anything on its own tap.
  */
 const CHOICES: readonly ActionChoice<MenuKey>[] = [
-  { type: "GOAL_FOR", label: "But", hint: "buteur, passeur", tone: "accent" },
-  { type: "GOAL_AGAINST", label: "But encaissé", hint: "enregistré aussitôt", tone: "danger" },
-  { type: "SUBSTITUTION", label: "Changement", hint: "qui sort, qui entre" },
-  { type: "COMMENT", label: "Commentaire", hint: "une note libre" },
-  { type: MORE, label: "Autre…", hint: "CSC, penalty, blessure, poste", wide: true },
+  {
+    type: "GOAL_FOR",
+    label: "But",
+    hint: "buteur, passeur",
+    tone: "accent",
+    icon: ACTION_ICONS.GOAL_FOR,
+  },
+  {
+    type: "GOAL_AGAINST",
+    label: "But encaissé",
+    hint: "enregistré aussitôt",
+    tone: "danger",
+    icon: ACTION_ICONS.GOAL_AGAINST,
+  },
+  {
+    type: "SUBSTITUTION",
+    label: "Changement",
+    hint: "qui sort, qui entre",
+    icon: ACTION_ICONS.SUBSTITUTION,
+  },
+  { type: "COMMENT", label: "Commentaire", hint: "une note libre", icon: ACTION_ICONS.COMMENT },
+  {
+    type: "REMARK",
+    label: "Remarque",
+    hint: "bon retour, perte de balle…",
+    icon: ACTION_ICONS.REMARK,
+    wide: true,
+  },
+  {
+    type: MORE,
+    label: "Autre…",
+    hint: "CSC, penalty, blessure, poste",
+    icon: ACTION_ICONS.MORE,
+    wide: true,
+  },
 ];
 
 /**
  * The second menu. « Faute » is deliberately not here: it was recorded once in the app's life and
  * nothing reads it, so it stops being offered. It is *not* removed from the vocabulary — `FOUL`
- * stays in `MATCH_EVENT_TYPES`, in `GAME_MODE_EVENT_TYPES` and in the retro-entry screen, because
- * `match_events` is append-only (invariant 1) and the fouls already in a log must still render and
- * still be voidable (decision 114).
+ * stays in `MATCH_EVENT_TYPES` and in the retro-entry screen, because `match_events` is append-only
+ * (invariant 1) and the fouls already in a log must still render and still be voidable
+ * (decision 114). Nothing on the server refuses the type either: this absence is a menu, not a gate.
  */
 const MORE_CHOICES: readonly ActionChoice[] = [
-  { type: "OWN_GOAL", label: "CSC", hint: "notre joueur", tone: "danger" },
-  { type: "PENALTY_SCORED", label: "Penalty marqué", hint: "tireur" },
-  { type: "PENALTY_MISSED", label: "Penalty manqué", hint: "tireur", tone: "danger" },
-  { type: "INJURY", label: "Blessure", hint: "notre joueur", tone: "danger" },
+  {
+    type: "OWN_GOAL",
+    label: "CSC",
+    hint: "notre joueur",
+    tone: "danger",
+    icon: ACTION_ICONS.OWN_GOAL,
+  },
+  {
+    type: "PENALTY_SCORED",
+    label: "Penalty marqué",
+    hint: "tireur",
+    icon: ACTION_ICONS.PENALTY_SCORED,
+  },
+  {
+    type: "PENALTY_MISSED",
+    label: "Penalty manqué",
+    hint: "tireur",
+    tone: "danger",
+    icon: ACTION_ICONS.PENALTY_MISSED,
+  },
+  {
+    type: "INJURY",
+    label: "Blessure",
+    hint: "notre joueur",
+    tone: "danger",
+    icon: ACTION_ICONS.INJURY,
+  },
   {
     type: "POSITION_CHANGE",
     label: "Changement de poste",
     hint: "qui, vers quel poste",
+    icon: ACTION_ICONS.POSITION_CHANGE,
     wide: true,
   },
 ];
+
+/**
+ * The six remarks, behind « Remarque ».
+ *
+ * Built from `REMARK_KINDS` rather than written out, so the day a seventh remark is added to
+ * `lib/match/events.ts` it appears here with its French and its glyph and nothing else to do. No
+ * hint on any of them: all six lead to the same question — about whom — and six copies of the same
+ * sentence under six tiles is noise on the one screen that is read at arm's length.
+ *
+ * `tone` is the only thing that is not derived: what a coach wants to find without reading is whether
+ * the tile he is about to tap is the praise or the reproach.
+ */
+const REMARK_TONES: Record<RemarkKind, "accent" | "danger"> = {
+  GOOD_TRACK_BACK: "accent",
+  GOOD_EFFORT: "accent",
+  BAD_PASS: "danger",
+  GOOD_POSITIONING: "accent",
+  LOST_BALL: "danger",
+  NICE_SKILL: "accent",
+};
+
+const REMARK_CHOICES: readonly ActionChoice<RemarkKind>[] = REMARK_KINDS.map((kind) => ({
+  type: kind,
+  label: remarkLabelFr(kind),
+  icon: REMARK_ICONS[kind],
+  tone: REMARK_TONES[kind],
+}));
 
 const EMPTY_QUEUE: OutboxState = {
   pending: [],
@@ -407,6 +507,8 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         return setFlow({ step: "more" });
       case "COMMENT":
         return setFlow({ step: "comment" });
+      case "REMARK":
+        return setFlow({ step: "remark" });
       case "GOAL_FOR":
         return setFlow({ step: "goal-scorer" });
       case "GOAL_AGAINST":
@@ -438,6 +540,25 @@ export function GameMode({ live, canOperate }: GameModeProps) {
 
   /** On the pitch first, then the bench. A blessure and a comment can both be about either. */
   const everyone: PlayerOption[] = [...onPitch, ...available];
+
+  /**
+   * Who a remark can be about: everybody on the match sheet, and nobody else.
+   *
+   * Not just the seven on the pitch — a remark about the lad who came off two minutes ago is the
+   * normal case, since the coach taps it when he gets a free second and not the instant it happened,
+   * and « bon placement » about a substitute warming up is a thing a coach says. But not everybody
+   * `available` either: that list carries members « hors feuille » so the operator can send on
+   * somebody who turned up late (decision 087), and a remark about a man who was never in this match
+   * is a mis-tap, not a remark. The pitch is kept whole and only the bench is filtered, so a player
+   * who is somehow on the pitch without a role on the sheet is never silently unremarkable.
+   */
+  const onSheetMemberIds = new Set(
+    live.players.filter((player) => player.squadRole !== null).map((player) => player.memberId),
+  );
+  const remarkable: PlayerOption[] = [
+    ...onPitch,
+    ...available.filter((option) => onSheetMemberIds.has(option.memberId)),
+  ];
 
   /**
    * The one button that earns a place beside the score, because it is the only one that changes what
@@ -637,6 +758,32 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           onConfirm={(note, memberId) =>
             finish("COMMENT", memberId ? { note, memberId } : { note })
           }
+        />
+      ) : null}
+
+      {/* The grid of six, then who. `setFlow` again: the remark keeps the minute of the tap that
+          opened ACTION (decision 031), and both screens are the same flow. */}
+      {flow?.step === "remark" && flow.kind === undefined ? (
+        <ActionMenu
+          open
+          onClose={closeFlow}
+          title="Remarque"
+          stampLabel={stampLabel}
+          choices={REMARK_CHOICES}
+          onPick={(kind) => setFlow({ step: "remark", kind })}
+        />
+      ) : null}
+
+      {flow?.step === "remark" && flow.kind !== undefined ? (
+        <RemarkSheet
+          open
+          // One instance per remark, so a sheet never opens holding the player a previous one chose.
+          key={flow.kind}
+          onClose={closeFlow}
+          kind={flow.kind}
+          stampLabel={stampLabel}
+          options={remarkable}
+          onConfirm={(memberId) => finish("REMARK", { kind: flow.kind, memberId })}
         />
       ) : null}
 

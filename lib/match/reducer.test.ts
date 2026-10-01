@@ -1306,6 +1306,84 @@ describe("a comment", () => {
 });
 
 /* -------------------------------------------------------------------------- */
+/* Remarks                                                                    */
+/* -------------------------------------------------------------------------- */
+
+describe("a remark", () => {
+  /** Same shape as the comment fixture above: kept off the last minute so the clocks anchor alike. */
+  const PLAYED: Fixture[] = [
+    { type: "KICKOFF", min: 0, period: 1 },
+    { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+    { type: "GOAL_FOR", min: 11, payload: { scorerId: "julien" } },
+  ];
+
+  const withRemark = (payload: unknown) =>
+    reduceMatch(
+      log([...PLAYED.slice(0, 2), { type: "REMARK", min: 5, payload }, ...PLAYED.slice(2)]),
+      [],
+      CONFIG,
+    );
+
+  const remarked = (payload: unknown) =>
+    withRemark(payload).timeline.find((line) => line.type === "REMARK")!;
+
+  it("changes nothing at all: not the score, not the clock, not the pitch, not the minutes", () => {
+    const plain = reduceMatch(log(PLAYED), [], CONFIG);
+    const state = withRemark({ kind: "GOOD_EFFORT", memberId: "karim" });
+
+    // The whole state but the log itself, so no field can quietly start moving.
+    expect({ ...state, timeline: [] }).toEqual({ ...plain, timeline: [] });
+    expect(state.goalsFor).toBe(1);
+    expect(state.goalsAgainst).toBe(0);
+    expect(state.onPitch).toHaveLength(7);
+    expect(state.anomalies).toEqual([]);
+  });
+
+  it("appears in the timeline with its kind and the player it names", () => {
+    const entry = remarked({ kind: "GOOD_EFFORT", memberId: "karim" });
+    expect(entry.remarkKind).toBe("GOOD_EFFORT");
+    expect(entry.actors).toEqual([{ memberId: "karim", role: "remarked" }]);
+    expect(entry.labelFr).toBe("Remarque");
+    expect(entry.minuteLabel).toBe("5’");
+    expect(entry.note).toBeNull();
+    expect(entry.scoreAfter).toBeNull();
+    expect(entry.invalidPayload).toBe(false);
+  });
+
+  /*
+   * The degradation that matters, and the one the lenient schema exists for: the kind is a word
+   * this build does not know, and the `memberId` beside it is perfectly good. Losing Karim with it
+   * would be the reducer refusing a log Postgres has already accepted (decision 122), so the row
+   * parses, names him, and has no kind to print.
+   */
+  it("names the player of a remark whose kind it does not know, and no kind", () => {
+    const entry = remarked({ kind: "GOOD_HAIRCUT", memberId: "karim" });
+    expect(entry.invalidPayload).toBe(false);
+    expect(entry.remarkKind).toBeNull();
+    expect(entry.actors).toEqual([{ memberId: "karim", role: "remarked" }]);
+  });
+
+  it("is still shown when its payload cannot be read, naming no kind and nobody", () => {
+    // No `memberId`: a remark about nobody is not a remark, so this one really is unreadable.
+    const entry = remarked({ kind: "GOOD_HAIRCUT" });
+    expect(entry.invalidPayload).toBe(true);
+    expect(entry.remarkKind).toBeNull();
+    expect(entry.actors).toEqual([]);
+
+    // And neither is a payload that is not an object at all.
+    const garbage = remarked("GOOD_EFFORT");
+    expect(garbage.invalidPayload).toBe(true);
+    expect(garbage.remarkKind).toBeNull();
+    expect(garbage.actors).toEqual([]);
+  });
+
+  it("leaves no remark kind on any other event", () => {
+    const state = reduceMatch(SEED_LOG, [], CONFIG);
+    expect(state.timeline.every((entry) => entry.remarkKind === null)).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
 /* Contracts                                                                  */
 /* -------------------------------------------------------------------------- */
 

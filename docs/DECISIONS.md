@@ -3052,9 +3052,12 @@ generic over its key so the « Autre… » tile — which records nothing and ha
 the same component as everything that does, rather than a copy of it.
 
 **« Faute » is no longer offered, and that is not the same as removing it.** `FOUL` stays in
-`MATCH_EVENT_TYPES`, in `GAME_MODE_EVENT_TYPES`, in `RETRO_FACT_TYPES` and in the `Flow` union, because
-`match_events` is append-only (invariant 1): the fouls already in a log must still render, still count
-in the stats and still be voidable. What changed is the one user-facing menu it appeared in. Amateur
+`MATCH_EVENT_TYPES`, in `RETRO_FACT_TYPES` and in the `Flow` union, because `match_events` is
+append-only (invariant 1): the fouls already in a log must still render, still count in the stats and
+still be voidable. What changed is the one user-facing menu it appeared in — and *only* that: this
+entry also named a `GAME_MODE_EVENT_TYPES` the type stayed in, which the review of decision 122 found
+to be a copy of `MATCH_EVENT_TYPES` that nothing imported, so it has been deleted rather than left
+looking like a gate. No allow-list narrower than the enum guards `POST /api/match-events`. Amateur
 7-a-side has no card count and no disciplinary consequence to compute, so the tile was asking a coach
 watching football to do data entry for nobody.
 
@@ -3697,3 +3700,68 @@ One untruth this makes visible without causing, recorded in `docs/ROADMAP.md` ra
 because when a player may still answer is a product call: a match in the past that nobody has
 declared over still shows « Ta réponse » with « Tu peux changer d'avis jusqu'au coup d'envoi », and
 still chases the players who never answered.
+
+## 122 — A remark is one event type with its kind in the payload
+
+**2026-10-01** · accepted · follows 114
+
+The owner wanted the touchline vocabulary he already says out loud, as one tap while the game goes
+on: « bon retour », « bel effort », « mauvaise passe », « bon placement », « perte de balle », « beau
+geste » — six judgements about one player, none of them a fact anybody could check. Decision 114 had
+just put a free-text `COMMENT` in the log for the same reason, and the obvious next step is six more
+event types beside it. That is the step not taken.
+
+**Decision.** One enum value, `REMARK`, with the kind in the payload: `{ kind, memberId }`, `kind`
+drawn from `REMARK_KINDS` in `lib/match/events.ts`. Six enum values would have been six
+`ALTER TYPE … ADD VALUE` statements, six payload schemas, six rows of `EVENT_LABELS_FR`, six icons
+and six branches in two formatters — and the seventh remark the owner thinks of next Sunday would be
+a migration on a production database, for a word. A kind in the payload is a line in an array, and
+`tsc` still refuses an incomplete set: `REMARK_LABELS_FR` and `REMARK_ICONS` are
+`Record<RemarkKind, …>`, so adding a kind without its French or without drawing it fails the
+typecheck rather than shipping a nameless or a blank tile.
+
+**The trade being accepted, written here rather than discovered later: the database no longer
+constrains which kinds exist.** `match_event_type` says a row is a remark and nothing more, so an
+unknown `kind` — an older device's payload, a hand-written insert, a kind somebody deletes from the
+array — is a runtime concern instead of a `22P02`. Two things answer it, and they are the two strictnesses
+`lib/match/events.ts` was already built around. At ingestion `MATCH_EVENT_PAYLOAD_SCHEMAS`
+validates `kind` against the `z.enum`, so nothing the API accepts carries one. And the reducer, which
+reads the lenient schemas because it **must never refuse a log Postgres has already accepted**, is
+lenient about the kind too: the row parses, the `memberId` beside the unfamiliar word survives, the
+`remarked` actor is pushed, and `remarkKind` is left null because `isRemarkKind` — the reducer's own
+check, not the schema's — does not recognise it. `remarkDetailFr` then returns null and the line
+degrades to « Remarque » naming the player. **The first draft of this entry said the entry was marked
+`invalidPayload` and named nobody, and that was the behaviour as written**: the lenient schema shared
+the strict `z.enum`, so the parse failed and threw the player away with the word. The review of the
+pull request caught it, and the fix is the one this paragraph always described — a kind the code cannot
+name costs the word, not the name. Only a payload that is *actually* unreadable (no `memberId`, or not
+an object) is `invalidPayload`. It says less rather than inventing something, which is the only
+acceptable failure for a screen in this repository.
+
+**`memberId` is required**, and that is the whole difference from 114's `COMMENT`, whose `memberId`
+is optional on purpose. « Bel effort » about nobody in particular is not a remark, it is a note — so
+the sheet opens with no player chosen, « Enregistrer » disabled, and a hint saying why, rather than
+defaulting to the man the coach happened to look at last.
+
+**The reducer computes nothing from a remark**, like the comment before it: an opinion moves no
+number. That is asserted as whole-state equality against the same log without it, every field but the
+timeline itself, so no figure can quietly start depending on one. What the reducer *does* record is
+the kind and the player — `remarkKind` on the entry and a `remarked` actor — because the historian
+names what happened and the presenter writes it down.
+
+**One formatter serves both screens**, `remarkDetailFr` in `lib/match/presenter.ts`, called by game
+mode's timeline and by the rating recap. This is the lesson of 114 applied before it cost anything:
+two screens formatting the same event is how one of them ends up dropping it. Remarks reach the
+shared match summary because `HIDDEN_EVENT_TYPES` in `lib/rating/recap.ts` hides only `PAUSE`,
+`RESUME` and `VOID` — the owner asked for that, so it is pinned by a test rather than left as a
+property of a set three screens away.
+
+Two smaller things that are consequences rather than choices. The remark carries **the minute the
+ACTION menu was opened**, not the minute the coach finished choosing a player: decision 031 already
+decided that a tap is stamped when it is made, and picking a name from a `<select>` takes as long as
+it takes. And the icons now on every action tile, including the six remarks, are **hand-rolled inline
+SVG** on `components/theme/theme-toggle.tsx`'s pattern — `currentColor` so a tile's tone tints its
+drawing and light and dark are free, `aria-hidden` so the accessible name stays the French label
+alone, and no icon dependency in this repository, which is a position and not an omission. They were
+rasterised at 16 px and four of them were redrawn, because a 24-unit grid stroked at 1.75 holds about
+four strokes before it turns to mud.

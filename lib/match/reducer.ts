@@ -98,7 +98,9 @@ import {
   EVENT_LABELS_FR,
   type MatchEventPayloads,
   type MatchEventType,
+  type RemarkKind,
   compareMatchEvents,
+  isRemarkKind,
   parseMatchEventPayload,
 } from "./events";
 import { type LineupDiff, type SlotAssignment, type SlotInfo, diffLineups } from "./lineup";
@@ -247,7 +249,9 @@ export type TimelineActorRole =
   | "foul"
   | "injured"
   /** The player a `COMMENT` is about, when the coach attached one. */
-  | "commented";
+  | "commented"
+  /** The player a `REMARK` is about. Always present: a remark names somebody by construction. */
+  | "remarked";
 
 export type TimelineActor = {
   memberId: string;
@@ -278,6 +282,12 @@ export type TimelineEntry = {
    * the presenter has one field to read rather than a payload to re-interpret.
    */
   note: string | null;
+  /**
+   * Which remark a `REMARK` is, as the identifier rather than as French: the reducer records what
+   * happened and the presenter writes it down. `null` on every other type, and on a `REMARK` whose
+   * payload could not be read.
+   */
+  remarkKind: RemarkKind | null;
   /** The running score immediately after this event, on the events that changed it. */
   scoreAfter: { goalsFor: number; goalsAgainst: number } | null;
   /** True when the payload could not be read; the entry is still shown. */
@@ -984,6 +994,24 @@ export function reduceMatch(
       if (comment?.memberId) actors.push({ memberId: comment.memberId, role: "commented" });
     }
 
+    // A REMARK moves nothing either, for the same reason and in the same place: it is an opinion
+    // about a player, not something that happened to the match. All it leaves behind is which
+    // remark it was and whom it named, so the timeline can say « Bel effort — Karim ».
+    //
+    // The kind is checked here rather than by the schema, and that is the point of the lenient set:
+    // a row whose kind this build does not know — an older device, a hand-written insert, a kind
+    // somebody deleted from `REMARK_KINDS` — still carries a perfectly good `memberId`, and
+    // throwing the player away with the word would be refusing history (decision 122). So it parses,
+    // names its player, and simply has no kind to print. A payload that is *actually* unreadable —
+    // no `memberId`, or not an object at all — still fails the parse and is reported as one.
+    let remarkKind: RemarkKind | null = null;
+    if (event.type === "REMARK") {
+      const remark = payload as MatchEventPayloads["REMARK"] | null;
+      const kind: unknown = remark?.kind;
+      remarkKind = isRemarkKind(kind) ? kind : null;
+      if (remark?.memberId) actors.push({ memberId: remark.memberId, role: "remarked" });
+    }
+
     timeline.push({
       eventId: event.id,
       clientEventId: event.clientEventId ?? null,
@@ -998,6 +1026,7 @@ export function reduceMatch(
       voidsEventId: event.type === "VOID" ? (event.voidsEventId ?? null) : null,
       actors,
       note,
+      remarkKind,
       scoreAfter,
       invalidPayload,
     });

@@ -9,6 +9,131 @@ contents change, and the version you remember from an hour ago may be stale.
 
 ---
 
+## NOW
+
+**2026-10-01.** **This section is rewritten in place on every push; everything from `## Log` down is
+appended to and never edited.** Those are the two halves of the protocol, and they are not
+interchangeable: this section says what is *true now*, the Log says what *happened*. So when you change
+a fact here you still leave a dated line in your own Log lane.
+
+Keep it to these labelled lines, and keep them short. The 200 lines this section replaced were a
+beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
+it. If a line takes more than a few seconds to correct, it will rot too.
+
+- **`main`** — at `v1.0.0-beta.5`. Managed from **the owner's machine**, which is the one gatekeeper:
+  it reviews and squash-merges, including work pushed from the other machine.
+- **Last shipped** — **`v1.0.0-beta.5`**. A version is `package.json`'s `version`; the annotated tag,
+  cut **by hand** on `main` by the owner, is the act that ships it and the only thing that migrates and
+  deploys production (decision 119). Nothing cuts a tag for you.
+- **Next free decision number** — **123**. The highest written is **122**, and it is on the open pull
+  request below rather than on `main`. Leave `## NNN — …` in your entry; the merging session numbers it.
+- **Live** — production `https://7orteils.bgonzva.fr`, deployed by `release.yml` on a tag. Preview
+  `https://dev.7orteils.bgonzva.fr`, deployed by `ci.yml` on a push to `main`, after it migrates the
+  preview database. Both go out through the **Vercel CLI**: `vercel.json` sets `git.deploymentEnabled`
+  to `false` for every branch including `main`, so Vercel's Git integration issues nothing, ever.
+  **A branch therefore deploys nowhere and gets no Vercel check on its pull request** — that is
+  deliberate (decision 119), not a broken integration. The way to look at a branch is `npm run build`.
+- **Open pull requests** — **#113**, `feat/action-icons-and-remarks`: the `REMARK` event and the drawn
+  action icons for game mode, carrying decision **122**. Open and under review as this is written.
+- **In flight · the owner's machine** — #113, above.
+- **In flight · the other machine** — its last word (Log, 2026-09-30 22:10) was that it had started
+  step 1 of the iPhone tap-latency brief, now filed under « Spent instructions » below. **That half is
+  done**: PR #111 and the `docs/SESSIONS.md` entry « Where the two seconds on the iPhone actually are »
+  are the measurement, and the three pull requests it proposes — acknowledge the tap, `<Suspense>` on
+  `/stats`, the auth prefix joins — are what remains. The region half was decision 111. Seeded here from
+  the Log by the owner's machine; it is the other machine's line to keep current.
+
+**Who writes which line — because two machines rewriting one block is exactly the conflict the two Log
+lanes were invented to avoid.** The gatekeeper machine, the owner's, owns every line above except the
+`In flight · …` lines: it is the only session that merges, so it is the only one that can know what
+`main`, the version, the next number and the open list are. **Every other session edits exactly one
+line, its own `In flight · …`**, and otherwise only appends to its own Log lane. Two machines then never
+touch the same line, a rebase of this section is a rebase of nothing, and nobody has to restructure a
+shared file to report a status. If you are not the gatekeeper and a line here looks wrong to you, **do
+not fix it**: say so in your Log lane and leave it alone. It will be right after the next merge, and a
+wrong line for an hour costs less than a conflict on the one file that exists to prevent conflicts.
+
+And « what is in flight » is stated **here only**. A Log line is dated history: « at 22:10 I started X »
+stays true forever and is never a status. This section is the only place that claims the present tense,
+so there is no second copy to keep in sync.
+
+---
+
+## The standing rules
+
+Live, and gathered here from the four 2026-09-23 sections now kept below for the record. Nothing in
+this list is new; what is new is that it is in one place.
+
+1. **`main` has one gatekeeper, and it is the owner's machine. Do not merge your own pull request.**
+   Open the branch, push it, let CI go green, and **leave it open**. The owner's session reviews and
+   squash-merges, usually within minutes. It is not a judgement on the work — it is one hand on `main`
+   instead of two. *(One thing to settle rather than assume: the other machine's Log line of 2026-09-30
+   22:10 reports being told « you can merge to main by yourself if needed », and numbered decision 120
+   itself on that basis. Until the owner says otherwise here, the rule above is what this file states,
+   and the other machine offered to go back to it.)*
+2. **Never race for a decision number.** Write the entry with its heading left as `## NNN — …`. The
+   merging session fills it in, because it is the only session that cannot lose the race. 074–081 were
+   claimed by four sessions in two hours and one entry was renumbered three times; that is what this
+   avoids.
+3. **Infrastructure is the owner's.** `vercel.json`, `.github/workflows/`, `package.json`'s `version`,
+   tags, and anything about Vercel or Neon. If you think one of them is wrong, write it in the Log and
+   leave it alone. Migrations are applied by CI (decision 078), never by hand: a push to `main`
+   migrates the **preview** database, production's schema moves only on a tag (decision 119).
+4. **Append; never restructure.** `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md` and
+   `docs/DEPLOY.md` are touched by every session. Add your block at the end of the relevant section and
+   change nothing above it. Two appends merge by hand in a minute; one append against a rewrite is a
+   real conflict. In this file, that means: append to your own Log lane, and edit only your own
+   `In flight · …` line in `## NOW`.
+5. **Rebase, do not merge, and re-run the checks after.** `git fetch` then `git rebase origin/main`. A
+   rebased docs conflict is almost always « keep both blocks, theirs first » — and then run
+   `npm run typecheck && npm run lint && npm test` again, because a clean textual merge of two correct
+   changes is still capable of producing a wrong file.
+6. **Write down what you could not verify.** If you claim a job, a deployment or a screen works, say
+   how you know. Entries in `docs/SESSIONS.md` have asserted things that had never been run once.
+7. **Say in the Log what you are starting and what you are stopping**, one line each, naming the
+   branch and the files or screens you are in. That one line is the only thing that stops two sessions
+   doing the same work. And never leave a change only in a working tree: commit it on its branch and
+   push it even half-done, with a message saying it is half-done.
+8. **Secrets stay with the owner and must not be worked around.** `SUPER_ADMIN_USERNAME` and
+   `SUPER_ADMIN_PASSWORD` are never stored in Vercel and never in a GitHub secret. `ALLOW_REMOTE_RESET`
+   is set nowhere. The production connection string is deliberately unreadable — sensitive in Vercel,
+   write-only as a secret — so if you need it, **ask**: do not try to extract it, and do not print it if
+   you are handed it.
+9. **Never `db:push` or `db:reset` against a remote database.** And know the trap that bit this machine
+   today: `db/load-env.ts` loads `.env.local` **and then** `.env`, so whichever file defines
+   `DATABASE_URL` first wins — and on at least one machine `.env` holds a **remote Neon** URL. A
+   `.env.local` pointing at the local Postgres is the whole protection; without one, `npm run db:reset`
+   can drop a remote database while looking exactly like a local command. Check which URL you are about
+   to aim at before any destructive `db:` script. Never write a connection string into this file.
+
+---
+
+## Watching for each other
+
+`npm run peer` prints what the other sessions have done since the last time it ran — branches, open
+pull requests, `main`, and how many lines this file's log has. `npm run peer -- --full` prints the
+whole picture whether or not it moved. It is read-only against `origin` (no fetch into the working
+tree, no checkout) and keeps its snapshot in `.git/`, so it can never be committed by accident. Exit
+code 0 means nothing changed and 10 means something did, so it can drive a watcher.
+
+The log below is the part worth checking. Everything else is inference from what a session _did_; a
+line here is a session saying what it _meant_.
+
+---
+
+## Spent instructions, kept for the record
+
+Nothing in this file is deleted. These four sections were written by the owner, or by a session doing
+its job, and they are answered now — so they are kept below what is live rather than above it, each
+with a dated line saying what answered it.
+
+---
+
+> **Answered in half, 2026-10-01.** The *measuring* half is done — PR #111 and the `docs/SESSIONS.md`
+> entry « Where the two seconds on the iPhone actually are » — and the region half was decision 111,
+> already noted inside. What remains is the three pull requests this brief asks for, which is why it is
+> still named in `## NOW` under « In flight · the other machine ».
+
 ## A TASK FOR THE OTHER MACHINE — from the owner, 2026-09-23 17:25 CEST
 
 **The stop at 14:35 is lifted for this one piece of work, and for nothing else.** The owner has tested
@@ -55,6 +180,12 @@ where you change nothing, because « we looked and it was 90 ms » is the thing 
 Everything else in the STOP section still stands: no merging your own work, no tags, no infrastructure,
 and nothing half-done left only in a working tree.
 
+---
+
+> **Spent, 2026-10-01.** The stop of 14:35 was lifted for the tap-latency brief above, and the other
+> machine has been working again since 2026-09-30. It is kept because its four points are where the
+> one-gatekeeper rule came from; the operative version is rule 1 of `## The standing rules`.
+
 ## STOP — from the owner, 2026-09-23 14:35 CEST
 
 **To the session on the other machine: your backlog is finished. Stop making changes.** The owner
@@ -87,6 +218,10 @@ players in a match played ten days earlier, « Tout le monde est là » one tap 
 days out. Thank you. The stop is about who holds the repository now, not about the work.
 
 ---
+
+> **Superseded in place, 2026-10-01.** Its substance is now rules 1, 2, 3 and 7 of
+> `## The standing rules` above — read those; this is the original wording. Point 4's `audit/` worklist
+> is history, closed out in the other machine's Log lane.
 
 ## THE WORKING AGREEMENT — from the owner, 2026-09-23 11:20 CEST
 
@@ -128,6 +263,15 @@ Commit it on its branch and push it even half-done, with a message saying it is 
 the next session can find is worth more than a tidy stopping point it cannot.
 
 ---
+
+> **Rotted, 2026-10-01, and kept only as the record of how the two-machine problem started.** Four
+> things in it are no longer true, and are named here rather than silently carried: the highest decision
+> number is **122**, not 082; `db:bootstrap` **has** been run and there is a user account; the app is
+> **not** at `football-manager-avznog-team.vercel.app` — production is `7orteils.bgonzva.fr` and the
+> preview is `dev.7orteils.bgonzva.fr`; and **nothing deploys from git at all** any more, both
+> deployments being issued by a workflow with the Vercel CLI (decision 119). Its « If you are that
+> session », « Things that changed under you » and « What stays with the owner » subsections are the
+> source of `## The standing rules`.
 
 ## STATUS: one session is looping, and it now knows it
 
@@ -216,17 +360,6 @@ unreadable — sensitive in Vercel, write-only as a secret — so if you need it
 extract it, and do not print it if you are handed it.
 
 ---
-
-## Watching for each other
-
-`npm run peer` prints what the other sessions have done since the last time it ran — branches, open
-pull requests, `main`, and how many lines this file's log has. `npm run peer -- --full` prints the
-whole picture whether or not it moved. It is read-only against `origin` (no fetch into the working
-tree, no checkout) and keeps its snapshot in `.git/`, so it can never be committed by accident. Exit
-code 0 means nothing changed and 10 means something did, so it can drive a watcher.
-
-The log below is the part worth checking. Everything else is inference from what a session _did_; a
-line here is a session saying what it _meant_.
 
 ## Log
 
@@ -501,6 +634,34 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   branch `main`, so `deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` to make the CLI deployment take
   that domain — **expected, not seen**. Watch the first `main` push. `7orteils.bgonzva.fr` has no git pin
   and is on the Production environment, so `--prod` takes it (verified).
+- **2026-10-01 · the owner's machine · `feat/action-icons-and-remarks`** — A new **`REMARK`** match event
+  and icons on every action tile. Decision **122**, so the next free number is **123**. What another
+  session could trip over, in order of likelihood. **`db/migrations/0005_goofy_sir_ram.sql`** is the
+  repo's second `ALTER TYPE … ADD VALUE`, `'REMARK' BEFORE 'FINAL_WHISTLE'` — if your local database is
+  behind, `getLiveMatch` and the reducer will read a type Postgres does not have, so `npm run db:migrate`
+  before you doubt anything — the 22:10 bullet below is a browser check that reported the expected result
+  for entirely the wrong reason because that machine was three migrations behind. **Six remarks are one
+  enum value with the kind in the payload**: `{ kind, memberId }`, `kind` from `REMARK_KINDS` in
+  `lib/match/events.ts`, so add a seventh there and not in `db/schema.ts`.
+  `memberId` is **required**, unlike `COMMENT`'s. **`TimelineEntry` has a new field, `remarkKind`**, null
+  on every other type — additive, but it is in the reducer's output, so a `toEqual` on a whole entry will
+  want it. The reducer computes nothing from a remark. **`remarkDetailFr` in `lib/match/presenter.ts` is
+  the only formatter**, called by game mode's timeline *and* by `lib/rating/recap.ts`; do not write a
+  second one, which is what decision 114 cost us. Remarks are visible in the shared match summary on
+  purpose and a test pins it. On the icons: `components/action-sheet/action-icons.tsx` is new, exported
+  through the barrel, hand-rolled inline SVG with **no dependency and there is not to be one**;
+  `ACTION_ICONS` is keyed by tile and **`REMARK_ICONS` is a total `Record<RemarkKind, ReactNode>`**, so a
+  seventh kind without a drawing fails `tsc` rather than shipping a blank tile. Nothing touched in
+  `vercel.json`, `.github/`, `package.json` or anything about the deployment, and no tag.
+  **Stale in this file, flagged rather than deleted** since they are other sessions' words: the iPhone
+  tap-latency brief at the top and its STOP lift are **answered** — the measurement is in
+  `docs/SESSIONS.md` « Where the two seconds on the iPhone actually are », and the three pull requests it
+  proposes are the open work, not the measuring; the « highest number on `main` is 082 » line in the
+  STATUS section is thirty-nine decisions out of date and the number is now **122**; « the app has no
+  user account, `db:bootstrap` has not been run » is no longer true, and neither is the
+  `football-manager-avznog-team.vercel.app` URL, which is `7orteils.bgonzva.fr` in production and
+  `dev.7orteils.bgonzva.fr` for the preview; and the STATUS heading's « one session is looping » has not
+  been true since the 22:10 bullet below.
 
 ### From the other machine
 

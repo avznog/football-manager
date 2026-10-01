@@ -11,13 +11,14 @@
  *
  * ## Two strictnesses, one definition
  *
- * `MATCH_EVENT_PAYLOAD_SCHEMAS` requires member and slot references to be UUIDs — that is the
- * truth of the columns they point at, and what the ingestion boundary must enforce.
- * `LENIENT_MATCH_EVENT_PAYLOAD_SCHEMAS` accepts any non-empty string id. The reducer uses the
- * lenient set on purpose: **it must never refuse to read a log Postgres has already accepted.**
- * A reducer that dropped a goal because an id looked odd would lose real history; the shape of an
- * id is the API's problem, not the historian's. Both sets come from one factory, so they cannot
- * drift apart.
+ * `MATCH_EVENT_PAYLOAD_SCHEMAS` requires member and slot references to be UUIDs, and a `REMARK`'s
+ * kind to be one this build knows — that is the truth of the columns they point at, and what the
+ * ingestion boundary must enforce. `LENIENT_MATCH_EVENT_PAYLOAD_SCHEMAS` accepts any non-empty
+ * string for both. The reducer uses the lenient set on purpose: **it must never refuse to read a
+ * log Postgres has already accepted.** A reducer that dropped a goal because an id looked odd would
+ * lose real history, and one that dropped a remark because its kind was unfamiliar would throw
+ * away the player it names; the shape of an id and the spelling of a kind are the API's problem,
+ * not the historian's. Both sets come from one factory, so they cannot drift apart.
  *
  * See `docs/DATA_MODEL.md` § "The match event log" for the table, and decision 010 for why there
  * are no cards, no opponent scorers, no shots and no corners.
@@ -53,6 +54,7 @@ export const MATCH_EVENT_TYPES = [
   "FOUL",
   "INJURY",
   "COMMENT",
+  "REMARK",
   "FINAL_WHISTLE",
   "VOID",
 ] as const;
@@ -130,10 +132,47 @@ const reasonSchema = z.string().trim().min(1).max(120);
 const noteSchema = z.string().trim().min(1).max(280);
 
 /**
- * Both payload dictionaries come from here, differing only in how an id is validated.
- * `id` is applied to every `team_members.id` and `formation_slots.id` reference.
+ * The six things a coach taps about a player during a match.
+ *
+ * They are **one** event type with the kind in the payload, not six types: a seventh remark is a
+ * line in this array, whereas a seventh enum value would be a migration on a production database.
+ * Same screaming-snake style as the event types above, because they are read in the same breath.
  */
-function buildPayloadSchemas(id: z.ZodType<string, unknown>) {
+export const REMARK_KINDS = [
+  "GOOD_TRACK_BACK",
+  "GOOD_EFFORT",
+  "BAD_PASS",
+  "GOOD_POSITIONING",
+  "LOST_BALL",
+  "NICE_SKILL",
+] as const;
+
+export type RemarkKind = (typeof REMARK_KINDS)[number];
+
+/**
+ * Whether a kind read back out of a `jsonb` payload is one this build knows.
+ *
+ * The reducer's guard, and the reason it can be lenient: the lenient schema lets any non-empty kind
+ * through so that the `memberId` beside it is not lost with it, and this is what then decides
+ * whether there is a French label to print (decision 122).
+ */
+export function isRemarkKind(value: unknown): value is RemarkKind {
+  return typeof value === "string" && (REMARK_KINDS as readonly string[]).includes(value);
+}
+
+/**
+ * Both payload dictionaries come from here, differing only in how two things are validated.
+ *
+ * `id` is applied to every `team_members.id` and `formation_slots.id` reference. `kind` is a
+ * `REMARK`'s kind: `REMARK_KINDS` for the strict set, any non-empty string for the lenient one, so
+ * that a remark whose kind this build does not know still parses and still yields the player it
+ * names. Which kind it was is then the reducer's own check, `isRemarkKind` above — refusing an
+ * unknown kind is the ingestion boundary's job, not the historian's.
+ */
+function buildPayloadSchemas<Kind extends string>(
+  id: z.ZodType<string, unknown>,
+  kind: z.ZodType<Kind, unknown>,
+) {
   const empty = z.object({});
   const pause = z.object({ reason: reasonSchema.optional() });
 
@@ -194,6 +233,12 @@ function buildPayloadSchemas(id: z.ZodType<string, unknown>) {
      */
     COMMENT: z.object({ note: noteSchema, memberId: id.optional() }),
 
+    /**
+     * One tap about one player. `memberId` is **required**, which is the one way a remark differs
+     * from a `COMMENT`: « bel effort » about nobody in particular is not a remark, it is a note.
+     */
+    REMARK: z.object({ kind, memberId: id }),
+
     FINAL_WHISTLE: empty,
 
     /** The target is carried by the `voids_event_id` column, not by the payload. */
@@ -201,11 +246,14 @@ function buildPayloadSchemas(id: z.ZodType<string, unknown>) {
   };
 }
 
-/** UUID-strict. What the ingestion API and the Server Actions validate against. */
-export const MATCH_EVENT_PAYLOAD_SCHEMAS = buildPayloadSchemas(z.uuid());
+/** UUID-strict, kind-strict. What the ingestion API and the Server Actions validate against. */
+export const MATCH_EVENT_PAYLOAD_SCHEMAS = buildPayloadSchemas(z.uuid(), z.enum(REMARK_KINDS));
 
-/** Shape-strict, id-lenient. What the reducer reads, so history is never refused. */
-export const LENIENT_MATCH_EVENT_PAYLOAD_SCHEMAS = buildPayloadSchemas(z.string().trim().min(1));
+/** Shape-strict, id- and kind-lenient. What the reducer reads, so history is never refused. */
+export const LENIENT_MATCH_EVENT_PAYLOAD_SCHEMAS = buildPayloadSchemas(
+  z.string().trim().min(1),
+  z.string().trim().min(1),
+);
 
 type PayloadSchemas = typeof MATCH_EVENT_PAYLOAD_SCHEMAS;
 
@@ -372,12 +420,32 @@ export const EVENT_LABELS_FR: Record<MatchEventType, string> = {
   FOUL: "Faute",
   INJURY: "Blessure",
   COMMENT: "Commentaire",
+  /**
+   * The generic word on purpose: the timeline prints the *kind* right next to it
+   * (« Remarque · Bel effort — Karim »), so naming the kind twice would say nothing twice. It is
+   * also what a `REMARK` whose payload cannot be read has left to show.
+   */
+  REMARK: "Remarque",
   FINAL_WHISTLE: "Coup de sifflet final",
   VOID: "Annulation",
 };
 
 export function eventLabelFr(type: MatchEventType): string {
   return EVENT_LABELS_FR[type];
+}
+
+/** What the timeline calls each remark. The owner's own words (decision 074: it tutoies, it is terse). */
+export const REMARK_LABELS_FR: Record<RemarkKind, string> = {
+  GOOD_TRACK_BACK: "Bon retour",
+  GOOD_EFFORT: "Bel effort",
+  BAD_PASS: "Mauvaise passe",
+  GOOD_POSITIONING: "Bon placement",
+  LOST_BALL: "Perte de balle",
+  NICE_SKILL: "Beau geste",
+};
+
+export function remarkLabelFr(kind: RemarkKind): string {
+  return REMARK_LABELS_FR[kind];
 }
 
 /** How a voided line reads in the timeline: « But 58’ — annulé ». */

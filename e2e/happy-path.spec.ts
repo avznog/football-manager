@@ -78,6 +78,19 @@ const MAX_NOTE = 280;
 /** « Autre… », which records nothing and opens the second menu. Spelt once, used three times. */
 const MORE_TILE = "Autre… CSC, penalty, blessure, poste";
 
+/** « Remarque », the other tile that records nothing on its own tap: it opens the sheet of six. */
+const REMARK_TILE = "Remarque bon retour, perte de balle…";
+
+/** The six remarks, in the order `REMARK_KINDS` lists them — which is the order the grid draws. */
+const REMARKS: readonly string[] = [
+  "Bon retour",
+  "Bel effort",
+  "Mauvaise passe",
+  "Bon placement",
+  "Perte de balle",
+  "Beau geste",
+];
+
 /**
  * The clock button's accessible name before kick-off — `clockActionFr().name`, not its `label`.
  *
@@ -97,6 +110,7 @@ const FIRST_TIER: readonly string[] = [
   "But encaissé enregistré aussitôt",
   "Changement qui sort, qui entre",
   "Commentaire une note libre",
+  REMARK_TILE,
   MORE_TILE,
 ];
 
@@ -334,7 +348,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(score).toHaveText("1 – 1");
   });
 
-  await test.step("the menu is four tiles and an « Autre… », and « Faute » is offered nowhere", async () => {
+  await test.step("the menu is four tiles, « Remarque », an « Autre… », and « Faute » nowhere", async () => {
     await page.clock.setFixedTime(at(27));
     await expect(clock).toHaveText("27:00");
 
@@ -350,14 +364,17 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     for (const name of FIRST_TIER) {
       await expect(first.getByRole("button", { name, exact: true })).toBeVisible();
     }
-    // Five tiles and « Fermer », and nothing else: nine tiles is what decision 114 removed, and a
-    // sixth tile creeping back into the row a thumb finds without reading is what this catches.
+    // The six tiles and « Fermer », and nothing else: nine tiles is what decision 114 removed, and a
+    // seventh tile creeping back into the row a thumb finds without reading is what this catches.
+    // Four of the six record something and are square; « Remarque » and « Autre… » each span a row,
+    // because neither records anything on its own tap.
     await expect(first.getByRole("button")).toHaveCount(FIRST_TIER.length + 1);
 
-    // Decision 114, the half nothing else can pin: `FOUL` stays in `MATCH_EVENT_TYPES`, in
-    // `GAME_MODE_EVENT_TYPES` and in the retro-entry screen — because `match_events` is append-only
-    // and the fouls already logged must still render — while leaving the one menu it appeared in.
-    // Every type-level test therefore still passes with the tile put back.
+    // Decision 114, the half nothing else can pin: `FOUL` stays in `MATCH_EVENT_TYPES` and in the
+    // retro-entry screen — because `match_events` is append-only and the fouls already logged must
+    // still render — while leaving the one menu it appeared in. Nothing on the server refuses the
+    // type, so every type-level test still passes with the tile put back: this line is the only
+    // thing that notices.
     await expect(first.getByRole("button", { name: "Faute" })).toHaveCount(0);
 
     await first.getByRole("button", { name: MORE_TILE, exact: true }).click();
@@ -487,9 +504,8 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
      * The reload is the assertion, the way it is in `offline.spec.ts`. Up to here every character on
      * screen could have come from React state and IndexedDB; afterwards the only source is the
      * server's own log replayed by the reducer — so this one line covers the `COMMENT` branch of
-     * `matchEventPayloadSchema`, the ingest allow-list in `GAME_MODE_EVENT_TYPES`, the `note` column
-     * of `TimelineEntry` and the fact that `reduceMatch` carries free text at all. None of that is
-     * exercised by anything that stops at the client.
+     * `matchEventPayloadSchema`, the `note` column of `TimelineEntry` and the fact that `reduceMatch`
+     * carries free text at all. None of that is exercised by anything that stops at the client.
      */
     await page.reload();
 
@@ -502,6 +518,61 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     // Nothing was refused on the way through, and nothing is still on the device.
     await expect(page.getByText("Actions refusées")).toHaveCount(0);
     await expect(page.getByText("en attente d’envoi")).toHaveCount(0);
+  });
+
+  await test.step("a remark about the man who came off, which cannot be about nobody", async () => {
+    await page.clock.setFixedTime(at(58));
+    await expect(clock).toHaveText("53:00");
+
+    await action(page, "Remarque");
+
+    // The sheet of six, which records nothing by itself — the same shape as « Autre… ».
+    const six = menu(page, "Remarque");
+    await expect(six).toContainText("53’");
+    for (const name of REMARKS) {
+      await expect(six.getByRole("button", { name, exact: true })).toBeVisible();
+    }
+    await expect(six.getByRole("button")).toHaveCount(REMARKS.length + 1);
+
+    await six.getByRole("button", { name: "Bel effort", exact: true }).click();
+
+    const sheet = page.getByRole("dialog", { name: "Bel effort", exact: true });
+    // The one way a remark differs from a comment: `memberId` is required, so the sheet opens with
+    // nothing chosen, « Enregistrer » dead, and the reason written where the eye already is rather
+    // than on a button nothing can hover (decision 072).
+    await expect(sheet.getByRole("combobox", { name: "À propos de qui ?" })).toHaveValue("");
+    await expect(sheet.getByRole("button", { name: "Enregistrer" })).toBeDisabled();
+    await expect(
+      sheet.getByText("Choisis le joueur : une remarque est toujours à propos de quelqu’un."),
+    ).toBeVisible();
+
+    // The bench is offered, not only the seven on the pitch: `cm2` came off at the 30th minute, and
+    // the remark a coach taps when he finally gets a free second is usually about him.
+    await sheet
+      .getByRole("combobox", { name: "À propos de qui ?" })
+      .selectOption({ label: cm2.displayName });
+    await expect(
+      sheet.getByText("Choisis le joueur : une remarque est toujours à propos de quelqu’un."),
+    ).toHaveCount(0);
+    await sheet.getByRole("button", { name: "Enregistrer" }).click();
+
+    // The sheet closes back to the screen the other tiles return to, and the remark is in the log.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const remark = logLine("Bel effort");
+    await expect(remark).toContainText("Remarque");
+    await expect(remark).toContainText("53’");
+    await expect(remark).toContainText(cm2.displayName);
+    // An opinion moves no number: the reducer counts nothing from a remark (invariant 2).
+    await expect(score).toHaveText("1 – 1");
+
+    // And the server believed it: the reload replays it from the log alone, which is the `REMARK`
+    // branch of `matchEventPayloadSchema` and the new enum value in the database, neither of which a
+    // client-side assertion reaches.
+    await page.reload();
+    const replayed = logLine("Bel effort");
+    await expect(replayed).toContainText("53’");
+    await expect(replayed).toContainText(cm2.displayName);
+    await expect(page.getByText("Actions refusées")).toHaveCount(0);
   });
 
   await test.step("the final whistle freezes the match", async () => {

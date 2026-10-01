@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { Sheet, cn } from "@/components/ui";
 import type { MatchEventType } from "@/lib/match/events";
 
@@ -14,6 +16,13 @@ export type ActionChoice<T extends string = MatchEventType> = {
   label: string;
   /** « qui a marqué ? » — what the next step will ask, so nothing is a surprise. */
   hint?: string;
+  /**
+   * A 16 px glyph on the label's own line, just before it, so the tile is recognised without being
+   * read. One of the components in `./action-icons`, which are `aria-hidden` — the tile's
+   * accessible name stays the label, and the icon inherits the tone's colour. Optional: a tile
+   * without one still reads.
+   */
+  icon?: ReactNode;
   /** `accent` for what happens most, `danger` for what goes against us. */
   tone?: "accent" | "danger" | "neutral";
   /** Spans both columns. For the tile that opens another menu rather than recording anything. */
@@ -42,9 +51,10 @@ const TONES = {
  *
  * A two-column grid of tall tiles rather than a list, because the whole point is that the target
  * is found without reading: « But » is always top left, « Changement » is always in the same
- * place. The match time is printed at the top because the action is stamped when the coach *taps*,
- * not when they finish choosing the player — so if the sheet has been open for thirty seconds, the
- * minute shown here is still the minute that will be recorded.
+ * place, and each one carries a 16 px glyph the thumb learns before the word. The match time is
+ * printed at the top because the action is stamped when the coach *taps*, not when they finish
+ * choosing the player — so if the sheet has been open for thirty seconds, the minute shown here is
+ * still the minute that will be recorded.
  *
  * The same component renders the second menu behind « Autre… ». Four tiles is what a thumb finds
  * without reading; nine was a list wearing a grid's clothes, and the four that matter were being
@@ -73,7 +83,10 @@ export function ActionMenu<T extends string = MatchEventType>({
               choice.wide ? "col-span-2 min-h-14" : undefined,
             )}
           >
-            <span className="text-[0.9375rem] leading-tight font-semibold">{choice.label}</span>
+            <span className="flex items-center gap-1.5 text-[0.9375rem] leading-tight font-semibold">
+              {choice.icon}
+              {choice.label}
+            </span>
             {choice.hint ? (
               <span className="text-xs leading-tight text-ink-muted">{choice.hint}</span>
             ) : null}

@@ -141,7 +141,7 @@ blocked, in selection and in the composition editor.
 id               uuid pk
 match_id         uuid not null
 client_event_id  uuid not null unique   -- idempotency key generated on the device
-type             text not null
+type             match_event_type not null   -- a Postgres enum; see below
 period           int not null
 minute           int not null           -- continuous: 2nd half of a 2x30 runs 30..60
 clock_ms         int not null           -- precise elapsed match time
@@ -169,8 +169,28 @@ Types and their payloads:
 | `LINEUP_APPLIED` | `{ lineupId, slots: [{ slotId, memberId }] }` — the confirmed result of a planned or ad-hoc composition; supersedes the previous on-pitch state wholesale |
 | `FOUL` | `{ memberId }` |
 | `INJURY` | `{ memberId }` |
+| `COMMENT` | `{ note, memberId? }` — a free note the coach types during the match, up to 280 characters; the player is optional because a comment is about the game as often as about somebody (decision 114) |
+| `REMARK` | `{ kind, memberId }` — one tap about one player. `memberId` is **required**, which is the only way a remark differs from a `COMMENT`. `kind` is one of `REMARK_KINDS` (decision 122) |
 | `FINAL_WHISTLE` | `{}` |
 | `VOID` | `{}` with `voids_event_id` set |
+
+`type` is the Postgres enum `match_event_type`, so the list of types is constrained by the database
+and a new one costs an `ALTER TYPE … ADD VALUE` — `0004_tricky_human_torch.sql` for `COMMENT` and
+`0005_goofy_sir_ram.sql` for `REMARK`, both inserted `BEFORE 'FINAL_WHISTLE'` so the enum keeps
+reading in match order. `MATCH_EVENT_TYPES` in `lib/match/events.ts` repeats the list for a module
+free of Drizzle at runtime, and `MATCH_EVENT_TYPES_MATCH_THE_DATABASE` stops compiling if the two
+**sets** drift — it compares two TypeScript unions, which are unordered, and both of them are
+TypeScript: the `pgEnum` array in `db/schema.ts`, not Postgres itself. So the shared order is a
+convention kept by hand rather than a proof, and it is kept so the enum reads in match order. Nothing
+at runtime depends on the ordinal.
+
+**Which kinds a `REMARK` may hold is *not* in the database** (decision 122). `REMARK_KINDS` —
+`GOOD_TRACK_BACK`, `GOOD_EFFORT`, `BAD_PASS`, `GOOD_POSITIONING`, `LOST_BALL`, `NICE_SKILL` — is an
+array in `lib/match/events.ts`, so a seventh remark is a line of TypeScript rather than a migration.
+The cost of that is a kind the code does not know: the strict payload schema refuses one at ingestion,
+and the reducer, which may never refuse history, reads such a row as a remark naming its player and no
+kind — the lenient schema accepts any non-empty kind precisely so the `memberId` is not thrown away
+with the word. A remark with no `memberId` at all is `invalidPayload` and names nobody.
 
 **Hard rules.** No `UPDATE`, no `DELETE`, ever. Ingestion is an idempotent insert keyed on
 `client_event_id`. A `VOID` may not target another `VOID`.
