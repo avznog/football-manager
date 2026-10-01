@@ -912,7 +912,10 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   stated in the decision rather than left to be rediscovered.
   Also verified while I was there, and nothing to fix: `/moi`'s badges read « coach · joueur » for
   `karim`, and the logout button that looks clipped in the capture is sitting in the shell's
-  `pb-[calc(4.5rem+safe-area)]` under a fixed tab bar, which is what that padding is for.
+  `pb-[calc(4.5rem + safe-area)]` under a fixed tab bar, which is what that padding is for. (The spaces
+  inside those brackets are deliberate and must stay: Tailwind scans this file, so the unspaced form was
+  a candidate and compiled to a real `padding-bottom: calc(4.5rem + safe-area)` rule — invalid, dead CSS
+  in every build. Whitespace is what makes a class-shaped string in prose stop being a class.)
   **Still unread from the new pass**, so we do not open the same PNG: `notation`, `stats`,
   `stats-coupe-buts`, `match-a-venir`, `match-joue`, `match-saisi-apres`, `match-nouveau`,
   `match-modifier`, `entrainement`, `entrainement-pointe`, `entrainement-non-pointe`,
