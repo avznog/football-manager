@@ -923,22 +923,28 @@ the reachable-turf finding below an **under**-statement on device rather than an
       validate the same ids with `z.uuid()`, which in Zod 4 enforces the RFC variant nibble — so a page
       can load for an id the action then silently rejects. Latent only: every real row is a
       `gen_random_uuid()` v4, which is exactly what hides it
-- [x] **`safe-px` was cancelling the `px-N` beside it, and the count has now been made: five `safe-*`
-      users, two defects.** Found here first, on `app/error.tsx`, where the error-screen button row
-      measured 4 → 386 of a 390 px viewport — the « confirm button 8 px off the right edge » class
-      arriving by a cascade rather than by arithmetic. This slice fixed that one screen by giving
-      `ErrorScreen` its own `px-5` and deliberately left the utility alone, which was the right call for
-      the reason given at the time: if the utility were wrong, every pair would silently lose its gutter.
-      Two corrections to how it was written up, both measured since: `safe-px` sets the **longhands**
-      `padding-left` / `padding-right` rather than `padding-inline` outright, and **declaration order is
-      not the mechanism** — Tailwind v4 sorts `@layer utilities` by property and interleaves custom
-      `@utility` rules among the built-ins, so `safe-px` is declared above `gutter-px` and emitted below
-      it. « Roughly a dozen pairs » was also an over-estimate: there are five `safe-*` users in total,
-      four of them clean because each is a lone longhand with no shorthand competing for the same
-      property. Decision 124 took the three standalone page shells, and the one remaining instance —
-      the sticky ActionBar in game mode — has its own closed item above. `tabbar-pb` is neither defect:
-      decision 118 already settled that it is kept deliberately and that its `+1rem` is clearance rather
-      than a discrepancy
+- [x] **`safe-px` cancelled every `px-N` it was paired with. The count was made and it is five `safe-*`
+      users, two defects — both now fixed.** `safe-px` sets the *longhands* `padding-left` /
+      `padding-right` (`app/globals.css:158-161`) while `px-N` compiles to the `padding-inline`
+      shorthand, and a longhand after a shorthand wins unconditionally — not a specificity coin-flip.
+      **Reordering the block cannot help**, and the reason is not the one first written here: Tailwind v4
+      sorts `@layer utilities` **by property** and interleaves custom `@utility` rules among the
+      built-ins rather than appending them after, which is why `safe-px` is declared *above* `gutter-px`
+      and emitted *below* it. So on a phone held upright, where every inset is `0px`, the gutter was
+      zero. Found on `app/error.tsx`, where the new error-screen button row measured 4 → 386 of a 390 px
+      viewport — the « confirm button 8 px off the right edge » class arriving by a cascade rather than
+      by arithmetic — and the worst of the three page shells was `app/(auth)/layout.tsx:9`: `/connexion`
+      and `/rejoindre` measured `0px/0px` with the card running 0 → 375 at 375 px, in both themes, on
+      the first two screens any new user sees. This slice deliberately fixed **none** of it: an earlier
+      push gave `ErrorScreen` its own `px-5` and it was withdrawn, because `app/(app)/error.tsx` renders
+      that same component inside `app-shell`'s `px-4`, so padding it there double-pads one parent while
+      leaving the others bare. Decision 124 did it instead, with a new `gutter-px` on the three page
+      shells and **not** a `max()` inside `safe-px` — `components/nav/bottom-nav.tsx` is the one
+      `safe-px`-with-no-`px` site in the tree, i.e. the one place the utility is used correctly, and
+      insetting a deliberately edge-to-edge bar would have taken four tap targets from 97.5 px to
+      87.5 px with nothing clipped and every check green. The second defect was the sticky ActionBar in
+      game mode, closed in its own item above. `tabbar-pb` is neither: decision 118 already settled that
+      it is kept deliberately and that its `+1rem` is clearance rather than a discrepancy
 - [ ] **The crash the owner reported from his iPhone is still unexplained.** The error-screen branch
       reproduced a real failure mode on the way — a stale Server Action id after a deploy, 404 and
       `UnrecognizedActionError`, which every one of the app's 42 `useActionState` call sites is exposed
