@@ -900,9 +900,11 @@ the reachable-turf finding below an **under**-statement on device rather than an
       was the only other instance: the sticky ActionBar carried `safe-pb py-2`, and `.safe-pb` is emitted
       after `.py-2`, so the 8 px under the two buttons the coach taps most resolved to the bare inset —
       measured `pb 0px` at 390 px. `.pb-2` is emitted before `.safe-pb` as well, so the obvious repair
-      would not have worked either; a sum is not expressible as two utilities here. One `sticky-pb`
-      utility, measured `pb 8px` after. The other four `safe-*` users were swept and are clean: each is a
-      lone longhand with no shorthand on the same property (decision 125)
+      would not have worked either; a sum is not expressible as two utilities here. One functional
+      `safe-pb-*` utility, used as `safe-pb-2`, measured `pb 8px` after — named rather than an inline
+      bracketed value because an arbitrary `pb-*` is emitted before `.safe-pb` and would silently lose
+      the sum to a stray, while the named one is emitted after it. The other four `safe-*` users were
+      swept and are clean: each is a lone longhand with no shorthand on the same property (decision 125)
 - [ ] `isUuid()` (`lib/player/validation.ts:23-25`) tests the lax regex at `:17`, while the actions
       validate the same ids with `z.uuid()`, which in Zod 4 enforces the RFC variant nibble — so a page
       can load for an id the action then silently rejects. Latent only: every real row is a

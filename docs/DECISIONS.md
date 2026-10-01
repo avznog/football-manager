@@ -3969,9 +3969,9 @@ for the same reason: the cost is one extra login, and it catches a class rather 
 **Date** 2026-10-01 · **Status** accepted · extends 124
 
 **Decision.** The sticky ActionBar in game mode
-(`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx:1040`) drops `safe-pb py-2` for `sticky-pb pt-2`,
-where `sticky-pb` is a new utility in `app/globals.css` declaring
-`padding-bottom: calc(calc(var(--spacing) * 2) + env(safe-area-inset-bottom, 0px))`. Every other
+(`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx:1044`) drops `safe-pb py-2` for `safe-pb-2 pt-2`,
+where `safe-pb-*` is a new functional utility in `app/globals.css` declaring
+`padding-bottom: calc(--value(integer) * var(--spacing) + env(safe-area-inset-bottom, 0px))`. Every other
 `safe-*` user in the repository was checked against the same shape and left alone.
 
 **Why.** Decision 124 is about `safe-px px-5`; this is the same defect on the other axis, and it was
@@ -3988,24 +3988,48 @@ shape, where the inset and the gutter are alternatives — but their **sum**: th
 home indicator rather than sit on it. A sum of a token and an `env()` cannot be written as two
 utilities at all, whatever the order, because two declarations of one property can only ever replace
 each other. So it is one declaration, following the `tabbar-pb` precedent, which composes exactly this
-shape for exactly this reason. An arbitrary value was tried first and rejected: `calc()` requires
-whitespace around `+`, so it has to be smuggled through Tailwind's `_` escape, and a bracketed
-expression that breaks silently when someone removes an underscore is worse than a named utility whose
-comment says what it is for.
+shape for exactly this reason.
 
-**`sticky-pb` is not immune to a stray `safe-pb`, it is merely lucky.** Measured, `sticky-pb safe-pb`
-gives `pb 8px` — the new utility wins, because `.sticky-pb` is emitted at 2016 and `.safe-pb` at 2012.
-That is the opposite of how `gutter-px` sits relative to `safe-px`, and it is the same mechanism:
-within a property group the order is not the source order and not « custom after built-in ». It is a
-fact about these two names today, not a property of the design, and nobody should rely on it.
+**Why a named utility rather than the inline form, and a correction to this entry.** An earlier draft
+said an arbitrary value had been tried and was *inexpressible* — that `calc()` needs whitespace around
+`+`, so it must be smuggled through Tailwind's `_` escape, and that an underscore anyone could delete
+is the hazard. **Both halves are false and were measured so.** `components/ui/sheet.tsx:149` already
+ships this exact shape, `pb-[calc( 0.75rem + env(safe-area-inset-bottom, 0px) )]` with no underscore
+anywhere in it — the spaces inside those brackets are this document's, not the source's, because an
+unspaced class-shaped string in prose is a candidate Tailwind extracts and emits as a real rule from the
+markdown it scans — and with a comment saying it is a single `pb-*` utility « so it cannot be overwritten
+by `py-*` », i.e. the reasoning this entry claimed to have invented. And compiled through
+`@tailwindcss/cli`, a bracketed `var(--spacing) * 2 + env(…)` emits exactly that sum as
+`padding-bottom: calc(…)` with the operators spaced: Tailwind inserts the whitespace itself, and there
+is no underscore to delete. The inline form was available, in use in this repository, and not rejected for
+being unwritable. The real argument is one the draft missed and is strictly better: an arbitrary
+`pb-[ … ]` lands in the **built-in** `padding-bottom` block and is emitted *before* `.safe-pb`, so
+`pb-[ … ] safe-pb` silently loses the sum, while the named custom utility is emitted *after* `.safe-pb`
+and survives a stray. (This entry names the error rather than quietly fixing it, as 124's does.)
+
+**The name says the amount and the axis, not the consumer.** `safe-pb-*` is functional:
+`safe-pb-2` reads « the inset plus 2 spacing units », generalises to the next bar that wants 3, and
+sits in the `safe-*` family where someone would look for it. An earlier `sticky-pb` named the
+*position of its consumer* and said neither 8 px nor « controls », which invited exactly the two wrong
+reaches: `match-bar.tsx:105` is also `sticky` but on the other axis, and `bottom-nav.tsx:53` is a fixed
+bottom bar that decision 124 established must stay bezel-to-bezel and must **not** gain 8 px. The sum
+is also written flat rather than as a nested `calc(calc(…))`, which is how `tabbar-pb` and
+`app-shell.tsx:142` already write theirs.
+
+**`safe-pb-2` is not immune to a stray `safe-pb`, it is merely lucky.** Measured, `safe-pb-2 safe-pb`
+gives `pb 8px` — the new utility wins, because `.safe-pb-2` is emitted after `.safe-pb`. That is the
+opposite of how `gutter-px` sits relative to `safe-px`, and it is the same mechanism: within a property
+group the order is not the source order and not « custom after built-in ». It is a fact about these two
+names today, not a property of the design, and nobody should rely on it.
 
 **The sweep is the part worth keeping.** Every `safe-pb` / `safe-pt` / `safe-px` user, all five:
-`game-mode.tsx:1040` was the defect; `components/ui/sheet.tsx:153` is `safe-pb shrink-0`;
+`game-mode.tsx:1044` was the defect; `components/ui/sheet.tsx:153` is `safe-pb shrink-0`;
 `match-bar.tsx:105` is `safe-pt` beside `px-3`, a different axis; `app-shell.tsx:76` is `safe-pt` alone;
 `bottom-nav.tsx:53` is `safe-pb safe-px` with no shorthand and is deliberately bezel-to-bezel (124).
 So four are clean for one reason — a lone longhand with no shorthand competing for the same property —
-and that sentence is the whole test. Decisions 124 and 125 found two instances between them and the
-repository has no third.
+and that sentence is the whole test. Decisions 124 and 125 found **two patterns across four call
+sites** between them — `safe-px px-5` on three screens, `safe-pb py-2` on one bar — and the repository
+has no fifth.
 
 **Consequences.** `md:py-3` still overrides the bottom padding above `md`, exactly as it already
 overrode `safe-pb`: the bar is `md:static` there, so there is no home indicator to clear and nothing

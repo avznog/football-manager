@@ -3252,19 +3252,23 @@ The repair was not the obvious one and that is the part worth remembering. `safe
 identically, because `.pb-2` is emitted before `.safe-pb` as well. And unlike 124 — where the inset and
 the gutter are *alternatives* and `max()` is the answer — here they are a **sum**: the buttons should
 clear the home indicator, not sit on it. Two utilities cannot express a sum of one property under any
-ordering, since the second declaration can only replace the first. So it is one `sticky-pb`, following
-`tabbar-pb`'s precedent, which composes exactly this shape. An arbitrary `pb-[calc(…)]` was tried first
-and dropped: `calc()` needs whitespace around `+`, which has to go through Tailwind's `_` escape, and a
-bracketed expression that silently breaks when someone deletes an underscore is worse than a named
-utility carrying a comment.
+ordering, since the second declaration can only replace the first. So it is one functional `safe-pb-*`,
+following `tabbar-pb`'s precedent, which composes exactly this shape; the bar carries `safe-pb-2`, « the
+inset plus 2 spacing units ». The inline arbitrary value was **not** rejected for being inexpressible,
+whatever the first draft of the entry said: `components/ui/sheet.tsx:149` already ships that shape, with
+spaces inserted by Tailwind and no `_` escape anywhere, and with a comment giving the same reasoning. It
+was rejected for where it lands — an arbitrary bracketed `pb-*` goes in the built-in `padding-bottom`
+block, which is emitted *before* `.safe-pb`, so a stray `safe-pb` beside it takes the sum back down to
+the bare inset; the named utility is emitted *after* `.safe-pb` and survives one.
 
 **The sweep is the deliverable, not the one-line fix.** All five `safe-*` users were checked against the
 same shape, and four are clean for one reason: a lone longhand with no shorthand competing for the same
 property. `sheet.tsx:153`, `match-bar.tsx:105`, `app-shell.tsx:76`, `bottom-nav.tsx:53`. So 124 and 125
-found two instances between them and there is no third — which is a better thing to have written down
-than either fix, because the next session's question will be « is this everywhere ».
+found **two patterns across four call sites** between them — three screens with `safe-px px-5`, one bar
+with `safe-pb py-2` — and there is no fifth, which is a better thing to have written down than either
+fix, because the next session's question will be « is this everywhere ».
 
-One honest note recorded in the entry rather than quietly enjoyed: `sticky-pb safe-pb` measures
+One honest note recorded in the entry rather than quietly enjoyed: `safe-pb-2 safe-pb` measures
 `pb 8px`, so the new utility happens to beat a stray `safe-pb` where `gutter-px` loses to one. Same
 mechanism, opposite outcome, decided by where two names land in a property group. It is luck about these
 two strings today and not a property of the design, and the entry says so — the alternative is a future

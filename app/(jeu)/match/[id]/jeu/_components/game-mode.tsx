@@ -1037,10 +1037,11 @@ function ActionBar({
   onPause,
 }: ActionBarProps) {
   return (
-    // `sticky-pb pt-2` rather than `safe-pb py-2`: both halves of the old pair wanted
-    // `padding-bottom`, and `.safe-pb` is emitted after `.py-2`, so the 8 px was dropped on
-    // every device whose bottom inset is 0. See the utility's own comment in `globals.css`.
-    <div className="sticky-pb sticky bottom-0 z-30 -mx-3 mt-3 border-t border-border/60 bg-canvas/95 px-3 pt-2 backdrop-blur md:static md:mx-0 md:rounded-2xl md:border md:px-4 md:py-3">
+    // `safe-pb-2 pt-2` rather than `safe-pb py-2`: `py-2` set `padding-block`, so its bottom
+    // half competed with `safe-pb`'s `padding-bottom`, and `.safe-pb` is emitted after `.py-2`,
+    // so the 8 px was dropped on every device whose bottom inset is 0. See the utility's own
+    // comment in `globals.css`.
+    <div className="safe-pb-2 sticky bottom-0 z-30 -mx-3 mt-3 border-t border-border/60 bg-canvas/95 px-3 pt-2 backdrop-blur md:static md:mx-0 md:rounded-2xl md:border md:px-4 md:py-3">
       <div
         className={
           onPause ? "grid grid-cols-[2fr_1fr_1fr] gap-2" : "grid grid-cols-[2fr_1fr] gap-2"

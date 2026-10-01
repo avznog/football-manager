@@ -212,9 +212,10 @@
 @utility tabbar-pb {
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
 }
-/* The inside bottom padding of a bar that is itself stuck to the bottom of the
-   viewport and holds controls: the home-indicator inset **plus** breathing room
-   above it, so the buttons clear the indicator instead of merely touching it.
+/* The home-indicator inset **plus** n spacing units: `safe-pb-2` reads as « the
+   inset plus 2 », for a bar that holds controls and must let them clear the
+   indicator instead of merely touching it. The game-mode ActionBar wants 2; the
+   next such bar may want 3.
 
    One declaration rather than `safe-pb py-2`, for the reason decision 124 gives
    about `safe-px px-5`: both want `padding-bottom`, they land in the same
@@ -222,9 +223,23 @@
    is emitted before `.safe-pb`, and so is `.pb-2` — so either pair resolves to
    the bare inset, which is 0 px on every device without a home indicator. The
    sticky ActionBar in game mode lost its 8 px that way, under the two buttons
-   the coach taps most. A sum cannot be written as two utilities here. */
-@utility sticky-pb {
-  padding-bottom: calc(calc(var(--spacing) * 2) + env(safe-area-inset-bottom, 0px));
+   the coach taps most. A sum cannot be written as two utilities here.
+
+   An inline `pb-[calc( var(--spacing) * 2 + env(safe-area-inset-bottom, 0px) )]`
+   does compile — `components/ui/sheet.tsx:149` ships that very shape, written with
+   no spaces, which is why the spaces are in this comment: a class-shaped string
+   without whitespace is a candidate Tailwind will extract and emit as a real rule
+   wherever it is scanned. But an inline value lands in the built-in
+   `padding-bottom` block and is emitted *before* `.safe-pb`, so a
+   stray `safe-pb` beside it silently takes the sum back down to the bare inset.
+   This named utility is emitted *after* `.safe-pb` and survives one.
+
+   **Not for `components/nav/bottom-nav.tsx`.** A fixed bottom bar wants the inset
+   alone — that is `safe-pb` — and spacing units there would inset a bar decision
+   124 established must stay bezel-to-bezel. The sum is written flat rather than as
+   a nested `calc(calc(…))`, matching `tabbar-pb` above and `app-shell.tsx:142`. */
+@utility safe-pb-* {
+  padding-bottom: calc(--value(integer) * var(--spacing) + env(safe-area-inset-bottom, 0px));
 }
 
 @layer base {
