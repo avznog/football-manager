@@ -60,12 +60,16 @@ it. If a line takes more than a few seconds to correct, it will rot too.
 - **In flight · the owner's machine** — nothing committed. Next is **PR 3, the ratings rebuild**, the
   largest piece of work left in the repository; ahead of it in priority is the **owner-side database
   wipe**, which is live work and needs its own plan before anything is run.
-- **In flight · the other machine** — its last word (Log, 2026-09-30 22:10) was that it had started
-  step 1 of the iPhone tap-latency brief, now filed under « Spent instructions » below. **That half is
-  done**: PR #111 and the `docs/SESSIONS.md` entry « Where the two seconds on the iPhone actually are »
-  are the measurement, and the three pull requests it proposes — acknowledge the tap, `<Suspense>` on
-  `/stats`, the auth prefix joins — are what remains. The region half was decision 111. Seeded here from
-  the Log by the owner's machine; it is the other machine's line to keep current.
+- **In flight · the other machine** — **the owner's fourth batch of iPhone remarks**, four areas, planned
+  in `docs/PLAN.md`'s new `## Amendments` and `docs/ROADMAP.md`'s « The fourth batch from the owner's
+  iPhone ». Open and waiting on the gatekeeper: **#114** (tap acknowledgement, released for merge),
+  **#116** (`feat/echo-native-date-values`), **#118** (`fix/error-screen-offers-a-reload`). In my hands
+  right now: the **preferred-positions** slice — narrow the picker to the seven-a-side codes, stop the
+  coach editing another player's wishes, and fix the save crash. The **retro match entry** redesign is
+  last and not started. Of #111's three proposed pull requests, « acknowledge the tap » is #114, the
+  « `<Suspense>` on `/stats` » one is **withdrawn and must not be re-opened** — it removes the no-JS path
+  that decisions 100 and 116 built, see #114 — and the auth prefix joins are untouched and still a
+  tidiness item.
 
 **Who writes which line — because two machines rewriting one block is exactly the conflict the two Log
 lanes were invented to avoid.** The gatekeeper machine, the owner's, owns every line above except the
@@ -1098,3 +1102,46 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   tap-latency brief at the top of this file**, the task whose STOP you lifted. Starting with step 1
   and nothing else — measuring, and writing the numbers down even where they say there is nothing to
   fix.
+- **2026-10-01 · other machine · `docs/plan-v4-remarks` and four slices** — The owner's **fourth batch of
+  iPhone remarks** is planned and being implemented: retro match entry, dates and times, preferred roles,
+  and the tab-tap delay. Plan in `docs/PLAN.md` (first-ever `## Amendments` section) and
+  `docs/ROADMAP.md`. Open: **#114** tap acknowledgement, **#116** echoing the native pickers' value in
+  `DD/MM/YYYY`, **#118** the error screen's reload. In hand: preferred positions. Not started: the retro
+  redesign. Decision entries left at `## NNN`, no tag, nothing touched in `vercel.json`, `.github/`,
+  `package.json` or anything about deployment.
+  **The dates remark turned out to be narrower than it sounds and that is worth knowing before anyone
+  re-opens it.** Decision 109 already did `DD/MM/YYYY` and 24h everywhere the app formats a date itself —
+  two formatters, every call site through them, `hour12: false` pinned twice. The only surface a formatter
+  cannot reach is the **five native pickers**, which render in the *browser's* locale, so on a phone set to
+  English the owner sees `03/14/2026` in the one place the app has no say. #116 keeps the native control
+  and prints the app's own string underneath it, which he preferred to the custom picker 109 offered him.
+  **Three corrections to things this file and `docs/` previously stated**, all found by measurement rather
+  than by reading: `safe-px` sets the **longhands** `padding-left`/`padding-right`, not `padding-inline`,
+  so it beats a paired `px-N` unconditionally and **reordering `globals.css` cannot fix it** — Tailwind v4
+  sorts custom `@utility` after its own built-ins; the clash is on **three** screens, not « roughly a
+  dozen », and the worst is `app/(auth)/layout.tsx`, i.e. `/connexion` and `/rejoindre` have no side
+  padding at all, which are the first two screens any new user sees; and `tabbar-pb` is **closed**, not
+  open — it already reads `3.5rem` and has zero `.tsx` occurrences. The gutter is the owner's machine's
+  slice and I have taken my own partial fix back out of #118.
+  **And one self-inflicted error on the record**, because it is the exact failure `CLAUDE.md` warns about
+  over decision 119: I cited « decisions 116/117 » in a shipped source comment for a rule that is
+  **122**'s, having restated it from memory instead of opening the file. 116 is the filter `<select>`;
+  117 is Label in Name and runs the opposite way. Caught by the other machine's reviewer, fixed in
+  #114, and said out loud in the decision entry rather than quietly corrected.
+  **Two operational notes for whoever is next on this machine.** Never `pkill -f "next dev"` — two
+  subagents of mine did, and it killed a dev server belonging to another session, because several
+  worktrees here match that pattern; kill the pid you started, or `lsof -ti:<port> | xargs -r kill`.
+  And a zombie `next start` can hold a port while `lsof -ti:<port>` reports **nothing**: `ss -ltnp`
+  sees it, which is how « Another next dev server is already running » got resolved.
+  **The owner's iPhone crash on saving preferred positions is explained, and not by me.** My
+  deployment-skew reproduction was real and is **not** his crash — his survived a force-quit, and a
+  force-quit is a document navigation always served from the latest deployment. The other machine
+  established the real shape: a thrown Postgres error inside `updatePlayerPositions`, which has no
+  try/catch, is a 500 straight into the error boundary, and the transaction rolls back, which is why
+  production's `player_positions` is empty. The leading candidate is a foreign-key violation on
+  `position_code` → `positions.code`, because **nothing in a migration seeds `positions`** — only
+  `seedReference()` in `db/seed-reference.ts`, run by hand, and no workflow runs it. **There is a
+  no-query discriminator the owner can use**: `seedReference()` writes the positions *and* the built-in
+  formation templates, so an unseeded table shows up as « the composition editor offers no formations at
+  all ». If that is what he sees, it is the FK.
+  **Next: the preferred-positions slice, then the retro match entry.**
