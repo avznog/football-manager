@@ -774,8 +774,10 @@ the reachable-turf finding below an **under**-statement on device rather than an
       four directories Vitest collects nothing out of — `include` governs collection, never what a test
       may open. **Eight live breaches fixed in the same change**: `terrain-sheet.tsx:176`, `:206`,
       `:301`; `lineup-composer.tsx:102`; `presenter.ts:569`, `:570`, `:868`, `:882`. Two more, in
-      `components/errors/error-screen.tsx:50`–`:51`, are baselined by their text until #118 merges, and
-      a third test fails the moment an entry stops matching. The uncomfortable half is in the decision
+      `components/errors/error-screen.tsx:50`–`:51`, were baselined by their text until #118 merged —
+      #118 went first (decision 127), so the two entries were deleted and the baseline's length cap
+      lowered to **zero** in this branch, which the staleness test would have forced anyway by going red
+      and naming them. The uncomfortable half is in the decision
       entry: `lib/match/presenter.test.ts:428` was asserting « Touchez un joueur pour le faire entrer. »
       verbatim, so a test was holding one of the eight in place
 - [ ] **16 unit-test assertions are incidental verbatim tripwires on French copy.** Each pins a whole

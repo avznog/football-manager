@@ -344,16 +344,13 @@ function sourceFiles(dir: string): string[] {
  * Keyed on the text and not the line number on purpose — an edit anywhere above a breach would move its
  * number and cost somebody an afternoon on a failure that means nothing.
  */
-const KNOWN_IMPERATIVE_BREACHES: { file: string; text: string }[] = [
-  // `components/errors/error-screen.tsx` — the breach this whole file was written in response to.
-  // Already fixed on pull request #118, « Offer a reload on the error screen, and stop giving advice
-  // that cannot work ». These two entries go when it merges.
-  {
-    file: "components/errors/error-screen.tsx",
-    text: "Cet écran n’a pas pu s’afficher. Réessayez ; si cela se reproduit, passez par un autre",
-  },
-  { file: "components/errors/error-screen.tsx", text: "écran et revenez." },
-];
+// Empty, and it stayed empty for less than a day. It held the two sentences on
+// `components/errors/error-screen.tsx` that this whole file was written in response to — « Cet écran
+// n’a pas pu s’afficher. Réessayez ; si cela se reproduit, passez par un autre écran et revenez. » —
+// excused by their text because they were another session's to rewrite, on open pull request #118.
+// #118 merged first (decision 127), so the two entries went with it rather than outliving it, and the
+// cap below went to zero in the same commit. Both of those are what the two tests under it are for.
+const KNOWN_IMPERATIVE_BREACHES: { file: string; text: string }[] = [];
 
 function scan(files: string[], rule: RegExp): { file: string; text: string; at: string }[] {
   return files.flatMap((path) => {
@@ -405,13 +402,14 @@ describe("the tutoiement, over the whole tree (decision 074)", () => {
 
   /**
    * The baseline is capped, because it is an allow-list and an allow-list with no ceiling silences the
-   * guard by the same edit that would appease it: append a line and the new breach is excused. The two
-   * entries below are a record of what was already in the tree the day the rule landed, not a place to
-   * put new work — and a reviewer reading a diff on that array cannot tell an added line from a deleted
-   * one without a number here that has to be raised deliberately, in writing, to let one in.
+   * guard by the same edit that would appease it: append a line and the new breach is excused. The
+   * array is a record of what was already in the tree the day the rule landed, not a place to put new
+   * work — and a reviewer reading a diff on that array cannot tell an added line from a deleted one
+   * without a number here that has to be raised deliberately, in writing, to let one in. It is zero
+   * now, which is the only number that needs no argument.
    */
   it("cannot grow its known-breach baseline", () => {
-    expect(KNOWN_IMPERATIVE_BREACHES.length).toBeLessThanOrEqual(2);
+    expect(KNOWN_IMPERATIVE_BREACHES.length).toBeLessThanOrEqual(0);
   });
 
   /** Proof the scan reads the tree, so a bad path or an empty glob cannot make it vacuously green. */

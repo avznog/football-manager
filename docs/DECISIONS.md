@@ -4125,7 +4125,7 @@ a coach is noise.
 The tone was modelled on `app/(jeu)/match/[id]/jeu/error.tsx`, which decision 058 already got right,
 already tutoies, and was left untouched.
 
-## NNN — The tutoiement is a test, because a convention nothing checks is a convention that decays
+## 128 — The tutoiement is a test, because a convention nothing checks is a convention that decays
 
 **2026-10-01** · accepted · enforces 074
 
@@ -4133,8 +4133,9 @@ already tutoies, and was left untouched.
 `tutoiement.test.ts`, at the repository root. It reads `app/`, `components/`, `lib/` and `db/` as text
 with `node:fs` and fails, on any line that is not a comment, on two things: the pronouns « vous »,
 « votre », « vos », and a curated list of second-person-plural imperatives — « Appuyez », « Touchez »,
-« Réessayez ». A small hard-coded baseline excuses two known breaches by their text, and a third test
-fails if a baseline entry stops matching anything.
+« Réessayez ». A hard-coded baseline can excuse a known breach by its text; it held two when this was
+written, it is **empty as this merges**, and two further tests keep it that way — one fails if an entry
+stops matching anything, one caps its length, now at zero.
 
 **Why a test and not a convention.** 074 was prose in `CLAUDE.md` for months, it was quoted in reviews,
 and eight breaches accumulated under it anyway: three in `components/action-sheet/terrain-sheet.tsx`
@@ -4168,23 +4169,33 @@ permission. Decision 097 made the same move for `lib/composition/copy.test.ts`. 
 module, the scan also reaches the one shape no import can: **JSX text**, `<p>Réessayez</p>`, which is
 inside no string literal and is the return value of nothing.
 
-**Why a small hard-coded baseline rather than a clean sweep.** Two of the ten breaches the imperative
-rule found are in `components/errors/error-screen.tsx:50`–`:51` — « Cet écran n’a pas pu s’afficher.
-Réessayez ; si cela se reproduit, passez par un autre écran et revenez. », wrapped across two lines and
-therefore two baseline entries. That file is another session's, already rewritten on open pull request
-#118, so correcting it here would be a conflict for nothing. The alternative was to hold the whole guard
-until #118 merges — that is, to have no guard during exactly the days when sentences are being
-rewritten, which is when it earns its keep.
+**Why a small hard-coded baseline rather than a clean sweep — and why it is empty anyway.** Two of the
+ten breaches the imperative rule found were in `components/errors/error-screen.tsx:50`–`:51` — « Cet
+écran n’a pas pu s’afficher. Réessayez ; si cela se reproduit, passez par un autre écran et revenez. »,
+wrapped across two lines and therefore two baseline entries. That file was another session's, already
+rewritten on open pull request #118, so correcting it here would have been a conflict for nothing. The
+alternative was to hold the whole guard until #118 merged — that is, to have no guard during exactly the
+days when sentences are being rewritten, which is when it earns its keep.
+
+**#118 merged first, as decision 127, so the baseline never shipped with anything in it.** The two
+entries and the cap's `2` went in the same commit as this file's rebase onto it, and the array is now
+`[]` with the cap at `0`. That is not a loose end tidied after the fact: the staleness test **forces**
+it. The moment that sentence became the infinitive « Réessayer », the two entries matched nothing and
+the suite went red naming them, so whichever of the two pull requests merged second had no way to leave
+them behind — `main` would have been red until they were deleted. A baseline that cannot outlive what it
+excuses is the only kind worth writing, and this is the proof, on the first and only entries it ever had.
 
 The hazard is named rather than hoped away: **an allow-list is a place a future breach can be hidden**,
 and a baseline fails in two directions, each with its own test. Downwards: « has no stale entry left in
 the known-breach baseline » goes red, naming the entry to delete, the moment one of those two sentences
-is rewritten, so the list shrinks under pressure or not at all. Upwards, which is the direction that
-actually silences a guard: « cannot grow its known-breach baseline » asserts the length is at most two,
-because an allow-list with no ceiling is defeated by the same edit that would appease it — append a line
-and the new breach is excused, and nobody reading a diff on that array can tell an added line from a
-deleted one. Raising the ceiling is then a deliberate act, in writing, that a reviewer sees. Two entries
-pinned from both sides is a different object from an allow-list that grows quietly.
+is rewritten, so the list shrinks under pressure or not at all — which is exactly what happened, one day
+later. Upwards, which is the direction that actually silences a guard: « cannot grow its known-breach
+baseline » asserts a length ceiling, because an allow-list with no ceiling is defeated by the same edit
+that would appease it — append a line and the new breach is excused, and nobody reading a diff on that
+array can tell an added line from a deleted one. Raising the ceiling is then a deliberate act, in
+writing, that a reviewer sees. An entry pinned from both sides is a different object from an allow-list
+that grows quietly, and the ceiling is `0`, so the next session that wants to excuse a sentence has to
+say so in a number before it can.
 
 **The baseline is keyed on the trimmed, comment-stripped line text, never on a line number.** A line
 number goes stale on the first edit anywhere above it, and the entry then excuses a line nobody chose —

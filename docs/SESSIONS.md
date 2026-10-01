@@ -3437,7 +3437,7 @@ being this team's interjection before it is an imperative. And `\b` is unusable 
 `/\bfaites\b/` matches inside « **Dé**faites », the label over the losses on `/stats`, which was the very
 first thing the rule flagged. Every rule goes through `wholeWords` and a `\p{L}` lookaround instead.
 
-Two breaches are **baselined rather than fixed**: `components/errors/error-screen.tsx:50`–`:51`, « Cet
+Two breaches were **baselined rather than fixed**: `components/errors/error-screen.tsx:50`–`:51`, « Cet
 écran n'a pas pu s'afficher. Réessayez ; si cela se reproduit, passez par un autre écran et revenez. »,
 which another session has already rewritten on #118. The alternative was to hold the guard until that
 merges — no guard during precisely the days when sentences are being rewritten. The baseline is keyed on
@@ -3447,7 +3447,11 @@ because it is a silence. And a third test fails, naming the entry to delete, the
 sentences changes, so the list shrinks under pressure or not at all. The guard's own review caught that
 this left the *other* direction open: an allow-list with no ceiling is defeated by the same edit that
 would appease it, since appending an entry excuses a new breach and reads in a diff exactly like deleting
-one. The length is now asserted to be at most two. The same review found the file floor loose in the same
+one. The length is asserted, and the assertion is now `0`: **#118 merged first**, as decision 127, so
+rebasing on it made both entries match nothing, the staleness test went red naming them, and they were
+deleted with the cap in the same commit — the baseline never reached `main` with anything in it, and the
+test that forced that is the only reason writing one was defensible. The same review found the file floor
+loose in the same
 way — the scan sees 232 files and asserted only « more than 200 », so one string added to the skip list
 could have hidden `(jeu)`, the whole of game mode, or `[id]`, 32 files, with every test still green. It is
 counted per root now.
