@@ -26,11 +26,11 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   A version is `package.json`'s `version`; the annotated tag, cut **by hand** on `main`, is the act
   that ships it and the only thing that migrates and deploys production (decision 119). Nothing cuts a
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
-  `package-lock.json` sat three releases stale at `beta.3` because the earlier bumps were hand-edited,
-  and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **124**. 122 is on `main` (the remark); **123 is claimed by the other
-  machine** for the tap-acknowledgement slice. Leave `## NNN — …` in your entry if you are unsure; the
-  merging session numbers it.
+  `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
+  hand-edited, and the release gate only reads `package.json`, so nothing complained.
+- **Next free decision number** — **123**. The highest written anywhere is **122**, on `main`. The other
+  machine's `perf/acknowledge-tab-taps` carries the entry that will take 123, and it correctly left the
+  heading as `## NNN — …` rather than claiming the number. Do the same; the merging session numbers it.
 - **Live** — production `https://7orteils.bgonzva.fr`, deployed by `release.yml` on a tag. Preview
   `https://dev.7orteils.bgonzva.fr`, deployed by `ci.yml` on a push to `main`, after it migrates the
   preview database. Both go out through the **Vercel CLI**: `vercel.json` sets `git.deploymentEnabled`
@@ -38,16 +38,21 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   **A branch therefore deploys nowhere and gets no Vercel check on its pull request** — that is
   deliberate (decision 119), not a broken integration. The way to look at a branch is `npm run build`.
   **Both halves are now observed rather than expected**, which is the one thing this line used to
-  hedge: on the `main` push for #113, `migrate-preview` and `deploy-preview` went green and
-  `dev.7orteils.bgonzva.fr` answers `200` with `/` → `/connexion`, so the branch-pinned domain does
-  take a CLI deployment carrying `VERCEL_GIT_COMMIT_REF: main`; and the `v1.0.0-beta.6` tag migrated
-  and deployed production, which answers `200` on its own domain. Nobody needs to re-check that.
-  **Preview's database is not empty and `ci.yml` did not fill it** — it carries the whole demo season,
-  seeded by hand, which another session established by logging in. So preview is a shared instance with
-  real-looking data in it, not a scratch pad.
-- **Open pull requests** — none of the owner's machine. The other machine has `perf/acknowledge-tab-taps`
-  (branched off `646b830`, unmerged by agreement) and `docs/plan-v4-remarks` pushed; neither is mine to
-  merge until it says it is ready.
+  hedge — and *how* they were observed matters, because a green job does not say it: on the `main` push
+  for #113 the `deploy preview` log prints a `*.vercel.app` URL and **no alias line for the pinned
+  domain**, so the proof is that `dev.7orteils.bgonzva.fr/connexion` and that deployment's own
+  `/connexion` return **byte-identical bodies** while production's differs. The branch-pinned domain
+  does take a CLI deployment carrying `VERCEL_GIT_COMMIT_REF: main`. Production is simpler: the
+  `deploy production` log prints `Aliased https://7orteils.bgonzva.fr` itself. Both domains answer
+  `307` on `/` then `200` on `/connexion`. Re-check by comparing bodies, not by reading the log.
+  **Preview's database is not empty, and `ci.yml` cannot be what filled it** — the `preview migrations`
+  job runs `npm run db:migrate` and nothing else, no `db:seed` and no `db:bootstrap`. That it carries
+  the whole demo season is **reported by a third session that logged in, and not independently checked
+  from here**; treat it as a warning rather than as a fact, and assume preview is a shared instance with
+  real-looking data in it rather than a scratch pad.
+- **Open pull requests** — **#114**, `perf/acknowledge-tab-taps` (the other machine: the tap
+  acknowledgement, branched off `646b830`, CI green, unmerged by its own request) and **#115**, the
+  rewrite of this section. Neither of the other machine's is mine to merge until it says it is ready.
 - **In flight · the owner's machine** — nothing committed. Next is **PR 3, the ratings rebuild**, the
   largest piece of work left in the repository; ahead of it in priority is the **owner-side database
   wipe**, which is live work and needs its own plan before anything is run.
@@ -696,7 +701,7 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   one sentence of decision 114 called it an enforcement point, which is the harmful part — corrected.
   **No allow-list narrower than the enum guards `POST /api/match-events`**, and narrowing it would mean
   dropping `FOUL`, which 114 keeps writable on purpose, so that is a product decision and I left it.
-  Also: `package-lock.json` had been three releases stale at `beta.3`, because the earlier bumps edited
+  Also: `package-lock.json` read `beta.3` at both the `beta.4` and the `beta.5` tags, because those bumps edited
   `package.json` by hand and the gate only reads that file — `npm version` from now on.
   **Answered for the other machine, in its lane rather than mine:** `REMARK` and `COMMENT` stay out of
   `RETRO_FACT_TYPES` as a **decision, not a deferral**. A substitution has a minute someone else can
@@ -709,8 +714,9 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   the answer — a tap before hydration is a cold document navigation, 5 of 5 on Calendrier under CPU ×4,
   so a CSS `:active` state is a fix and not a mask, because it is the only acknowledgement that exists
   before any JavaScript runs. **Still owner-side and untouched**: the preview and production database
-  wipe (now more delicate — preview holds a hand-seeded demo season and a third session is auditing it
-  with the owner's own credentials and his permission to write), the `admin`/`admin` super admin, the
+  wipe — now more delicate, since a third session reports preview holding a hand-seeded demo season and
+  says the owner gave it credentials and leave to write there, neither of which I can check from here —
+  and then the `admin`/`admin` super admin, the
   Neon `neondb_owner` rotation, the `btrim(lower(username))` constraint, and the stale
   `.claude/worktrees/agent-*`.
 
