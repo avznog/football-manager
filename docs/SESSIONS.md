@@ -3515,3 +3515,97 @@ cost a renumbering across four files earlier the same day.
 
 **Verified**: typecheck clean, 1347 unit tests green, no source file touched — `docs/DECISIONS.md`,
 `docs/ROADMAP.md`, `docs/SESSIONS.md` and `COORDINATION.md` only.
+
+## The positions crash, which was a promise the schema was not keeping
+
+The previous session's leading explanation was right, and this session confirmed it the cheap way:
+**on a fresh database after `db:migrate` alone, `positions` held 0 rows.**
+`player_positions.position_code` has referenced `positions.code` since the first migration
+(`db/migrations/0000_wealthy_radioactive_man.sql:264`), nothing in any migration has ever inserted
+those eleven rows, and `seedReference()` — the only thing that writes them — is reachable by hand and
+by no workflow, while `ci.yml` and `release.yml` both run `db:migrate` and stop. So the constraint
+shipped without its targets, every save raised `23503 foreign_key_violation`, and the reason it read
+as a mystery is that **reads work perfectly**: a player with no rows renders « Aucun poste préféré
+indiqué » and the screen is correct and complete right up until he taps. `db/migrations/0006_seed_positions.sql`
+inserts them with `ON CONFLICT ("code") DO NOTHING`, so `seedReference()` keeps owning every later
+label, line and coordinate — this migration's only job is that the rows exist at all, and it must
+never overwrite what the seeder has since refined. The framing in the decision entry is attributed to
+the session that was scoping the deployment split, because it is better than anything in these
+commits: a table with no rows is not an empty table, it is a broken constraint.
+
+**`formations` and `formation_slots` are 0 either way, and that half is deliberately not fixed.**
+`formation_slots.position_code` has its own foreign key at `0000_wealthy_radioactive_man.sql:239` and
+both tables come from the same hand-run seeder, so the same database can plan no composition at all —
+which is exactly the third symptom the previous session predicted without needing a query. The seven
+templates are editable content with a product decision behind them (decision 005), so a migration
+writing them would be a migration quietly taking that decision. It is a `[ ]` under « Deployment »
+with the measurement attached, not a patch.
+
+**The second defect was a coach who could edit a teammate's wishes, and `can()` had been saying no the
+whole time.** `profile:editPositions` is in `SELF_ACTIONS` (`lib/auth/can.ts:112`) and the self branch
+(`:142-147`) refuses a foreign `targetMemberId` — but the action went through `assertCanActFor`
+(`lib/player/actions.ts:53`), which tries the self action and then falls back to the coach's
+`member:update`. Invariant 4 was satisfied to the letter: a helper that succeeds on either of two
+actions is not an ad-hoc check, which is why nobody caught it. `:116` is now a bare `assertCan`, and
+`assertCanActFor` has one caller left — `:227`, the flocage, which **keeps** its fallback because a
+shirt name is printed on a garment somebody orders by a deadline and a wish about where you like to
+play is an account of yourself. **Decision 104 cited the positions as the precedent for that shape**,
+so the new entry supersedes that one clause by name rather than leaving 104 pointing at a defect; its
+rule — two owners means two forms and two actions — is what this change applies.
+
+**The picker now offers eight codes, and the test recomputes the eight rather than listing them.** It
+is the union of the slots of `1-3-2-1` and `1-2-3-1`, eight distinct codes across seven-a-side twice
+over, and `db/reference.test.ts:188` derives that union from `BUILTIN_FORMATIONS` so the stated rule
+and the shipped constant cannot drift. `POSITION_CODES` stays at eleven on purpose: narrowing a wish
+list judges what to ask a player, narrowing the vocabulary judges what the team may field. **The
+consequence is real and is in the entry rather than buried**: `MOC` is a slot in the built-in
+`1-3-3-0` and `AG`/`AD` in `1-2-1-3`, both still shippable, so a player can no longer wish for three
+positions two of the team's own formations still field. Nothing matches wishes to slots, so nothing
+breaks functionally — hence the copy says « Ces postes ne sont plus proposés. » and never
+« n'existent plus », which would be false. A chip row derived from `value` lets a player remove a
+stored `MOC`, one way only, because the eight-marker turf would otherwise leave such a code invisible
+*and* unremovable; removing one that was the primary leaves no primary rather than promoting a
+secondary, which would invent a wish nobody expressed. `positionCodeSchema` keeps all eleven for the
+same reason the picker cannot: the form posts back what is already stored, and a narrowed enum would
+lock that player out of saving anything ever again.
+
+**Two type-level things, both of which turned out to be about what a list of call sites cannot find.**
+`POSITION_BY_CODE` was an `Object.fromEntries` **cast** to a total `Record`, which is why an unguarded
+`.labelFr` type-checked and why one bad row could 500 a profile, `/moi`, `/equipe` and the composition
+editor at once. `Partial<Record<PositionCode, …>>` — not `Record<string, … | undefined>`, which would
+let `POSITION_BY_CODE["LIBERO"]` type-check — produced **16 errors across 5 files**, and the fifth
+file was `db/reference.ts` itself (`positionLabelFr`), which nobody hand-listing the callers would
+have reached. And the sentinel is `Number.MAX_SAFE_INTEGER`, reusing `orderShape`'s choice
+(`lib/formation/shape.ts:114`) rather than inventing a second one: `Infinity - Infinity` is `NaN`, a
+`NaN` comparator leaves the order implementation-defined, and that would make `positionsSignature`
+unstable — it is the React `key` the profile editor is mounted on, so profiles would remount at
+random. The repro fixture has **three** rows, because `Array.prototype.sort` never calls the
+comparator for a one-element array and a one-row test would have proved nothing while looking like
+proof.
+
+**The field errors the form had been building and not showing.** Zod reports the offending array
+*element*, so `toFormState` keys it `secondary.1` while the form read `fieldErrors.secondary` and
+rendered nothing. `fieldErrorsUnder` in `lib/auth/validation.ts` strips the trailing index, and it was
+fixed in the consumer rather than in the `toFormState` every other form in the app shares. Every
+message on that path is French now; one of the English Zod defaults had been leaking the internal
+position codes to the player.
+
+**Two things this session did not do, said plainly.** `npm run test:e2e`, `npm run typecheck`, `npm run
+lint` and the unit suite were not run from this docs session — they belong to the branch's own checks
+and to CI on the pull request, and this entry does not claim they passed. And **nothing tests the
+positions editor at all**: no unit test and no Playwright spec names `updatePlayerPositions`,
+`PositionsEditor`, `PositionPicker` or any string the card prints. The permission change rests entirely
+on `can()`'s own assertions, which are narrower than they look — `lib/auth/can.test.ts:79` pins a
+*player* out of somebody else's positions, `:126` a *non-playing* coach out of his own, and the
+`playerCoach` fixture at `:27`, which is precisely the actor the old fallback let through, is used for
+three self-scoped assertions and never once with a foreign `targetMemberId`. The case the decision
+turns on is true by construction and asserted nowhere. That is the first `[ ]` added under M1, and it
+is the real finding of the slice: a 500 on the most ordinary save in the app shipped because the most
+ordinary save in the app is untested.
+
+**`docs/DATA_MODEL.md` was checked and left alone.** It does not claim the picker offers eleven — line
+57's list of eleven describes the `positions` *table*, which is still eleven, and the formation-matching
+sentence under it is still true. The `player_positions` line already read « Set by the player on their
+profile by tapping a pitch diagram », which was the invariant this branch enforced rather than one it
+changed: the document has been describing the intended ownership all along, and the code had drifted
+away from it.

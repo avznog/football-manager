@@ -4220,6 +4220,224 @@ inside « **Dé**faites », the label over the losses on `/stats`, which was the
 rule flagged. Every rule goes through `wholeWords`, which spells the boundary out as a lookaround on
 `\p{L}`.
 
+## 129 — A wish about where you play is the player's own, and the table it writes to had no rows
+
+**2026-10-01** · accepted · **supersedes the one clause of decision 104 that cited the preferred
+positions as its precedent.** 104's rule stands; `profile:editShirtName` keeps its fallback.
+
+The owner, from his phone: saving his preferred positions crashed, and `player_positions` in
+production was empty. Two separate defects sat under that, and they are in one entry because the
+second is reachable by anybody and the first decided *which* anybody could reach it.
+
+**Part one. `updatePlayerPositions` asserts `profile:editPositions` directly, and nothing else.**
+`can()` was already right about this: `profile:editPositions` is in `SELF_ACTIONS`
+(`lib/auth/can.ts:112`), and the self branch (`:142-147`) refuses any `targetMemberId` that is not
+the actor's own membership and refuses every self action outright to `is_player = false`. The coach
+never went through that branch. He went through `assertCanActFor` (`lib/player/actions.ts:53`), which
+tries the self action and then falls back to the coach's `member:update` — so the gate was wide open
+at the call site while `can()` sat behind it saying no, and invariant 4 was satisfied to the letter
+the whole time. A permission helper that tries two actions and succeeds on either is not an ad-hoc
+check, which is exactly why this was easy to miss. Line 116 is now a bare `assertCan`, and
+`assertCanActFor` has exactly one caller left: `:227`, the flocage.
+
+**What of decision 104 survives, and what does not.** 104's rule survives whole, and this entry is an
+application of it rather than a retreat from it: *when two fields of one record answer to two
+different owners, they are two forms and two actions, not one form gated on the stricter of them.*
+What is superseded is a single descriptive clause in 104's fourth paragraph, which said
+`updateShirtName` « uses the `assertCanActFor` shape the preferred positions already use » and
+offered that shape as the precedent to copy. The precedent was itself the defect. The positions no
+longer have that shape and should never have had it; 104 reached the right answer for the flocage by
+pointing at the wrong neighbour.
+
+**And the flocage keeps its fallback, because it is a different kind of thing.** A shirt name is
+printed on a garment somebody orders, in a batch, by a deadline, from a supplier — 104's own reason
+for putting it on the `/equipe` squad row is that that is the list a coach reads when he orders a set
+of shirts. A coach typing « MOMO » for a teammate who has not got round to it is finishing an order.
+A wish about where you like to play is an account of yourself: there is no order, no deadline and no
+supplier, and a coach filling it in is a coach writing down his own opinion of a player under that
+player's name, in the one field on the page that is supposed to be the player speaking. The
+asymmetry is not about seniority, as 104 already said about the number; it is about whether anybody
+else can truthfully answer the question.
+
+The page follows that decision rather than taking a second one: `can(actor, "profile:editPositions",
+context)` at `app/(app)/joueur/[id]/page.tsx:50` is passed straight down as `canEdit` (`:115`), and
+the card renders read-only with the picker `disabled` and one line under it — « Chaque joueur choisit
+ses postes lui-même. » (`app/(app)/joueur/_components/positions-editor.tsx:66`, the sentence at
+`:76`). A dead pitch with no explanation is a defect of the wave-3 shape; the sentence is the whole
+reason the targets do not respond, and it is prose under the thing it explains rather than a `title`
+nobody on a phone can reach (decision 072).
+
+**Part two. The eleven positions are seeded by a migration, because the schema's own foreign keys
+depend on them.** `db/migrations/0006_seed_positions.sql`, the eleven rows, `ON CONFLICT ("code") DO
+NOTHING`.
+
+`player_positions.position_code` has referenced `positions.code` since the first migration
+(`db/migrations/0000_wealthy_radioactive_man.sql:264`) and **no migration has ever inserted those
+rows.** Only `seedReference()` did, and `seedReference()` is reachable by hand and by no workflow:
+`ci.yml` and `release.yml` both run `db:migrate` and stop there. So a database that has been migrated
+and never bootstrapped carries the constraint and none of the rows, and every save of a preferred
+position raises `23503 foreign_key_violation`. **Measured on a fresh database after `db:migrate`
+alone: `positions` held 0 rows before this migration.** The symptom is precisely the owner's, and the
+reason it read as a mystery is that **reads work perfectly** — a player with no rows renders « Aucun
+poste préféré indiqué », the screen is correct and complete, and nothing is wrong with it until he
+taps. Migrating is what creates the constraint, so migrating is what has to satisfy it.
+
+The framing worth keeping is not this session's; it came from the session that was scoping the
+deployment split, and it is better than anything in the commits: **« a `positions` table with no rows
+is not an empty table, it is a broken constraint — the foreign key is a promise the schema makes and
+nothing was keeping. Seeding it from a migration is the schema finishing its own sentence. »**
+
+`DO NOTHING` and deliberately not `DO UPDATE`. `db/reference.ts` stays the single source of truth for
+this vocabulary and `seedReference()` still owns every *later* change to the rows: it upserts labels,
+lines and coordinates on each `db:seed` / `db:bootstrap`, so a corrected label or a moved marker
+reaches an existing database through the seeder rather than through a new migration. This migration's
+only job is that the rows exist at all, and it must never overwrite what the seeder has since
+refined. The file says so in its own header, because a copy of reference data frozen at one moment is
+the kind of thing a later session will otherwise try to keep in sync.
+
+**`formations` and `formation_slots` are 0 either way, and are deliberately left that way.**
+`formation_slots.position_code` has its own foreign key to `positions.code`
+(`0000_wealthy_radioactive_man.sql:239`) and both tables are written only by the same seeder, so the
+same migrated-never-bootstrapped database can **plan no composition at all** — an editor offering an
+empty Formation select, which is the third symptom the previous session predicted without needing a
+query. Fixing it here was rejected: the built-in templates are editable content, a team may fork them
+into its own `formations` rows (decision 005), and a migration inserting them would be a migration
+quietly taking a product decision about what the seven shapes are and about what happens to a team
+that has already edited one. That is the owner's call and it is in `docs/ROADMAP.md` as one, with the
+measurement attached, rather than being settled by whoever happened to be fixing the positions.
+
+**Part three. A failed write is a French sentence; a forbidden one is still a 500.** The `try` wraps
+only the `db.transaction` (`lib/player/actions.ts:132`) — `requireActor`, the `safeParse` and the
+`assertCan` all stay outside it on purpose. A malformed form is already a `FormState` the picker can
+render, and a `ForbiddenError` **must** keep reaching the error boundary rather than being flattened
+into a polite French sentence: somebody editing a teammate's wishes is a bug or an attack, not a
+failed save, and it should stay loud. A write that fails returns « Tes postes n'ont pas été
+enregistrés. Réessaie. » (`:157`), which is true of every cause and promises nothing about which. The
+log reads the Postgres `code` and `constraint` off the error object rather than stringifying it,
+because the code is the diagnosis and the message is not: `23503` means the `positions` table has no
+such row — an unseeded database, nothing to do with this player — while `23505` would mean two rows
+for the same position got past `toPositionRows`. Those are different bugs with different fixes, one
+digit apart, and a stringified error buries the digit.
+
+**The honest weakness, and it is the reason any of this shipped.** **Nothing in the suite exercises
+the positions editor** — no unit test and no Playwright spec mentions `updatePlayerPositions`,
+`PositionsEditor`, `PositionPicker` or any string the card prints. `lib/player/positions.test.ts`
+covers the pure helpers thoroughly and never reaches the action. What holds this change up is
+`lib/auth/can.ts`'s own assertions, and they are narrower than they look: `lib/auth/can.test.ts:79`
+asserts a *player* may not touch somebody else's positions, `:126` that a *non-playing* coach has
+none of his own — and the `playerCoach` fixture at `:27`, a coach who plays, which is exactly the
+actor the old fallback let through, is used for three self-scoped assertions at `:135-137` and never
+once with a foreign `targetMemberId`. So the case this entry turns on is true of `can()` by
+construction and asserted nowhere. A 500 on the most ordinary save in the app shipped because the
+most ordinary save in the app is untested; that is a line in `docs/ROADMAP.md`, not a claim that this
+is now safe.
+
+## 130 — The wish picker offers eight codes, and the vocabulary stays at eleven
+
+**2026-10-01** · accepted · narrows one component and nothing else
+
+**Decision.** The preference picker draws `PREFERRED_POSITION_CODES` (`db/reference.ts:164`) — eight
+codes: `GB DG DC DD MG MC MD AT`. `POSITION_CODES` stays at eleven, the composition editor keeps all
+of them, and the Zod enum that validates a submission keeps all of them too.
+
+**Eight is not a hand-picked list, it is a union.** It is exactly the union of the slots of the two
+shapes this team really plays: `1-3-2-1` is `GB DG DC DD MC MC AT`, `1-2-3-1` is `GB DC DC MG MC MD
+AT` — seven on the pitch in each, eight distinct codes across the two. `db/reference.test.ts:188`
+**recomputes that union from `BUILTIN_FORMATIONS`** rather than comparing it with a second typed
+list, so changing either formation fails the test and the stated rule cannot drift away from the
+shipped constant; a hand-written copy would have been a comment pretending to be a check. `satisfies
+readonly PositionCode[]` keeps the subset honest the same way, by the compiler rather than by prose.
+
+**Why the wide list does not move with it.** Narrowing a wish list judges *what it is reasonable to
+ask a player*; narrowing the vocabulary judges *what the team may field*. Those are different
+questions with different owners, and collapsing them is how a copy change becomes a capability
+change. So all seven built-in formations stay shippable, the composition editor still places any of
+the eleven, and `MOC`, `AG` and `AD` still exist in this app — a coach can put them on the pitch this
+Sunday. They are simply no longer *offered as a wish*, because being asked where you would like to
+play is a question about the shapes the team actually turns out in. For the same reason the
+marker-spacing rule in `POSITIONS` is kept for all eleven even though the picker now draws eight: the
+composition editor places a slot anywhere on that list, and a narrower picker must not license a
+crowded layout somewhere else.
+
+**The consequence the owner should see, stated rather than buried.** `MOC` is a slot in the built-in
+`1-3-3-0` and `AG`/`AD` are slots in `1-2-1-3`. Both formations are still shippable and still in the
+Formation select. **So after this, a player cannot wish for three positions that two of the team's
+own formations still field.** Nothing in the app matches a wish to a slot — the composition editor
+reads `player_positions` for display only, and the squad row prints the codes — so nothing breaks
+functionally and no composition becomes unplannable. But it is a real narrowing, and it is the
+owner's to reverse: if the team starts turning out in `1-2-1-3`, the two ailiers belong back in the
+picker, and the way to do that is to add the label to `USUAL_SHAPES` in the test and let the union
+recompute itself.
+
+That is also why the copy reads « Ces postes ne sont plus proposés. » and **must never read
+« n'existent plus », which would be false.** The codes exist, the formations that use them exist, and
+a sentence saying otherwise would be the wave-3/4 failure again — a screen stating something untrue
+that no test catches.
+
+**The chip row, and its one-way rule.** The turf draws only `PREFERRED_POSITIONS`, so a stored `MOC`
+would be invisible on it *and* unremovable — the form posts the selection's own keys, so it would
+also keep being posted for ever. Hence a chip row below, derived from `value`
+(`components/pitch/PositionPicker.tsx:95`) exactly as the grid is, which is what keeps `cyclePosition`
+and the whole write path out of it: **a chip only ever removes** (`:107`). The sentence above it gains
+a second half only when the picker is live — « Tu peux les retirer, pas les remettre. » (`:168`) —
+because that is an instruction, and there is nothing to instruct a coach looking at a disabled card
+about.
+
+Removing a retired code that happened to be the **primary leaves the player with no primary**, and
+does not promote a secondary in its place. Promoting one would invent a wish nobody expressed, and
+choosing *which* secondary to promote would be arbitrary. No new state had to be built for it either:
+the summary line already says « Aucun poste principal choisi. » (`:204`) and the form already posts an
+empty `primary` for that case, so the honest outcome was also the one the screen could already
+describe.
+
+**`positionCodeSchema` keeps all eleven, on purpose** (`lib/player/validation.ts:21`). The form posts
+back the codes already stored for the player, so a record still holding a `MOC` posts it; narrowing
+the enum would make the server reject that player's whole submission and leave him unable to save
+anything, ever again — a validation rule locking a player out of his own record because of a copy
+decision taken later. Dropping a stored code is the picker's job, not the schema's. That is the shape
+of the whole slice: the narrowing lives in the one component that offers choices, and nothing
+downstream of it was narrowed at all.
+
+## 131 — An unknown position code is `undefined`, and it sorts at `Number.MAX_SAFE_INTEGER`
+
+**2026-10-01** · accepted · a convention, because it now lives in two modules
+
+This earns an entry rather than a comment for one reason: the sentinel is in two places now, and the
+next session to read a lone `?? Number.MAX_SAFE_INTEGER` will see a tidier `Infinity` and be right
+about everything except the consequence.
+
+`POSITION_BY_CODE` was built by `Object.fromEntries(...)` and **cast** to `Record<PositionCode,
+PositionDefinition>`. That cast is why an unguarded `POSITION_BY_CODE[code].labelFr` type-checked, and
+why a lookup on a code this module does not know threw `TypeError: Cannot read properties of
+undefined` — from one bad `player_positions` or `formation_slots` row, which are `text` columns
+referencing `positions.code` and not this closed list, that is a 500 on a player's profile, `/moi`,
+`/equipe` and the composition editor at once. It is now `Partial<Record<PositionCode,
+PositionDefinition>>` (`db/reference.ts:128`). Deliberately **not** `Record<string,
+PositionDefinition | undefined>`, which would make the values honest while letting
+`POSITION_BY_CODE["LIBERO"]` type-check and losing key checking entirely — one unsoundness traded for
+another.
+
+**The churn is the argument, not the cost.** The honest type produced **16 errors across 5 files**,
+and the fifth file was `db/reference.ts` itself: `positionLabelFr` at `:192`, inside the module that
+defines the lookup. A hand-written list of call sites could not have found that one, because whoever
+writes the list is thinking about *callers*. When a cast goes, let the compiler enumerate the readers.
+
+**`Number.MAX_SAFE_INTEGER` and not `Infinity`, and that is now the rule.** `positionRankOf`
+(`db/reference.ts:204-205`) is where it is documented; `orderShape` in `lib/formation/shape.ts:114`
+had already settled on it, so this reuses a choice rather than inventing a second one. `Infinity -
+Infinity` is `NaN`, a comparator returning `NaN` leaves `Array.prototype.sort`
+implementation-defined, and two unknown codes among one player's rows would then make
+`sortPreferredPositions` non-deterministic — which makes `positionsSignature` unstable, and that
+string is the React `key` the profile editor is mounted on
+(`app/(app)/joueur/[id]/page.tsx:111`). The visible failure of an unstable comparator is therefore
+not a mis-sorted list; it is a profile that remounts at random and loses what the player had just
+tapped.
+
+**And the test fixture has three rows, not one** (`lib/player/positions.test.ts:50`).
+`Array.prototype.sort` never calls the comparator for a one-element array, so a one-row repro of an
+unknown code exercises a different path and passes under either sentinel. One row would have proved
+nothing and looked like proof.
+
 ## 132 — Production keeps its data, its super admin and its database password: the owner closes three standing items
 
 **2026-10-01** · accepted · closes three items that had been carried for weeks · supersedes nothing
