@@ -4219,3 +4219,51 @@ fix. And `\b` is unusable for French text in this repository: it is ASCII, so `/
 inside « **Dé**faites », the label over the losses on `/stats`, which was the first thing the imperative
 rule flagged. Every rule goes through `wholeWords`, which spells the boundary out as a lookaround on
 `\p{L}`.
+
+## 132 — Production keeps its data, its super admin and its database password: the owner closes three standing items
+
+**2026-10-01** · accepted · closes three items that had been carried for weeks · supersedes nothing
+
+**Decision.** The owner has decided, in these words, that we are **not** wiping the databases, **not**
+changing the super admin's password and **not** rotating the Neon `neondb_owner` password. All three are
+closed. They are not deferred, not blocked and not waiting on a plan: they are **not being done**, and a
+session that rediscovers the underlying facts should read this entry rather than re-propose the work.
+
+**What each of the three was, so that nobody has to reconstruct it.**
+
+- **The database wipe.** Originally the owner's own instruction, from before production existed. The
+  ground then moved under it — production has since been migrated, deployed and tagged — and it had grown
+  into a sequence needing its own written order of operations: what is dropped, in which Neon branch,
+  `db:bootstrap` with a real password, re-seeding preview with the demo season. That sequence is now
+  never going to be run, so it is not worth writing.
+- **The super admin's password.** The account exists on a live instance and can read and rewrite every
+  team. Its password spent the first hour of the deployment in the Vercel environment, which
+  `docs/DEPLOY.md` says it must never do. `db:bootstrap` is idempotent and re-hashes on every run, so the
+  change would have been one command; the owner's answer is that it is not being made.
+- **The Neon `neondb_owner` password.** It appeared in a session transcript, which is why rotation has
+  been recommended repeatedly in `docs/`, in `COORDINATION.md` and in session reports.
+
+**What follows from closing them, stated plainly rather than argued.** The transcript-exposed database
+password stays valid, so anyone holding that transcript holds the database. The super-admin credential
+stays as it is, with the reach described above. Production keeps whatever rows it holds, so no session may
+assume an empty table on production — and one empty table is a live defect rather than an invariant:
+`formations` and `formation_slots` hold nothing there, so **no composition can be planned on production
+at all**, which is a separate open question for the owner and is unaffected by this entry. The standing
+prohibitions are unchanged and are now the whole of the protection: **never `db:push` against a production
+database, never `db:reset` against one, `ALLOW_REMOTE_RESET` set nowhere, `SUPER_ADMIN_USERNAME` and
+`SUPER_ADMIN_PASSWORD` never in Vercel and never in a GitHub secret, and the production connection string
+not to be extracted or printed.**
+
+**Why this is an entry and not a line in `COORDINATION.md`.** The three items were raised in every session
+report for weeks, because the facts behind them are rediscoverable from the repository and each new session
+found them again, correctly, and said so. A `## NOW` line would have gone stale and a roadmap item would
+have read as waiting. The owner's decision is the only thing that stops the loop, so it goes where
+decisions go. Two items that travelled with the wipe but are **not** closed by it: the
+`check (username = btrim(lower(username)))` constraint, which exists only in Zod and is why a trailing TAB
+once reached the `username` column, and the owner's confirmation that Preview and Production
+`DATABASE_URL` are two different strings. Neither needs a wipe; both are still open.
+
+**The number.** 129, 130 and 131 are reserved by the other machine for PR #125's three placeholders, which
+it said it is assigning on its own rebase, so this takes **132** rather than the next free integer. A gap
+is cheaper than a collision: a collision costs a renumbering across four files, which has already happened
+once today.

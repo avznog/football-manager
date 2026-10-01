@@ -619,10 +619,12 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       `docs/DEPLOY.md` §3, from the Neon dashboard's pooled string. **Whether it has been run cannot
       be checked from a session**: the connection string is only in Vercel (sensitive, unreadable) and
       in a GitHub secret (write-only), so the answer is a login attempt in a browser
-- [ ] Reset the super-admin password, which spent the first hour of the deployment sitting in the
-      Vercel environment where `docs/DEPLOY.md` says it must never be. Free, if the account is created
-      with a fresh password rather than the one that was in Vercel: the same `db:bootstrap` run does
-      both, because it is idempotent and re-hashes the password every time
+- [x] ~~Reset the super-admin password, which spent the first hour of the deployment sitting in the
+      Vercel environment where `docs/DEPLOY.md` says it must never be.~~ **Closed without being done, by
+      the owner (decision 132).** It would have been free — `db:bootstrap` is idempotent and re-hashes on
+      every run — and the password's hour in Vercel is a real fact, not a doubt. The decision is the
+      owner's and the item is not waiting on anything; do not re-propose it. The same entry closes the
+      database wipe and the Neon `neondb_owner` rotation
 - [ ] Verify on a real iPhone and Android in daylight — `docs/DEPLOY.md` §6. No longer blocked by the
       login page; it now waits only on an account to log in with
 - [ ] Preview has its own Neon branch. Decision 080 removed the hazard by removing the previews and this

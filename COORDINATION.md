@@ -32,10 +32,11 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **129**. The highest on `main` is **127**; **128** is taken by #121,
-  which is merging as this is written. Leave your heading as `## NNN — …` rather than claiming a number;
-  the merging session fills it in. The other machine reports three `NNN` placeholders on PR #125 and two
-  more coming on `feat/retro-one-action-list`, and is not claiming a range.
+- **Next free decision number** — **133**. The highest on `main` is **132** (the owner closing three live
+  items), and **129, 130 and 131 are reserved** by the other machine for PR #125's three placeholders, on
+  its own say-so — which is why 132 skipped them. A gap is cheaper than a collision. Otherwise leave your
+  heading as `## NNN — …` rather than claiming a number; the merging session fills it in. Two more
+  placeholders are coming on `feat/retro-one-action-list`, unclaimed.
 - **Live** — production `https://7orteils.bgonzva.fr`, deployed by `release.yml` on a tag. Preview
   `https://dev.7orteils.bgonzva.fr`, deployed by `ci.yml` on a push to `main`, after it migrates the
   preview database. Both go out through the **Vercel CLI**: `vercel.json` sets `git.deploymentEnabled`
@@ -61,8 +62,11 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   until it says it is ready. **#117 merged** (`f13f27e`): both of the happy path's reloads were racing
   the outbox flush, which is why a docs-only branch could fail the e2e job.
 - **In flight · the owner's machine** — nothing committed. Next is **PR 3, the ratings rebuild**, the
-  largest piece of work left in the repository; ahead of it in priority is the **owner-side database
-  wipe**, which is live work and needs its own plan before anything is run.
+  largest piece of work left in the repository, and nothing is ahead of it any more: the **database wipe
+  is closed without being done**, along with the super-admin password reset and the Neon `neondb_owner`
+  rotation, by the owner's decision (**132**). Do not re-propose any of the three. The facts behind them
+  are all still true and still rediscoverable, which is exactly why they were raised in every session
+  report for weeks — read 132 instead of raising them a fifth time.
 - **In flight · the other machine** — **the owner's fourth batch of iPhone remarks**, four areas, planned
   in `docs/PLAN.md`'s new `## Amendments` and `docs/ROADMAP.md`'s « The fourth batch from the owner's
   iPhone ». Open and waiting on the gatekeeper: **#114** (tap acknowledgement, released for merge),
@@ -778,6 +782,23 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   skipped left no room: deleting two files from `db/` would have failed reporting a hidden directory.
   **Nothing touched** in `vercel.json`, `.github/`, `package.json`'s `version`, Neon or Vercel, and **no
   tag cut**.
+
+- **2026-10-01 14:10 CEST · the owner's machine · `docs/the-owner-closes-three-live-items`** — **merged
+  #128**, four corrections to decision 128's own prose, found by review after #121 had already merged: the
+  claim that the baseline deletion rode in on the rebase commit (it did not, and the three rebased commits
+  in between are red on the staleness test by construction), two `e2e/` counts that were a `getByRole`
+  total relabelled as a count of copy, and a JSDoc describing a populated baseline in the present tense.
+  Also lowered the `db/` file floor from 8 to 5, because nine files with `migrations/` skipped left no
+  room and a floor of 8 would have failed on anybody deleting two files. **And decision 132: the owner has
+  closed the database wipe, the super-admin password reset and the Neon `neondb_owner` rotation, without
+  doing any of them.** That is for your lane too — all three were in your reports as well as mine, the
+  facts behind them are unchanged and still rediscoverable, and the entry exists precisely so that
+  rediscovering them does not restart the loop. The standing prohibitions are untouched and are now the
+  whole of the protection: no `db:push` or `db:reset` against production, `ALLOW_REMOTE_RESET` nowhere,
+  `SUPER_ADMIN_*` never in Vercel or a GitHub secret, the production string never extracted or printed.
+  Two items that travelled with the wipe are **not** closed by it: the `btrim(lower(username))` constraint
+  and the owner's confirmation that Preview and Production `DATABASE_URL` differ. Still nothing touched in
+  `vercel.json`, `.github/`, `package.json`'s `version`, Neon or Vercel, and **no tag cut**.
 
 ### From the other machine
 
