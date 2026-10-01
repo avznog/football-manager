@@ -3237,3 +3237,64 @@ read one role at a time, by people who had seen both. The definition of done in 
 for both roles **side by side in one pass**, alongside the existing both-themes-at-390 px rule, and
 the reasoning is a decision entry. The owner approved the wording; two sessions agreeing with each
 other is not authority to edit a project instruction, and neither of us did until he chose it.
+
+## The same bug, one axis over, on the screen that matters most
+
+Decision 124 had barely merged when its reviewer pointed at a second instance, and the second one is on
+the screen a coach stares at for ninety minutes: the sticky ActionBar in game mode carried
+`safe-pb py-2`, so the 8 px under « Coup d'envoi » and « TERRAIN » resolved to the bare safe-area inset.
+Measured in a browser at 390 px, **`pb 0px`** before and `pb 8px` after. A phone with a home indicator
+hides it, because the inset there is larger than the padding that went missing — so the device anyone
+would reach for to check is the one device where the bug is invisible, which is the second time in two
+slices that the thing we test on is the thing that conceals the defect.
+
+The repair was not the obvious one and that is the part worth remembering. `safe-pb pb-2` fails
+identically, because `.pb-2` is emitted before `.safe-pb` as well. And unlike 124 — where the inset and
+the gutter are *alternatives* and `max()` is the answer — here they are a **sum**: the buttons should
+clear the home indicator, not sit on it. Two utilities cannot express a sum of one property under any
+ordering, since the second declaration can only replace the first. So it is one functional `safe-pb-*`,
+following `tabbar-pb`'s precedent, which composes exactly this shape; the bar carries `safe-pb-2`, « the
+inset plus 2 spacing units ». The inline arbitrary value was **not** rejected for being inexpressible,
+whatever the first draft of the entry said: `components/ui/sheet.tsx:149` already ships that shape, with
+spaces inserted by Tailwind and no `_` escape anywhere, and with a comment giving the same reasoning. It
+was rejected for where it lands — an arbitrary bracketed `pb-*` goes in the built-in `padding-bottom`
+block, which is emitted *before* `.safe-pb`, so a stray `safe-pb` beside it takes the sum back down to
+the bare inset; the named utility is emitted *after* `.safe-pb` and survives one.
+
+**The sweep is the deliverable, not the one-line fix.** All five `safe-*` users were checked against the
+same shape, and four are clean for one reason: a lone longhand with no shorthand competing for the same
+property. `sheet.tsx:153`, `match-bar.tsx:105`, `app-shell.tsx:76`, `bottom-nav.tsx:53`. So 124 and 126
+found **two patterns across four call sites** between them — three screens with `safe-px px-5`, one bar
+with `safe-pb py-2` — and there is no fifth, which is a better thing to have written down than either
+fix, because the next session's question will be « is this everywhere ».
+
+One honest note recorded in the entry rather than quietly enjoyed: `safe-pb-2 safe-pb` measures
+`pb 8px`, so the new utility happens to beat a stray `safe-pb` where `gutter-px` loses to one. Same
+mechanism, opposite outcome, decided by where two names land in a property group. It is luck about these
+two strings today and not a property of the design, and the entry says so — the alternative is a future
+session reading it as a rule and combining them.
+
+Also this session, and the reason the above was possible: **#114 merged as decision 123 and #119 as
+124.** Before merging #114 its two line citations were re-derived — the commit that fixed its citations
+had added nineteen comment lines to the file it was citing and orphaned the two numbers it did not
+touch, so `:55` had become a `<ul>` and `:81` a closing brace. The peer's narrower lesson is the one to
+keep: **a commit that adds lines to a file it cites must re-resolve every citation in that file**, not
+only the ones it edits.
+
+And #119 shipped with a correction to itself. Its first draft claimed the longhands made
+`gutter-px safe-px` unexpressible; the reviewer measured it and got `padding-left: 0px;
+padding-right: 0px`, the original defect in full. The stated mechanism was wrong too — Tailwind v4 sorts
+`@layer utilities` **by property** and interleaves custom `@utility` rules among the built-ins rather
+than appending them after, which is why `safe-px` is declared *above* `gutter-px` and emitted *below*
+it. The conclusion survived, but the wrong reason is what a reader reasons from, and the peer found the
+same false sentence in a third place neither of us had grepped for: a source comment in
+`components/errors/error-screen.tsx`, not prose in `docs/`. Byte offsets have been dropped from the
+documentation entirely, by agreement: they move the next time anyone adds a utility, and mine had
+already been wrong twice in one write-up. The ordering and the computed value are the durable facts.
+
+**Not shipped:** `main` is now five commits past `v1.0.0-beta.6` with `package.json` still reading
+`1.0.0-beta.6`, so the gate would refuse a tag and production is serving beta.6. That is deliberate.
+The one change production actually needs is the peer's positions slice — a migration seeding the eleven
+`positions` rows, because `db:migrate` creates the foreign key and nothing was keeping it — and a
+release now would ship a gutter and a tab bar while leaving the crash and the unseeded table exactly as
+they are. One bump to `1.0.0-beta.7` after that slice lands, and the tag is the owner's to cut.
