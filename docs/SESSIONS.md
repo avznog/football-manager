@@ -3074,7 +3074,7 @@ had. With the boundaries in place the router committed the `/stats` shell before
 `/calendrier` with the response itself held**. That was read at the time as « the two compose rather
 than stack », which was true and was the wrong thing to be pleased about — a boundary that commits the
 shell early is a boundary that takes the in-flight acknowledgement away and replaces it with a shape
-stating more than it knows. Decision **NNN** has it as evidence for the two-and-only-two split: CSS for
+stating more than it knows. Decision **123** has it as evidence for the two-and-only-two split: CSS for
 the tap that lands before any JavaScript, `useLinkStatus` for the tap the router is still working on,
 and nothing in between for a third to occupy.
 

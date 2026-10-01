@@ -3766,7 +3766,7 @@ alone, and no icon dependency in this repository, which is a position and not an
 rasterised at 16 px and four of them were redrawn, because a 24-unit grid stroked at 1.75 holds about
 four strokes before it turns to mud.
 
-## NNN — Two acknowledgements of a tap, split by what can run before hydration
+## 123 — Two acknowledgements of a tap, split by what can run before hydration
 
 **2026-10-01** · accepted · acts on #111's findings 3 and 5
 
@@ -3782,14 +3782,14 @@ here is 123.)
 
 **Decision. The tab bar acknowledges a tap twice, and the split is not cosmetic — it is which of the
 two can run at all in the window where the owner's taps are being lost.** The pressed state is plain
-CSS, `active:bg-surface-2` at `components/nav/bottom-nav.tsx:55`, so it paints with no JavaScript
+CSS, `active:bg-surface-2` at `components/nav/bottom-nav.tsx:68`, so it paints with no JavaScript
 having executed; that is the *only* feedback available before hydration, and the pre-hydration window
 is precisely where finding 5 says the lost taps happen. The tab deliberately carries no
 `transition-colors`, so the fill lands in the same frame as the touch rather than waiting on an
 animation — and the fill itself is the one every `ghost` and `secondary` variant in
 `components/ui/button.tsx` already uses, because the tab bar was the single tappable surface in the app
 with no `active:` class of any kind. The second acknowledgement is `useLinkStatus`, in `TabPending`
-(`components/nav/bottom-nav.tsx:81`): a 2 px hairline across the top of the tab that started the
+(`components/nav/bottom-nav.tsx:100`): a 2 px hairline across the top of the tab that started the
 navigation, which exists only after hydration and means something the pressed state cannot say — the
 router took the tap and the navigation is in flight. It is `aria-hidden` and wordless on purpose, which
 is **decision 122's** rule reused rather than rediscovered: the action tiles' inline SVGs are
@@ -3811,8 +3811,10 @@ reason a pressed state had to be hand-written at all: the framework removed an a
 nothing replaced it. Restoring the native highlight was considered and rejected — it is WebKit-only, it
 cannot be themed, and it would make the one surface that acknowledges a tap acknowledge it differently
 from every `Button` in the repository. And there is no `touch-manipulation` on the tabs. The only
-`touch-action` in the tree is `touch-none` / `touch-pan-x` on the drag surfaces of the composition
-editor and the terrain sheet, where it exists to stop a gesture being stolen; `touch-manipulation` is
+`touch-action` in the tree is `touch-none` / `touch-pan-x` on the three drag surfaces — the composition
+editor, the terrain sheet, and `/stats/equipe-type`'s pitch
+(`app/(app)/stats/equipe-type/_components/seven-pitch.tsx:317`) — where it exists to stop a gesture
+being stolen; `touch-manipulation` is
 for suppressing the 300 ms double-tap-zoom delay, and the responsive viewport this app already declares
 (`width: "device-width"`, `initialScale: 1`, `app/layout.tsx:23-24`) is what removes that delay on both
 engines. So `touch-manipulation` here would be cargo — and worse than inert, since it also disables

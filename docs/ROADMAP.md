@@ -798,7 +798,7 @@ the reachable-turf finding below an **under**-statement on device rather than an
       for 180 ms so it never fires on the 126–217 ms navigations the pressed state already answered.
       Two acknowledgements and no third: a `<Suspense>` boundary was built for `/stats` and thrown
       away, because the shell commits before the 180 ms and the hairline then never paints at all —
-      0 hairlines at 100 ms on `/stats` against 1 at 300 ms on `/calendrier` (decision NNN)
+      0 hairlines at 100 ms on `/stats` against 1 at 300 ms on `/calendrier` (decision 123)
 - [ ] `/stats` costs 844 ms of the 844 ms it takes to appear on an emulated 4G phone — 2.4× its
       neighbours, and 314 ms against 109 ms as a local load. Its own aggregation, not the shared auth
       prefix. **And not a `<Suspense>` boundary**, which earlier notes in this file and in
@@ -809,7 +809,7 @@ the reachable-turf finding below an **under**-statement on device rather than an
       `<Link>`s precisely so this screen reads and filters with no JavaScript. It also only engages
       when the query outruns the shell flush, so the fast case keeps the no-JS path and the slow case,
       which is the phone case, loses it. The fix here is the aggregation, not a shape to look at while
-      it runs (decision NNN)
+      it runs (decision 123)
 - [ ] **Two things about the tab bar that only the owner's phone can answer**, both written as checks
       to run rather than as defects. First, whether iOS Safari's own bottom toolbar is consuming the
       first tap: the viewport is `viewportFit: "cover"` at `app/layout.tsx:27`, so the bar sits in the
