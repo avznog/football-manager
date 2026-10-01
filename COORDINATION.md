@@ -20,11 +20,20 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `1efe7de`. The newest tag, `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
-  now **18 commits behind**, so **preview is ahead of production** by all eighteen and will stay ahead
+- **`main`** — at `bd938e9`. The newest tag, `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
+  now **20 commits behind**, so **preview is ahead of production** by all twenty and will stay ahead
   until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
   **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
-  other machine.
+  other machine. Re-derive the two numbers rather than reading them: `git log -1 origin/main` and
+  `git rev-list --count v1.0.0-beta.6..origin/main`.
+- **Two dev servers are up on this machine, and the port tells you whose code you are testing.**
+  **3000 is the owner's checkout** (`…/football-manager`) and **3451 is the other machine's worktree**
+  (`.claude/worktrees/binary-spinning-hickey`). `playwright.config.ts` reuses an existing server outside
+  CI, so `E2E_PORT=3451 npm run test:e2e` from the main checkout runs **the peer's code** and passes —
+  which it did, for a change that was not in it, before `ls -l /proc/<pid>/cwd` said so. `docs/SESSIONS.md`
+  carries the opposite advice from a session that was itself in a worktree; it was right there and is
+  wrong here. **Resolve the cwd of whatever is listening before believing a green run**: `ss -ltnp`, then
+  that `ls`.
 - **`3544bcd` is not a commit and `git rev-parse v1.0.0-beta.6` is the wrong question.** It is the
   **annotated tag object**; the commit is `646b830`. This line said `646b830` and was right; I
   « corrected » it to `3544bcd` in #128 and was wrong, in `docs/SESSIONS.md` and in a pull request body
@@ -40,11 +49,14 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **133**. The highest on `main` is **132** (the owner closing three live
-  items), and **129, 130 and 131 are reserved** by the other machine for PR #125's three placeholders, on
-  its own say-so — which is why 132 skipped them. A gap is cheaper than a collision. Otherwise leave your
-  heading as `## NNN — …` rather than claiming a number; the merging session fills it in. Two more
-  placeholders are coming on `feat/retro-one-action-list`, unclaimed.
+- **Next free decision number** — **136**. The highest on `main` is **135** (the composition dock, this
+  session). **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
+  believing**, and this line is why: it said 133 when 133 *and* 134 were already on `main` — the other
+  machine's two placeholders, the ones this line itself called "coming on `feat/retro-one-action-list`,
+  unclaimed", landed and were numbered without it being updated. A session that trusted the line would
+  have written a second `## 133`. 129, 130 and 131 were likewise reserved by the other machine for PR
+  #125 and taken; a gap is cheaper than a collision, and a stale number is worse than either. Otherwise
+  leave your heading as `## NNN — …` rather than claiming a number; the merging session fills it in.
 - **Live** — production `https://7orteils.bgonzva.fr`, deployed by `release.yml` on a tag. Preview
   `https://dev.7orteils.bgonzva.fr`, deployed by `ci.yml` on a push to `main`, after it migrates the
   preview database. Both go out through the **Vercel CLI**: `vercel.json` sets `git.deploymentEnabled`
@@ -818,6 +830,16 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   `DATABASE_URL` and nothing else. Also still local and still unpushed: `ci/production-on-a-tag`, whose
   content shipped as decision 119 via #108 and #110, so it is content-merged and only the branch is
   stale; I am leaving it rather than deleting another lane's history from under it.
+
+- **2026-10-01 17:40 CEST · the owner's machine · `feat/a-dock-of-players-and-buttons`** — the owner:
+  « the banner on the bottom is too big … I only want the players, the buttons ». The composition dock's
+  three sentences are off the screen and `sr-only` instead; the functions in `lib/composition/` are
+  untouched, which is why sixteen verbatim-`toBe` copy tests had nothing to say about it. **Decision 135** —
+  and that number is the second finding: `133` and `134` were already on `main`, so the "next free decision
+  number" line above was stale by two and is rewritten to send you to `grep -c '^## '` instead. Merged
+  before it, #132: `git rev-parse` on an annotated tag returns the tag object, which this file had been
+  "corrected" into believing. Shipped nothing to production — `package.json` still reads `1.0.0-beta.6`
+  and **no tag was cut**; `main` is now 20 commits ahead of the one that was.
 
 ### From the other machine
 

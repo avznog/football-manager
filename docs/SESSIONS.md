@@ -3770,3 +3770,16 @@ That claim is now made by the button, so the step asserts the button offers to *
 « Enregistrer » is absent, and keeps the sentence as `toBeAttached` — deliberately not `toBeVisible`, which
 Tailwind's `sr-only` would have satisfied by accident with a 1×1 box and left the step passing while
 testing nothing.
+
+**Checks.** `npm run typecheck`, `npx eslint` on both touched files, `npm test` (1414 across 65 files) and
+`npm run test:e2e` (5 tests, 1.1 min) green — and the last of those was **green once before it meant
+anything**. The previous entry in this file says to pass `E2E_PORT=3451` because port 3000 belongs to
+another session; on this machine it is the other way round. **3000 is this checkout and 3451 is the peer's
+worktree**, `playwright.config.ts` reuses an existing server outside CI, and so the first full run — plus
+the first pair of screenshots, which showed all three removed sentences still on screen — exercised the
+peer's code. `ls -l /proc/<pid>/cwd` on what `ss -ltnp` lists is what settles it, and `COORDINATION.md`
+now says so, because a port number is not a fact about a machine.
+
+**Looked at, at 390 px, in both themes**, which on this screen is the whole point: the dock is the five
+discs plus the two buttons, and the turf grows by about 44 px — enough that the attacker's poste is on
+screen with the pitch at rest, where before it was under the banner.
