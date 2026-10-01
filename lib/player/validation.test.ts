@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { POSITION_CODES } from "@/db/reference";
 import {
   INJURY_NOTE_MAX,
   declareInjurySchema,
@@ -76,6 +77,90 @@ describe("updatePositionsSchema", () => {
         secondary: [],
       }).success,
     ).toBe(false);
+  });
+
+  it("keeps accepting every stored code, not just the ones the picker offers", () => {
+    for (const code of POSITION_CODES) {
+      expect(
+        updatePositionsSchema.safeParse({
+          teamId: TEAM,
+          memberId: MEMBER,
+          primary: code,
+          secondary: [code],
+        }).success,
+      ).toBe(true);
+    }
+  });
+
+  // The player reads these, so no English default and no internal code may reach the screen.
+  it("says in French that a stale form is the problem, without blaming the player", () => {
+    const issues = (
+      updatePositionsSchema.safeParse({
+        teamId: "pas-une-equipe",
+        memberId: "moi",
+        primary: "",
+        secondary: [],
+      }).error?.issues ?? []
+    ).map((issue) => issue.message);
+
+    expect(issues).toEqual([
+      "Ce formulaire est invalide, recharge la page.",
+      "Ce formulaire est invalide, recharge la page.",
+    ]);
+  });
+
+  it("names an unknown position in French, in both fields", () => {
+    expect(
+      updatePositionsSchema.safeParse({
+        teamId: TEAM,
+        memberId: MEMBER,
+        primary: "LIBERO",
+        secondary: [],
+      }).error?.issues[0].message,
+    ).toBe("Poste inconnu.");
+
+    expect(
+      updatePositionsSchema.safeParse({
+        teamId: TEAM,
+        memberId: MEMBER,
+        primary: "",
+        secondary: ["ARRIERE"],
+      }).error?.issues[0].message,
+    ).toBe("Poste inconnu.");
+  });
+
+  it("refuses more positions than there are, in French and without listing them", () => {
+    expect(
+      updatePositionsSchema.safeParse({
+        teamId: TEAM,
+        memberId: MEMBER,
+        primary: "",
+        secondary: [...POSITION_CODES, "MC"],
+      }).error?.issues[0].message,
+    ).toBe("Trop de postes dans ce formulaire.");
+  });
+
+  it("leaks no position code and no field name in any message", () => {
+    const messages = [
+      updatePositionsSchema.safeParse({
+        teamId: "x",
+        memberId: "x",
+        primary: "LIBERO",
+        secondary: ["ARRIERE", ...POSITION_CODES],
+      }).error?.issues ?? [],
+    ]
+      .flat()
+      .map((issue) => issue.message);
+
+    expect(messages.length).toBeGreaterThan(0);
+    for (const message of messages) {
+      // Zod's own defaults, which is what every one of these used to say.
+      expect(message).not.toMatch(/Invalid|Too big|expected/);
+      expect(message).not.toMatch(/teamId|memberId|primary|secondary/);
+      for (const code of POSITION_CODES) {
+        expect(message).not.toContain(code);
+      }
+    }
   });
 });
 

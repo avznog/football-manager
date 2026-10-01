@@ -11,7 +11,14 @@ import { POSITION_CODES } from "@/db/reference";
 import { isIsoDate } from "./injury";
 import { SHIRT_NAME_MAX_CHARS } from "./shirt";
 
-export const positionCodeSchema = z.enum(POSITION_CODES);
+/**
+ * All eleven codes, deliberately — **not** the eight the picker offers. The form posts back the
+ * codes already stored for the player, so a record still holding one of the three the picker no
+ * longer shows posts it too; narrowing this enum would make Zod reject that player's whole
+ * submission and leave them unable to save anything ever again. Dropping a stored code is the
+ * picker's job, not the schema's.
+ */
+export const positionCodeSchema = z.enum(POSITION_CODES, { message: "Poste inconnu." });
 export const positionPreferenceSchema = z.enum(["primary", "secondary"]);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -36,16 +43,25 @@ const optionalIsoDateSchema = z
   .transform((value) => (value === "" ? null : value));
 
 /**
+ * The identifiers only ever come from hidden fields the app itself rendered, so a failure here is a
+ * stale or forged form rather than anything the player tapped: the message asks for the one thing
+ * that helps and blames nobody. Same reasoning as `lib/rating/validation.ts`.
+ */
+const identifierSchema = z.uuid("Ce formulaire est invalide, recharge la page.");
+
+/**
  * The picker posts one `primary` field and one `secondary` field per wanted position — an
  * ordinary form, no JSON body. An empty `primary` means « aucun poste principal ».
  */
 export const updatePositionsSchema = z.object({
-  teamId: z.uuid(),
-  memberId: z.uuid(),
+  teamId: identifierSchema,
+  memberId: identifierSchema,
   primary: z
-    .union([z.literal(""), positionCodeSchema])
+    .union([z.literal(""), positionCodeSchema], { message: "Poste inconnu." })
     .transform((value) => (value === "" ? null : value)),
-  secondary: z.array(positionCodeSchema).max(POSITION_CODES.length),
+  secondary: z
+    .array(positionCodeSchema)
+    .max(POSITION_CODES.length, "Trop de postes dans ce formulaire."),
 });
 
 /**
