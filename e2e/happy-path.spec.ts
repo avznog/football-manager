@@ -75,6 +75,14 @@ const NOTE_ABOUT_PLAYER =
 /** Mirrors `MAX_NOTE` in `comment-sheet.tsx` and `noteSchema` in `lib/match/events.ts`. */
 const MAX_NOTE = 280;
 
+/**
+ * What a timeline line says while it is still only on the device — `event-timeline.tsx:59`, rendered
+ * from `line.pending`. Its absence is how this spec waits for the outbox to drain before a reload,
+ * which it must: a line that is still queued is on screen from React state alone, so an assertion
+ * made before the flush proves nothing about the server and a reload can race the POST.
+ */
+const PENDING_MARKER = "en attente d’envoi";
+
 /** « Autre… », which records nothing and opens the second menu. Spelt once, used three times. */
 const MORE_TILE = "Autre… CSC, penalty, blessure, poste";
 
@@ -506,7 +514,13 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
      * server's own log replayed by the reducer — so this one line covers the `COMMENT` branch of
      * `matchEventPayloadSchema`, the `note` column of `TimelineEntry` and the fact that `reduceMatch`
      * carries free text at all. None of that is exercised by anything that stops at the client.
+     *
+     * Wait for the outbox to drain first. Reloading while a POST is still in flight is a race this
+     * step lost in CI on 2026-10-01, and losing it is silent: the assertions before the reload read
+     * the same React state the queue does, so they pass either way. `offline.spec.ts:131` waits the
+     * same way for the same reason, and that spec is the one that was written about the queue.
      */
+    await expect(page.getByText(PENDING_MARKER)).toHaveCount(0);
     await page.reload();
 
     await expect(clock).toHaveText("50:00");
@@ -517,7 +531,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(replayed).toContainText(striker.displayName);
     // Nothing was refused on the way through, and nothing is still on the device.
     await expect(page.getByText("Actions refusées")).toHaveCount(0);
-    await expect(page.getByText("en attente d’envoi")).toHaveCount(0);
+    await expect(page.getByText(PENDING_MARKER)).toHaveCount(0);
   });
 
   await test.step("a remark about the man who came off, which cannot be about nobody", async () => {
@@ -567,7 +581,8 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 
     // And the server believed it: the reload replays it from the log alone, which is the `REMARK`
     // branch of `matchEventPayloadSchema` and the new enum value in the database, neither of which a
-    // client-side assertion reaches.
+    // client-side assertion reaches. Drain the outbox before reloading, as above.
+    await expect(page.getByText(PENDING_MARKER)).toHaveCount(0);
     await page.reload();
     const replayed = logLine("Bel effort");
     await expect(replayed).toContainText("53’");
