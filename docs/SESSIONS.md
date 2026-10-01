@@ -3748,3 +3748,25 @@ and badly without it: `findRetroIssues` has `missing-substitute-out` / `missing-
 `retroChangeSchema` requires two uuids on that arm, so a no-JS or crafted POST is answered « Ce joueur
 n'est pas valide. » before the issue finder is asked. The fix is the order of operations in
 `submitRetroMatch`, not this slice. And the audit's `D18` reproduces, untouched by this work.
+
+## The composition dock, down to the players and the buttons
+
+The owner's instruction was one sentence — *« The banner on the bottom is too big … Basically, I only want
+the players, the buttons »* — and the three sentences named in it are now off that screen: the bench count
+with its tap instruction, the save state, and « Il reste N postes à pourvoir. » **Decision 135** has the
+reasoning, including why « Personne n'est dans les buts. » stays and the drag hint stays for exactly as
+long as a finger is over the dock.
+
+**No French was deleted.** `benchHintFr`, `editorSaveStateFr` and `findPlanIssues`' `incomplete` message
+are untouched in `lib/composition/`, still unit-tested branch by branch — all three moved to `sr-only`
+with `aria-live`, and the bench count became the strip's `aria-describedby` rather than a line in the flow.
+That is the only reason this was a twenty-line change and not a negotiation with sixteen verbatim-`toBe`
+copy tests: **the strings are rendered somewhere else now, and `lib/composition/plan.test.ts` asserts the
+functions, not the layout.** 1414 unit tests green, unchanged in number.
+
+One e2e assertion had to move rather than be deleted. `e2e/happy-path.spec.ts` checked that a pre-filled
+editor does not claim to be saved by looking for « Rien n'est encore enregistré. » and calling it visible.
+That claim is now made by the button, so the step asserts the button offers to **create** and that
+« Enregistrer » is absent, and keeps the sentence as `toBeAttached` — deliberately not `toBeVisible`, which
+Tailwind's `sr-only` would have satisfied by accident with a 1×1 box and left the step passing while
+testing nothing.

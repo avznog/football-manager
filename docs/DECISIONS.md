@@ -4688,3 +4688,49 @@ subset, so there is no longer a second list to keep in step by hand.
   and not to this slice.
 - **`D18` reproduces and is untouched here.** It is listed under slice 4 of the UX audit and this work
   neither fixed nor worsened it.
+
+## 135 — The composition dock holds the players and the buttons, and says nothing
+
+**2026-10-01** · accepted · the owner's instruction · narrows decision 097's remit, supersedes nothing
+
+**Decision.** The sticky dock in `components/composition/composition-editor.tsx` draws the bench strip,
+the blocking errors that cannot be read off the turf, and the two buttons. The three sentences it used to
+print are gone from the screen:
+
+- « 12 au banc, 7 postes libres. Appuie sur un joueur puis sur un poste. » — `benchHintFr`;
+- « Rien n'est encore enregistré. » / « Modifications non enregistrées. » / « À jour. » — `editorSaveStateFr`;
+- « Il reste 3 postes à pourvoir. » — the `incomplete` issue from `findPlanIssues`.
+
+**Why.** The owner asked, in these words: *« The banner on the bottom is too big … Basically, I only want
+the players, the buttons. »* And the reason it was too big is structural rather than a matter of taste:
+this is the one screen in the app that is **pinned at both ends**. The turf is above, the fixed tab bar is
+below, and everything the dock prints is bought from the height of the pitch the coach is aiming a thumb
+at. On a 390 px screen three lines of `text-xs` plus their gaps is about 60 px, which is two rows of discs.
+
+**Each of the three had a reason, and in each case the screen above it had already made the point.**
+
+- the bench count was there because the strip scrolls sideways and about five discs fit, so « 9 au banc »
+  was what stopped the four off the right edge being forgotten (`lib/composition/hints.ts`'s own
+  docblock). True — but the strip is *visibly* cut off at the edge, which is the affordance; the sentence
+  was the caption. The tap path it also spelled out is still on the list's `aria-label`;
+- the save state was there because a pre-filled pitch must not claim to be saved (decision 106). Still
+  true, and still said: the submit button reads « Créer la composition » for something new and
+  « Enregistrer » for something that exists. A form whose button offers to create is not claiming to have
+  saved;
+- « Il reste 3 postes à pourvoir. » counts the empty postes **drawn empty, directly above it**. It still
+  blocks the save, and it is still printed on the compositions list, where there is no turf to read it
+  off.
+
+**What stays visible, and why that is not inconsistent.** « Personne n'est dans les buts. » stays, because
+it names *which* empty poste is the fatal one and the turf does not rank its own holes. The drop hint
+stays, but only while a player from the pitch is actually held over the dock: `Pitch` is `overflow-hidden`,
+so the lifted disc is clipped at the bottom of the turf and the gesture reads as having lost him, and that
+is the one state of this screen that genuinely cannot explain itself (decision 112's neighbour).
+
+**Nothing was deleted, only stopped being drawn.** All three strings are still produced by the same pure
+functions, still unit-tested branch by branch, and all three are now `sr-only` with `aria-live` — the
+bench count as the strip's `aria-describedby`, so a reader moving through the discs is not told the total
+between two of them. This is where decision 097 is narrowed rather than contradicted: 097 says a French
+sentence that is true of only some states of the screen belongs in a pure function a test can walk. It
+says nothing about the sentence having to be *drawn*, and the version of this screen that printed all of
+them was the one that proved a true sentence can still be the wrong 20 px.
