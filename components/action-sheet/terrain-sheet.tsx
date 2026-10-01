@@ -173,7 +173,7 @@ export function TerrainSheet({
       // The safety rule, said out loud. The composition editor benches a player dropped outside a
       // slot; at 70′ that is how a slipped thumb costs you a player, so here it is a no-op.
       setAnnouncement(
-        `${players.nameOf(carried.memberId)} n’a pas bougé : relâchez-le sur un poste, ou utilisez « Faire sortir ».`,
+        `${players.nameOf(carried.memberId)} n’a pas bougé : relâche-le sur un poste, ou utilise « Faire sortir ».`,
       );
       setSelected(null);
     },
@@ -203,7 +203,7 @@ export function TerrainSheet({
     }
     setSelected(memberId);
     setAnnouncement(
-      `${players.nameOf(memberId)} sélectionné. Appuyez sur un poste pour le placer.`,
+      `${players.nameOf(memberId)} sélectionné. Appuie sur un poste pour le placer.`,
     );
   }
 
@@ -298,7 +298,7 @@ export function TerrainSheet({
         {/* --- the pitch --- */}
         <section className="space-y-2">
           <p className="text-sm text-ink-muted">
-            Faites glisser un joueur sur un poste, ou appuyez sur un joueur puis sur un poste. Sur un
+            Fais glisser un joueur sur un poste, ou appuie sur un joueur puis sur un poste. Sur un
             poste occupé, les deux joueurs échangent.
           </p>
 

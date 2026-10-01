@@ -425,7 +425,7 @@ describe("the player pickers", () => {
 
     const card = enterableCardFr({ available: onlySubs, players: PLAYERS, canAct: true });
 
-    expect(card.hintFr).toBe("Touchez un joueur pour le faire entrer.");
+    expect(card.hintFr).toBe("Touche un joueur pour le faire entrer.");
   });
 
   it("tells a spectator what the list is, not what to do with it", () => {
