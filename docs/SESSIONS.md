@@ -2988,3 +2988,51 @@ nobody has declared over still shows « Ta réponse » with « Tu peux changer d
 d'envoi », and still offers the coach a « relancer » message. Both gate on `status === "scheduled"`,
 which was a fair proxy for « still to come » until this change; the untruth is older than the change
 and merely easier to reach now.
+
+## Six words a coach says out loud, and one event type to hold them
+
+The owner wanted to tap « bon retour » or « mauvaise passe » about a player while the match is
+running, and he listed six of them. The whole of the design question was whether that is six event
+types or one, and the answer is **one**: a `REMARK` whose payload carries `{ kind, memberId }`, with
+`kind` drawn from `REMARK_KINDS`. Six enum values would have been six `ALTER TYPE … ADD VALUE`
+statements, six payload schemas, six label rows and six branches in two formatters, and the seventh
+remark the owner thinks of next Sunday would have been a migration on a production database for one
+word. Decision **122** records it, including the trade it accepts: the database no longer says which
+kinds exist, so an unknown one is a runtime concern — refused at ingestion by the strict payload
+schema, and read by the reducer as a remark naming no kind and nobody, because the reducer may never
+refuse a log Postgres has accepted. `tsc` covers the ordinary mistake instead: `REMARK_LABELS_FR` and
+`REMARK_ICONS` are `Record<RemarkKind, …>`, so a seventh kind without its French or without a drawing
+does not compile.
+
+Four things fell out of it that are worth knowing before touching the area. `memberId` is
+**required**, which is the only difference from decision 114's `COMMENT` — « bel effort » about nobody
+is a note, not a remark — so the sheet opens with no player chosen and the button disabled under a
+hint saying why. The reducer computes **nothing** from a remark, and that is asserted as whole-state
+equality against the same log without it rather than field by field, so no figure can quietly start
+depending on one. **One** formatter, `remarkDetailFr` in `lib/match/presenter.ts`, serves game mode's
+timeline and the rating recap, which is 114's lesson applied before it cost anything — two screens
+formatting the same event is how one of them drops it. And remarks do reach the shared match summary,
+which the owner asked for: it works because `HIDDEN_EVENT_TYPES` in `lib/rating/recap.ts` holds only
+`PAUSE`, `RESUME` and `VOID`, which is a property of a set three screens away, so a test pins it.
+
+The minute a remark carries is **the minute the ACTION menu was opened**, not the minute the coach
+finished picking a name out of a `<select>` — decision 031 already decided a tap is stamped when it is
+made, and the two-step sheet does not change that.
+
+The other half of the branch is that the action tiles are now **drawn** as well as named, the ACTION
+menu and the six remarks alike. Hand-rolled inline SVG on `components/theme/theme-toggle.tsx`'s
+pattern: one shared `<Icon>` frame, `stroke="currentColor"` with no fill so a tile's tone tints its
+drawing and light and dark are free, and `aria-hidden="true"` so a tile's accessible name stays its
+French label alone. There is no icon dependency in this repository and the comment at the top of
+`components/action-sheet/action-icons.tsx` says there is not to be one. They were rasterised at 16 px
+and looked at rather than trusted, and four were redrawn after the first pass turned to mud — a
+24-unit grid stroked at 1.75 units holds about four strokes, so each drawing is a ball, a box, an
+arrow, a shield or a star and nothing more. **`ACTION_ICONS` is keyed by tile and `REMARK_ICONS` by
+`RemarkKind`**; the second is a total record on purpose, which is what makes a new kind fail the
+typecheck rather than ship a blank tile.
+
+**Next**, and both are written down in `docs/ROADMAP.md` rather than started: there are **no
+per-remark statistics** — counting « mauvaise passe » per player is a different feature, and since a
+remark is an opinion rather than an observation it needs a product answer about what the count is for
+before a column exists for it — and a remark is **tapped live only**, because `RETRO_FACT_TYPES` in
+`lib/retro/log.ts` is untouched, so a match typed up after the fact cannot carry one.

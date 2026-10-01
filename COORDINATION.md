@@ -501,6 +501,34 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   branch `main`, so `deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` to make the CLI deployment take
   that domain — **expected, not seen**. Watch the first `main` push. `7orteils.bgonzva.fr` has no git pin
   and is on the Production environment, so `--prod` takes it (verified).
+- **2026-10-01 · the owner's machine · `feat/action-icons-and-remarks`** — A new **`REMARK`** match event
+  and icons on every action tile. Decision **122**, so the next free number is **123**. What another
+  session could trip over, in order of likelihood. **`db/migrations/0005_goofy_sir_ram.sql`** is the
+  repo's second `ALTER TYPE … ADD VALUE`, `'REMARK' BEFORE 'FINAL_WHISTLE'` — if your local database is
+  behind, `getLiveMatch` and the reducer will read a type Postgres does not have, so `npm run db:migrate`
+  before you doubt anything — the 22:10 bullet below is a browser check that reported the expected result
+  for entirely the wrong reason because that machine was three migrations behind. **Six remarks are one
+  enum value with the kind in the payload**: `{ kind, memberId }`, `kind` from `REMARK_KINDS` in
+  `lib/match/events.ts`, so add a seventh there and not in `db/schema.ts`.
+  `memberId` is **required**, unlike `COMMENT`'s. **`TimelineEntry` has a new field, `remarkKind`**, null
+  on every other type — additive, but it is in the reducer's output, so a `toEqual` on a whole entry will
+  want it. The reducer computes nothing from a remark. **`remarkDetailFr` in `lib/match/presenter.ts` is
+  the only formatter**, called by game mode's timeline *and* by `lib/rating/recap.ts`; do not write a
+  second one, which is what decision 114 cost us. Remarks are visible in the shared match summary on
+  purpose and a test pins it. On the icons: `components/action-sheet/action-icons.tsx` is new, exported
+  through the barrel, hand-rolled inline SVG with **no dependency and there is not to be one**;
+  `ACTION_ICONS` is keyed by tile and **`REMARK_ICONS` is a total `Record<RemarkKind, ReactNode>`**, so a
+  seventh kind without a drawing fails `tsc` rather than shipping a blank tile. Nothing touched in
+  `vercel.json`, `.github/`, `package.json` or anything about the deployment, and no tag.
+  **Stale in this file, flagged rather than deleted** since they are other sessions' words: the iPhone
+  tap-latency brief at the top and its STOP lift are **answered** — the measurement is in
+  `docs/SESSIONS.md` « Where the two seconds on the iPhone actually are », and the three pull requests it
+  proposes are the open work, not the measuring; the « highest number on `main` is 082 » line in the
+  STATUS section is thirty-nine decisions out of date and the number is now **122**; « the app has no
+  user account, `db:bootstrap` has not been run » is no longer true, and neither is the
+  `football-manager-avznog-team.vercel.app` URL, which is `7orteils.bgonzva.fr` in production and
+  `dev.7orteils.bgonzva.fr` for the preview; and the STATUS heading's « one session is looping » has not
+  been true since the 22:10 bullet below.
 
 ### From the other machine
 

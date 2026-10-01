@@ -293,6 +293,22 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       **accessible name** gave way: `clockActionFr` returns a third string, `name`, which is `label`
       everywhere except the two kick-off branches. `presenter.test.ts` walks every reachable phase of a
       1, 2 and 3-period match asserting the containment (decision 117)
+- [x] A `REMARK` action behind « Remarque »: six one-tap judgements about one player, in the words the
+      owner uses on the touchline — « Bon retour », « Bel effort », « Mauvaise passe », « Bon placement »,
+      « Perte de balle », « Beau geste ». **One** enum value with the kind in the payload and not six
+      types, so a seventh remark is a line in `REMARK_KINDS` rather than a migration (decision 122,
+      `0005_goofy_sir_ram.sql`). `memberId` is required, unlike a `COMMENT`'s; the reducer computes
+      nothing from it, asserted as whole-state equality against the same log without it; one formatter,
+      `remarkDetailFr`, writes the line for game mode's timeline and for the recap; and a remark reaches
+      the shared match summary, which the owner asked for, because `HIDDEN_EVENT_TYPES` hides only
+      `PAUSE`, `RESUME` and `VOID` — pinned by a test, since that is a set three screens away
+- [x] Every action tile is drawn as well as named, the ACTION menu and the six remarks alike:
+      hand-rolled inline SVG on `components/theme/theme-toggle.tsx`'s pattern, `currentColor` so a
+      tile's tone tints its drawing and both themes are free, `aria-hidden` so the accessible name
+      stays the French label. No icon dependency, and there is not to be one. Rasterised at 16 px and
+      four of them redrawn: a 24-unit grid stroked at 1.75 holds about four strokes before it turns to
+      mud. `ACTION_ICONS` is keyed by tile; `REMARK_ICONS` is a total `Record<RemarkKind, ReactNode>`,
+      so a seventh kind added without a drawing fails `tsc` instead of shipping a blank tile
 - [ ] Two shapes of the match bar still do not fit at 393 px and cannot at any font metric: « 10 – 10 »
       with a stoppage span wants 370 of the 369 available, and a match long enough to print « 120:00 »
       wants 388. Today the action slot absorbs it by clipping — TERRAIN loses up to 19 px of its right
@@ -317,6 +333,18 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       required, the player is not
 - [ ] Reading the comments attached to a player on that player's own page. The event carries
       `memberId`, so the data is there the day it is wanted
+- [ ] A remark can only be tapped **live**. `RETRO_FACT_TYPES` in `lib/retro/log.ts` is untouched, so a
+      match typed up afterwards carries none — the same gap as the `COMMENT` line above and for the
+      same reason: the owner asked for a remark during the match. `retroFactNeedsMember` would need a
+      case where the player is required and there is no free text, which is the easier half; what the
+      retro form would have to grow is a kind picker, and whether a judgement made from memory a
+      fortnight later is worth recording is a product question, not a missing branch
+- [ ] **No per-remark statistics at all.** Nothing counts « mauvaise passe » per player, and nothing
+      should until somebody decides what the count is *for*: these are the one thing in the log that is
+      an opinion rather than an observation (decision 122), and a season table of them is a judgement
+      about a teammate that the rest of the team can read. `match_player_stats` has no column for one,
+      `lib/stats/aggregate.ts` ignores them, and the data is all in the log the day the product answer
+      exists. A remark is readable today exactly where it was tapped: the timeline and the recap
 
 ## M5 — Stats
 - [x] Player stats: matches, minutes, goals, assists, own goals, fouls
