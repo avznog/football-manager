@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
+import { CAPTURE_SOURCE } from "./capture-source";
 import {
   formatTraceLines,
+  isTraceRequestAllowed,
   isTraceSinkEnabled,
   MAX_TRACE_ENTRIES,
   parseTracePayload,
   TRACE_ERRORS,
   TRACE_MARKER,
+  traceSecretMatches,
   tracePayloadSchema,
   type TraceEntry,
 } from "./trace";
@@ -65,6 +68,71 @@ describe("isTraceSinkEnabled", () => {
 
   it("refuses an environment name it does not know, rather than guessing", () => {
     expect(isTraceSinkEnabled({ VERCEL_ENV: "staging", NODE_ENV: "development" })).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The secret                                                                 */
+/* -------------------------------------------------------------------------- */
+
+describe("traceSecretMatches", () => {
+  it("accepts exactly the expected secret", () => {
+    expect(traceSecretMatches("s3cret-de-trace", "s3cret-de-trace")).toBe(true);
+  });
+
+  it("fails closed when no secret is configured, which is the whole point", () => {
+    expect(traceSecretMatches(undefined, "anything")).toBe(false);
+    expect(traceSecretMatches("", "anything")).toBe(false);
+    expect(traceSecretMatches(undefined, undefined)).toBe(false);
+    // The empty string presented against an unset secret must not read as « both empty, equal ».
+    expect(traceSecretMatches("", "")).toBe(false);
+  });
+
+  it("refuses a missing, empty or wrong presentation", () => {
+    expect(traceSecretMatches("s3cret-de-trace", undefined)).toBe(false);
+    expect(traceSecretMatches("s3cret-de-trace", null)).toBe(false);
+    expect(traceSecretMatches("s3cret-de-trace", "")).toBe(false);
+    expect(traceSecretMatches("s3cret-de-trace", "s3cret-de-trace-")).toBe(false);
+    expect(traceSecretMatches("s3cret-de-trace", "S3cret-de-trace")).toBe(false);
+  });
+
+  it("does not throw on a length mismatch, which is what timingSafeEqual would do", () => {
+    expect(() => traceSecretMatches("court", "beaucoup plus long")).not.toThrow();
+    expect(traceSecretMatches("court", "beaucoup plus long")).toBe(false);
+  });
+
+  it("compares bytes and not code units, so a multi-byte secret still works", () => {
+    expect(traceSecretMatches("clé-é✓", "clé-é✓")).toBe(true);
+    expect(traceSecretMatches("clé-é✓", "cle-e✓")).toBe(false);
+  });
+});
+
+describe("isTraceRequestAllowed", () => {
+  const preview = { VERCEL_ENV: "preview", TRACE_SECRET: "s3cret-de-trace" };
+
+  it("allows a preview deployment presenting the configured secret", () => {
+    expect(isTraceRequestAllowed(preview, "s3cret-de-trace")).toBe(true);
+  });
+
+  it("refuses production even with the right secret", () => {
+    expect(
+      isTraceRequestAllowed(
+        { VERCEL_ENV: "production", TRACE_SECRET: "s3cret-de-trace" },
+        "s3cret-de-trace",
+      ),
+    ).toBe(false);
+  });
+
+  it("refuses an allowed environment with no secret configured", () => {
+    expect(isTraceRequestAllowed({ VERCEL_ENV: "preview" }, "s3cret-de-trace")).toBe(false);
+    expect(isTraceRequestAllowed({ NODE_ENV: "development" }, "")).toBe(false);
+    // Local development is not an exception: unset means off there too.
+    expect(isTraceRequestAllowed({ NODE_ENV: "development", TRACE_SECRET: "" }, "x")).toBe(false);
+  });
+
+  it("refuses a wrong or absent presentation on an otherwise healthy deployment", () => {
+    expect(isTraceRequestAllowed(preview, "autre-chose")).toBe(false);
+    expect(isTraceRequestAllowed(preview, null)).toBe(false);
   });
 });
 
@@ -218,5 +286,51 @@ describe("formatTraceLines", () => {
       expect(entry.label).toBe("tabbar après compo");
       expect(typeof entry.i).toBe("number");
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The served capture source                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `GET /api/dev/trace` serves `CAPTURE_SOURCE`, which is generated from
+ * `scripts/iphone-trace/capture.js` by `build-bookmarklet.mjs` and committed. Nothing else in the
+ * repo can notice that the two have parted company — the route cannot read `capture.js` at runtime,
+ * because `scripts/` is not in Vercel's serverless bundle, which is the reason the constant exists at
+ * all.
+ *
+ * So this is a drift alarm and not a proof: it asserts the constant is there and still looks like the
+ * capture script, which catches the two failures that matter — a generator that wrote an empty string,
+ * and a hand-edit that gutted it. It deliberately does **not** re-minify `capture.js` and compare: that
+ * would make the test a second copy of the build, and a bug in the minifier would then be asserted
+ * true rather than caught. The real rule is « rerun the build in the same commit as the edit ».
+ */
+describe("CAPTURE_SOURCE", () => {
+  it("is a non-empty script, and plausibly the whole of it", () => {
+    expect(CAPTURE_SOURCE.length).toBeGreaterThan(5000);
+  });
+
+  it("still contains the markers that make it the capture script", () => {
+    // The idempotence flag the owner types into a tethered Web Inspector, and the one the loader
+    // bookmarklet checks before injecting a second copy.
+    expect(CAPTURE_SOURCE).toContain("window.__fmTrace");
+    // Where it posts, which is this very route.
+    expect(CAPTURE_SOURCE).toContain('const ENDPOINT = "/api/dev/trace"');
+    // The header that carries the shared secret: without it every POST would come back 404.
+    expect(CAPTURE_SOURCE).toContain("x-trace-secret");
+    // The hit test is the member that justifies the whole tool.
+    expect(CAPTURE_SOURCE).toContain("elementFromPoint");
+  });
+
+  it("bakes in no secret: the key reaches the shim from outside", () => {
+    expect(CAPTURE_SOURCE).toContain("window.__fmTraceKey");
+    // It may only ever *read* the global. `=` and not `===`, so the `typeof … === "string"` test the
+    // shim does on it is not mistaken for an assignment.
+    expect(CAPTURE_SOURCE).not.toMatch(/__fmTraceKey\s*=[^=]/);
+  });
+
+  it("carries no comment block, so what is served is what the minifier produced", () => {
+    expect(CAPTURE_SOURCE.startsWith("(function ()")).toBe(true);
   });
 });

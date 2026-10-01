@@ -12,25 +12,51 @@ Safari's own bottom toolbar is eating the first tap on the tab bar, and whether
 — « sometimes nothing happens » — and they are told apart by which element is really under the pixel
 you aimed at.
 
-**This ships no production code.** Nothing here is imported by the app, is in its bundle, or changes
-a rendered screen. `capture.js` only ever runs in a tab you injected it into yourself.
+**This changes no screen and nothing of it reaches the browser on its own.** `capture.js` only ever
+runs in a tab you injected it into yourself. One honest qualification: the capture script's text is
+committed as `lib/dev/capture-source.ts` and therefore sits in the **server** bundle of
+`app/api/dev/trace/route.ts`, because that route serves it — see « Build it ». It is in no client
+bundle, it is invisible to `npm run audit:screens`, and it runs only if you fetch it with the key.
+
+## Set the secret first
+
+The endpoint is behind a shared secret, `TRACE_SECRET`, and it **fails closed**: with the variable
+unset the route answers 404 to everything, exactly as if it were not deployed. So, once, by hand:
+
+1. Generate a key — `openssl rand -base64 24` is plenty.
+2. Add it in Vercel as `TRACE_SECRET`, in the **Preview** environment only. Not Production: the sink
+   refuses production whatever the variable says, so a value there would be a value that does nothing
+   except exist in a place it can leak from.
+3. Redeploy preview (a push to `main`) so the running function sees it.
+
+Keep the same value to hand for the build below — the bookmarklet carries it.
 
 ## Build it
 
 ```bash
-node scripts/iphone-trace/build-bookmarklet.mjs
+TRACE_SECRET='…' node scripts/iphone-trace/build-bookmarklet.mjs
+# or
+node scripts/iphone-trace/build-bookmarklet.mjs --secret='…'
 ```
 
-It prints the `javascript:` URL to stdout and writes it to **`audit/iphone-trace-bookmarklet.txt`**
-(`audit/` is already gitignored, and already where `scripts/audit-screens.ts` puts its output — so
-nothing was added to `.gitignore` for this).
+It refuses to build without a key, and it never prints the key in full — only its length and first
+two characters, so you can tell which one an artefact carries. It writes three things:
 
-It also prints the length and warns above 8 000 characters. The current build is around 14 000, which
-is expected: the minifier is deliberately conservative — it strips comments and indentation and
-nothing else, because a clever minifier is a bug in a tool whose whole job is to be believed. The
-warning is a prompt to check the paste went in whole, not a failure.
+| | what | tracked? |
+|---|---|---|
+| `lib/dev/capture-source.ts` | the capture script as a committed TypeScript constant | **yes — commit it** |
+| `audit/iphone-trace-loader.txt` | the loader bookmarklet, ~420 characters — **install this one** | no (`audit/` is gitignored) |
+| `audit/iphone-trace-bookmarklet.txt` | the whole script inline, ~15 000 characters — the fallback | no |
 
-Edit `capture.js` and rebuild. Never edit the URL.
+`lib/dev/capture-source.ts` is committed because `GET /api/dev/trace` serves it and **cannot read
+`capture.js` at runtime**: `scripts/` is not part of Vercel's serverless bundle, so a file read would
+work on your machine and 500 on preview. **Edit `capture.js`, rerun the build, commit both in the same
+commit.** `lib/dev/trace.test.ts` fails if the constant is empty or has lost its markers, which
+catches the gross drift and not the subtle kind.
+
+Both artefacts contain the key in clear text. `audit/` is gitignored; do not copy them anywhere else.
+
+Edit `capture.js` and rebuild. Never edit a URL by hand.
 
 ## Install it on the iPhone
 
@@ -38,16 +64,39 @@ Edit `capture.js` and rebuild. Never edit the URL.
 scheme on entry; it only honours it from a bookmark. So the install is: make a bookmark of anything,
 then replace its address.
 
-1. On the Mac, run the build and copy the URL — the whole thing, from `javascript:` to the end. (If
-   you prefer: open `audit/iphone-trace-bookmarklet.txt`, select all, copy.)
+Install the **loader** — `audit/iphone-trace-loader.txt`, around 420 characters. It carries the key and
+nothing else; the script itself comes from `GET /api/dev/trace?k=…` when you tap it.
+
+1. On the machine you built on, open `audit/iphone-trace-loader.txt`, select all, copy. It is short
+   enough to see whole, which is the point of it.
 2. Get it onto the phone. Easiest is to paste it into a note or an iMessage to yourself; **do not**
    let anything turn it into a tappable link, and do not tap it there — copy it from there.
 3. On the iPhone, open Safari on any page and tap **Partager** → **Ajouter un favori**. Name it
    `FM trace`, save it in **Favoris** (so it is one tap away in a new tab), and save.
 4. Tap the bookmarks icon (the open book) → **Favoris** → **Modifier** → tap `FM trace`.
-5. Clear its **address** field completely and **paste** the URL in. Check the end of it is there by
-   scrolling the field — a truncated paste is the one failure that looks like success.
+5. Clear its **address** field completely and **paste** the URL in. Check the end is there —
+   `(window,document)` — by scrolling the field.
 6. **Terminé**. The bookmark is now the tool.
+
+Rebuilding with the same key produces the same loader, so a `capture.js` edit needs **no reinstall**:
+the next tap fetches the new script. Only changing the key means redoing the bookmark.
+
+If a tap gives you `Trace KO`, the route did not serve the script. That is one of three things, and it
+answers 404 to all three on purpose: the key in the bookmark is not the one in Vercel, `TRACE_SECRET`
+is unset on the deployment, or you are on production (where the sink does not exist). Check the Vercel
+variable first, then rebuild the loader with the key you actually set.
+
+### The inline fallback
+
+`audit/iphone-trace-bookmarklet.txt` is the whole capture script in the bookmark, ~15 000 characters,
+and it depends on nothing but itself — use it if the route is unreachable or the key is not set in
+Vercel yet. Install it the same way, with one caveat that has not gone away:
+
+> **Nobody has yet observed iOS Safari accepting a 15 KB bookmark address.** It is expected to work and
+> it is untested. A truncated paste is the one failure that looks exactly like success, so scroll to the
+> end of the address field and check the last characters are there — `%7D)()%3B` or thereabouts.
+
+That hazard is the entire reason the loader exists, and it applies only here.
 
 ## Use it
 
@@ -67,14 +116,16 @@ then replace its address.
    numbered and they all survive in the same run.
 7. Use the app normally in between. Anything the page logs, throws, or rejects is recorded as it
    happens.
-8. Tap **Envoyer**. The status line shows the HTTP status: `Envoyé ✓ 202 · 23 entrées` means it
-   landed. Anything else means it did not, and says what came back instead.
+8. Tap **Envoyer**. The status line shows the HTTP status: `Envoyé ✓ 200 · 23 entrées` means it
+   landed. A `404 · clé refusée, absente, ou sink éteint` is the gate, not a bug — the endpoint refuses
+   to say which of the three it is. Anything else says what came back instead.
 
 It also flushes by itself when you background the tab or lock the phone, so a run is rarely lost. It
 keeps the **last 200** entries and says so in the payload if it had to drop older ones.
 
 Tapping the bookmark a second time on the same page does **not** install it twice — it just re-shows
-the panel. Navigating to another page unloads it; install it again there.
+the panel. The loader checks the same `window.__fmTrace` flag the script sets, so a double tap costs
+one request at most. Navigating to another page unloads it; tap it again there.
 
 ### What the hit test is asserting
 
@@ -115,6 +166,9 @@ whether it is running installed to the home screen, and the **resolved**
 
 ## When you are done
 
-Nothing to uninstall from the app — there is nothing in the app. Delete the bookmark, or keep it; it
-does nothing until it is tapped, and it only ever posts to `/api/dev/trace`, which is not a route
-production should be serving.
+Nothing to uninstall from the app. Delete the bookmark, or keep it; it does nothing until it is
+tapped, and it only ever talks to `/api/dev/trace`, which production does not serve.
+
+To close the channel for good, remove `TRACE_SECRET` from Vercel's preview environment: the gate fails
+closed, so the endpoint goes dead on the next deployment without a code change. Rotating the key is the
+same move — change it in Vercel, rebuild the loader, replace the bookmark's address.

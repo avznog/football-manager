@@ -22,6 +22,8 @@
  * warning is about. It therefore takes its environment as an argument and never reads `process.env`.
  */
 
+import { timingSafeEqual } from "node:crypto";
+
 import { z } from "zod";
 
 /* -------------------------------------------------------------------------- */
@@ -47,6 +49,53 @@ export function isTraceSinkEnabled(env: { VERCEL_ENV?: string; NODE_ENV?: string
   return env.NODE_ENV !== "production";
 }
 
+/**
+ * Whether a presented secret is the expected one, compared in constant time.
+ *
+ * **An absent or empty `expected` is a refusal.** That is the whole point of the signature taking it
+ * as an argument that may be `undefined`: a deployment where `TRACE_SECRET` was never set is a
+ * deployment whose sink is dead, not one whose sink is open. Fail closed, because the failure mode of
+ * the other choice — a forgotten variable turning a diagnostic endpoint into an anonymous write
+ * channel into the log stream — is the one nobody notices until it is being used.
+ *
+ * `timingSafeEqual` throws on buffers of unequal length, so the length is checked first and a
+ * mismatch returns early. That early return does leak the secret's length to a very patient prober,
+ * which is the standard and accepted shape of this comparison: the length of a random secret is not
+ * the secret, and the alternative (hashing both sides to a fixed width) buys nothing here.
+ *
+ * Pure, and reading no `process.env`, for the same reason `isTraceSinkEnabled` does not: decision
+ * 114 — a gate that cannot be unit-tested is a gate that merely *looks* like one.
+ */
+export function traceSecretMatches(
+  expected: string | undefined,
+  presented: string | null | undefined,
+): boolean {
+  if (!expected || !presented) return false;
+
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(presented, "utf8");
+  if (a.length !== b.length) return false;
+
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * The one gate both verbs of the route ask: the environment allows the sink **and** the request
+ * carries the shared secret.
+ *
+ * Three independent conditions, all of which must hold: `VERCEL_ENV` is not `production`,
+ * `TRACE_SECRET` is set and non-empty, and the request presents exactly it. Any of them failing is
+ * the same answer — a 404 with `TRACE_ERRORS.disabled`. Off, misconfigured and probed with a wrong
+ * key are deliberately indistinguishable from never deployed; see the route's doc comment.
+ */
+export function isTraceRequestAllowed(
+  env: { VERCEL_ENV?: string; NODE_ENV?: string; TRACE_SECRET?: string },
+  presented: string | null | undefined,
+): boolean {
+  if (!isTraceSinkEnabled(env)) return false;
+  return traceSecretMatches(env.TRACE_SECRET, presented);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Refusals                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -60,7 +109,11 @@ export const MAX_TRACE_ENTRIES = 200;
  * tutoies, and a decision-128 scan of `lib/` as text finds nothing to correct here.
  *
  * `disabled` is answered with a **404**, not a 403: on production the endpoint must be
- * indistinguishable from one that was never deployed.
+ * indistinguishable from one that was never deployed. The same string, and the same status, answers a
+ * missing or wrong `x-trace-secret` — no new entry was added for « mauvaise clé », deliberately,
+ * because a message that distinguishes « wrong key » from « no such route » is a message that
+ * confirms the route exists. « Cette route n’existe pas » is the honest answer to all three cases:
+ * from the caller's side the route really does not exist.
  */
 export const TRACE_ERRORS = {
   disabled: "Cette route n’existe pas.",

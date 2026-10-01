@@ -43,6 +43,31 @@
     const ENDPOINT = "/api/dev/trace";
 
     /**
+     * The shared secret the endpoint demands, which **is never written into this file**: it reaches
+     * the shim from the outside, so the committed source — and the committed `lib/dev/capture-source.ts`
+     * generated from it — carry no key at all.
+     *
+     * Two ways in, in order. The loader bookmarklet sets `window.__fmTraceKey` before injecting the
+     * script, and the inline fallback bookmarklet does the same; that is the normal path. Failing
+     * that, the script was loaded as `<script src="/api/dev/trace?k=…">` by something that did not
+     * set the global, so the key is read back off its own `src` — it got here, therefore the key in
+     * that URL is the right one.
+     *
+     * The POST then sends it as the `x-trace-secret` header, which is the stronger of the two forms
+     * the endpoint accepts: a header stays out of access logs and out of history.
+     */
+    const SECRET =
+      (typeof window.__fmTraceKey === "string" && window.__fmTraceKey) ||
+      (function () {
+        try {
+          const src = document.currentScript && document.currentScript.src;
+          return (src && new URL(src, location.href).searchParams.get("k")) || "";
+        } catch {
+          return "";
+        }
+      })();
+
+    /**
      * `at` on every entry is milliseconds since install, not a wall clock. The useful question in
      * these traces is always « what happened between the tap and the thing that did not happen »,
      * which is an interval; and a monotonic clock cannot be dragged backwards by the phone.
@@ -445,9 +470,17 @@
        * reason: the most interesting flush is the one on `visibilitychange`, when the tab is being
        * backgrounded and an ordinary fetch is cancelled with it.
        */
+      /**
+       * The secret goes in the header and not in the URL, even though the endpoint accepts both: the
+       * query-string form exists only for the `<script src>` the loader injects, which cannot carry a
+       * header. A header keeps the key out of the access log and out of the phone's history.
+       */
+      const headers = { "Content-Type": "application/json" };
+      if (SECRET) headers["x-trace-secret"] = SECRET;
+
       fetch(ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: headers,
         body: JSON.stringify(payload),
         keepalive: true,
       })
@@ -456,13 +489,20 @@
            * The status code is shown on screen because there is no console on a phone. « 404 » and
            * « 2xx » are two completely different mornings for the owner, and he has to be able to
            * tell them apart without tethering the thing to a Mac.
+           *
+           * A 404 is now ambiguous on purpose — the endpoint answers the same thing whether it is off,
+           * unconfigured or refusing the key — so the panel says what the three possibilities are
+           * rather than pretending to know which one it hit.
            */
           status(
             (res.ok ? "Envoyé ✓ " : "Échec ") +
               res.status +
               " · " +
               payloadEntries.length +
-              " entrées",
+              " entrées" +
+              (res.status === 404
+                ? " · clé refusée, absente, ou sink éteint"
+                : ""),
           );
           if (res.ok) {
             entries.length = 0;

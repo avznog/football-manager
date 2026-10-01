@@ -20,8 +20,10 @@ import { SESSION_COOKIE } from "@/lib/auth/cookies";
  * `/api/dev/trace` is here because the guard below 307-redirects any extension-less path with no
  * session cookie to `/connexion`: the trace sink would then answer HTML to a `fetch` and swallow
  * precisely the captures worth having, the ones taken on `/connexion` and `/rejoindre` where there
- * is no session by definition. The sink itself only exists on preview and refuses production
- * (`lib/dev/trace.ts`).
+ * is no session by definition. The same applies to the `GET` that serves the capture script: a
+ * redirect there would make the bookmark's `<script src>` load HTML. Being public here is not being
+ * open — the sink itself only exists off production and demands a shared secret on both verbs
+ * (`lib/dev/trace.ts`, `isTraceRequestAllowed`).
  */
 const PUBLIC_PATHS = ["/connexion", "/rejoindre", "/api/dev/trace"];
 
