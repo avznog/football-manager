@@ -3367,10 +3367,11 @@ compiles to the `padding-inline` shorthand, so a longhand after a shorthand wins
 gutter on a phone held upright is **zero**: measured with the new two-button row, the pair ran 4 → 386 of
 390 px — the « confirm button 8 px off the right edge » defect class arriving by a new route. Two
 corrections to the first telling of it, both from another session's measurements. It is not a specificity
-coin-flip and **reordering the block in `globals.css` cannot help**, because Tailwind v4 sorts custom
-`@utility` after its own built-ins — which is the first thing anyone would try. And the count is
-**three** sites, not « roughly a dozen »: `app/error.tsx:27`, `app/not-found.tsx:21` and
-`app/(auth)/layout.tsx:9`.
+coin-flip and **reordering the block in `globals.css` cannot help**, because Tailwind v4 sorts the
+utilities layer **by property** and interleaves custom `@utility` rules among its own built-ins, so a
+custom utility is emitted after one it was declared above — which is the first thing anyone would try.
+And the count is **three** sites, not « roughly a dozen »: `app/error.tsx:27`,
+`app/not-found.tsx:21` and `app/(auth)/layout.tsx:9`.
 
 `ErrorScreen` was given its own `px-5` and then had it taken away again, which is the useful part.
 `app/(app)/error.tsx` renders that same component inside `app-shell`'s own `px-4`, so padding it in the

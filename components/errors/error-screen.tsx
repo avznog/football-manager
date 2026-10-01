@@ -96,7 +96,9 @@ export function ErrorScreen({
     // `padding-left`/`padding-right` (`globals.css:158-161`) while `px-5` compiles to the
     // `padding-inline` shorthand, and a longhand after a shorthand always wins. Upright on a phone
     // the gutter is therefore 0 — measured, the button row ran 4 → 386 of 390 px. Moving the block
-    // in `globals.css` does not help: Tailwind v4 sorts custom `@utility` after its own built-ins.
+    // in `globals.css` does not help: Tailwind v4 sorts the utilities layer by property and
+    // interleaves custom `@utility` rules among its own built-ins, so a custom utility is emitted
+    // after one it was declared above.
     //
     // The gutter belongs to the three standalone page shells carrying that clash (`app/error.tsx`,
     // `app/not-found.tsx`, `app/(auth)/layout.tsx`) rather than here, because `app/(app)/error.tsx`
