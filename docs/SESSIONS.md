@@ -3116,15 +3116,19 @@ in that entry, the least code, and the owner's lane. Two device-only checks are 
 tap under `viewportFit: "cover"`, and `html { overflow-x: hidden }` against a `fixed` bar — because
 neither can be settled from Linux.
 
-## 2026-10-01 — The side padding that was never applied
+## The side padding that was never applied
 
 `/connexion` and `/rejoindre` had no side padding. Measured at 375 × 667, both themes, the form card
 ran **0 → 375 of the viewport** — flush against both bezels, on the first two screens any new user
 sees. `app/not-found.tsx` was worse at 0 → 390, having no `max-w` to accidentally save it. All three
 carried `safe-px px-5`, and the `px-5` was dead: `safe-px` sets the longhands `padding-left` /
 `padding-right`, `px-5` compiles to the `padding-inline` shorthand, and a longhand after a shorthand
-wins unconditionally. Tailwind v4 sorts custom `@utility` after its own built-ins inside
-`@layer utilities`, so reordering `globals.css` — the first thing anyone tries — cannot help.
+wins unconditionally. Tailwind v4 sorts `@layer utilities` **by property**, interleaving custom
+`@utility` rules among the built-ins rather than appending them after, so reordering `globals.css` —
+the first thing anyone tries — cannot help. Nor is the new utility immune: `gutter-px safe-px` on one
+element measures `0px` / `0px`, the original defect in full, because `.gutter-px` lands at 36008 and
+`.safe-px` at 36192. An earlier draft of the decision entry claimed the longhands made that
+unexpressible; the reviewer measured it and it does not.
 
 Fixed with one new utility, `gutter-px`, on the three page shells. After: 20px/20px, card 20 → 355 at
 375 and 20 → 370 at 390. The decision entry records the fix that was **rejected**, which is the part
@@ -3150,9 +3154,12 @@ formations.
 
 **Merged:** #117, the outbox drain before the happy path's two reloads, found because a docs-only
 branch failed the e2e job — the one branch whose diff could not be the cause. #115, the
-`COORDINATION.md` NOW rewrite. **Held:** #114, whose `<Suspense>` boundary on `/stats` removed the
-no-JavaScript path that decisions 100 and 116 both defend — the fallback HTML is what ships and the
-swap to real content is an inline script, so with JS off the reader sits on a skeleton announcing
-« Chargement… » for ever while the figures sit hidden in the same document. It only engages when the
-query outruns the shell flush, which is the premise of the change, so the normal case on a phone was
-the broken case.
+`COORDINATION.md` NOW rewrite. **Held and then cleared:** #114 arrived with a `<Suspense>` boundary on
+`/stats` that removed the no-JavaScript path decisions 100 and 116 both defend — the fallback markup is
+what ships in the HTML and the swap to real content is an inline `$RC()` script, so with JS off the
+reader sits on a skeleton announcing « Chargement… » for ever while the figures sit hidden in the same
+document, and the boundary only engages when the query outruns the shell flush, which is the premise of
+the change. The peer's answer was not to patch it but to **revert the boundary entirely** — `/stats`
+restored byte-identical to `main` — so what #114 ships is the tab-tap half alone, and the hairline it
+adds now paints on `/stats` precisely because there is no boundary to let the route commit early. It
+merged as decision 123; the gutter is 124.

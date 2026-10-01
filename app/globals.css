@@ -175,16 +175,21 @@
    why nobody saw this: it is invisible at the width we test and visible at the
    width the phone is.
 
-   Moving this block earlier in the file does not help. Tailwind v4 emits
-   `@utility` into `@layer utilities` *after* its own `px-*`, so source order
-   here is not what decides it.
+   Moving this block in the file does not help, and source order is not what
+   decides it: `safe-px` is declared *above* this one and is emitted *below* it.
+   Tailwind v4 sorts `@layer utilities` by property, with custom `@utility`
+   rules interleaved among the built-ins rather than appended after them — which
+   is why every `padding-inline` lands before every `padding-left`.
 
    `max()` rather than a plain `padding: 20px` because it keeps what
    `safe-px px-5` was reaching for: in landscape the notch inset exceeds 20 px
    and wins, which is the whole reason `safe-px` was on these elements. And
-   longhands rather than `padding-inline` so that a stray `safe-px` left behind
-   on the same element cannot reintroduce the bug — the two can no longer
-   disagree, which is the standard decision 118 set for the tab bar's height. */
+   longhands rather than `padding-inline` so this utility sits in the same group
+   as `safe-px` and is decided by order within it rather than by the shorthand
+   rule — but measured, `.gutter-px` is emitted at byte 36008 and `.safe-px` at
+   36192, so `gutter-px safe-px` on one element still resolves to a zero gutter.
+   That pair is not expressible-but-wrong, it is simply wrong: don't write it.
+   The three screens below carry `gutter-px` alone. */
 @utility gutter-px {
   padding-left: max(env(safe-area-inset-left, 0px), calc(var(--spacing) * 5));
   padding-right: max(env(safe-area-inset-right, 0px), calc(var(--spacing) * 5));

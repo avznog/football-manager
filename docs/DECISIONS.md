@@ -3894,11 +3894,13 @@ side gutter and did not.
 
 **Why.** `safe-px` sets the longhands `padding-left` / `padding-right`; `px-5` compiles to the
 `padding-inline` shorthand; a longhand after a shorthand overrides it unconditionally, with no
-specificity contest to win. Both land in `@layer utilities`, and Tailwind v4 sorts custom `@utility`
-after its own built-ins — verified in the compiled stylesheet, `.px-5` at byte 34764 and `.safe-px` at
-36004 — so **moving the block earlier in `globals.css` cannot fix it**, which is the first thing
-anyone will try. On an upright phone both insets are 0 and the pair therefore resolves to a gutter of
-zero.
+specificity contest to win. Both land in `@layer utilities` with equal specificity, so emission order
+is the whole of it — and Tailwind v4 sorts that layer **by property**, interleaving custom `@utility`
+rules among the built-ins rather than appending them after. Verified in the compiled stylesheet:
+`.px-5` at byte 34768, `.gutter-px` at 36008, `.safe-px` at 36192, while in the *source* `safe-px` is
+declared above `gutter-px`. So **moving the block earlier in `globals.css` cannot fix it**, which is
+the first thing anyone will try, and source order is not the lever either. On an upright phone both
+insets are 0 and the pair therefore resolves to a gutter of zero.
 
 Measured, before: `/connexion` and `/rejoindre` ran **0 → 375 of a 375 px viewport**, the form card
 flush against both bezels, in both themes — the first two screens any new user sees. `not-found.tsx`
@@ -3918,9 +3920,13 @@ utility right rather than merely safer.
 
 **Consequences.** `max()` rather than a flat padding keeps what the pair was reaching for: in
 landscape the notch inset exceeds 20 px and wins, which is why `safe-px` was on these elements at all
-and which a plain `px-5` would have discarded. Longhands rather than `padding-inline` mean a stray
-`safe-px` left on the same element cannot reintroduce the bug — the two can no longer disagree, which
-is the standard decision 118 set for the tab bar's height. The padding stays on the three page shells
+and which a plain `px-5` would have discarded. Longhands rather than `padding-inline` put `gutter-px`
+in the same property group as `safe-px`, so the two are decided by order within that group instead of
+by the shorthand rule — but **that does not make the bug unexpressible, and an earlier draft of this
+entry claimed it did.** Measured: `gutter-px safe-px` on one element gives `padding-left: 0px;
+padding-right: 0px`, the original defect in full, because `.gutter-px` is emitted at 36008 and
+`.safe-px` at 36192. The pair is simply not to be written; the three screens carry `gutter-px` alone,
+and a utility that cannot be combined wrongly was not on offer here. The padding stays on the three page shells
 and **not** on `components/errors/error-screen.tsx`: `app/(app)/error.tsx` renders that same component
 inside `app-shell`'s `px-4`, so a gutter on the component double-pads one parent while fixing the
 other — padding that is correct for one parent and wrong for another is padding living in the wrong
