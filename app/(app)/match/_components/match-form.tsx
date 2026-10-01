@@ -15,6 +15,7 @@
 import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -92,7 +93,7 @@ export function MatchForm({ teamId, matchId, defaults, competitions }: MatchForm
         error={state?.fieldErrors?.kickoffAt}
       >
         {({ id, describedBy, invalid }) => (
-          <Input
+          <DateInput
             id={id}
             name="kickoffAt"
             type="datetime-local"

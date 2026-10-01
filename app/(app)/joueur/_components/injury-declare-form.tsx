@@ -15,8 +15,8 @@
 import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { declareInjury } from "@/lib/player/actions";
 import { INJURY_NOTE_MAX } from "@/lib/player/validation";
@@ -57,7 +57,7 @@ export function InjuryDeclareForm({
           error={state?.fieldErrors?.startedOn}
         >
           {({ id, describedBy, invalid }) => (
-            <Input
+            <DateInput
               id={id}
               name="startedOn"
               type="date"
@@ -79,7 +79,7 @@ export function InjuryDeclareForm({
           error={state?.fieldErrors?.expectedReturnOn}
         >
           {({ id, describedBy, invalid }) => (
-            <Input
+            <DateInput
               id={id}
               name="expectedReturnOn"
               type="date"

@@ -238,6 +238,46 @@ export function formatTime(instant: Date): string {
   return TIME_FORMAT.format(instant);
 }
 
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * `"2026-03-14"` → `"14/03/2026"`, and null for anything that is not an ISO calendar day.
+ *
+ * The **string** half of the numeric shape `formatDate` produces from an instant: same digits, same
+ * order, reached from a plain `YYYY-MM-DD` that has no timezone and must not be given one.
+ * `new Date("2026-03-14")` is UTC midnight, so a `timeZone` formatter west of Greenwich renders the
+ * 13th; this reads the parts and never builds a `Date` at all. `lib/player/injury.ts` formats its
+ * `date` columns through here, so the app still has exactly one definition of `DD/MM/YYYY`
+ * (decision 109).
+ */
+export function formatIsoDay(value: string): string | null {
+  const match = ISO_DAY.exec(value);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * What a native picker is currently holding, written the way the app writes dates:
+ * `"2026-03-14"` → `"14/03/2026"`, `"2026-03-14T20:30"` → `"14/03/2026 à 20:30"`.
+ *
+ * Null — never a placeholder, never `Invalid Date` — for an empty or unparseable value, so the echo
+ * under a picker says nothing rather than something untrue. The separator is « à », as in
+ * `formatWhen`, and the clock is the 24-hour digits the input already submits: no `Intl` is involved
+ * because there is no instant here, only the wall clock the user just picked.
+ */
+export function formatInputValueFr(value: string): string | null {
+  const trimmed = value.trim();
+  const day = formatIsoDay(trimmed);
+  if (day) return day;
+
+  const match = LOCAL_INPUT.exec(trimmed);
+  if (!match) return null;
+  const [, year, month, dayOfMonth, hour, minute] = match;
+  if (Number(hour) > 23 || Number(minute) > 59) return null;
+  return `${dayOfMonth}/${month}/${year} à ${hour}:${minute}`;
+}
+
 /**
  * `"aujourd’hui, 27/09/2026"`, `"demain, 28/09/2026"`, `"hier, 26/09/2026"`, else `formatDay`.
  *

@@ -13,6 +13,8 @@
  * lexicographically — and formatted from their parts.
  */
 
+import { formatIsoDay } from "@/lib/calendar/time";
+
 /** An injury as every screen reads it: plain strings, safe across the RSC boundary. */
 export type InjuryRecord = {
   id: string;
@@ -136,15 +138,14 @@ export function injuryStatus(injuries: readonly InjuryRecord[], today: string): 
 
 /**
  * « 13/09/2026 » — the French numeric date, for the dates that are read off a list or a record
- * rather than read as a sentence: the injury history, « Arrivé le ». Same shape as
- * `formatDate` in `lib/calendar/time.ts`, reached from an ISO day instead of an instant, so a
- * `YYYY-MM-DD` column never has to be turned into a `Date` and a timezone question.
+ * rather than read as a sentence: the injury history, « Arrivé le ». The digits come from
+ * `formatIsoDay` in `lib/calendar/time.ts`, beside the instant formatters, so the app has one
+ * definition of `DD/MM/YYYY` and not two (decision 109); an ISO day never has to be turned into a
+ * `Date` and a timezone question. Anything that is not a calendar day is returned untouched, which
+ * is what the callers here want: a column that somehow holds prose shows the prose.
  */
 export function formatDateFr(value: string): string {
-  const match = ISO_DATE.exec(value);
-  if (!match) return value;
-  const [, year, month, day] = match;
-  return `${day}/${month}/${year}`;
+  return formatIsoDay(value) ?? value;
 }
 
 /** « depuis 3 jours », « aujourd’hui », « dans 12 jours »… for a relative day count. */

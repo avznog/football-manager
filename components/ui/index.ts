@@ -15,6 +15,7 @@ export { Card, type CardProps } from "./card";
 export { cn } from "./cn";
 /** Raw colour maths lives in `@/lib/color`; only the CSS-facing helpers are re-exported here. */
 export { inkOnColor, isReadableOnColor, parseHex } from "./contrast";
+export { DateInput, type DateInputProps } from "./date-input";
 export { EmptyState, type EmptyStateProps } from "./empty-state";
 export { Field, type FieldProps } from "./field";
 export { FieldError, type FieldErrorProps } from "./field-error";

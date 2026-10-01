@@ -11,6 +11,7 @@
 import { useActionState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,7 +48,7 @@ export function TrainingForm({ teamId, trainingId, defaults }: TrainingFormProps
         error={state?.fieldErrors?.startsAt}
       >
         {({ id, describedBy, invalid }) => (
-          <Input
+          <DateInput
             id={id}
             name="startsAt"
             type="datetime-local"

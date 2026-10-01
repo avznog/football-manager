@@ -12,8 +12,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DateInput } from "@/components/ui/date-input";
 import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { resolveInjury } from "@/lib/player/actions";
 import {
   type InjuryRecord,
@@ -96,7 +96,7 @@ export function InjuriesCard({
                   className="min-w-44"
                 >
                   {({ id }) => (
-                    <Input
+                    <DateInput
                       id={id}
                       name="resolvedOn"
                       type="date"
