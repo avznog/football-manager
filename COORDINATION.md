@@ -20,13 +20,21 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `e634b21`. The newest tag, `v1.0.0-beta.6`, is on **`3544bcd`**, now **11 commits
-  behind**, so **preview is ahead of production** by all eleven and will stay ahead until the next tag —
-  which is normal and is what the split is for, not a thing to fix. Two things this line got wrong while
-  nobody re-derived it: the commit (`646b830` is the squash of #113, which the tag does not point at) and
-  « one commit behind », which was true for about a day in a month of merging. Managed from **the owner's machine**, the
-  gatekeeper: it reviews and squash-merges, including work pushed from the other machine.
-- **Last shipped** — **`v1.0.0-beta.6`**, on `3544bcd`: the `REMARK` event and the drawn action tiles.
+- **`main`** — at `1efe7de`. The newest tag, `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
+  now **18 commits behind**, so **preview is ahead of production** by all eighteen and will stay ahead
+  until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
+  **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
+  other machine.
+- **`3544bcd` is not a commit and `git rev-parse v1.0.0-beta.6` is the wrong question.** It is the
+  **annotated tag object**; the commit is `646b830`. This line said `646b830` and was right; I
+  « corrected » it to `3544bcd` in #128 and was wrong, in `docs/SESSIONS.md` and in a pull request body
+  too. What makes the trap work is that the two tags behave differently: `v1.0.0-beta.6` is annotated
+  (`git cat-file -t` → `tag`) and `v1.0.0-beta.5` is **lightweight** (→ `commit`), so the same
+  `rev-parse` yields a tag object for one and a commit for the other, and checking the method on the
+  older tag confirms it. **Use `git rev-parse <tag>^{commit}`**, or `git log -1 <tag>`, which dereferences
+  for you. `git rev-list --count <tag>..origin/main` dereferences too, which is why the count stayed
+  right while the hash was wrong — a wrong fact next to a right one, with no failure in between.
+- **Last shipped** — **`v1.0.0-beta.6`**, on `646b830`: the `REMARK` event and the drawn action tiles.
   A version is `package.json`'s `version`; the annotated tag, cut **by hand** on `main`, is the act
   that ships it and the only thing that migrates and deploys production (decision 119). Nothing cuts a
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
