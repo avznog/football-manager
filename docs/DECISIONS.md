@@ -4485,3 +4485,94 @@ once reached the `username` column, and the owner's confirmation that Preview an
 it said it is assigning on its own rebase, so this takes **132** rather than the next free integer. A gap
 is cheaper than a collision: a collision costs a renumbering across four files, which has already happened
 once today.
+
+## 133 — The native picker keeps the thumb, and says underneath what it holds
+
+**2026-10-01** · accepted · supersedes the « what is still not ours » carve-out at the end of
+decision 109
+
+*(Numbering: another session is assigning numbers on merge and 123 is already spoken for by a decision
+written on `perf/acknowledge-tab-taps`. This is the decision about the five native date and time
+pickers echoing their value in the app's own shape; the merging session gives it its number.)*
+
+The owner, from his iPhone: every date must be `DD/MM/YYYY` and every clock 24-hour. The audit that
+preceded any change found the remark narrower than it sounds. **Decision 109 had already done it**
+everywhere the app formats a date itself: `lib/calendar/time.ts` and `lib/player/injury.ts` are the
+only two formatters in the repository, every call site goes through one of them, the 24-hour clock is
+pinned twice over by the `fr-FR` locale *and* an explicit `hour12: false`, and the tests hold the
+literal French strings rather than re-deriving them. **None of that is touched here**, and a session
+arriving at this entry with the same remark should re-run that audit before believing there is a
+formatter to fix.
+
+The one surface no formatter can reach is the five `<input type="date">` and
+`<input type="datetime-local">` controls — the match form (`app/(app)/match/_components/match-form.tsx:96`),
+the séance form (`app/(app)/entrainements/_components/training-form.tsx:51`), the two dates of an injury
+declaration (`app/(app)/joueur/_components/injury-declare-form.tsx:60` and `:82`) and « Guéri le »
+(`app/(app)/joueur/_components/injuries-card.tsx:99`). They render in the **browser's** locale, which no
+stylesheet, no `lang` attribute and no `Intl` option of ours can override: on a phone set to English the
+owner picks a kick-off in `MM/DD/YYYY` off an AM/PM clock, inside an app that writes `27/09/2026`
+everywhere else. Decision 109 saw exactly this, offered the owner a control of our own, and he declined
+— so 109 wrote it down as « not ours » and stopped. He has come back to it with a third answer, which is
+better than either of the two that were on the table, and that is what this entry records.
+
+**Decision: the native control stays, and gains an echo.** `components/ui/date-input.tsx` wraps all five
+of them and renders one quiet line underneath — « 14/03/2026 », or « 14/03/2026 à 20:05 » with the same
+« à » `formatWhen` already uses — saying, in the app's shape, what the picker currently holds.
+
+**Why the control is kept.** It is still the best thing under a thumb: the system wheel on iOS, a
+keyboard that knows it is typing a date, a calendar the owner already knows how to drive, and
+`min` / `max` enforced by the platform. A masked text field or a hand-rolled calendar would make the
+*format* correct by making the *control* worse, on the one device this app exists for — and it would be
+ours to maintain, in a repository that has deliberately hand-rolled components but has never hand-rolled
+an input method. Trading a good control for a good string is the wrong way round.
+
+**Why an echo is honest rather than a workaround.** The defect is not that the picker is wrong — it is
+showing the owner's own phone's format, correctly — it is that the reader has to hold two shapes of one
+date in his head, which is precisely the work decisions 101 and 109 exist to remove. An echo removes it
+without lying about anything: the app states the date in the app's shape, beside a control that states
+it in the system's. It is a confirmation, not a label, which is why it is a quiet `text-sm text-ink-muted`
+line and not a second field.
+
+**Nothing is rendered at all for an empty or unreadable value.** No `--/--/----`, no « Aucune date ». A
+screen showing `--/--/----` is *stating* something, and this one has nothing to state; placeholder digits
+under an empty field are noise at best and, on a form the reader has not filled, an invitation to read
+them as a value. `formatInputValueFr` returns `null` rather than a string for every input it cannot read
+(`lib/calendar/time.ts:269`), and `DateInput` renders no element for `null` — the wave-3 and wave-4 rule
+that a screen says less rather than something untrue, applied to the absence of a date.
+
+**The echo never constructs a `Date`, and that is load-bearing.** `formatIsoDay`
+(`lib/calendar/time.ts:253`) reads the parts of the `YYYY-MM-DD` string with a regular expression and
+reorders them. `new Date("2026-03-14")` is **UTC midnight**, so any formatter given a timezone west of
+Greenwich renders the 13th — and the owner's phone was reproduced at `America/New_York` for exactly that
+reason. An echo off by one day would be worse than no echo: it would turn a cosmetic mismatch into the
+app contradicting the control directly above it, and the reader would have no way to tell which of the
+two had the date he picked. The same holds for the wall clock, which is read out of the string rather
+than through `Intl`: there is no instant here, only the digits the input will submit.
+
+**`lib/player/injury.ts` was a settled file and was touched for exactly one reason.** It already owned
+this arithmetic — decision 109 had left `formatDateFr` there as the one place that turns a `date` column
+into French digits — and the fix for a wrong date format must not introduce a **third** way to format a
+date. So `formatDateFr` now delegates (`lib/player/injury.ts:148`) and the digits live beside the instant
+formatters they have to agree with; a unit test asserts that the echo and `formatDate` produce the same
+string for the same calendar day, so the two can no longer drift apart silently. `formatDateFr` keeps its
+own documented behaviour of returning a non-ISO value untouched, because its callers want a column
+holding prose to show the prose.
+
+**The echo is `aria-hidden`, and deliberately not in `aria-describedby`.** The defect is that the *eye*
+sees the browser's locale; a screen reader already speaks the control's value correctly, from the
+control. Appending « 14/03/2026 » to what the control announces would make it say the same date twice in
+two formats — and `components/ui/field.tsx:43` keeps a control's accessible description to its hint and
+its error on purpose, so widening it is a change to every field in the app, not to this one. Decisions
+116 and 117 are the two halves of the principle this follows: 117 refused to answer a *visual* loss with
+an `aria-label`, because that « tells the one reader who did not need telling », and 116 put the thing a
+reader needs on screen, visibly labelled, rather than in an attribute. Here the direction is reversed and
+the rule is the same — a repair for a visual mismatch is addressed to the eye only.
+
+**Consequences.** `DateInput` passes `name`, `value` / `defaultValue`, `required`, `min`, `max` and the
+`Field` wiring straight through, so every Server Action receives the field it always did and the forms
+still post **with JavaScript off**; without hydration the echo is simply the one the server rendered from
+`defaultValue`, and it stops following the picker rather than disappearing. Any new date or time field
+uses `DateInput` and not `Input` — a bare native picker is now the exception that has to justify itself.
+The Playwright suite addresses these inputs by their label (`e2e/happy-path.spec.ts:162` and two more,
+`e2e/offline.spec.ts:83`), which the wrapper does not change, because the `<label for>` / `id` pairing
+still comes from `Field`.

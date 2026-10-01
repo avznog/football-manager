@@ -8,6 +8,8 @@ import {
   formatDate,
   formatDay,
   formatDayLabel,
+  formatInputValueFr,
+  formatIsoDay,
   formatRelativeDays,
   formatShortDay,
   formatTime,
@@ -179,6 +181,52 @@ describe("French formatting", () => {
     expect(formatWhen(kickoff, new Date("2026-09-26T08:30:00Z"))).toBe(
       "demain, 27/09/2026 à 10:30",
     );
+  });
+});
+
+/**
+ * The echo under a native picker (`components/ui/date-input.tsx`). Every assertion here is about a
+ * **string with no timezone**: the day the user picked must come back as the day the user picked, in
+ * any zone the suite happens to run in, which is why nothing below goes through `new Date()`.
+ */
+describe("formatIsoDay and formatInputValueFr", () => {
+  it("turns an ISO day into the French numeric date", () => {
+    expect(formatIsoDay("2026-03-14")).toBe("14/03/2026");
+    expect(formatInputValueFr("2026-03-14")).toBe("14/03/2026");
+  });
+
+  it("does not shift the day, whatever the host zone", () => {
+    // UTC midnight read in a negative-offset zone is the previous day; the parts are read instead.
+    expect(formatInputValueFr("2026-01-01")).toBe("01/01/2026");
+    expect(formatInputValueFr("2026-12-31")).toBe("31/12/2026");
+    expect(formatInputValueFr("2026-03-29T02:30")).toBe("29/03/2026 à 02:30");
+  });
+
+  it("joins a wall clock to the day with « à », in 24-hour digits", () => {
+    expect(formatInputValueFr("2026-09-27T10:30")).toBe("27/09/2026 à 10:30");
+    expect(formatInputValueFr("2026-09-27T20:05")).toBe("27/09/2026 à 20:05");
+    expect(formatInputValueFr("2026-09-27T00:00")).toBe("27/09/2026 à 00:00");
+  });
+
+  it("says nothing at all for an empty or unreadable value", () => {
+    for (const value of [
+      "",
+      "   ",
+      "hier",
+      "14/03/2026",
+      "2026-03",
+      "2026-03-14T25:00",
+      "2026-03-14T10:70",
+      "2026-03-14T10:30:00",
+    ]) {
+      expect(formatInputValueFr(value)).toBeNull();
+    }
+    expect(formatIsoDay("hier")).toBeNull();
+  });
+
+  it("agrees with formatDate on the same calendar day", () => {
+    // What the picker echoes and what a list prints for that day must be the same string.
+    expect(formatInputValueFr("2026-09-27")).toBe(formatDate(new Date("2026-09-27T12:00:00Z")));
   });
 });
 
