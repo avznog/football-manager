@@ -3765,3 +3765,119 @@ drawing and light and dark are free, `aria-hidden` so the accessible name stays 
 alone, and no icon dependency in this repository, which is a position and not an omission. They were
 rasterised at 16 px and four of them were redrawn, because a 24-unit grid stroked at 1.75 holds about
 four strokes before it turns to mud.
+
+## 123 — Two acknowledgements of a tap, split by what can run before hydration
+
+**2026-10-01** · accepted · acts on #111's findings 3 and 5
+
+The owner, from his iPhone: « there is always a delay when I tap the tabs, and sometimes nothing
+happens and I have to tap several times ». Pull request #111 measured that and deliberately changed no
+production code, and its fifth finding is what this entry acts on: under CPU ×4, a tap landing the
+instant the previous screen's heading appeared produced a **native document navigation rather than a
+router navigation in 5 of 5 samples on Calendrier**, and 1 of 5 on Stats. So « nothing happens » is not
+a tap the page failed to receive. It is a tap that started the slowest navigation the app has, and then
+said nothing at all while it ran. (This is pull request #111; **decision 111 in this file is the
+unrelated `iad1` → `lhr1` region pin** and has nothing to do with it. The next free decision number
+here is 123.)
+
+**Decision. The tab bar acknowledges a tap twice, and the split is not cosmetic — it is which of the
+two can run at all in the window where the owner's taps are being lost.** The pressed state is plain
+CSS, `active:bg-surface-2` at `components/nav/bottom-nav.tsx:68`, so it paints with no JavaScript
+having executed; that is the *only* feedback available before hydration, and the pre-hydration window
+is precisely where finding 5 says the lost taps happen. The tab deliberately carries no
+`transition-colors`, so the fill lands in the same frame as the touch rather than waiting on an
+animation — and the fill itself is the one every `ghost` and `secondary` variant in
+`components/ui/button.tsx` already uses, because the tab bar was the single tappable surface in the app
+with no `active:` class of any kind. The second acknowledgement is `useLinkStatus`, in `TabPending`
+(`components/nav/bottom-nav.tsx:100`): a 2 px hairline across the top of the tab that started the
+navigation, which exists only after hydration and means something the pressed state cannot say — the
+router took the tap and the navigation is in flight. It is `aria-hidden` and wordless on purpose, which
+is **decision 122's** rule reused rather than rediscovered: the action tiles' inline SVGs are
+`aria-hidden` so that a drawing added for a sighted reader stays out of the control's accessible name,
+and a hairline is the same kind of thing. Decision 117 is the principle under both and it is cited here
+only to say that it **runs the other way** — Label in Name means the visible text must appear in the
+accessible name, so when the two disagree it is the *name* that gives way, as « Envoi » → « Début »
+did. A wordless decoration never enters that trade, which is exactly why it is allowed to be wordless.
+(An earlier draft of this entry cited 116 and 117 for the rule. 116 is the filter `<select>` and has
+nothing to do with it. The citation was written from memory instead of from the file, which is the
+failure `CLAUDE.md` warns about over decision 119, and it is recorded here rather than quietly fixed.)
+
+**Two things this slice deliberately does not add, stated because their absence looks like an
+oversight.** There is no `-webkit-tap-highlight-color` anywhere in `app/` or `components/` — and that is
+not because nobody thought of it, but because **Tailwind v4's preflight already sets it to `transparent`
+on `html`** (`node_modules/tailwindcss/preflight.css:50`), and the property inherits, so every tappable
+surface in this app lost the platform's free tap flash the day Tailwind was installed. That is the
+reason a pressed state had to be hand-written at all: the framework removed an acknowledgement and
+nothing replaced it. Restoring the native highlight was considered and rejected — it is WebKit-only, it
+cannot be themed, and it would make the one surface that acknowledges a tap acknowledge it differently
+from every `Button` in the repository. And there is no `touch-manipulation` on the tabs. The only
+`touch-action` in the tree is `touch-none` / `touch-pan-x` on the three drag surfaces — the composition
+editor, the terrain sheet, and `/stats/equipe-type`'s pitch
+(`app/(app)/stats/equipe-type/_components/seven-pitch.tsx:317`) — where it exists to stop a gesture
+being stolen; `touch-manipulation` is
+for suppressing the 300 ms double-tap-zoom delay, and the responsive viewport this app already declares
+(`width: "device-width"`, `initialScale: 1`, `app/layout.tsx:23-24`) is what removes that delay on both
+engines. So `touch-manipulation` here would be cargo — and worse than inert, since it also disables
+double-tap zoom, which is a reader's own accessibility affordance and not ours to take.
+
+**The 180 ms delay in `.fm-pending` (`app/globals.css:260`) is what keeps the second from firing on the
+navigations the first has already answered.** A tab tap measured 126–217 ms unthrottled (#111's table),
+and an indicator that appears and vanishes inside that is noise on a screen held at arm's length. So
+the animation is `120ms linear 180ms both`, and `both` is load-bearing: without it the hairline would
+sit at full opacity through the delay instead of being held invisible. The `prefers-reduced-motion`
+block above it only shortens durations and iteration counts, so the delay survives there and the
+hairline appears rather than fades — which is the right behaviour for somebody who asked for less
+motion, and the reason this does not need `.fm-spinner`'s exemption.
+
+**A third acknowledgement was built for `/stats` — two `<Suspense>` boundaries with a content-free
+skeleton — and it is not in this slice, because a streaming boundary silently removes the
+no-JavaScript path.** This is the part of the entry worth reading. Streaming SSR puts the *fallback* in
+the HTML and swaps the real content in with an inline `$RC(...)` script; with JavaScript off the swap
+never runs, so the reader sits on a skeleton permanently while the figures sit finished and hidden in
+the same document. That is not a degraded screen, it is a screen that lies in the one mode it was
+designed to work in: decisions 100 and 116 made the competition chips `<Link>`s rather than a client
+filter **specifically** so `/stats` reads and filters with no JavaScript at all, and a boundary added
+for perceived speed would have withdrawn that without one line of either decision being superseded.
+Worse, it only engages when the query outruns the shell flush — so the fast case keeps the no-JS path
+and the slow case, which is the whole case on a phone, loses it. The normal case would have been the
+broken one.
+
+Two further defects disappear with it rather than needing patches, and both are the wave-3/4 shape: the
+skeleton promised three cards where the true answer on a new team is often **zero** — the only claim a
+loading shape can make is « there will be cards here, about this many », and on this screen that claim
+is frequently false — and `e2e/first-run.spec.ts`'s fresh-bootstrap reader would have met three pulsing
+outlines on the way to « Pas encore de statistiques ». A skeleton standing in for an empty state is an
+untruth with a built-in excuse.
+
+**What the boundary left behind is the measurement that explains why it and the hairline could never
+have coexisted.** With the boundaries in place the router committed the new shell before the 180 ms
+delay elapsed, so the hairline never painted on that tab at all: **0 hairlines observed at 100 ms after
+the tap on `/stats` with its query slowed by 2.5 s**, against **1 at 300 ms on `/calendrier` with the
+response itself held**. Read at the time as « the two compose rather than stack », which was true and
+was the wrong thing to be pleased about — a boundary that commits the shell early is a boundary that
+takes the in-flight acknowledgement away and replaces it with a shape that states more than it knows.
+Two acknowledgements, split by hydration, is the whole design: the pressed state covers the tap that
+lands before any JavaScript has run, the hairline covers the tap the router has taken and is still
+working on, and between them there is no window left for a third. `/stats` is now untouched by this
+slice, and its 844 ms stays open in `docs/ROADMAP.md` as a query to make faster rather than a wait to
+decorate.
+
+**`/moi`'s two queries were combined and `/stats`'s were not, and the asymmetry is deliberate.**
+`getUserTeams` and `getPlayerProfile` share no input — one is keyed on the user, the other on the
+membership the page already holds — so they ran in sequence for no reason and are now one `Promise.all`
+(`app/(app)/moi/page.tsx`), with the `null` for a non-playing coach passed straight through so the
+condition stays a condition instead of becoming a query that returns nothing. `/stats` cannot do the
+same: `getSeasonStats` consumes the competition id that `parseCompetitionId` has just validated against
+`getTeamCompetitions`, and that validation is what drops an id naming a deleted or a foreign
+competition. Parallelising those two would mean trusting the id from the query string. Either way it is
+tens of milliseconds, and **per #111 none of this is the latency fix**: the server contributes 31–35 ms
+to a whole screen, and the 1.54 s number in that entry is a cold function start, which is
+infrastructure and the owner's lane.
+
+**The one residual risk, and it cannot be cleared from a Linux session.** iOS Safari has historically
+applied `:active` on a tap to `<a>` and `<button>` elements but not to a plain `<div>`, which is why the
+pressed state is on the `<Link>`'s own `<a>` and not on a wrapper — and every `Button` variant in this
+repository already relies on `active:` the same way, so if this did not work there, a good deal more
+than the tab bar would be silently inert. That is an argument, not an observation. **Only the owner's
+iPhone can confirm that the fill actually paints under his thumb**, and until he says so that is
+expected behaviour rather than verified behaviour.

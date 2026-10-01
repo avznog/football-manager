@@ -236,3 +236,27 @@
     background-color: rgb(4 7 10 / 0.6);
   }
 }
+
+/* A navigation already in flight (`useLinkStatus` on the tab bar). The DELAY is
+   the point, not the fade: a tab tap measured 126–217 ms unthrottled, and an
+   indicator that appears and vanishes inside that is noise on a screen the
+   coach is holding at arm's length. So nothing is painted for the first 180 ms,
+   and a navigation that lands before then is acknowledged by the pressed state
+   alone.
+
+   `both` is what keeps it invisible during the delay instead of flashing at
+   full opacity first. The reduced-motion block above only shortens durations and
+   iteration counts, so the delay survives it and the hairline simply appears
+   rather than fading — which is the right behaviour for somebody who asked for
+   less motion, and the reason this does not need `.fm-spinner`'s exemption. */
+@keyframes fm-pending-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.fm-pending {
+  animation: fm-pending-in 120ms linear 180ms both;
+}

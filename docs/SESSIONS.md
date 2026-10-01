@@ -3036,3 +3036,82 @@ per-remark statistics** — counting « mauvaise passe » per player is a differ
 remark is an opinion rather than an observation it needs a product answer about what the count is for
 before a column exists for it — and a remark is **tapped live only**, because `RETRO_FACT_TYPES` in
 `lib/retro/log.ts` is untouched, so a match typed up after the fact cannot carry one.
+
+## Acknowledging the tap, which is CSS before it is JavaScript
+
+**2026-10-01.** Step 2 of the tap-latency brief, and the first of #111's findings to turn into
+production code — finding 3 (nothing acknowledges a tap) with finding 5 folded into it, because the two
+are one problem seen from either side. #111's fifth finding is the whole reason the order matters: a tap
+landing before the tab bar has hydrated does not route at all, it becomes a cold native document
+navigation, 5 of 5 samples on Calendrier under CPU ×4. So the acknowledgement the owner is missing has
+to exist in a window where no JavaScript has run, and `useLinkStatus` cannot reach it. The pressed state
+is therefore plain CSS and comes first — `active:bg-surface-2` on the tab itself, with no
+`transition-colors` so the fill lands in the same frame as the touch, and the tab bar was the one
+tappable surface in the app carrying no `active:` class at all. The hairline from `useLinkStatus` is the
+second half and says something else: the router took the tap. It is `aria-hidden` and wordless, which is
+**decision 122** applied rather than relearned — the action tiles' SVGs are `aria-hidden` so a drawing
+added for the eye stays out of the control's name — and `.fm-pending` holds it invisible for 180 ms
+because a tab navigation measured 126–217 ms unthrottled and an indicator that appears and vanishes
+inside that is noise. `/moi` combines its two independent queries; `/stats` deliberately does not,
+because `getSeasonStats` consumes the id `parseCompetitionId` has just validated against
+`getTeamCompetitions`.
+
+**The thing this session got wrong and then removed is the more useful half of the entry.** `/stats` was
+given two `<Suspense>` boundaries with a content-free skeleton, and they are **gone**: a streaming
+boundary puts the *fallback* in the HTML and swaps the content in with an inline script, so with
+JavaScript off the reader sits on the skeleton for good while the figures sit finished and hidden in the
+same document — and decisions 100 and 116 made those chips `<Link>`s precisely so this screen reads and
+filters without JavaScript. It also only engages when the query outruns the shell flush, so the fast
+case keeps the no-JS path and the slow case, which is the phone case, loses it: the normal case was the
+broken one. Two further defects left with it rather than being patched — the skeleton promised three
+cards where a new team's true answer is often zero, and `e2e/first-run.spec.ts`'s fresh-bootstrap reader
+would have met three pulsing outlines on the way to « Pas encore de statistiques ». A skeleton standing
+in for an empty state is an untruth with an excuse built in.
+
+What the boundary left behind is the measurement that says why there is no third acknowledgement to be
+had. With the boundaries in place the router committed the `/stats` shell before the 180 ms elapsed:
+**0 hairlines at 100 ms on `/stats` with its query slowed by 2.5 s**, against **1 at 300 ms on
+`/calendrier` with the response itself held**. That was read at the time as « the two compose rather
+than stack », which was true and was the wrong thing to be pleased about — a boundary that commits the
+shell early is a boundary that takes the in-flight acknowledgement away and replaces it with a shape
+stating more than it knows. Decision **123** has it as evidence for the two-and-only-two split: CSS for
+the tap that lands before any JavaScript, `useLinkStatus` for the tap the router is still working on,
+and nothing in between for a third to occupy.
+
+**The verification was Playwright at 390 × 844, in both themes, against the local Docker Postgres.** The
+pressed fill was measured rather than eyeballed: `rgb(233, 236, 240)` under the thumb in light, which is
+`--color-surface-2`, and `rgb(32, 38, 44)` in dark, which is the same token on the other side. The
+accessible names of the four tabs read `["Calendrier", "Équipe", "Stats", "Moi"]` both at rest and in the
+middle of a navigation, which is the assertion that matters for the hairline — **decision 122** is about
+exactly that regression, a mark added for the eye leaking into a control's name. Two negatives were
+checked rather than assumed: there is no `-webkit-tap-highlight-color` anywhere in `app/` or
+`components/`, because Tailwind v4's preflight already sets it to `transparent` on `html`
+(`node_modules/tailwindcss/preflight.css:50`) and it inherits — which is *why* the pressed state had to
+be hand-written, the framework having removed the platform's free one — and no `touch-manipulation`
+either, the only `touch-action` in the tree being `touch-none`/`touch-pan-x` on drag surfaces.
+
+**An earlier draft of this entry, and of the decision, cited « decisions 116/117 » for the
+accessible-name rule. That was wrong and was caught by another session's reviewer.** 116 is the filter
+`<select>`; 117 is Label in Name and runs the opposite way, saying the accessible name is what gives way
+when it disagrees with visible text. The rule actually reused is 122. The cause is worth recording
+because `CLAUDE.md` names it over decision 119: the citation was written from memory instead of from the
+file.
+
+`npm run typecheck`, `npm run lint` and the 1324 unit tests pass. **`npm run test:e2e` was not run.** With
+the `/stats` boundary gone, the one assertion that had needed thinking about —
+`e2e/first-run.spec.ts:109`'s `getByText("0 match terminé")`, which would have sat behind a fallback —
+is back to reading a server-rendered string, and `:104`'s per-tab `h1` waits were never affected.
+**Expected is not observed**: the browser suite still has to run on the pull request, and this entry does
+not claim it passed.
+
+**One thing went wrong and is worth not repeating.** A cleanup `pkill -f "next dev"` at the end of the
+browser checks killed a dev server on port 3000 that belonged to **another session**, not to this one.
+This worktree is one of several on the machine and the pattern matched all of them. Kill by the pid this
+session started, never by a pattern that names the framework.
+
+**Next**, unchanged from #111's own list: the auth prefix joins (finding 1), described as the tidiness
+item it is and not as a latency fix; and the cold function start (finding 2), which is the largest number
+in that entry, the least code, and the owner's lane. Two device-only checks are now in
+`docs/ROADMAP.md` instead of being guessed at here — iOS Safari's own toolbar possibly eating the first
+tap under `viewportFit: "cover"`, and `html { overflow-x: hidden }` against a `fixed` bar — because
+neither can be settled from Linux.
