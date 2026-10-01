@@ -53,6 +53,7 @@ export const MATCH_EVENT_TYPES = [
   "FOUL",
   "INJURY",
   "COMMENT",
+  "REMARK",
   "FINAL_WHISTLE",
   "VOID",
 ] as const;
@@ -130,6 +131,24 @@ const reasonSchema = z.string().trim().min(1).max(120);
 const noteSchema = z.string().trim().min(1).max(280);
 
 /**
+ * The six things a coach taps about a player during a match.
+ *
+ * They are **one** event type with the kind in the payload, not six types: a seventh remark is a
+ * line in this array, whereas a seventh enum value would be a migration on a production database.
+ * Same screaming-snake style as the event types above, because they are read in the same breath.
+ */
+export const REMARK_KINDS = [
+  "GOOD_TRACK_BACK",
+  "GOOD_EFFORT",
+  "BAD_PASS",
+  "GOOD_POSITIONING",
+  "LOST_BALL",
+  "NICE_SKILL",
+] as const;
+
+export type RemarkKind = (typeof REMARK_KINDS)[number];
+
+/**
  * Both payload dictionaries come from here, differing only in how an id is validated.
  * `id` is applied to every `team_members.id` and `formation_slots.id` reference.
  */
@@ -193,6 +212,12 @@ function buildPayloadSchemas(id: z.ZodType<string, unknown>) {
      * as often as it is about a player, and forcing a subject would make the coach pick one.
      */
     COMMENT: z.object({ note: noteSchema, memberId: id.optional() }),
+
+    /**
+     * One tap about one player. `memberId` is **required**, which is the one way a remark differs
+     * from a `COMMENT`: « bel effort » about nobody in particular is not a remark, it is a note.
+     */
+    REMARK: z.object({ kind: z.enum(REMARK_KINDS), memberId: id }),
 
     FINAL_WHISTLE: empty,
 
@@ -372,12 +397,32 @@ export const EVENT_LABELS_FR: Record<MatchEventType, string> = {
   FOUL: "Faute",
   INJURY: "Blessure",
   COMMENT: "Commentaire",
+  /**
+   * The generic word on purpose: the timeline prints the *kind* right next to it
+   * (« Remarque · Bel effort — Karim »), so naming the kind twice would say nothing twice. It is
+   * also what a `REMARK` whose payload cannot be read has left to show.
+   */
+  REMARK: "Remarque",
   FINAL_WHISTLE: "Coup de sifflet final",
   VOID: "Annulation",
 };
 
 export function eventLabelFr(type: MatchEventType): string {
   return EVENT_LABELS_FR[type];
+}
+
+/** What the timeline calls each remark. The owner's own words (decision 074: it tutoies, it is terse). */
+export const REMARK_LABELS_FR: Record<RemarkKind, string> = {
+  GOOD_TRACK_BACK: "Bon retour",
+  GOOD_EFFORT: "Bel effort",
+  BAD_PASS: "Mauvaise passe",
+  GOOD_POSITIONING: "Bon placement",
+  LOST_BALL: "Perte de balle",
+  NICE_SKILL: "Beau geste",
+};
+
+export function remarkLabelFr(kind: RemarkKind): string {
+  return REMARK_LABELS_FR[kind];
 }
 
 /** How a voided line reads in the timeline: « But 58’ — annulé ». */

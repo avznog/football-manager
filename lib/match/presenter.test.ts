@@ -579,6 +579,22 @@ describe("the timeline", () => {
     expect(timelineLines(state, index)[0].detail).toBe("Karim : trop haut sur le côté");
   });
 
+  it("puts a remark's kind first, then the player it names", () => {
+    const remarked = log([
+      ...KICKED_OFF,
+      { type: "REMARK", min: 58, payload: { kind: "GOOD_EFFORT", memberId: "karim" } },
+    ]);
+    const state = reduceLive(live(remarked), [], T0 + 60 * MIN);
+
+    // The title only says « Remarque »; the kind is the news, so it leads the detail line.
+    expect(timelineLines(state, index)[0]).toMatchObject({
+      title: "Remarque",
+      detail: "Bel effort — Karim",
+      minuteLabel: "58’",
+      scoreLabel: null,
+    });
+  });
+
   it("names an unknown player rather than printing an id at the coach", () => {
     const orphan = log([...KICKED_OFF, { type: "FOUL", min: 14, payload: { memberId: "ghost" } }]);
     const state = reduceLive(live(orphan), [], T0 + 20 * MIN);

@@ -23,7 +23,7 @@ import {
   projectClockMs,
   type PeriodsConfig,
 } from "./clock";
-import { EVENT_LABELS_FR, canBeVoided, type MatchEventType } from "./events";
+import { EVENT_LABELS_FR, canBeVoided, remarkLabelFr, type MatchEventType } from "./events";
 import { describeLineupDiffFr, type SlotInfo } from "./lineup";
 import {
   reduceMatch,
@@ -674,9 +674,34 @@ export function noteDetailFr(
   return about ? `${nameOf(about.memberId)} : ${entry.note}` : entry.note;
 }
 
+/**
+ * The detail line of a `REMARK`: « Bel effort — Karim ».
+ *
+ * The kind comes first because it is the news; the title above it only says « Remarque », so
+ * without this line the entry would state nothing at all. **Shared with the recap** for the reason
+ * `noteDetailFr` spells out: a remark is one of the things the shared match summary exists to show,
+ * and a second formatter is how one screen ends up dropping it.
+ *
+ * Returns null for anything that is not a readable remark, so the caller falls through to its own
+ * actor phrasing — which, for a remark whose payload is unreadable, still names the player.
+ */
+export function remarkDetailFr(
+  entry: Pick<TimelineEntry, "remarkKind" | "actors">,
+  nameOf: (memberId: string) => string,
+): string | null {
+  if (!entry.remarkKind) return null;
+  const about = entry.actors.find((actor) => actor.role === "remarked");
+  const label = remarkLabelFr(entry.remarkKind);
+  return about ? `${label} — ${nameOf(about.memberId)}` : label;
+}
+
 /** The line under the title: the free text the event carries, or who it was about. */
 function detailFr(entry: TimelineEntry, players: PlayerIndex): string | null {
-  return noteDetailFr(entry, players.nameOf) ?? describeActorsFr(entry.type, entry.actors, players);
+  return (
+    noteDetailFr(entry, players.nameOf) ??
+    remarkDetailFr(entry, players.nameOf) ??
+    describeActorsFr(entry.type, entry.actors, players)
+  );
 }
 
 /** Who an event was about, phrased the way a coach reads it out. */
@@ -721,7 +746,8 @@ function describeActorsFr(
     find("moved") ??
     find("foul") ??
     find("injured") ??
-    find("commented");
+    find("commented") ??
+    find("remarked");
   return single ? players.nameOf(single.memberId) : null;
 }
 

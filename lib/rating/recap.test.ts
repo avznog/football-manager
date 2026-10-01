@@ -304,6 +304,27 @@ describe("buildRecap — timeline", () => {
     expect(recapOf(events).timeline.at(-1)?.detail).toBe("Karim Benali : trop haut sur le côté");
   });
 
+  /*
+   * `HIDDEN_EVENT_TYPES` is PAUSE/RESUME/VOID, so a remark reaches the shared summary without this
+   * module knowing the type exists — which is exactly what was asked for, and exactly the kind of
+   * thing a later « let us hide the small events » would break silently. Hence a test, not code.
+   */
+  it("shows a remark, with its kind and the player it names", () => {
+    const events = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTERS) },
+      { type: "REMARK", min: 58, payload: { kind: "GOOD_EFFORT", memberId: "karim" } },
+    ]);
+
+    expect(recapOf(events).timeline.at(-1)).toMatchObject({
+      label: "Remarque",
+      detail: "Bel effort — Karim Benali",
+      minuteLabel: "58’",
+      scoreAfter: null,
+      tone: "neutral",
+    });
+  });
+
   it("runs oldest first, with continuous minutes", () => {
     expect(timeline.map((entry) => entry.minuteLabel)).toEqual([
       "0’",

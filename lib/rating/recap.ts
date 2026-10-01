@@ -37,7 +37,7 @@
 import type { SquadRole } from "@/db/schema";
 import { pluralize, resultLabel, scoreLineFr } from "@/lib/calendar/labels";
 import { VOIDED_SUFFIX_FR } from "@/lib/match/events";
-import { noteDetailFr } from "@/lib/match/presenter";
+import { noteDetailFr, remarkDetailFr } from "@/lib/match/presenter";
 import type { MatchState, PlayerMatchState, TimelineEntry } from "@/lib/match/reducer";
 
 /** What this module needs to know about a person: how to write their name. */
@@ -253,11 +253,14 @@ export function buildTimeline(
   entries: readonly TimelineEntry[],
   nameOf: (memberId: string) => string,
 ): RecapTimelineEntry[] {
-  // `detail` asks `noteDetailFr` first: a note is the whole point of the event that carries it, and
-  // that formatter is shared with game mode's timeline — see its comment for why the *rest* of this
-  // description is deliberately phrased differently on the two screens.
+  // `detail` asks `noteDetailFr` and `remarkDetailFr` first: what such an event carries *is* the
+  // event, and both formatters are shared with game mode's timeline — see their comments for why
+  // the *rest* of this description is deliberately phrased differently on the two screens.
   const detailOf = (entry: TimelineEntry): string | null =>
-    noteDetailFr(entry, nameOf) ?? describeActors(entry, nameOf) ?? missingScorerNote(entry);
+    noteDetailFr(entry, nameOf) ??
+    remarkDetailFr(entry, nameOf) ??
+    describeActors(entry, nameOf) ??
+    missingScorerNote(entry);
 
   return (
     entries

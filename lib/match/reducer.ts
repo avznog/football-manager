@@ -98,6 +98,7 @@ import {
   EVENT_LABELS_FR,
   type MatchEventPayloads,
   type MatchEventType,
+  type RemarkKind,
   compareMatchEvents,
   parseMatchEventPayload,
 } from "./events";
@@ -247,7 +248,9 @@ export type TimelineActorRole =
   | "foul"
   | "injured"
   /** The player a `COMMENT` is about, when the coach attached one. */
-  | "commented";
+  | "commented"
+  /** The player a `REMARK` is about. Always present: a remark names somebody by construction. */
+  | "remarked";
 
 export type TimelineActor = {
   memberId: string;
@@ -278,6 +281,12 @@ export type TimelineEntry = {
    * the presenter has one field to read rather than a payload to re-interpret.
    */
   note: string | null;
+  /**
+   * Which remark a `REMARK` is, as the identifier rather than as French: the reducer records what
+   * happened and the presenter writes it down. `null` on every other type, and on a `REMARK` whose
+   * payload could not be read.
+   */
+  remarkKind: RemarkKind | null;
   /** The running score immediately after this event, on the events that changed it. */
   scoreAfter: { goalsFor: number; goalsAgainst: number } | null;
   /** True when the payload could not be read; the entry is still shown. */
@@ -984,6 +993,16 @@ export function reduceMatch(
       if (comment?.memberId) actors.push({ memberId: comment.memberId, role: "commented" });
     }
 
+    // A REMARK moves nothing either, for the same reason and in the same place: it is an opinion
+    // about a player, not something that happened to the match. All it leaves behind is which
+    // remark it was and whom it named, so the timeline can say « Bel effort — Karim ».
+    let remarkKind: RemarkKind | null = null;
+    if (event.type === "REMARK") {
+      const remark = payload as MatchEventPayloads["REMARK"] | null;
+      remarkKind = remark?.kind ?? null;
+      if (remark?.memberId) actors.push({ memberId: remark.memberId, role: "remarked" });
+    }
+
     timeline.push({
       eventId: event.id,
       clientEventId: event.clientEventId ?? null,
@@ -998,6 +1017,7 @@ export function reduceMatch(
       voidsEventId: event.type === "VOID" ? (event.voidsEventId ?? null) : null,
       actors,
       note,
+      remarkKind,
       scoreAfter,
       invalidPayload,
     });
