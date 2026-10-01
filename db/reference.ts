@@ -76,10 +76,16 @@ export type PositionDefinition = {
 };
 
 /**
- * The canonical spot of each position. These eleven points are shown **all at once** by the
- * position picker, so they are spaced for a 48 px target on a 320 px wide pitch: the closest
- * pair (`MC` and `MOC`) is 240 units apart once corrected for the pitch's aspect ratio, which
- * is about 71 px there — see `MIN_MARKER_DISTANCE` in `lib/pitch/geometry.ts`.
+ * The canonical spot of each position. The eleven are spaced so that the **whole** list can be
+ * drawn as one layout without two 48 px targets touching on a 320 px wide pitch: the closest pair
+ * (`MC` and `MOC`) is 240 units apart once corrected for the pitch's aspect ratio, which is about
+ * 71 px there — see `MIN_MARKER_DISTANCE` in `lib/pitch/geometry.ts`, and the test in
+ * `db/reference.test.ts` that holds the whole list to it.
+ *
+ * The preference picker draws only `PREFERRED_POSITIONS` — a wish is one of the eight codes the
+ * team's two usual shapes actually use — so `MOC` is no longer tapped next to `MC` there. The
+ * spacing rule is kept for the eleven all the same: the composition editor places a slot anywhere
+ * on this list, and a narrower picker must not license a crowded layout elsewhere.
  */
 export const POSITIONS: readonly PositionDefinition[] = [
   { code: "GB", labelFr: "Gardien de but", line: "GB", defaultX: 500, defaultY: 60, sort: 1 },
@@ -136,6 +142,49 @@ export const LINE_ORDER: readonly PositionLine[] = ["GB", "DEF", "MIL", "ATT"];
 /** Narrow an arbitrary string to a known position code. */
 export function isPositionCode(value: string): value is PositionCode {
   return (POSITION_CODES as readonly string[]).includes(value);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The narrower vocabulary a player picks their wishes from                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The codes a player may wish for: exactly the **union of the slots of the two shapes this team
+ * really plays**, `1-3-2-1` (`GB DG DC DD MC MC AT`) and `1-2-3-1` (`GB DC DC MG MC MD AT`).
+ * Seven on the pitch, eight distinct codes across the two. `db/reference.test.ts` recomputes that
+ * union from `BUILTIN_FORMATIONS`, so this list cannot drift away from the formations it is drawn
+ * from.
+ *
+ * A strict subset of `POSITION_CODES`, which deliberately does **not** change: all seven built-in
+ * formations stay shippable and the composition editor keeps the whole eleven, so `MOC`, `AG` and
+ * `AD` still exist in this app — a coach can field them. They are simply no longer offered as a
+ * wish, because being asked where you would like to play is a question about the shapes the team
+ * turns out in on a Sunday. `satisfies` is what keeps the subset honest rather than a comment.
+ */
+export const PREFERRED_POSITION_CODES = [
+  "GB",
+  "DG",
+  "DC",
+  "DD",
+  "MG",
+  "MC",
+  "MD",
+  "AT",
+] as const satisfies readonly PositionCode[];
+
+export type PreferredPositionCode = (typeof PREFERRED_POSITION_CODES)[number];
+
+/**
+ * Their definitions, in the same canonical `sort` order as `POSITIONS` — filtered from it rather
+ * than retyped, so a coordinate is edited in exactly one place.
+ */
+export const PREFERRED_POSITIONS: readonly PositionDefinition[] = POSITIONS.filter((position) =>
+  isPreferredPositionCode(position.code),
+);
+
+/** Narrow an arbitrary string to a code the picker still offers. */
+export function isPreferredPositionCode(value: string): value is PreferredPositionCode {
+  return (PREFERRED_POSITION_CODES as readonly string[]).includes(value);
 }
 
 /** The full French name of a position, or the raw code if it is unknown. */

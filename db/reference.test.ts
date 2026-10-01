@@ -13,6 +13,9 @@ import {
   POSITIONS,
   POSITION_BY_CODE,
   POSITION_CODES,
+  PREFERRED_POSITIONS,
+  PREFERRED_POSITION_CODES,
+  type FormationTemplate,
   type PositionCode,
   type PositionDefinition,
   DEFAULT_FORMATION_LABEL,
@@ -20,6 +23,7 @@ import {
   formationDistribution,
   formationLabelOf,
   isPositionCode,
+  isPreferredPositionCode,
   atPositionFr,
   positionLabelFr,
   positionRankOf,
@@ -133,7 +137,7 @@ describe("positions", () => {
     expect(positionLabelFr("DC")).toBe("Défenseur central");
   });
 
-  it("never lets two canonical positions overlap — the picker shows all eleven at once", () => {
+  it("never lets two canonical positions overlap — the eleven are one layout", () => {
     for (let i = 0; i < POSITIONS.length; i += 1) {
       for (let j = i + 1; j < POSITIONS.length; j += 1) {
         const a = POSITIONS[i];
@@ -163,6 +167,76 @@ describe("positions", () => {
       expect(POSITION_BY_CODE[code]?.code).toBe(code);
     }
     expect(Object.keys(POSITION_BY_CODE)).toHaveLength(POSITION_CODES.length);
+  });
+});
+
+/**
+ * The narrower list the preference picker offers. Its definition is « the union of the slots of the
+ * two shapes this team really plays », so the union is **recomputed here from the formation data**
+ * rather than compared with a hand-typed list: change either formation and this fails, which is the
+ * only way the stated rule and the shipped constant cannot drift apart.
+ */
+describe("preferred positions", () => {
+  const USUAL_SHAPES = ["1-3-2-1", "1-2-3-1"] as const;
+
+  function slotCodesOf(label: string): PositionCode[] {
+    const formation = formationByLabel(label);
+    expect(formation, `${label} is not a built-in formation`).toBeDefined();
+    return (formation as FormationTemplate).slots.map((slot) => slot.positionCode);
+  }
+
+  it("is exactly the union of the slots of the two shapes the team plays", () => {
+    const union = new Set(USUAL_SHAPES.flatMap(slotCodesOf));
+    // Seven on the pitch in each, eight distinct codes across the two.
+    expect(union.size).toBe(8);
+    expect(new Set(PREFERRED_POSITION_CODES)).toEqual(union);
+    for (const label of USUAL_SHAPES) {
+      expect(slotCodesOf(label)).toHaveLength(FORMATION_SLOT_COUNT);
+    }
+  });
+
+  it("has eight entries, no duplicate, and is a subset of the wide vocabulary", () => {
+    expect(PREFERRED_POSITION_CODES).toHaveLength(8);
+    expect(new Set(PREFERRED_POSITION_CODES).size).toBe(PREFERRED_POSITION_CODES.length);
+    for (const code of PREFERRED_POSITION_CODES) {
+      expect(POSITION_CODES).toContain(code);
+    }
+  });
+
+  it("excludes exactly MOC, AG and AD", () => {
+    const excluded = POSITION_CODES.filter((code) => !isPreferredPositionCode(code));
+    expect(excluded).toEqual(["MOC", "AG", "AD"]);
+  });
+
+  it("keeps the wide vocabulary at eleven: the composition editor is not narrowed with it", () => {
+    // Deliberate, not an oversight. All seven built-in formations stay shippable, so the three
+    // excluded codes are still fieldable — which is why the picker never says they do not exist.
+    expect(POSITION_CODES).toHaveLength(11);
+    expect(slotCodesOf("1-3-3-0")).toContain("MOC");
+    expect(slotCodesOf("1-2-1-3")).toContain("AG");
+    expect(slotCodesOf("1-2-1-3")).toContain("AD");
+  });
+
+  it("carries the matching definitions, in canonical sort order", () => {
+    expect(PREFERRED_POSITIONS.map((position) => position.code)).toEqual([
+      ...PREFERRED_POSITION_CODES,
+    ]);
+    const sorts = PREFERRED_POSITIONS.map((position) => position.sort);
+    expect([...sorts]).toEqual([...sorts].sort((a, b) => a - b));
+    for (const position of PREFERRED_POSITIONS) {
+      expect(position).toBe(POSITION_BY_CODE[position.code]);
+    }
+  });
+
+  it("agrees with its own narrowing function", () => {
+    for (const code of POSITION_CODES) {
+      expect(isPreferredPositionCode(code)).toBe(
+        (PREFERRED_POSITION_CODES as readonly string[]).includes(code),
+      );
+    }
+    expect(isPreferredPositionCode("GB")).toBe(true);
+    expect(isPreferredPositionCode("MOC")).toBe(false);
+    expect(isPreferredPositionCode("LIBERO")).toBe(false);
   });
 });
 

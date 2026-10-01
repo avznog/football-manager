@@ -1,9 +1,15 @@
 "use client";
 
 /**
- * The position picker on a player's profile: the eleven canonical positions as tappable targets
- * on the turf. Each tap cycles **non souhaité → secondaire → principal → non souhaité**, which
- * is exactly `player_positions.preference` (no row / `secondary` / `primary`).
+ * The position picker on a player's profile: the eight positions this team's two usual shapes use
+ * (`PREFERRED_POSITIONS`) as tappable targets on the turf. Each tap cycles
+ * **non souhaité → secondaire → principal → non souhaité**, which is exactly
+ * `player_positions.preference` (no row / `secondary` / `primary`).
+ *
+ * A record written before the list narrowed may still hold `MOC`, `AG` or `AD`. Nothing deletes
+ * such a code — the form posts the selection's own keys — so without the chip row below it would be
+ * invisible *and* unremovable. The chips are derived from `value`, exactly like the grid, which is
+ * what keeps `cyclePosition` and the whole write path out of this: a chip only ever removes.
  *
  * A **controlled** component: it holds no state, never talks to the database and defines no
  * Server Action. The page above it owns the selection and persists it — which is what makes it
@@ -15,7 +21,12 @@
  * and a phone screen in direct sunlight.
  */
 
-import { POSITIONS, positionLabelFr } from "@/db/reference";
+import {
+  PREFERRED_POSITIONS,
+  type PositionCode,
+  isPreferredPositionCode,
+  positionLabelFr,
+} from "@/db/reference";
 import { cn } from "@/components/ui/cn";
 import {
   type PositionPreference,
@@ -52,6 +63,13 @@ const STATE_STYLE: Record<"none" | PositionPreference, string> = {
   primary: "border-2 border-line bg-accent text-accent-ink",
 };
 
+/**
+ * A retired wish, off the turf: the neutral `Badge` shape (`bg-surface-2` + a `border` ring), not a
+ * pitch style — `line` is white, which only reads on grass.
+ */
+const CHIP =
+  "inline-flex items-center gap-1.5 rounded-full bg-surface-2 text-sm font-semibold text-ink-muted ring-1 ring-inset ring-border/40";
+
 function stateOf(preference: PositionPreference | undefined): "none" | PositionPreference {
   return preference ?? "none";
 }
@@ -72,12 +90,31 @@ export function PositionPicker({
   className,
 }: PositionPickerProps) {
   const primary = primaryPosition(value);
+  // Wishes the picker no longer offers. Kept rather than dropped: they are in the database, and the
+  // player is the only one who may decide they are over.
+  const retired = (Object.keys(value) as PositionCode[]).filter(
+    (code) => value[code] && !isPreferredPositionCode(code),
+  );
+
+  /**
+   * Removal only, never addition — hence no `cyclePosition`.
+   *
+   * If the code being removed was the primary the player is simply left with no primary, which the
+   * summary line below already states (« Aucun poste principal choisi. ») and the form already
+   * posts as an empty `primary`. Promoting a secondary in its place would invent a wish nobody
+   * expressed, and picking *which* secondary would be arbitrary.
+   */
+  function removeRetired(code: PositionCode): void {
+    const next = { ...value };
+    delete next[code];
+    onChange(next);
+  }
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <div role="group" aria-label="Postes souhaités sur le terrain">
         <Pitch label="Terrain de football à 7, vu depuis nos buts">
-          {POSITIONS.map((position) => {
+          {PREFERRED_POSITIONS.map((position) => {
             const preference = value[position.code];
             const state = stateOf(preference);
             return (
@@ -118,6 +155,48 @@ export function PositionPicker({
       </div>
 
       <Legend />
+
+      {retired.length > 0 ? (
+        <div
+          role="group"
+          aria-label="Postes qui ne sont plus proposés"
+          className="flex flex-col gap-1.5"
+        >
+          <p className="text-sm text-ink-muted">
+            {disabled
+              ? "Ces postes ne sont plus proposés."
+              : "Ces postes ne sont plus proposés. Tu peux les retirer, pas les remettre."}
+          </p>
+          <ul className="flex flex-wrap items-center gap-2">
+            {retired.map((code) => (
+              <li key={code}>
+                {disabled ? (
+                  <span className={cn(CHIP, "px-3 py-1")}>
+                    {code}
+                    <span className="sr-only"> — {positionLabelFr(code)}</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => removeRetired(code)}
+                    aria-label={`Retirer ${positionLabelFr(code)} de tes postes souhaités`}
+                    className={cn(
+                      CHIP,
+                      "min-h-11 px-3",
+                      "hover:bg-surface focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+                    )}
+                  >
+                    {code}
+                    <span aria-hidden className="text-base leading-none">
+                      ×
+                    </span>
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <p className="text-sm text-ink-muted">
         {primary

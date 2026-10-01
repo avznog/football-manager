@@ -234,9 +234,17 @@ the same.
 
 ### `PositionPicker` — `'use client'`
 
-The player profile picker: all eleven canonical positions as tappable targets on the turf. Each
-tap cycles **non souhaité → secondaire → principal → non souhaité**, i.e.
-`player_positions.preference` (no row / `secondary` / `primary`).
+The player profile picker: the eight positions of `PREFERRED_POSITIONS` — the union of the slots of
+the two shapes this team really plays, `1-3-2-1` and `1-2-3-1` — as tappable targets on the turf.
+Each tap cycles **non souhaité → secondaire → principal → non souhaité**, i.e.
+`player_positions.preference` (no row / `secondary` / `primary`). The composition editor is *not*
+narrowed with it and still places any of the eleven.
+
+A record written before the list narrowed may hold `MOC`, `AG` or `AD`. Nothing drops such a code —
+the profile posts the selection's own keys — so the picker renders those as a small row of removable
+chips under the legend, derived from `value` like the grid. One-way: a chip removes, nothing adds one
+back, and `cyclePosition` is not involved. Removing the primary leaves the player with no primary
+rather than promoting a secondary nobody chose.
 
 ```ts
 type PositionSelection = Partial<Record<PositionCode, "primary" | "secondary">>;
@@ -253,14 +261,16 @@ type PositionPickerProps = {
 Fully controlled: no state, no database, no Server Action — the profile page owns the value and
 saves it through its own `actions.ts`. Real `<button>` elements, so Tab/Enter/Space work, with a
 visible focus ring. French `aria-label`s spell out both the current state and what a tap will do
-(« Attaquant, poste secondaire — appuyer pour en faire votre poste principal »).
+(« Attaquant, poste secondaire — appuyer pour en faire le poste principal »).
 
 Primary and secondary are distinguishable **without colour**: primary is filled with an inner
 ring, secondary is hollow with a solid outline, unwanted is a dashed outline — plus a visible
 legend. The three shapes read the same for a colour-blind user and in direct sunlight.
 
 The eleven canonical coordinates in `db/reference.ts` are spaced so that the closest pair
-(`MC`/`MOC`) is 240 units apart — about 71 px on a 320 px pitch, comfortable for 48 px targets.
+(`MC`/`MOC`) is 240 units apart — about 71 px on a 320 px pitch, comfortable for 48 px targets. That
+rule is kept for the whole eleven even though the picker now draws eight of them: the composition
+editor can place a slot anywhere on the list.
 
 ---
 
