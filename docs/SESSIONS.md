@@ -3049,36 +3049,60 @@ is therefore plain CSS and comes first — `active:bg-surface-2` on the tab itse
 `transition-colors` so the fill lands in the same frame as the touch, and the tab bar was the one
 tappable surface in the app carrying no `active:` class at all. The hairline from `useLinkStatus` is the
 second half and says something else: the router took the tap. It is `aria-hidden` and wordless, which is
-decisions 116/117 applied rather than relearned, and `.fm-pending` holds it invisible for 180 ms because
-a tab navigation measured 126–217 ms unthrottled and an indicator that appears and vanishes inside that
-is noise. `/stats` got two `<Suspense>` boundaries keyed on the filter instead of a `loading.tsx` — a
-`loading.tsx` blanks the competition chips, and those carry `scroll={false}` precisely because they only
-replace the numbers already under the reader's thumb — with a fallback that states no figure and no
-plausible row. `/moi` combines its two independent queries; `/stats` deliberately does not, because
-`getSeasonStats` consumes the id `parseCompetitionId` has just validated against `getTeamCompetitions`.
-Decision **NNN** has the reasoning, including the one thing that surprised: the two acknowledgements
-**compose rather than stack** — with the boundaries in place the router commits the `/stats` shell
-before the 180 ms elapses, so **0 hairlines at 100 ms on `/stats` with its query slowed by 2.5 s**,
-against **1 at 300 ms on `/calendrier` with the response itself held**. The hairline only appears where
-the shell genuinely cannot arrive, and that was not tuned — it falls out of the delay.
+**decision 122** applied rather than relearned — the action tiles' SVGs are `aria-hidden` so a drawing
+added for the eye stays out of the control's name — and `.fm-pending` holds it invisible for 180 ms
+because a tab navigation measured 126–217 ms unthrottled and an indicator that appears and vanishes
+inside that is noise. `/moi` combines its two independent queries; `/stats` deliberately does not,
+because `getSeasonStats` consumes the id `parseCompetitionId` has just validated against
+`getTeamCompetitions`.
+
+**The thing this session got wrong and then removed is the more useful half of the entry.** `/stats` was
+given two `<Suspense>` boundaries with a content-free skeleton, and they are **gone**: a streaming
+boundary puts the *fallback* in the HTML and swaps the content in with an inline script, so with
+JavaScript off the reader sits on the skeleton for good while the figures sit finished and hidden in the
+same document — and decisions 100 and 116 made those chips `<Link>`s precisely so this screen reads and
+filters without JavaScript. It also only engages when the query outruns the shell flush, so the fast
+case keeps the no-JS path and the slow case, which is the phone case, loses it: the normal case was the
+broken one. Two further defects left with it rather than being patched — the skeleton promised three
+cards where a new team's true answer is often zero, and `e2e/first-run.spec.ts`'s fresh-bootstrap reader
+would have met three pulsing outlines on the way to « Pas encore de statistiques ». A skeleton standing
+in for an empty state is an untruth with an excuse built in.
+
+What the boundary left behind is the measurement that says why there is no third acknowledgement to be
+had. With the boundaries in place the router committed the `/stats` shell before the 180 ms elapsed:
+**0 hairlines at 100 ms on `/stats` with its query slowed by 2.5 s**, against **1 at 300 ms on
+`/calendrier` with the response itself held**. That was read at the time as « the two compose rather
+than stack », which was true and was the wrong thing to be pleased about — a boundary that commits the
+shell early is a boundary that takes the in-flight acknowledgement away and replaces it with a shape
+stating more than it knows. Decision **NNN** has it as evidence for the two-and-only-two split: CSS for
+the tap that lands before any JavaScript, `useLinkStatus` for the tap the router is still working on,
+and nothing in between for a third to occupy.
 
 **The verification was Playwright at 390 × 844, in both themes, against the local Docker Postgres.** The
 pressed fill was measured rather than eyeballed: `rgb(233, 236, 240)` under the thumb in light, which is
 `--color-surface-2`, and `rgb(32, 38, 44)` in dark, which is the same token on the other side. The
 accessible names of the four tabs read `["Calendrier", "Équipe", "Stats", "Moi"]` both at rest and in the
-middle of a navigation, which is the assertion that matters for the hairline — decisions 116/117 are
-about exactly the regression of a visual affordance leaking into a control's name. And the `/stats`
-skeleton was looked at, not assumed: the title, the scope line and all five competition chips above
-three card outlines, with nothing numeric anywhere on screen.
+middle of a navigation, which is the assertion that matters for the hairline — **decision 122** is about
+exactly that regression, a mark added for the eye leaking into a control's name. Two negatives were
+checked rather than assumed: there is no `-webkit-tap-highlight-color` anywhere in `app/` or
+`components/`, because Tailwind v4's preflight already sets it to `transparent` on `html`
+(`node_modules/tailwindcss/preflight.css:50`) and it inherits — which is *why* the pressed state had to
+be hand-written, the framework having removed the platform's free one — and no `touch-manipulation`
+either, the only `touch-action` in the tree being `touch-none`/`touch-pan-x` on drag surfaces.
 
-`npm run typecheck`, `npm run lint` and the 1324 unit tests pass. **`npm run test:e2e` was not run.**
-The two assertions in the suite that this could plausibly break were read instead —
-`e2e/first-run.spec.ts:104`, which waits for each tab's `h1`, and `:109`, whose
-`getByText("0 match terminé")` now sits behind a `<Suspense>` boundary. Both are expected to pass:
-Playwright's `toBeVisible` auto-waits, and the fallback's shorter sentence does not contain that string,
-so there is no state in which the assertion matches the placeholder and then goes stale. **Expected is
-not observed** — the browser suite still has to run on the pull request, and this entry does not claim
-it passed.
+**An earlier draft of this entry, and of the decision, cited « decisions 116/117 » for the
+accessible-name rule. That was wrong and was caught by another session's reviewer.** 116 is the filter
+`<select>`; 117 is Label in Name and runs the opposite way, saying the accessible name is what gives way
+when it disagrees with visible text. The rule actually reused is 122. The cause is worth recording
+because `CLAUDE.md` names it over decision 119: the citation was written from memory instead of from the
+file.
+
+`npm run typecheck`, `npm run lint` and the 1324 unit tests pass. **`npm run test:e2e` was not run.** With
+the `/stats` boundary gone, the one assertion that had needed thinking about —
+`e2e/first-run.spec.ts:109`'s `getByText("0 match terminé")`, which would have sat behind a fallback —
+is back to reading a server-rendered string, and `:104`'s per-tab `h1` waits were never affected.
+**Expected is not observed**: the browser suite still has to run on the pull request, and this entry does
+not claim it passed.
 
 **One thing went wrong and is worth not repeating.** A cleanup `pkill -f "next dev"` at the end of the
 browser checks killed a dev server on port 3000 that belonged to **another session**, not to this one.

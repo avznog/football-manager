@@ -27,6 +27,19 @@ import { NAV_ITEMS, isActivePath } from "./nav-items";
  * nothing here depends on a transition finishing: the tab has no
  * `transition-colors`, so the fill is on screen in the same frame as the touch.
  *
+ * It had to be hand-written because the platform's own tap flash is already
+ * gone: Tailwind v4's preflight sets `-webkit-tap-highlight-color: transparent`
+ * on `html` (`node_modules/tailwindcss/preflight.css:50`), and that property
+ * inherits, so every tappable surface in this app lost the free acknowledgement
+ * before anyone chose to. Nothing here adds `touch-manipulation` either; the
+ * only `touch-action` in the tree is on drag surfaces.
+ *
+ * The fill also paints on the tab you are already on, deliberately. Tapping the
+ * current tab is a real navigation that re-renders the screen, and a reader who
+ * taps « Stats » from Stats is owed the same « yes, received » as anyone else —
+ * suppressing it would make the one tap that looks like nothing happened the
+ * one tap that genuinely says nothing.
+ *
  * `TabPending` is the other half, and it only exists after hydration: the
  * navigation registered and is in flight. It says nothing a pressed state
  * already said in the first 180 ms — see the delay in `.fm-pending`.
@@ -74,9 +87,15 @@ export function BottomNav() {
  * requires — it reads the status of its nearest ancestor link.
  *
  * `aria-hidden` and no text, deliberately: the accessible name of each tab is
- * its label and nothing else. Decisions 116/117 are about exactly this — a
- * sentence appended for a sighted reader became part of what a screen reader
- * announces the control as.
+ * its label and nothing else. That is decision 122's rule reused — the action
+ * tiles' inline SVGs are `aria-hidden` so a drawing added for a sighted reader
+ * stays out of the control's name — and the hairline is the same shape of thing,
+ * a mark that means something only to the eye.
+ *
+ * Decision 117 is the principle behind both, and it runs the other way, which is
+ * why it is not the citation here: Label in Name says the *visible* text must
+ * appear in the accessible name, so when the two disagree it is the name that
+ * gives way, not the label. A wordless decoration never enters that trade.
  */
 function TabPending() {
   const { pending } = useLinkStatus();
