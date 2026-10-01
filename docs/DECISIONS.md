@@ -3934,7 +3934,7 @@ place. And `tabbar-pb` was checked for the same shape and is clean: it is a lone
 no shorthand competitor, it now reads `var(--tabbar-h)`, and it is used nowhere at all because
 `app-shell.tsx:142` writes the value inline for the `md:` variant.
 
-## NNN — A role-dependent screen is reviewed in both roles at once, or it is not reviewed
+## 125 — A role-dependent screen is reviewed in both roles at once, or it is not reviewed
 
 The definition of done in `CLAUDE.md` already requires both themes **actually looked at, at 390 px**.
 This adds the same kind of rule for the other axis the app branches on: **every screen with a
