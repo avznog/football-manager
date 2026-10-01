@@ -130,6 +130,16 @@ calling `tsc` directly: `PageProps<"/route">` does not exist until the route typ
   test: « 0 – 0 » for a match nobody recorded, « 7 changements » for the starting seven, a confirm
   button 8 px off the right edge. `npm run db:reset` then walking the season is the cheapest review
   tool in the repo
+- **every screen with a role-dependent branch looked at in both roles, side by side in one pass.**
+  The defect is in the comparison: a coach's card spelling out « Ailier gauche » next to a player's
+  bare position code, or a coach reading « postes secondaires : Défenseur central, Milieu droit » in
+  prose while the player gets the instruction « Appuie sur un poste… » in the same slot, is invisible
+  to a reader who sees one screen at a time. Four findings got through people who had read both code
+  paths — just never together: the positions chip, the secondary-positions summary, `D25` (a player
+  can never find out whether he was marked present) and `S8` (a player sees the lineup on `/jeu` and
+  a 404 on `/composition`). « In one pass » is the whole rule, for the same reason « actually looked
+  at » is: the audit's own `/equipe` theme-drift finding was false precisely because it measured the
+  two arms sequentially, and the same method applied in a single pass gave the right answer
 - `docs/ROADMAP.md` updated, `docs/SESSIONS.md` appended to, and `docs/DECISIONS.md`
   extended if a decision was made
 - migrations committed alongside the schema change that produced them
