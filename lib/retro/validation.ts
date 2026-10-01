@@ -4,8 +4,8 @@
  * Two jobs, both pure, so both testable without a browser or a database.
  *
  * 1. **Decoding.** The screen is one `<form>` with a variable number of rows, so the rows travel as
- *    controls whose *names* carry their identity: `starter:<slotId>`, `change-out:<rowKey>`,
- *    `fact-type:<rowKey>`… Same trick as `lib/composition/validation.ts`, for the same reason — it
+ *    controls whose *names* carry their identity: `starter:<slotId>`, `action-type:<rowKey>`,
+ *    `action-out:<rowKey>`… Same trick as `lib/composition/validation.ts`, for the same reason — it
  *    survives with JavaScript switched off, and it needs no JSON blob in a hidden field.
  * 2. **Judging.** `findRetroIssues` answers "can this be saved, and what should I warn about",
  *    in French, before anything is written. `retroLogIssuesFr` is the belt-and-braces check: the
@@ -24,12 +24,13 @@ import { type MatchAnomalyCode, reduceMatch } from "@/lib/match/reducer";
 
 import {
   RETRO_FACT_TYPES,
+  type RetroAction,
   type RetroChange,
   type RetroEntry,
   type RetroFact,
   type RetroFactType,
   type RetroStarter,
-  isRetroFactType,
+  isRetroActionType,
   resolveFactClockMs,
   retroEventRecords,
   retroFactNeedsMember,
@@ -101,27 +102,58 @@ function readRows<T>(
   return [...rows].map(([key, values]) => build(key, values));
 }
 
-export function readChangeFields(entries: Entries): RetroChange[] {
-  return readRows(entries, ["change-out", "change-in", "change-minute"], (key, values) => ({
-    key,
-    outId: text(values["change-out"]),
-    inId: text(values["change-in"]),
-    minute: optionalMinute(values["change-minute"]),
-  })).filter((row) => row.outId !== "" || row.inId !== "");
-}
-
-export function readFactFields(entries: Entries): RetroFact[] {
+/**
+ * Every row of the sheet, from one `action-*` family of controls: a substitution and a goal arrive
+ * through the same decoder and come out as the two arms of `RetroAction`.
+ *
+ * Two behaviours are deliberate and are the reason this is not a one-liner:
+ *
+ * - a row whose `action-type` is not enterable is **dropped**. Nothing in the form can produce one, so
+ *   it is a crafted POST, and the right answer is to ignore it rather than to explain it;
+ * - a **half-filled substitution is kept**. « Sort… » chosen and « Entre… » still empty is a row the
+ *   coach started, and `findRetroIssues` says so by name; swallowing it here would make the row vanish
+ *   on submit and the match save as if it had never been typed (UX audit D22).
+ *
+ * The `optionalId` nulls on the fact arm are what « Buteur inconnu » and « Sans passe décisive » post
+ * (decisions 017 and 036): absent, not invalid.
+ */
+export function readActionFields(entries: Entries): RetroAction[] {
   return readRows(
     entries,
-    ["fact-type", "fact-member", "fact-assist", "fact-minute"],
-    (key, values) => ({
-      key,
-      type: text(values["fact-type"]) as RetroFactType,
-      memberId: optionalId(values["fact-member"]),
-      assistId: optionalId(values["fact-assist"]),
-      minute: optionalMinute(values["fact-minute"]),
-    }),
-  ).filter((row) => isRetroFactType(row.type));
+    ["action-type", "action-minute", "action-member", "action-assist", "action-out", "action-in"],
+    (key, values): RetroAction | null => {
+      const type = text(values["action-type"]);
+      if (!isRetroActionType(type)) return null;
+      const minute = optionalMinute(values["action-minute"]);
+
+      switch (type) {
+        case "SUBSTITUTION": {
+          const row = {
+            key,
+            type,
+            outId: text(values["action-out"]),
+            inId: text(values["action-in"]),
+            minute,
+          };
+          // An untouched row the coach added and left alone is not a mistake to report.
+          return row.outId === "" && row.inId === "" ? null : row;
+        }
+        case "POSITION_CHANGE":
+          // Enterable per `RETRO_ACTION_TYPES`, but `RetroAction` has no arm for it yet: the form
+          // offers no such row, so one can only have been crafted. Dropped like an unknown type until
+          // the arm lands, at which point this case is where it is decoded.
+          return null;
+        default:
+          return {
+            key,
+            type,
+            memberId: optionalId(values["action-member"]),
+            assistId: optionalId(values["action-assist"]),
+            minute,
+          };
+      }
+    },
+  ).filter((row): row is RetroAction => row !== null);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -137,8 +169,23 @@ const minuteSchema = z
 
 const idSchema = z.uuid("Ce joueur n’est pas valide.");
 
+const rowKeySchema = z.string().min(1).max(64);
+
+/**
+ * **The correctable fact, and no longer the entry schema.**
+ *
+ * `retroActionSchema` below is what the entry form posts. This one survives for `amendSubmitSchema`,
+ * which is a different question: `RETRO_FACT_TYPES` is what a coach may *correct* on a frozen match and
+ * `RETRO_ACTION_TYPES` is what he may *type up* on a sheet (decision 049). Building the amendment
+ * schema out of the wider list would hand `SUBSTITUTION` and `POSITION_CHANGE` a correction payload
+ * nobody decided to give them.
+ *
+ * It is also the fact arm of the union below, rather than a second copy of those five fields: one
+ * declaration, so « corriger un but » and « saisir un but » cannot drift apart in shape while staying
+ * apart in *which types* they accept.
+ */
 export const retroFactSchema = z.object({
-  key: z.string().min(1).max(64),
+  key: rowKeySchema,
   // The list itself, not a second copy of it: this was seven literals hand-kept in step with
   // `RETRO_FACT_TYPES`, which is the kind of duplication decision 064 exists about.
   type: z.enum(RETRO_FACT_TYPES),
@@ -148,15 +195,27 @@ export const retroFactSchema = z.object({
 });
 
 export const retroChangeSchema = z.object({
-  key: z.string().min(1).max(64),
+  key: rowKeySchema,
+  type: z.literal("SUBSTITUTION"),
+  // Both required, unlike the fact arm's nullable players: « je ne sais plus qui est sorti » is not a
+  // substitution, it is an unfinished row — which `findRetroIssues` reports rather than this schema.
   outId: idSchema,
   inId: idSchema,
   minute: minuteSchema,
 });
 
 /**
- * The form as a whole. The caps are sanity ceilings, not rules: a seven-a-side match with more than
- * 40 changes or 60 facts is a typo, and `matchEventBatchSchema` refuses more than 200 events anyway.
+ * One row of the sheet, as a discriminated union on `type` — the schema-level mirror of `RetroAction`.
+ *
+ * Discriminated rather than a widened object so Zod reports « ce joueur n'est pas valide » against the
+ * arm the row actually is, instead of complaining that a goal has no outgoing player.
+ */
+export const retroActionSchema = z.discriminatedUnion("type", [retroFactSchema, retroChangeSchema]);
+
+/**
+ * The form as a whole. The cap is a sanity ceiling, not a rule: a seven-a-side match with more than a
+ * hundred actions on the sheet is a typo, and `matchEventBatchSchema` refuses more than 200 events
+ * anyway — which, with the frame of the match, is the real limit.
  *
  * There is no `submissionId` field: the action derives it from the content with
  * `retroSubmissionId`, so a retry is idempotent without the browser having to carry a uuid around.
@@ -169,8 +228,7 @@ export const retroSubmitSchema = z.object({
     .array(z.object({ slotId: z.uuid(), memberId: idSchema }))
     .min(1, "Il faut au moins un joueur dans la composition de départ.")
     .max(FORMATION_SLOT_COUNT, "Une équipe de foot à 7 compte sept joueurs sur le terrain."),
-  changes: z.array(retroChangeSchema).max(40),
-  facts: z.array(retroFactSchema).max(60),
+  actions: z.array(retroActionSchema).max(100),
 });
 
 /**
@@ -317,7 +375,7 @@ export function findRetroIssues(input: {
     });
   }
 
-  /* ---- the substitutions ------------------------------------------------- */
+  /* ---- the actions ------------------------------------------------------- */
 
   const pitch = retroPitch(entry);
   /**
@@ -336,7 +394,7 @@ export function findRetroIssues(input: {
     );
   const everOn = (memberId: string): boolean => (pitch.spells.get(memberId) ?? []).length > 0;
 
-  for (const change of entry.changes) {
+  const addChangeIssues = (change: RetroChange): void => {
     const resolved = pitch.changes.find((candidate) => candidate.key === change.key);
     for (const memberId of [change.outId, change.inId]) {
       if (!byId.has(memberId)) {
@@ -357,7 +415,7 @@ export function findRetroIssues(input: {
         messageFr: `${nameOf(change.outId)} ne peut pas se remplacer lui-même.`,
         blocking: true,
       });
-      continue;
+      return;
     }
     if (change.minute !== null && (change.minute < 0 || change.minute > regulation)) {
       add({
@@ -367,7 +425,7 @@ export function findRetroIssues(input: {
         blocking: true,
       });
     }
-    if (!resolved) continue;
+    if (!resolved) return;
     if (!resolved.outWasOn) {
       add({
         code: "change-out-not-on",
@@ -386,11 +444,9 @@ export function findRetroIssues(input: {
         blocking: true,
       });
     }
-  }
+  };
 
-  /* ---- the facts --------------------------------------------------------- */
-
-  for (const fact of entry.facts) {
+  const addFactIssues = (fact: RetroFact): void => {
     if (fact.memberId !== null && !byId.has(fact.memberId)) {
       add({
         code: "unknown-member",
@@ -435,6 +491,24 @@ export function findRetroIssues(input: {
           : `${nameOf(memberId)} n’apparaît ni dans la composition de départ ni dans les changements.`,
         blocking: true,
       });
+    }
+  };
+
+  /*
+   * One pass over the sheet, in the order the coach typed it, and the fourth of the four places the
+   * union is taken apart. The two arms get genuinely different rules — three of the substitution ones
+   * are about `RetroPitch`, which a goal has nothing to do with — so a widened record would have meant
+   * a null check in front of every rule instead of a narrowed argument. A third arm fails to compile on
+   * the `default` line rather than falling through as a fact.
+   */
+  for (const action of entry.actions) {
+    switch (action.type) {
+      case "SUBSTITUTION":
+        addChangeIssues(action);
+        break;
+      default:
+        addFactIssues(action);
+        break;
     }
   }
 

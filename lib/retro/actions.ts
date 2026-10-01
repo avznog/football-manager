@@ -33,14 +33,14 @@ import {
   retroEntrySeed,
   retroEventId,
   retroSubmissionId,
+  retroSubstitutions,
   type RetroEntry,
 } from "./log";
 import {
   amendSubmitSchema,
   blockingRetroIssues,
   findRetroIssues,
-  readChangeFields,
-  readFactFields,
+  readActionFields,
   readStarterFields,
   retroLogIssuesFr,
   retroSubmitSchema,
@@ -71,8 +71,7 @@ export async function submitRetroMatch(
     matchId: formData.get("matchId"),
     lineupId: formData.get("lineupId") || undefined,
     starters: readStarterFields(entries),
-    changes: readChangeFields(entries),
-    facts: readFactFields(entries),
+    actions: readActionFields(entries),
   });
   if (!parsed.success) return toFormState(parsed.error);
 
@@ -106,8 +105,7 @@ export async function submitRetroMatch(
     kickoffAtMs,
     lineupId: parsed.data.lineupId ?? null,
     starters: parsed.data.starters,
-    changes: parsed.data.changes,
-    facts: parsed.data.facts,
+    actions: parsed.data.actions,
   };
   // Derived from the sheet, not submitted with it: the same sheet posted twice is one log.
   const entry: RetroEntry = {
@@ -193,7 +191,8 @@ export async function submitRetroMatch(
 async function upsertSquadFromEntry(matchId: string, entry: RetroEntry): Promise<void> {
   const roles = new Map<string, "starter" | "substitute">();
   for (const starter of entry.starters) roles.set(starter.memberId, "starter");
-  for (const change of entry.changes) {
+  // The substitution rows only: who came on is a question about those and not about the goals.
+  for (const change of retroSubstitutions(entry.actions)) {
     if (!roles.has(change.inId)) roles.set(change.inId, "substitute");
   }
   if (roles.size === 0) return;

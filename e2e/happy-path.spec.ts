@@ -860,7 +860,10 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   // And the row the tap creates has to exist and be rendered — UX audit D6 as a test. Today it is
   // created 487 px below the fold in the « Actions du match » card, which is the defect; what this
   // pins is that the tap produces an editable goal row at all, wherever that row ends up living.
-  const goalRows = page.locator('select[name^="fact-type:"]');
+  // `action-type:` since the two row families share one field prefix. A `<select>` with that name is
+  // still only ever a fact row: a substitution row posts its type in a hidden input, because the card
+  // it lives in offers no choice of type.
+  const goalRows = page.locator('select[name^="action-type:"]');
   await expect(goalRows).toHaveCount(1);
   await expect(goalRows.first()).toBeVisible();
 

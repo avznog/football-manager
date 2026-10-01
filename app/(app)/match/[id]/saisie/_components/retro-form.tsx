@@ -52,9 +52,10 @@ import {
   retroFactNeedsMember,
   retroFactTakesAssist,
   retroFactTakesMember,
-  type RetroChange,
+  retroFacts,
+  isRetroFactType,
+  type RetroAction,
   type RetroEntry,
-  type RetroFact,
   type RetroFactType,
 } from "@/lib/retro/log";
 import { findRetroIssues, type RetroIssue } from "@/lib/retro/validation";
@@ -79,8 +80,16 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
   const [starters, setStarters] = useState<Record<string, string>>(() =>
     Object.fromEntries(view.slots.map((slot) => [slot.id, planned.get(slot.id) ?? ""])),
   );
-  const [changes, setChanges] = useState<readonly ChangeRow[]>([]);
-  const [facts, setFacts] = useState<readonly FactRow[]>([]);
+  /**
+   * **One list of rows, substitutions included**, in the order the coach added them.
+   *
+   * Still rendered as two cards, because merging the two cards into one list on screen is the next
+   * slice and this one is meant to be invisible. What changed is underneath: both cards read from and
+   * write to this array, and both post one `action-*` family of field names.
+   */
+  const [actions, setActions] = useState<readonly ActionRow[]>([]);
+  const changes = actions.filter(isSubstitutionRow);
+  const facts = actions.filter(isFactRow);
 
   const regulation = regulationMinutes({
     periodsCount: view.match.periodsCount,
@@ -101,12 +110,13 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
       starters: view.slots
         .map((slot) => ({ slotId: slot.id, memberId: starters[slot.id] ?? "" }))
         .filter((starter) => starter.memberId !== ""),
-      changes: changes
-        .filter((row) => row.outId !== "" && row.inId !== "")
-        .map(toRetroChange),
-      facts: facts.map(toRetroFact),
+      // A substitution with a side still unchosen is left out of the *preview* — the reducer cannot
+      // replay « sort personne » — while the server keeps it and reports it. Unchanged behaviour.
+      actions: actions
+        .filter((row) => !isSubstitutionRow(row) || (row.outId !== "" && row.inId !== ""))
+        .map(toRetroAction),
     }),
-    [changes, facts, starters, view.match, view.slots],
+    [actions, starters, view.match, view.slots],
   );
 
   /** The score and the minutes this sheet implies — asked of the reducer, never counted here. */
@@ -151,7 +161,7 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
    * How many rows on the sheet can move the score. Zero of them means the Score card has nothing to
    * state yet — and the 0 – 0 it used to print there was the only untrue thing on the screen.
    */
-  const goalActions = entry.facts.filter((fact) =>
+  const goalActions = retroFacts(entry.actions).filter((fact) =>
     (SCORING_EVENT_TYPES as readonly string[]).includes(fact.type),
   ).length;
   const scoreLine = retroScoreLineFr({
@@ -173,11 +183,23 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
       : "";
 
   function addGoal(type: RetroFactType) {
-    setFacts((rows) => [
+    setActions((rows) => [
       ...rows,
       { key: nextKey("f"), type, memberId: "", assistId: "", minute: "" },
     ]);
   }
+
+  /** Narrowed updaters: a substitution row and a fact row have no fields in common but `key`. */
+  const patchChange = (key: string, values: Partial<SubRow>) =>
+    setActions((rows) =>
+      rows.map((row) => (row.key === key && isSubstitutionRow(row) ? { ...row, ...values } : row)),
+    );
+  const patchFact = (key: string, values: Partial<FactRow>) =>
+    setActions((rows) =>
+      rows.map((row) => (row.key === key && isFactRow(row) ? { ...row, ...values } : row)),
+    );
+  const removeRow = (key: string) =>
+    setActions((rows) => rows.filter((row) => row.key !== key));
 
   return (
     <form action={action} className="space-y-4">
@@ -277,9 +299,9 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
             variant="ghost"
             size="sm"
             onClick={() =>
-              setChanges((rows) => [
+              setActions((rows) => [
                 ...rows,
-                { key: nextKey("c"), outId: "", inId: "", minute: "" },
+                { key: nextKey("c"), type: "SUBSTITUTION", outId: "", inId: "", minute: "" },
               ])
             }
           >
@@ -295,14 +317,19 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
           <ul className="space-y-3">
             {changes.map((row) => (
               <li key={row.key} className="space-y-1.5 rounded-xl border border-border/60 p-3">
+                {/*
+                  The row's kind, posted rather than inferred from which controls arrived: one decoder
+                  reads every row now, and `action-type` is the discriminant it switches on. A hidden
+                  field because the card above the « Actions du match » one offers no choice of type —
+                  that is the next slice's job, and this one must not change what is on screen.
+                */}
+                <input type="hidden" name={`action-type:${row.key}`} value="SUBSTITUTION" />
                 <div className="flex items-center gap-2">
                   <Select
                     aria-label="Joueur sortant"
-                    name={`change-out:${row.key}`}
+                    name={`action-out:${row.key}`}
                     value={row.outId}
-                    onChange={(event) =>
-                      setChanges((rows) => patch(rows, row.key, { outId: event.target.value }))
-                    }
+                    onChange={(event) => patchChange(row.key, { outId: event.target.value })}
                     className="min-h-11"
                   >
                     <option value="">Sort…</option>
@@ -317,11 +344,9 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
                   </span>
                   <Select
                     aria-label="Joueur entrant"
-                    name={`change-in:${row.key}`}
+                    name={`action-in:${row.key}`}
                     value={row.inId}
-                    onChange={(event) =>
-                      setChanges((rows) => patch(rows, row.key, { inId: event.target.value }))
-                    }
+                    onChange={(event) => patchChange(row.key, { inId: event.target.value })}
                     className="min-h-11"
                   >
                     <option value="">Entre…</option>
@@ -335,18 +360,13 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
 
                 <div className="flex items-center gap-2">
                   <MinuteInput
-                    name={`change-minute:${row.key}`}
+                    name={`action-minute:${row.key}`}
                     label="Minute du changement"
                     value={row.minute}
                     regulation={regulation}
-                    onChange={(minute) => setChanges((rows) => patch(rows, row.key, { minute }))}
+                    onChange={(minute) => patchChange(row.key, { minute })}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setChanges((rows) => rows.filter((item) => item.key !== row.key))}
-                  >
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(row.key)}>
                     Retirer
                   </Button>
                 </div>
@@ -368,12 +388,7 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() =>
-              setFacts((rows) => [
-                ...rows,
-                { key: nextKey("f"), type: "GOAL_FOR", memberId: "", assistId: "", minute: "" },
-              ])
-            }
+            onClick={() => addGoal("GOAL_FOR")}
           >
             + Ajouter
           </Button>
@@ -388,12 +403,10 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
                 <div className="flex items-center gap-2">
                   <Select
                     aria-label="Type d’action"
-                    name={`fact-type:${row.key}`}
+                    name={`action-type:${row.key}`}
                     value={row.type}
                     onChange={(event) =>
-                      setFacts((rows) =>
-                        patch(rows, row.key, { type: event.target.value as RetroFactType }),
-                      )
+                      patchFact(row.key, { type: event.target.value as RetroFactType })
                     }
                     className="min-h-11"
                   >
@@ -404,22 +417,20 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
                     ))}
                   </Select>
                   <MinuteInput
-                    name={`fact-minute:${row.key}`}
+                    name={`action-minute:${row.key}`}
                     label="Minute de l’action"
                     value={row.minute}
                     regulation={regulation}
-                    onChange={(minute) => setFacts((rows) => patch(rows, row.key, { minute }))}
+                    onChange={(minute) => patchFact(row.key, { minute })}
                   />
                 </div>
 
                 {retroFactTakesMember(row.type) ? (
                   <Select
                     aria-label={retroFactNeedsMember(row.type) ? "Joueur" : "Buteur"}
-                    name={`fact-member:${row.key}`}
+                    name={`action-member:${row.key}`}
                     value={row.memberId}
-                    onChange={(event) =>
-                      setFacts((rows) => patch(rows, row.key, { memberId: event.target.value }))
-                    }
+                    onChange={(event) => patchFact(row.key, { memberId: event.target.value })}
                     className="min-h-11"
                   >
                     <option value="">
@@ -436,11 +447,9 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
                 {retroFactTakesAssist(row.type) ? (
                   <Select
                     aria-label="Passeur"
-                    name={`fact-assist:${row.key}`}
+                    name={`action-assist:${row.key}`}
                     value={row.assistId}
-                    onChange={(event) =>
-                      setFacts((rows) => patch(rows, row.key, { assistId: event.target.value }))
-                    }
+                    onChange={(event) => patchFact(row.key, { assistId: event.target.value })}
                     className="min-h-11"
                   >
                     <option value="">Sans passe décisive</option>
@@ -453,12 +462,7 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
                 ) : null}
 
                 <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFacts((rows) => rows.filter((item) => item.key !== row.key))}
-                  >
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(row.key)}>
                     Retirer
                   </Button>
                 </div>
@@ -538,7 +542,12 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
 /* Rows                                                                       */
 /* -------------------------------------------------------------------------- */
 
-type ChangeRow = { key: string; outId: string; inId: string; minute: string };
+/**
+ * A row as the controls hold it: the same two arms as `RetroAction`, with `minute` and the player ids
+ * as the strings a `<select>` and a number input actually carry. `""` is « rien choisi », which
+ * `toRetroAction` turns into the `null` the domain means by it.
+ */
+type SubRow = { key: string; type: "SUBSTITUTION"; outId: string; inId: string; minute: string };
 type FactRow = {
   key: string;
   type: RetroFactType;
@@ -546,28 +555,23 @@ type FactRow = {
   assistId: string;
   minute: string;
 };
+type ActionRow = SubRow | FactRow;
 
-function toRetroChange(row: ChangeRow): RetroChange {
-  return {
-    key: row.key,
-    outId: row.outId,
-    inId: row.inId,
-    minute: row.minute === "" ? null : Number(row.minute),
-  };
-}
+const isSubstitutionRow = (row: ActionRow): row is SubRow => row.type === "SUBSTITUTION";
+/** Asked of the list, not of « everything that is not a substitution », so a third arm is excluded. */
+const isFactRow = (row: ActionRow): row is FactRow => isRetroFactType(row.type);
 
-function toRetroFact(row: FactRow): RetroFact {
-  return {
-    key: row.key,
-    type: row.type,
-    memberId: row.memberId === "" ? null : row.memberId,
-    assistId: row.assistId === "" ? null : row.assistId,
-    minute: row.minute === "" ? null : Number(row.minute),
-  };
-}
-
-function patch<T extends { key: string }>(rows: readonly T[], key: string, values: Partial<T>): T[] {
-  return rows.map((row) => (row.key === key ? { ...row, ...values } : row));
+function toRetroAction(row: ActionRow): RetroAction {
+  const minute = row.minute === "" ? null : Number(row.minute);
+  return isSubstitutionRow(row)
+    ? { key: row.key, type: row.type, outId: row.outId, inId: row.inId, minute }
+    : {
+        key: row.key,
+        type: row.type,
+        memberId: row.memberId === "" ? null : row.memberId,
+        assistId: row.assistId === "" ? null : row.assistId,
+        minute,
+      };
 }
 
 function playerLabel(player: RetroView["players"][number]): string {
