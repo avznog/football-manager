@@ -4035,3 +4035,92 @@ has no fifth.
 overrode `safe-pb`: the bar is `md:static` there, so there is no home indicator to clear and nothing
 changes. The unit suite (1324) and the browser suite (5 specs) both pass, the second because this is a
 screen the happy path walks.
+
+## NNN — The error screen offers a reload unconditionally, and classifies nothing in order to be correct
+
+**2026-10-01** · accepted · follows 058
+
+The screen both error boundaries show said « Cet écran n'a pas pu s'afficher. Réessayez ; si cela se
+reproduit, passez par un autre écran et revenez. » Three things were wrong with twenty-two words. Both
+instructions are `vous` in an app that tutoies without exception (decision 074) — a third shipped
+vouvoiement beside the two `docs/ROADMAP.md` already lists, and this one hid behind the same `-ez`
+imperative the others did, which is why no `grep` for « vous » or « votre » ever saw it. And both
+instructions are **inert** for a whole class of failure: `reset()` is `this.setState({ error: null })`
+and nothing else (Next 16.3.6, `dist/client/components/error-boundary.js:16-19`), so it re-renders the
+segment out of the same JavaScript bundle; and « passez par un autre écran et revenez » is a
+client-side navigation, which is the same bundle wearing a longer path. For a failure that *is* the
+bundle, the screen's only two suggestions were the two things that cannot work.
+
+**Decision. « Recharger la page » is the primary button, offered for every error this screen shows,
+and the screen does not have to know what broke in order to be right.** That is the whole argument and
+it is the part that must survive: a reload is never *wrong* guidance for « this screen could not
+display » — it discards the document, the router cache and the bundle, so whatever state produced the
+crash is gone and the app comes back on the deployment that is live now — whereas retrying is wrong
+*specifically*. So correctness of the advice does not depend on correctly identifying the error, and
+`isDeploymentSkew` (`components/errors/error-screen.tsx:78`) may change **only the sentence, never
+whether the button is offered**. « Réessayer » stays, second, because the other common cause here is a
+query that failed once on a cold Neon connection and a re-render is the cheap fix for that one;
+`window.location.reload()` and not `router.refresh()` at `:129`, because only a document reload throws
+the stale bundle away.
+
+**This decision is what let the slice survive its own motivating diagnosis being refuted**, and that
+is recorded here because it is the reusable part. The failure that made the old copy's wrongness
+concrete is deployment skew — a page loaded from one deployment posting a Server Action id the newer
+one no longer has, which Next answers with 404 « Failed to find Server Action … older or newer
+deployment » and the client surfaces as `UnrecognizedActionError`. It was reproduced end to end against
+two production builds served on one port, and it is real. It is **not** the crash the owner reported
+from his iPhone: that one survived a force-quit, a force-quit is a document navigation, and a document
+navigation is always served by the latest deployment, so skew cannot survive one. His crash is still
+unexplained and is another session's investigation. Had the branch keyed its design on the diagnosis,
+the refutation would have taken the branch with it. Because the design keyed on « what is never wrong
+to say », the refutation only shortened the claim: the screen's advice is now true, and
+`UnrecognizedActionError` is a real exposure on every deploy that moves an action, which is a different
+and smaller sentence than « this fixes the bug ».
+
+**There is no host-level fix to buy, so this affordance is the whole of what engineering can do about
+skew.** Vercel's Skew Protection is Pro and Enterprise only — the owner is on the free plan — and in any
+case defaults to a one-day maximum age, so it would be a window and not a guarantee. Setting
+`deploymentId` alone adds a `?dpl=` cache-buster to asset URLs without routing a request back to the
+deployment that served the page, so it buys nothing here. The recovery affordance is not a stopgap
+pending a transparent fix; it is the fix available.
+
+**The blast radius, put on the record because of what it argues for next time.** This screen is the
+recovery surface for all **42 `useActionState` call sites** — availability, compositions, ratings, team
+settings, login, the retro forms — because React cancels the queued action and shows the nearest
+boundary when a dispatch throws. **Game mode is the one part of the app structurally immune**, and for a
+reason worth keeping: `lib/match/outbox.ts` posts to a Route Handler whose URL is a path, which exists
+identically on every deployment, and ingestion is idempotent on `client_event_id` (invariant 6), so a
+retry against a deployment the page has never met both routes and deduplicates. That was built for
+offline and is skew-immune as a side effect. **So the next time somebody proposes replacing a Route
+Handler with a Server Action because it is less code, this is the cost:** the endpoint stops being
+addressable by path and starts being addressable by a build-time id, and the live match becomes a
+screen that can be killed by a deploy. The live match is the one screen in this app that must not be.
+
+**The `unstable_` predicate was refused.** `next/navigation` does export
+`unstable_isUnrecognizedActionError` in 16.3.6, and it was not used. Two reasons, in order: the
+`unstable_` prefix is outside semver, so a minor Next bump could break the *recovery* screen — the
+worst file in the repository to have fail — and the predicate is an `instanceof` check against a class
+identity that a stale bundle is not guaranteed to share with the one that threw, which is precisely the
+situation it would be asked about. The load-bearing check is `error.name === "UnrecognizedActionError"`,
+set in the constructor and carried across bundles as a string. And because the branch only chooses a
+sentence, a future Next renaming the error degrades this screen to vaguer copy rather than to a dead
+end — which is the same property the unconditional button buys, applied to the detector.
+
+**`retry` is destructured and deliberately unused**, with an `eslint-disable` line saying so
+(`components/errors/error-screen.tsx:88`, and both boundaries now declare it). It is the boundary's
+third prop (`error-boundary.js:20-24`, passed at `:114`, typed in `error-boundary.d.ts`) and it does
+`router.refresh()` then `reset()`. It looks like the answer and is not: the RSC refetch is issued by the
+same stale bundle, so it asks the new deployment for a payload in the old format. Naming it in the
+props is cheaper than the next reader rediscovering it in Next's types and assuming nobody looked.
+
+**`digest` stays on screen, framed as something to send.** It renders as a **ten-digit decimal** in a
+production build — `3004583682`, observed, not a hash — which means it can be read aloud over a phone,
+and on this project the person reading the Vercel logs is the person the app broke in front of. So the
+line is « Si tu nous le signales, donne ce code : … » rather than « Code de l'erreur ». It is **absent
+for a client-side throw**, and the screen then prints no code line at all: that absence is itself a
+diagnosis — no code means the throw happened in the browser, so there is no server log line to go and
+find — and it is recorded in a comment at `:140-146` rather than on screen, because explaining that to
+a coach is noise.
+
+The tone was modelled on `app/(jeu)/match/[id]/jeu/error.tsx`, which decision 058 already got right,
+already tutoies, and was left untouched.

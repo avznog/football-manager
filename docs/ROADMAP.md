@@ -12,6 +12,16 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       built-in « This page could not be found. », in English, in a French app; there was no error
       boundary of any kind, so one failing query took the whole screen. All five walked at 390 px
       in both themes against a production build
+- [x] …and the shared error screen now offers the one recovery that works. It said « Réessayez ; si
+      cela se reproduit, passez par un autre écran et revenez », which is two vouvoiements (decision
+      074) and two inert instructions: `reset()` is `setState({ error: null })` and re-renders out of
+      the same JavaScript bundle, and a client navigation keeps that bundle, so for a stale Server
+      Action id after a deploy — 404, `UnrecognizedActionError`, the failure mode all 42
+      `useActionState` call sites share — neither could ever recover. « Recharger la page » is the
+      primary button now, offered for **every** error rather than only the one it was found on,
+      because a reload is never wrong advice for « this screen could not display »; a skew-specific
+      sentence may change the copy and never whether the button is there (decision NNN). Five states
+      walked at 390 × 844 in both themes, and the full Playwright suite run for it
 - [x] `npm run audit:screens` — 23 screens of the demo season walked at 390 px in both themes, as a
       coach and as a non-coach player, screenshotted, with the mechanical defects failing the command:
       a console error, a box outside the viewport no scroll container owns, an English framework
@@ -728,7 +738,11 @@ the reachable-turf finding below an **under**-statement on device rather than an
       `components/action-sheet/terrain-sheet.tsx:206` « Appu**yez** sur un poste pour le placer » is a
       live-region announcement, which is why no screenshot caught it — and `CLAUDE.md` quotes
       « Appuie sur un poste » as the correct form. A `grep` for the `-ez` imperative belongs in the
-      review checklist: « vous » and « votre » were already clean, and these two hid behind that
+      review checklist: « vous » and « votre » were already clean, and these two hid behind that.
+      **A third has since been found and fixed** — « Réessay**ez** ; si cela se reproduit, pass**ez** par
+      un autre écran » on the shared error screen, two vouvoiements in one sentence, on the one screen a
+      user only ever reads when something has already gone wrong (decision NNN). Three for three behind
+      the `-ez` imperative is the argument for the grep, not a coincidence
 - [ ] « À **Les** grosses courges », on every away fixture whose opponent's name opens with an
       article. `lib/calendar/labels.ts:111` is `` `${isHome ? "contre" : "à"} ${opponentName}` `` with
       no elision, so « à » never contracts to « aux » or « au », and « à FC des Deux-Ponts » claims to
@@ -909,6 +923,30 @@ the reachable-turf finding below an **under**-statement on device rather than an
       validate the same ids with `z.uuid()`, which in Zod 4 enforces the RFC variant nibble — so a page
       can load for an id the action then silently rejects. Latent only: every real row is a
       `gen_random_uuid()` v4, which is exactly what hides it
+- [x] **`safe-px` was cancelling the `px-N` beside it, and the count has now been made: five `safe-*`
+      users, two defects.** Found here first, on `app/error.tsx`, where the error-screen button row
+      measured 4 → 386 of a 390 px viewport — the « confirm button 8 px off the right edge » class
+      arriving by a cascade rather than by arithmetic. This slice fixed that one screen by giving
+      `ErrorScreen` its own `px-5` and deliberately left the utility alone, which was the right call for
+      the reason given at the time: if the utility were wrong, every pair would silently lose its gutter.
+      Two corrections to how it was written up, both measured since: `safe-px` sets the **longhands**
+      `padding-left` / `padding-right` rather than `padding-inline` outright, and **declaration order is
+      not the mechanism** — Tailwind v4 sorts `@layer utilities` by property and interleaves custom
+      `@utility` rules among the built-ins, so `safe-px` is declared above `gutter-px` and emitted below
+      it. « Roughly a dozen pairs » was also an over-estimate: there are five `safe-*` users in total,
+      four of them clean because each is a lone longhand with no shorthand competing for the same
+      property. Decision 124 took the three standalone page shells, and the one remaining instance —
+      the sticky ActionBar in game mode — has its own closed item above. `tabbar-pb` is neither defect:
+      decision 118 already settled that it is kept deliberately and that its `+1rem` is clearance rather
+      than a discrepancy
+- [ ] **The crash the owner reported from his iPhone is still unexplained.** The error-screen branch
+      reproduced a real failure mode on the way — a stale Server Action id after a deploy, 404 and
+      `UnrecognizedActionError`, which every one of the app's 42 `useActionState` call sites is exposed
+      to — and it is **not** this: the owner's crash survived a force-quit, a force-quit is a document
+      navigation, and a document navigation is always served by the latest deployment, so skew cannot
+      survive one. Decision NNN made the recovery screen's advice true and bought a real exposure a
+      recovery; it closed nothing about the report. Another session is investigating, so coordinate
+      before duplicating the hunt
 
 ### The audit tooling itself
 

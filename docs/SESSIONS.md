@@ -3298,3 +3298,80 @@ The one change production actually needs is the peer's positions slice — a mig
 `positions` rows, because `db:migrate` creates the foreign key and nothing was keeping it — and a
 release now would ship a gutter and a tab bar while leaving the crash and the unseeded table exactly as
 they are. One bump to `1.0.0-beta.7` after that slice lands, and the tag is the owner's to cut.
+
+## The error screen's two instructions were the two things that cannot work
+
+**2026-10-01** · `fix/error-screen-offers-a-reload`
+
+« Cet écran n'a pas pu s'afficher. Réessayez ; si cela se reproduit, passez par un autre écran et
+revenez. » Decision 058 built that screen and the copy went unexamined until a crash report sent
+somebody to read it. Both sentences are `vous` in an app that tutoies (decision 074) — a third shipped
+vouvoiement, hiding behind the same `-ez` imperative as the two `docs/ROADMAP.md` already lists, which
+is why a `grep` for « vous » never found any of them — and both describe a recovery that, for a whole
+class of failure, provably does nothing. `reset()` is `this.setState({ error: null })` and nothing else
+(Next 16.3.6, `dist/client/components/error-boundary.js:16-19`), so it re-renders the segment from the
+same JavaScript bundle; « passez par un autre écran et revenez » is a client navigation, so it is the
+same bundle wearing a longer path; and `retry`, the boundary's third prop this repository had never
+destructured (`error-boundary.js:20-24`, passed at `:114`), does `router.refresh()` then `reset()`,
+which asks a new deployment for an RSC payload using the old bundle's format. The one recovery that
+exists — a document reload — was the one thing the screen did not offer.
+
+So **« Recharger la page » is now the primary button, unconditionally, on every error this screen
+shows**, with « Réessayer » second for the cold-Neon case a re-render really does fix, and « Retour au
+calendrier » as a ghost on the root boundary. The design argument is in decision **NNN** and is worth
+reading before touching the file, because it is the reason the branch survived its own premise being
+refuted: a reload is never *wrong* advice for « this screen could not display », whereas retrying is
+wrong specifically, so the screen does not have to classify the failure in order to be correct.
+`isDeploymentSkew` (`components/errors/error-screen.tsx:78`) therefore changes only a sentence and never
+whether the button appears.
+
+**The premise, and why it is not the owner's bug.** The failure that made the old copy's wrongness
+concrete is deployment skew: a stale page posts a Server Action id the live deployment no longer has,
+Next answers 404 « Failed to find Server Action … older or newer deployment », and the client throws
+`UnrecognizedActionError`. It was reproduced end to end and it is real, on every deploy that moves an
+action, with no host-level protection available — Skew Protection is Pro and Enterprise only and the
+owner is on the free plan, and `deploymentId` alone only adds a `?dpl=` cache-buster without routing
+anything. But it is **not** the crash the owner reported: he has since confirmed a force-quit did not
+fix it, a force-quit is a document navigation, and a document navigation is always served by the latest
+deployment, so skew cannot survive one. That crash is still unexplained and another session has it. The
+claim this branch makes is the smaller one — the screen's advice is true now, and a real exposure has a
+recovery.
+
+**The correction most likely to save the next person an afternoon: two production builds differing by
+one comment in an `actions.ts` produce byte-identical sets of action ids.** Turbopack in 16.3.6 does not
+hash the module body into the id, so all 41 ids in `server-reference-manifest.json` matched and the stale
+page logged in happily against the new server. The obvious minimal experiment therefore returns a **false
+negative** and would have had this branch concluding skew does not exist. The ids only moved when an
+exported action was **renamed** — and with a rename it reproduced exactly: `POST /connexion` 404, the skew
+sentence fired on `error.name` with no `digest` present, and the reload recovered the login screen fully.
+
+**Blast radius, recorded as an argument and not as trivia.** This one component is the recovery surface
+for all **42 `useActionState` call sites**, because React cancels the queued action and shows the nearest
+boundary when a dispatch throws. Game mode is the single part of the app structurally immune:
+`lib/match/outbox.ts` posts to a Route Handler at a path-based URL that exists identically on every
+deployment, and ingestion is idempotent on `client_event_id`. Built for offline, skew-immune as a side
+effect — so a future proposal to replace that Route Handler with a Server Action would be trading the
+live match's immunity for less code.
+
+Two smaller findings. `digest` is a **ten-digit decimal** in a production build (`3004583682`), not a
+hash, so it reads aloud over a phone: the code line stays and now says « Si tu nous le signales, donne ce
+code : … », and prints nothing when the digest is absent, which it is for every client-side throw. And
+`unstable_isUnrecognizedActionError` does exist in `next/navigation` in 16.3.6 and was deliberately not
+imported — `unstable_` is outside semver, and the predicate is an `instanceof` against a class identity a
+stale bundle is not guaranteed to share with the one that threw, which is exactly the situation it would
+be asked about. `error.name === "UnrecognizedActionError"` survives both.
+
+**`app/error.tsx`'s `px-5` is dead, and that is left as somebody else's investigation.** `safe-px` is
+declared after `px` in `app/globals.css:158` and sets `padding-inline` outright, so on a phone held
+upright it wins and the gutter is **zero**: measured with the new two-button row, the pair ran 4 → 386 of
+390 px — the « confirm button 8 px off the right edge » defect class arriving by a new route. `ErrorScreen`
+was given its own `px-5` (`:98`) and `safe-px` itself was **not** touched on purpose: roughly a dozen
+`safe-px px-N` pairs exist in the codebase, and if the utility is wrong then every one of them silently
+loses its gutter, which is a sweep and not a line. Another session has taken that on, including whether
+`tabbar-pb` (`4rem` against a `3.5rem` bar) is the same cascade shape or a separate arithmetic slip.
+
+**Verified**: typecheck, lint, 1324 unit tests, and — unlike the previous two slices — **the full
+Playwright suite, 5/5 in 1.2 min**, because the change touches a Server Action's failure path. Both
+themes looked at at 390 × 844 across all **five** states of the screen: generic and skew copy, with and
+without a `digest`, and with and without the home link. The tone was modelled on
+`app/(jeu)/match/[id]/jeu/error.tsx`, which decision 058 already got right and which was left untouched.
