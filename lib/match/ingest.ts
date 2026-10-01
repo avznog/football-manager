@@ -16,7 +16,7 @@
  * minute — the server must never restamp it.
  */
 
-import { MAX_MINUTE, type MatchEventInput, type MatchEventType } from "./events";
+import { MAX_MINUTE, type MatchEventInput } from "./events";
 
 /* -------------------------------------------------------------------------- */
 /* Preparation                                                                */
@@ -191,24 +191,15 @@ export const MAX_BATCH_SIZE = 200;
 /** A minute no seven-a-side match reaches, re-exported so the outbox can refuse early. */
 export { MAX_MINUTE };
 
-/** Event types the game-mode screen is allowed to produce. `VOID` included (invariant 1). */
-export const GAME_MODE_EVENT_TYPES: readonly MatchEventType[] = [
-  "KICKOFF",
-  "PERIOD_END",
-  "PAUSE",
-  "RESUME",
-  "GOAL_FOR",
-  "GOAL_AGAINST",
-  "OWN_GOAL",
-  "PENALTY_SCORED",
-  "PENALTY_MISSED",
-  "SUBSTITUTION",
-  "POSITION_CHANGE",
-  "LINEUP_APPLIED",
-  "FOUL",
-  "INJURY",
-  "COMMENT",
-  "REMARK",
-  "FINAL_WHISTLE",
-  "VOID",
-];
+/*
+ * There is **no allow-list of the types game mode may produce**, and the one that used to sit here
+ * was not one: `GAME_MODE_EVENT_TYPES` repeated all eighteen values of `MATCH_EVENT_TYPES` in the
+ * same order, nothing imported it, and wiring it to the one door it could have guarded
+ * (`POST /api/match-events`, whose only writer is the outbox — retro entry goes through
+ * `amendMatchEvents` and a Server Action) would have refused exactly nothing that
+ * `matchEventTypeSchema` does not already refuse. Narrowing it to the tiles actually offered would
+ * mean dropping `FOUL`, which decision 114 deliberately keeps writable, and would stop a crafted
+ * POST writing a foul the same coach may write anyway on the retro-entry screen. So the gap is
+ * real and empty: what any batch is checked against is the enum, the payload schemas, `can()` and
+ * `matches.status`, and nothing claims otherwise.
+ */

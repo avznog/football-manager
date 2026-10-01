@@ -370,10 +370,11 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     // because neither records anything on its own tap.
     await expect(first.getByRole("button")).toHaveCount(FIRST_TIER.length + 1);
 
-    // Decision 114, the half nothing else can pin: `FOUL` stays in `MATCH_EVENT_TYPES`, in
-    // `GAME_MODE_EVENT_TYPES` and in the retro-entry screen — because `match_events` is append-only
-    // and the fouls already logged must still render — while leaving the one menu it appeared in.
-    // Every type-level test therefore still passes with the tile put back.
+    // Decision 114, the half nothing else can pin: `FOUL` stays in `MATCH_EVENT_TYPES` and in the
+    // retro-entry screen — because `match_events` is append-only and the fouls already logged must
+    // still render — while leaving the one menu it appeared in. Nothing on the server refuses the
+    // type, so every type-level test still passes with the tile put back: this line is the only
+    // thing that notices.
     await expect(first.getByRole("button", { name: "Faute" })).toHaveCount(0);
 
     await first.getByRole("button", { name: MORE_TILE, exact: true }).click();
@@ -503,9 +504,8 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
      * The reload is the assertion, the way it is in `offline.spec.ts`. Up to here every character on
      * screen could have come from React state and IndexedDB; afterwards the only source is the
      * server's own log replayed by the reducer — so this one line covers the `COMMENT` branch of
-     * `matchEventPayloadSchema`, the ingest allow-list in `GAME_MODE_EVENT_TYPES`, the `note` column
-     * of `TimelineEntry` and the fact that `reduceMatch` carries free text at all. None of that is
-     * exercised by anything that stops at the client.
+     * `matchEventPayloadSchema`, the `note` column of `TimelineEntry` and the fact that `reduceMatch`
+     * carries free text at all. None of that is exercised by anything that stops at the client.
      */
     await page.reload();
 
@@ -566,8 +566,8 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(score).toHaveText("1 – 1");
 
     // And the server believed it: the reload replays it from the log alone, which is the `REMARK`
-    // branch of `matchEventPayloadSchema`, the new enum value in the database and the allow-list in
-    // `GAME_MODE_EVENT_TYPES`, none of which a client-side assertion reaches.
+    // branch of `matchEventPayloadSchema` and the new enum value in the database, neither of which a
+    // client-side assertion reaches.
     await page.reload();
     const replayed = logLine("Bel effort");
     await expect(replayed).toContainText("53’");

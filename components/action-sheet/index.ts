@@ -25,6 +25,7 @@ export {
   PenaltyScoredIcon,
   PositionChangeIcon,
   REMARK_ICONS,
+  RemarkIcon,
   SubstitutionIcon,
 } from "./action-icons";
 export { ActionMenu, type ActionChoice, type ActionMenuProps } from "./action-menu";

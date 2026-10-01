@@ -17,9 +17,10 @@ export type ActionChoice<T extends string = MatchEventType> = {
   /** « qui a marqué ? » — what the next step will ask, so nothing is a surprise. */
   hint?: string;
   /**
-   * A 16 px glyph above the label, so the tile is recognised without being read. One of the
-   * components in `./action-icons`, which are `aria-hidden` — the tile's accessible name stays the
-   * label, and the icon inherits the tone's colour. Optional: a tile without one still reads.
+   * A 16 px glyph on the label's own line, just before it, so the tile is recognised without being
+   * read. One of the components in `./action-icons`, which are `aria-hidden` — the tile's
+   * accessible name stays the label, and the icon inherits the tone's colour. Optional: a tile
+   * without one still reads.
    */
   icon?: ReactNode;
   /** `accent` for what happens most, `danger` for what goes against us. */
@@ -50,9 +51,10 @@ const TONES = {
  *
  * A two-column grid of tall tiles rather than a list, because the whole point is that the target
  * is found without reading: « But » is always top left, « Changement » is always in the same
- * place, and each one carries a 16 px glyph the thumb learns before the word. The match time is printed at the top because the action is stamped when the coach *taps*,
- * not when they finish choosing the player — so if the sheet has been open for thirty seconds, the
- * minute shown here is still the minute that will be recorded.
+ * place, and each one carries a 16 px glyph the thumb learns before the word. The match time is
+ * printed at the top because the action is stamped when the coach *taps*, not when they finish
+ * choosing the player — so if the sheet has been open for thirty seconds, the minute shown here is
+ * still the minute that will be recorded.
  *
  * The same component renders the second menu behind « Autre… ». Four tiles is what a thumb finds
  * without reading; nine was a list wearing a grid's clothes, and the four that matter were being

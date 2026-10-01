@@ -11,13 +11,14 @@
  *
  * ## Two strictnesses, one definition
  *
- * `MATCH_EVENT_PAYLOAD_SCHEMAS` requires member and slot references to be UUIDs — that is the
- * truth of the columns they point at, and what the ingestion boundary must enforce.
- * `LENIENT_MATCH_EVENT_PAYLOAD_SCHEMAS` accepts any non-empty string id. The reducer uses the
- * lenient set on purpose: **it must never refuse to read a log Postgres has already accepted.**
- * A reducer that dropped a goal because an id looked odd would lose real history; the shape of an
- * id is the API's problem, not the historian's. Both sets come from one factory, so they cannot
- * drift apart.
+ * `MATCH_EVENT_PAYLOAD_SCHEMAS` requires member and slot references to be UUIDs, and a `REMARK`'s
+ * kind to be one this build knows — that is the truth of the columns they point at, and what the
+ * ingestion boundary must enforce. `LENIENT_MATCH_EVENT_PAYLOAD_SCHEMAS` accepts any non-empty
+ * string for both. The reducer uses the lenient set on purpose: **it must never refuse to read a
+ * log Postgres has already accepted.** A reducer that dropped a goal because an id looked odd would
+ * lose real history, and one that dropped a remark because its kind was unfamiliar would throw
+ * away the player it names; the shape of an id and the spelling of a kind are the API's problem,
+ * not the historian's. Both sets come from one factory, so they cannot drift apart.
  *
  * See `docs/DATA_MODEL.md` § "The match event log" for the table, and decision 010 for why there
  * are no cards, no opponent scorers, no shots and no corners.
@@ -149,10 +150,29 @@ export const REMARK_KINDS = [
 export type RemarkKind = (typeof REMARK_KINDS)[number];
 
 /**
- * Both payload dictionaries come from here, differing only in how an id is validated.
- * `id` is applied to every `team_members.id` and `formation_slots.id` reference.
+ * Whether a kind read back out of a `jsonb` payload is one this build knows.
+ *
+ * The reducer's guard, and the reason it can be lenient: the lenient schema lets any non-empty kind
+ * through so that the `memberId` beside it is not lost with it, and this is what then decides
+ * whether there is a French label to print (decision 122).
  */
-function buildPayloadSchemas(id: z.ZodType<string, unknown>) {
+export function isRemarkKind(value: unknown): value is RemarkKind {
+  return typeof value === "string" && (REMARK_KINDS as readonly string[]).includes(value);
+}
+
+/**
+ * Both payload dictionaries come from here, differing only in how two things are validated.
+ *
+ * `id` is applied to every `team_members.id` and `formation_slots.id` reference. `kind` is a
+ * `REMARK`'s kind: `REMARK_KINDS` for the strict set, any non-empty string for the lenient one, so
+ * that a remark whose kind this build does not know still parses and still yields the player it
+ * names. Which kind it was is then the reducer's own check, `isRemarkKind` above — refusing an
+ * unknown kind is the ingestion boundary's job, not the historian's.
+ */
+function buildPayloadSchemas<Kind extends string>(
+  id: z.ZodType<string, unknown>,
+  kind: z.ZodType<Kind, unknown>,
+) {
   const empty = z.object({});
   const pause = z.object({ reason: reasonSchema.optional() });
 
@@ -217,7 +237,7 @@ function buildPayloadSchemas(id: z.ZodType<string, unknown>) {
      * One tap about one player. `memberId` is **required**, which is the one way a remark differs
      * from a `COMMENT`: « bel effort » about nobody in particular is not a remark, it is a note.
      */
-    REMARK: z.object({ kind: z.enum(REMARK_KINDS), memberId: id }),
+    REMARK: z.object({ kind, memberId: id }),
 
     FINAL_WHISTLE: empty,
 
@@ -226,11 +246,14 @@ function buildPayloadSchemas(id: z.ZodType<string, unknown>) {
   };
 }
 
-/** UUID-strict. What the ingestion API and the Server Actions validate against. */
-export const MATCH_EVENT_PAYLOAD_SCHEMAS = buildPayloadSchemas(z.uuid());
+/** UUID-strict, kind-strict. What the ingestion API and the Server Actions validate against. */
+export const MATCH_EVENT_PAYLOAD_SCHEMAS = buildPayloadSchemas(z.uuid(), z.enum(REMARK_KINDS));
 
-/** Shape-strict, id-lenient. What the reducer reads, so history is never refused. */
-export const LENIENT_MATCH_EVENT_PAYLOAD_SCHEMAS = buildPayloadSchemas(z.string().trim().min(1));
+/** Shape-strict, id- and kind-lenient. What the reducer reads, so history is never refused. */
+export const LENIENT_MATCH_EVENT_PAYLOAD_SCHEMAS = buildPayloadSchemas(
+  z.string().trim().min(1),
+  z.string().trim().min(1),
+);
 
 type PayloadSchemas = typeof MATCH_EVENT_PAYLOAD_SCHEMAS;
 

@@ -179,13 +179,18 @@ and a new one costs an `ALTER TYPE … ADD VALUE` — `0004_tricky_human_torch.s
 `0005_goofy_sir_ram.sql` for `REMARK`, both inserted `BEFORE 'FINAL_WHISTLE'` so the enum keeps
 reading in match order. `MATCH_EVENT_TYPES` in `lib/match/events.ts` repeats the list for a module
 free of Drizzle at runtime, and `MATCH_EVENT_TYPES_MATCH_THE_DATABASE` stops compiling if the two
-drift.
+**sets** drift — it compares two TypeScript unions, which are unordered, and both of them are
+TypeScript: the `pgEnum` array in `db/schema.ts`, not Postgres itself. So the shared order is a
+convention kept by hand rather than a proof, and it is kept so the enum reads in match order. Nothing
+at runtime depends on the ordinal.
 
 **Which kinds a `REMARK` may hold is *not* in the database** (decision 122). `REMARK_KINDS` —
 `GOOD_TRACK_BACK`, `GOOD_EFFORT`, `BAD_PASS`, `GOOD_POSITIONING`, `LOST_BALL`, `NICE_SKILL` — is an
 array in `lib/match/events.ts`, so a seventh remark is a line of TypeScript rather than a migration.
-The cost of that is a kind the code does not know: the payload schema refuses one at ingestion, and
-the reducer, which may never refuse history, reads such a row as a remark naming no kind and nobody.
+The cost of that is a kind the code does not know: the strict payload schema refuses one at ingestion,
+and the reducer, which may never refuse history, reads such a row as a remark naming its player and no
+kind — the lenient schema accepts any non-empty kind precisely so the `memberId` is not thrown away
+with the word. A remark with no `memberId` at all is `invalidPayload` and names nobody.
 
 **Hard rules.** No `UPDATE`, no `DELETE`, ever. Ingestion is an idempotent insert keyed on
 `client_event_id`. A `VOID` may not target another `VOID`.

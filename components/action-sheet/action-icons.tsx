@@ -22,8 +22,8 @@ import type { RemarkKind } from "@/lib/match/events";
  */
 
 /**
- * The shared frame. Sixteen copies of the same seven attributes is sixteen chances to mistype one,
- * and the rendered element is identical to the ones in `theme-toggle.tsx`.
+ * The shared frame. Seventeen copies of the same seven attributes is seventeen chances to mistype
+ * one, and the rendered element is identical to the ones in `theme-toggle.tsx`.
  */
 function Icon({ children }: { children: ReactNode }) {
   return (

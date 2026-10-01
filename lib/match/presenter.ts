@@ -682,8 +682,14 @@ export function noteDetailFr(
  * `noteDetailFr` spells out: a remark is one of the things the shared match summary exists to show,
  * and a second formatter is how one screen ends up dropping it.
  *
- * Returns null for anything that is not a readable remark, so the caller falls through to its own
- * actor phrasing — which, for a remark whose payload is unreadable, still names the player.
+ * Returns null for a remark whose kind this build does not know, so the caller falls through to its
+ * own actor phrasing, which names the player alone: the reducer keeps the `remarked` actor of any
+ * remark that parsed at all, precisely so that an unfamiliar word costs the word and not the name
+ * (decision 122). « Remarque — Karim » says less than « Bel effort — Karim » and nothing untrue.
+ *
+ * The fallback to the label alone, for a kind with no actor beside it, is belt and braces: the
+ * reducer never produces one, since a payload without a `memberId` does not parse and therefore has
+ * no kind either. It is one branch rather than a judgement about what a hand-built entry may hold.
  */
 export function remarkDetailFr(
   entry: Pick<TimelineEntry, "remarkKind" | "actors">,

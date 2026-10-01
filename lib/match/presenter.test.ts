@@ -595,6 +595,21 @@ describe("the timeline", () => {
     });
   });
 
+  it("names the player of a remark whose kind it cannot name", () => {
+    const strange = log([
+      ...KICKED_OFF,
+      { type: "REMARK", min: 58, payload: { kind: "GOOD_HAIRCUT", memberId: "karim" } },
+    ]);
+    const state = reduceLive(live(strange), [], T0 + 60 * MIN);
+
+    // No kind to print, so the detail falls through to the `remarked` actor: « Remarque — Karim »
+    // across two lines says less than the row holds, and nothing untrue (decision 122).
+    expect(timelineLines(state, index)[0]).toMatchObject({
+      title: "Remarque",
+      detail: "Karim",
+    });
+  });
+
   it("names an unknown player rather than printing an id at the coach", () => {
     const orphan = log([...KICKED_OFF, { type: "FOUL", min: 14, payload: { memberId: "ghost" } }]);
     const state = reduceLive(live(orphan), [], T0 + 20 * MIN);

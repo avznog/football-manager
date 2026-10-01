@@ -149,10 +149,16 @@ describe("payload parsing", () => {
     ).toBe(true);
   });
 
-  it("refuses a remark kind it does not know", () => {
-    expect(parseMatchEventPayload("REMARK", { kind: "GOOD_HAIRCUT", memberId: "karim" }).ok).toBe(
-      false,
-    );
+  it("refuses a remark kind it does not know at the boundary, and keeps the player past it", () => {
+    const unknown = { kind: "GOOD_HAIRCUT", memberId: UUID_B };
+    // Nothing the API accepts carries a kind this build cannot name.
+    expect(parseMatchEventPayload("REMARK", unknown, { strict: true }).ok).toBe(false);
+    // The reducer's set is lenient about the kind on purpose: the row is already in the log, and
+    // the `memberId` beside the unfamiliar word is perfectly good (decision 122).
+    expect(parseMatchEventPayload("REMARK", unknown)).toEqual({ ok: true, payload: unknown });
+    // Lenient about the kind is not lenient about the shape: a remark still has to name somebody.
+    expect(parseMatchEventPayload("REMARK", { kind: "GOOD_HAIRCUT" }).ok).toBe(false);
+    expect(parseMatchEventPayload("REMARK", { kind: "", memberId: "karim" }).ok).toBe(false);
     // Every kind the array declares parses, so adding one cannot forget the schema.
     for (const kind of REMARK_KINDS) {
       expect(parseMatchEventPayload("REMARK", { kind, memberId: "karim" }).ok).toBe(true);

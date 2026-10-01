@@ -1350,11 +1350,31 @@ describe("a remark", () => {
     expect(entry.invalidPayload).toBe(false);
   });
 
+  /*
+   * The degradation that matters, and the one the lenient schema exists for: the kind is a word
+   * this build does not know, and the `memberId` beside it is perfectly good. Losing Karim with it
+   * would be the reducer refusing a log Postgres has already accepted (decision 122), so the row
+   * parses, names him, and has no kind to print.
+   */
+  it("names the player of a remark whose kind it does not know, and no kind", () => {
+    const entry = remarked({ kind: "GOOD_HAIRCUT", memberId: "karim" });
+    expect(entry.invalidPayload).toBe(false);
+    expect(entry.remarkKind).toBeNull();
+    expect(entry.actors).toEqual([{ memberId: "karim", role: "remarked" }]);
+  });
+
   it("is still shown when its payload cannot be read, naming no kind and nobody", () => {
+    // No `memberId`: a remark about nobody is not a remark, so this one really is unreadable.
     const entry = remarked({ kind: "GOOD_HAIRCUT" });
     expect(entry.invalidPayload).toBe(true);
     expect(entry.remarkKind).toBeNull();
     expect(entry.actors).toEqual([]);
+
+    // And neither is a payload that is not an object at all.
+    const garbage = remarked("GOOD_EFFORT");
+    expect(garbage.invalidPayload).toBe(true);
+    expect(garbage.remarkKind).toBeNull();
+    expect(garbage.actors).toEqual([]);
   });
 
   it("leaves no remark kind on any other event", () => {

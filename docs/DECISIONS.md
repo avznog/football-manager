@@ -3052,9 +3052,12 @@ generic over its key so the « Autre… » tile — which records nothing and ha
 the same component as everything that does, rather than a copy of it.
 
 **« Faute » is no longer offered, and that is not the same as removing it.** `FOUL` stays in
-`MATCH_EVENT_TYPES`, in `GAME_MODE_EVENT_TYPES`, in `RETRO_FACT_TYPES` and in the `Flow` union, because
-`match_events` is append-only (invariant 1): the fouls already in a log must still render, still count
-in the stats and still be voidable. What changed is the one user-facing menu it appeared in. Amateur
+`MATCH_EVENT_TYPES`, in `RETRO_FACT_TYPES` and in the `Flow` union, because `match_events` is
+append-only (invariant 1): the fouls already in a log must still render, still count in the stats and
+still be voidable. What changed is the one user-facing menu it appeared in — and *only* that: this
+entry also named a `GAME_MODE_EVENT_TYPES` the type stayed in, which the review of decision 122 found
+to be a copy of `MATCH_EVENT_TYPES` that nothing imported, so it has been deleted rather than left
+looking like a gate. No allow-list narrower than the enum guards `POST /api/match-events`. Amateur
 7-a-side has no card count and no disciplinary consequence to compute, so the tile was asking a coach
 watching football to do data entry for nobody.
 
@@ -3723,10 +3726,17 @@ unknown `kind` — an older device's payload, a hand-written insert, a kind some
 array — is a runtime concern instead of a `22P02`. Two things answer it, and they are the two strictnesses
 `lib/match/events.ts` was already built around. At ingestion `MATCH_EVENT_PAYLOAD_SCHEMAS`
 validates `kind` against the `z.enum`, so nothing the API accepts carries one. And the reducer, which
-reads the lenient schemas because it **must never refuse a log Postgres has already accepted**, marks
-the entry `invalidPayload` and leaves `remarkKind` null; `remarkDetailFr` then returns null, and the
-timeline line degrades to « Remarque » with no kind and no name. It says less rather than inventing
-something, which is the only acceptable failure for a screen in this repository.
+reads the lenient schemas because it **must never refuse a log Postgres has already accepted**, is
+lenient about the kind too: the row parses, the `memberId` beside the unfamiliar word survives, the
+`remarked` actor is pushed, and `remarkKind` is left null because `isRemarkKind` — the reducer's own
+check, not the schema's — does not recognise it. `remarkDetailFr` then returns null and the line
+degrades to « Remarque » naming the player. **The first draft of this entry said the entry was marked
+`invalidPayload` and named nobody, and that was the behaviour as written**: the lenient schema shared
+the strict `z.enum`, so the parse failed and threw the player away with the word. The review of the
+pull request caught it, and the fix is the one this paragraph always described — a kind the code cannot
+name costs the word, not the name. Only a payload that is *actually* unreadable (no `memberId`, or not
+an object) is `invalidPayload`. It says less rather than inventing something, which is the only
+acceptable failure for a screen in this repository.
 
 **`memberId` is required**, and that is the whole difference from 114's `COMMENT`, whose `memberId`
 is optional on purpose. « Bel effort » about nobody in particular is not a remark, it is a note — so

@@ -162,9 +162,9 @@ const CHOICES: readonly ActionChoice<MenuKey>[] = [
 /**
  * The second menu. « Faute » is deliberately not here: it was recorded once in the app's life and
  * nothing reads it, so it stops being offered. It is *not* removed from the vocabulary — `FOUL`
- * stays in `MATCH_EVENT_TYPES`, in `GAME_MODE_EVENT_TYPES` and in the retro-entry screen, because
- * `match_events` is append-only (invariant 1) and the fouls already in a log must still render and
- * still be voidable (decision 114).
+ * stays in `MATCH_EVENT_TYPES` and in the retro-entry screen, because `match_events` is append-only
+ * (invariant 1) and the fouls already in a log must still render and still be voidable
+ * (decision 114). Nothing on the server refuses the type either: this absence is a menu, not a gate.
  */
 const MORE_CHOICES: readonly ActionChoice[] = [
   {

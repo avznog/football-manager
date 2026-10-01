@@ -100,6 +100,7 @@ import {
   type MatchEventType,
   type RemarkKind,
   compareMatchEvents,
+  isRemarkKind,
   parseMatchEventPayload,
 } from "./events";
 import { type LineupDiff, type SlotAssignment, type SlotInfo, diffLineups } from "./lineup";
@@ -996,10 +997,18 @@ export function reduceMatch(
     // A REMARK moves nothing either, for the same reason and in the same place: it is an opinion
     // about a player, not something that happened to the match. All it leaves behind is which
     // remark it was and whom it named, so the timeline can say « Bel effort — Karim ».
+    //
+    // The kind is checked here rather than by the schema, and that is the point of the lenient set:
+    // a row whose kind this build does not know — an older device, a hand-written insert, a kind
+    // somebody deleted from `REMARK_KINDS` — still carries a perfectly good `memberId`, and
+    // throwing the player away with the word would be refusing history (decision 122). So it parses,
+    // names its player, and simply has no kind to print. A payload that is *actually* unreadable —
+    // no `memberId`, or not an object at all — still fails the parse and is reported as one.
     let remarkKind: RemarkKind | null = null;
     if (event.type === "REMARK") {
       const remark = payload as MatchEventPayloads["REMARK"] | null;
-      remarkKind = remark?.kind ?? null;
+      const kind: unknown = remark?.kind;
+      remarkKind = isRemarkKind(kind) ? kind : null;
       if (remark?.memberId) actors.push({ memberId: remark.memberId, role: "remarked" });
     }
 
