@@ -1131,3 +1131,381 @@ Ordered by harm, which is not the order they are cheapest to fix.
       named « UX Audit H »/« retro »/« retro 2 » on the preview database. Ids in the report's last
       section. The matches cannot be deleted through the UI and should not be — `deleteMatch` refuses once
       an event log exists, which is invariant 1 working
+---
+
+## The fourth batch from the owner's iPhone — 2026-10-01
+
+Four remarks, after the owner installed the beta and used it as a coach would. They are written up as a
+batch in `docs/PLAN.md` under « Amendments » — two of them are scope rather than defects, which is why
+the plan had to grow a section for them.
+
+**Two of the four are narrower than the words**, and both were audited before anything was changed.
+That is the part worth reading if you are new to this batch: a remark acted on literally, when the
+literal reading is already satisfied, produces a diff that changes nothing and a session that believes
+it shipped something.
+
+**Where the work is, as of 2026-10-01.** This section was written before any of it was done, so the
+boxes below have been brought back in line with the repository more than once; read them, not this
+paragraph, for the detail. **All four of the owner's remarks are now on `main`**, and each carries a
+decision entry that exists and is numbered: the tab-bar acknowledgement merged first as #114, decision
+123; the preferred positions merged as #125, decisions **129** (whose wish it is, and the empty
+`positions` table behind the crash — `db/migrations/0006_seed_positions.sql`), **130** (eight codes in
+the picker, eleven in the vocabulary) and **131** (an unknown code sorts last instead of throwing); the
+native-picker echo merged as #116, decision **133**; and the retro redesign merged last, as #127
+`feat/retro-one-action-list`, squashed into `e8bc983`, as decision **134** — which decision 049 now
+points at in one added clause, so the *enterable* / *correctable* split is findable from whichever entry
+a reader lands on first. **No `[~]` is left in this section.** The thing earlier versions of this
+paragraph named as the remainder — a `POSITION_CHANGE` row, waiting on a `RetroAction` arm — is not
+outstanding: the owner **decided against building it**, and #127's last commit took the type back out of
+the enterable list (decision 134).
+
+**Three small things are left over**, and none of them is the redesign. One: whether a `REMARK` or a
+`COMMENT` typed up from memory a week later is worth recording at all is a product question the owner
+has not answered, still open under M4, and named in the action-set item below. Two: on the positions
+form, a rejected `teamId` or `memberId` still leaves the screen silent while « Modifications non
+enregistrées. » claims the work is pending — the last item of the positions subsection says so, and it
+is open on `main`. Three: the two unticked boxes further down, the two device-only tab-bar suspicions no
+Linux session can settle and the `E2E_PORT` collision, which are open by their own statement rather than
+by omission. Each item names the commit, the pull request and the decision that did it, and where the plan
+recorded here turned out to be wrong, the item says so rather than being quietly replaced — the owner's
+observation is the provenance and stays as he made it.
+
+### The retro-entry screen is one list, with the button underneath
+
+The owner, on typing up a match played without the phone: the add button must sit under the actions and
+not over them; the score must not be editable; the same actions as in game mode must be available; and
+« Changements » and « Actions du match » must become one block. They are one redesign, not four items.
+
+- [x] **The « Score » card keeps its scoreline — and keeps its two buttons.** This line used to say it
+      would lose them, and that was the plan rather than the answer. The owner's remark stands as he
+      made it: « we must not be able to edit the score directly ». It does not describe a typed score —
+      there is **no score input anywhere in this repository**, and `retro-form.tsx` has derived the
+      scoreline through `reduceMatch` since it was written, as the second bullet of its own header
+      comment says. What it describes is the one row-adding helper the two buttons share —
+      `addFactRow("GOAL_FOR")` and `addFactRow("GOAL_AGAINST")` in `retro-form.tsx`, which used to be a
+      separate `addGoal` — behind « + But pour nous » / « + But encaissé »,
+      inside a card titled « Score », above everything else: tap, and the number above goes up. **The
+      two shortcuts were deliberately kept.** They are one tap per goal — a 7–3 is ten taps, against ten
+      `<select>` interactions if the only way in is an action row — and the tap was never score editing,
+      because the number above is derived from the row it adds and nothing else (invariant 2, decision
+      047). What was wrong was the card rendering *unconditionally*, which is the last item in this
+      group, and that is what shipped. Also corrected rather than kept: « the one way to add a goal that
+      cannot name a scorer » is false. The tap creates a fact row with a scorer field — 487 px below
+      the fold, which is the audit's `D6`, and why `dc8b952` takes « Un appui par but » out of the card
+      description instead of leaving a sentence that confirmed the wrong mental model. All of that is on
+      `main`: #127, squash-merged as `e8bc983`, decision 134
+- [x] **The two « + Ajouter » buttons become one, below the list.** They were passed as the `Card`
+      `action` prop, and `components/ui/card.tsx:61` renders that inside the `<header>`, before
+      `{children}` — which is the defect itself, and the reason `Card` is the one file not to touch
+      here. Typing up a
+      match is a loop, so the control that starts the next iteration has to be where the last one left
+      the thumb; above a growing list it walks backwards up the screen on every action. **Done by
+      `280c6b5` on #127, now on `main` as part of `e8bc983` (decision 134)**, and the *way* it was done
+      is the part not to undo:
+      the single « + Ajouter une action » is passed as a **child after the `<ul>`**, and `Card` itself was
+      deliberately left untouched. One call site needs a footer and no other card in the app does, so a
+      `footer` prop would reshape a component used everywhere to serve one screen. A sticky button was
+      rejected for a reason a later session would otherwise rediscover: it would cover « Enregistrer ».
+      `61bd777` had prepared the ground on the same branch — the end-to-end walk located the seven
+      starter selects by `page.locator("select").nth(index)`, which would have gone red for nothing the
+      moment a `select` appeared higher up the page, and is now scoped to `select[name^="starter:"]`
+- [x] **One list, not two: a substitution is just another action.** `buildRetroLog` has always emitted
+      a change as an ordinary `SUBSTITUTION` event — the `retroSubstitutions` loop inside it, in
+      `lib/retro/log.ts` — so the two blocks are a distinction the model never made. **Both halves are
+      now on `main` (#127, squashed into `e8bc983`, decision 134),
+      in two commits on purpose: `79dbdee` the data and `280c6b5` the screen.** The first deliberately
+      left the screen alone — the form went on rendering « Changements » and « Actions du match » as two
+      cards reading and writing one array, because a visible string moving in that commit would have been
+      a bug rather than the feature. `280c6b5` is the screen: one card, one `<ul>` in the order the coach
+      typed it, and one merged empty state `retroActionsEmptyFr` replacing the two that each described one
+      of the two cards.
+      Two properties of the screen half not to undo. **The list is never sorted by minute** — rows would
+      jump under the thumb the moment a minute is typed, and an undated row, which decision 048 makes the
+      common case, would have no defined place. And `entry` now carries every row including the
+      half-filled ones, so the warnings can appear while the coach is still typing and « Enregistrer » can
+      refuse; a separate `previewEntry` holds the filtered list for `buildRetroLog`, because « sort
+      personne » is not an event the reducer can replay. And this line used to say the opposite of what
+      shipped: it claimed keeping
+      `entry.changes` as the internal representation was « cheaper and no less honest », and it was
+      neither. The two sections were two shapes — a substitution has two players and no type, a fact has
+      a type with a scorer and an assist — each with its own field prefix, decoder, schema, domain type
+      and validation rules, converging only inside `buildRetroLog`. They are one `RetroAction`
+      discriminated union now, `RetroEntry.changes`/`.facts` are one `actions` array, and `RetroChange`
+      and `RetroFact` survive as `Extract<…>` of it, so `retroPitch` kept its signature and its tests.
+      The four exhaustive switch sites that replaced two loops are still the return, and the reason is no
+      longer an arm that is coming — there is none, by decision 134, as the item below now says. It is
+      that the four places the two shapes diverge are *named and enumerable*: the payload builder and the
+      idempotency seed in `lib/retro/log.ts`, `readActionFields` and `findRetroIssues` in
+      `lib/retro/validation.ts`. Any future arm is a compile error at exactly those four and nowhere else,
+      instead of a silent omission nobody can list — and the stamp resolver is the same guarantee by
+      narrowing rather than by `switch`: `resolveFactClockMs` takes `RetroFact`, so « just resolve the
+      stamp of an action » does not compile, which is what keeps decision 048's two rules two rules
+- [x] **The action set gains `SUBSTITUTION`, and `POSITION_CHANGE` was decided against.** This line read
+      « gains `SUBSTITUTION` and `POSITION_CHANGE`, and nothing else » for as long as that was the plan;
+      the owner's answer is narrower, and it is the answer. « The same actions as during a game » cannot
+      mean identical, in either direction. `FOUL` is offered in retro
+      and is deliberately **not** a game-mode tile (decision 114). `REMARK` and `COMMENT` are live-only
+      by design, and whether a remark made from memory a week later is worth recording is a product
+      question the owner has not answered. It stays open under M4 rather than being answered by an array
+      literal. **And the asymmetry now runs the other way too: `POSITION_CHANGE` is a game-mode tile and
+      is deliberately not a retro row.** The owner decided not to build it, so game mode keeps one action
+      the retro sheet does not — and that is **the trade, not a gap**. It is recorded as decision 134,
+      whose reasons a later session should read before « fixing » it: the slot select such a row needs has
+      non-unique labels (`labelFr` on a 1-3-2-1 gives two « Milieu »), `retroPitch`'s slot bookkeeping
+      would go stale, an unstamped position change is a label floating inside a spell, and it is the
+      action least likely to be reconstructed from memory a week later. Nothing in the repository is
+      waiting on it: #127's last commit (`3695da2` on the branch, in `main` as part of `e8bc983`) removed
+      `POSITION_CHANGE` from `RETRO_ACTION_TYPES` and deleted `readActionFields`'s explicit
+      `case "POSITION_CHANGE"`, and `lib/retro/log.test.ts` now asserts `isRetroActionType` refuses it,
+      with the test's own name saying that re-adding it for symmetry is the mistake it exists to catch.
+      **Two things this line said are no longer true.** It is not « two places »: `947dbf1`
+      deleted the duplicated `z.enum` in `retroFactSchema` (`lib/retro/validation.ts`), which had the
+      seven codes written out a second time and accepted and refused independently of the constant it was
+      meant to mirror, and
+      `retroFactSchema` is now `z.enum(RETRO_FACT_TYPES)`. And it is not one list: putting
+      a type the entry form offers into `RETRO_FACT_TYPES` (`lib/retro/log.ts`) makes it **correctable
+      on a finished match**, because `isAmendableEventType` is `isRetroFactType(type) || type ===
+      "SUBSTITUTION"` (`lib/retro/amend.ts:55`) — a permission change by accident, several files from the
+      list that caused it, and a contradiction of decision 049's « only football facts may be corrected ».
+      **So the two constants stay two, and that is the clause in this item not to tidy away.**
+      `RETRO_ACTION_TYPES` is now *literally* `RETRO_FACT_TYPES` plus `SUBSTITUTION`, which makes the pair
+      look like pure duplication and is exactly why decision 134 spends a paragraph on it: merging them
+      would point `isAmendableEventType` at the array the entry form is built from, so the **next** type
+      added for data entry would silently become correctable on a frozen match. `RETRO_ACTION_TYPES`
+      answers « what may a coach type up? », `RETRO_FACT_TYPES` answers « what may he correct
+      afterwards? », only the second is a permission, and `SUBSTITUTION`'s amendability is granted
+      explicitly by name in that predicate. Both carry the question they answer in their doc comment, and
+      those comments are
+      load-bearing. **All of it is on `main` (#127, `e8bc983`): `SUBSTITUTION` is offered in the per-row
+      type select**, which maps over `RETRO_ACTION_TYPES` itself — the hand-written
+      `RETRO_FACT_TYPES` + `"SUBSTITUTION"` list the form used to keep, in order to subtract
+      `POSITION_CHANGE`, is gone, because there is nothing left to subtract and nothing left to keep in
+      step by hand
+- [x] **A match typed up with no actions at all must say so, not print « 0 – 0 ».** Making the scoreline
+      the only score surface makes this case easier to reach, not harder, and it is the defect the third
+      batch already paid for once. Done by `dc8b952` on #127, now on `main` as part of `e8bc983`, so
+      `lib/retro/labels.ts` holds both functions below. `retroScoreLineFr` returns `null`
+      unless the sheet holds a row of `SCORING_EVENT_TYPES`, and the card prints a sentence instead of a
+      scoreline when it does not: not « any content at all », so a sheet with one foul and no goals still
+      shows none, which is what lets the next card's « Un 0 – 0 sans rien à signaler, ça existe. » stay
+      true. `280c6b5` then collapsed the two lists' two empty states into `retroActionsEmptyFr` in the same
+      module, which keeps the only thing that distinguished them — before the starting seven is named the
+      list has nothing it can usefully hold, so it points at the composition card above rather than
+      inviting an action nobody could fill in — and takes a boolean, not a count, because the sentence
+      claims no number (decision 083). In `labels.ts`
+      because Vitest sees nothing under `app/` (decision 083), and the walk asserts the untouched sheet
+      prints no scoreline
+
+### Dates and times — audited, and already right everywhere the app controls
+
+- [x] **Every date the app formats itself is `DD/MM/YYYY`, and every time is 24h.** Decision 109 did
+      this. Audited end to end for this batch: `lib/calendar/time.ts` is the only module that formats an
+      instant and `lib/player/injury.ts` the only one that formats a `date` column; all twenty-odd call
+      sites go through them; 24h is pinned twice over, by the `fr-FR` locale **and** an explicit
+      `hour12: false` (`time.ts:195`), with a test looping all 24 hours; there is no
+      `toLocaleDateString` in the repository and `MONTHS_FR` is gone. The tests pin the literal strings
+- [x] **The five native pickers render in the browser's locale, not the app's** — the three
+      `<input type="date">` in the injury forms (now `DateInput` at `injury-declare-form.tsx:60`, `:82`,
+      `injuries-card.tsx:99`) and the two `<input type="datetime-local">` in the match and training
+      forms (`match-form.tsx:96`, `training-form.tsx:51`). On a phone set to English the owner sees
+      `MM/DD/YYYY` and an AM/PM clock in the one place a formatter cannot reach. Decision 109 saw this
+      and declined to act — « offered to the owner, not taken » — and this batch is him coming back to
+      it. **His answer: keep the native control, which is still the best thing under a thumb, and print
+      the value it holds underneath it in the app's own shape.** Not a custom picker. **Shipped in #116
+      (`feat/echo-native-date-values`), merged, as decision 133.**
+      `components/ui/date-input.tsx` wraps all five and renders one quiet line — « 14/03/2026 », or
+      « 14/03/2026 à 20:05 » with the « à » `formatWhen` already uses. Three properties of it worth not
+      undoing: the echo never builds a `Date`, because parsing `YYYY-MM-DD` as one gives UTC midnight and
+      an off-by-one-day echo is worse than none; an empty or unreadable value renders no element at all
+      rather than a placeholder, since « --/--/---- » is a screen stating something it does not know; and
+      it is `aria-hidden`, because the defect is what the eye sees and a reader already hears the control's
+      value once. `lib/player/injury.ts` delegates to the same digits, so the fix for a wrong date format
+      is not a third way to format a date. Decision 133 supersedes the carve-out at the end of 109 rather
+      than opening a second decision about date formats
+
+### Preferred positions belong to the player, and the picker offers eight
+
+- [x] **The coach must not be able to edit a player's preferred positions.** `assertCanActFor`
+      (`lib/player/actions.ts:53-61`) tries the self action and then falls back to `member:update`,
+      which is a coach permission (`lib/auth/can.ts:89`) — so a coach rewriting a teammate's wishes was
+      deliberate, documented, and wrong. It had to go in **three** places or it half-went: the
+      fallback at the positions call site, `canEditPositions` in `app/(app)/joueur/[id]/page.tsx`, and
+      the coach wording in `positions-editor.tsx`. Removing only the first would leave a coach an
+      enabled save button whose submit throws. Note `profile:editShirtName` has the same fallback by the
+      same reasoning and is **not** in scope: the owner asked about positions. **Shipped in #125
+      (`fix/positions-belong-to-the-player`), merged, as decision 129** — whose part one this is, and
+      which supersedes the one clause of decision 104 that cited the preferred positions as its
+      precedent. `lib/player/actions.ts:116` is the bare `assertCan` now. `fffff7b` did exactly those three
+      files and no others, so the « three places » count held: the call is now a bare `assertCan` on the
+      self-only `profile:editPositions`, the coach's card now says « Chaque joueur choisit ses postes
+      lui-même. » — whose decision it is, rather than that a permission is missing — and the editable
+      description lost the ternary only the player can now reach. `profile:editShirtName` keeps its
+      fallback and the branch says why rather than leaving it to look like a leftover: a shirt name is an
+      order with a supplier and a deadline. `lib/auth/can.test.ts` already asserted a coach may not, and
+      passed unchanged — thinner cover than it sounds, since nothing unit or Playwright exercises the
+      positions editor at all
+- [x] **The picker offers eight positions, not eleven: `GB DG DC DD MG MC MD AT`.** `MOC`, `AG` and
+      `AD` are 11-a-side positions this team never fields. The owner asked for « only 7, as we are
+      playing with 7 players », and that is not expressible — `1-2-3-1` is `GB,DC,DC,MG,MC,MD,AT` and
+      `1-3-2-1` is `GB,DG,DC,DD,MC,MC,AT`, which is seven slots each but **six** distinct codes each and
+      **eight** in union. Put to him, and he chose the union. Shipped in `e7e319c` on #125, merged, as
+      decision 130, with the eight recomputed in the test from `BUILTIN_FORMATIONS` so the list cannot
+      drift from the shapes it is drawn from. **One consequence this line did not mention and should:
+      a stored `MOC`, `AG` or `AD` survives every save** — the hidden inputs come from the selection's own
+      keys and `fromSelection` iterates all eleven — so a shorter grid alone would make such a code
+      invisible and *unremovable*, with no screen anywhere able to clear it. Hence a row of removable
+      chips, derived from the same value the grid is, one per non-offered code, removable once and not
+      re-addable. Its copy says « Ces postes ne sont plus proposés » and must never say « n'existent
+      plus », which would be false: `MOC` is a slot in `1-3-3-0` and `AG`/`AD` in `1-2-1-3`, both still
+      shippable. Removing a retired *primary* leaves no primary rather than promoting a secondary, a
+      state already legal and already reachable by cycling your only primary off
+- [x] **Narrow the picker, not `POSITION_CODES`.** The constant at `db/reference.ts:50-62` is read by
+      `lib/composition/validation.ts:89` (`z.enum(POSITION_CODES)` on every saved lineup slot),
+      `components/composition/composition-editor.tsx:69`, `lib/formation/shape.ts` and
+      `lib/stats/best-seven-input.ts`. Narrowing it would make every built-in formation containing a
+      dropped code **unsavable** — `1-3-3-0` has `MOC`, `1-2-1-3` has `AG` and `AD` — and would silently
+      drop existing declarations through the `isPositionCode` filters at `lib/player/queries.ts:131-137`
+      and `lib/team/queries.ts:90`. The composition editor keeps all seven built-in formations: « only
+      two compositions » was about the picker, confirmed with the owner. Honoured by #125, merged, rather
+      than merely restated — it is the second half of decision 130: `POSITION_CODES` is untouched at eleven
+      and a test pins the eleven so nobody tidies them away to match the picker. `024a403` on the same
+      branch is **decision 131** and goes the other way, making the vocabulary *safer* to be wide —
+      `POSITION_BY_CODE` was built with a cast, so `rankOf` threw a `TypeError` on any code the reference
+      data does not know, reachable from `getPreferredPositions` and
+      `getSquad` and therefore able to take out the profile, `/moi`, `/equipe` and the composition editor
+      at once; typing it `Partial<Record<…>>` let the compiler enumerate the sixteen readers across five
+      files instead of a hand-written list missing one
+- [x] **The app crashes on select-and-save, reported from the phone. The cause was found, and it was
+      not in the code.** The first crash in the beta rather than a wrong sentence, so the reproduction
+      stays written down. **Fixed in #125, merged, as part two of decision 129.**
+      `updatePlayerPositions` had **no try/catch**, so anything it threw reached the
+      error boundary instead of becoming a French message; `fa2d3ed` puts a
+      guard around the write and **only** the write — `requireActor`, the schema parse and the permission
+      check stay outside it, because a `ForbiddenError` is a bug or an attack and must keep reaching the
+      boundary rather than being flattened into a polite sentence. It logs the Postgres `code` rather
+      than a stringified error, because `23503` and `23505` are different bugs one digit apart. **The
+      cause: `player_positions.position_code` references `positions.code`, and no migration had ever
+      inserted a single row into `positions` — the only writer was `seedReference()`, reached only from
+      the hand-run `db:seed` and `db:bootstrap`.** So a database that had had `db:migrate` run and had
+      never been bootstrapped carried the foreign key and none of its targets, and every save of a
+      preferred position raised `23503`; reads worked, because a read joins to a table that is merely
+      empty. `db/migrations/0006_seed_positions.sql` inserts the eleven with `ON CONFLICT (code) DO
+      NOTHING`, generated through `drizzle-kit generate --custom` so the journal carries it, and
+      `db/reference.ts` stays the single source of truth. **The line that used to say « the local
+      `positions` reference table holds all eleven rows » is struck**: it was true, it was offered here as
+      having ruled the crash out, and it was the measurement most likely to hide it — the local database
+      is seeded, the owner's was not, so the one machine anybody would check on is the one machine where
+      the bug cannot happen. Still ruled out and still worth keeping: Neon imposes no transaction
+      limitation here (`db/client.ts` is postgres.js over TCP in both environments, so `db.transaction` is
+      fine), `player_positions` is one row per position rather than an array column, and `revalidatePath`
+      is present. Two loose ends. `formations` and `formation_slots` are in the same state and were
+      deliberately left — `formation_slots.position_code` has its own foreign key, both tables are written
+      only by the same seeder, and a freshly migrated database measurably has zero formations, so it can
+      plan **no composition at all**; decision 129 records that as the owner's decision rather than
+      smuggling it in — « 0 either way, and deliberately left that way », with the reason that a team
+      renames its shapes into its own `formations` rows (decision 005). And #118, which rewrote the error
+      screen this crash landed on, explicitly declined to claim
+      the stale-action-id failure was the owner's crash, since a force-quit always fetches the latest
+      deployment — a restraint that reads correctly now the real cause is known
+- [x] **`toFormState` and the editor disagree about a field name, so a rejected position is silent.**
+      `toFormState` (`lib/auth/validation.ts:72-79`) builds keys with `issue.path.join(".")`, producing
+      `secondary.1`, while the editor read `state?.fieldErrors?.secondary`. A validation rejection on
+      a position code therefore rendered **nothing at all**. Found while reading for the crash; it is not
+      the crash. Fixed by `d738c45`, merged with the rest of #125, with `fieldErrorsUnder`
+      (`lib/auth/validation.ts:96`, called at `positions-editor.tsx:103`) — in the *consumer*, not in
+      `toFormState`, because `["secondary", 1]` is a correct description of the issue and `toFormState` is
+      shared by every form in the app, so
+      collapsing the index there would silently merge messages on screens nobody is looking at. It strips
+      only a trailing index and matches the key in full, so `secondaryThing` stays a different field. Two
+      details the original line missed: the `??` meant `primary`'s message only ever appeared *because*
+      the `secondary` key was absent, so the single case that did produce a flat `secondary` key
+      suppressed `primary` at the same time; and `teamId` and `memberId` are rendered nowhere on this
+      form, so a rejected identifier still leaves the screen silent while « Modifications non
+      enregistrées. » claims the work is pending — a separate defect, and still open on `main` now that
+      the rest of this item has merged
+
+### A tap on the bottom tab bar is acknowledged
+
+PR #111 measured this and deliberately changed no production code; its numbers are in `docs/SESSIONS.md`
+under « Where the two seconds on the iPhone actually are ». **Do not re-measure.** The items it
+prescribed are below, in its order. (Decision 111 is an older, unrelated entry that happens to share the
+number with the pull request — it is the `iad1` → `lhr1` region pin, not #111's write-up.)
+
+- [x] **A pressed state on `components/nav/bottom-nav.tsx`, in plain CSS.** This is #111's own
+      conclusion and the reason the order matters: **a pressed state renders before hydration, a router
+      pending state does not.** #111 found that under CPU ×4 a tap landing before hydration produced a
+      full native document navigation in **5 of 5** samples on Calendrier — the bar is a client
+      component reading `usePathname`, so until it hydrates a tab tap is a cold document load whose
+      first paint is seconds away with nothing on screen. That is the owner's « I click and nothing
+      happens, I need to click a few times ». Every `Button` variant in `components/ui/button.tsx` had
+      an `active:` class and the tab bar had none. Shipped in #114, merged, as decision 123:
+      `active:bg-surface-2` at `components/nav/bottom-nav.tsx:68`, the fill every `ghost` and
+      `secondary` variant already uses, and deliberately with no `transition-colors` so it lands in the
+      same frame as the touch. The reason it had to be hand-written is in that entry and is not obvious:
+      Tailwind v4's preflight sets `-webkit-tap-highlight-color: transparent` on `html`, so the app lost
+      the platform's free tap flash the day Tailwind was installed. **One thing #114 could not verify from
+      a Linux session**: iOS Safari has historically not applied `:active` to a plain `<div>`, which is
+      why the class is on the `<Link>`'s own `<a>` — only the owner's phone can confirm the fill paints
+      under his thumb
+- [x] **`useLinkStatus` for the post-hydration half**, called from a component inside the `<Link>`.
+      There was no `useLinkStatus`, `useTransition` or `useOptimistic` anywhere in `app/` or
+      `components/`. Keep it quiet, and keep it out of each tab's accessible name. Shipped in #114,
+      merged: `TabPending` at `components/nav/bottom-nav.tsx:100` draws a 2 px hairline across the top of
+      the tab that started the navigation, `aria-hidden` and wordless on purpose — decision 122's rule
+      about the action tiles' SVGs reused rather than rediscovered. The `120ms linear 180ms both` in
+      `.fm-pending` (`app/globals.css:325`) is what keeps it off the navigations the pressed state has
+      already answered: a tab tap measured 126–217 ms unthrottled, and `both` is load-bearing, since
+      without it the hairline would sit at full opacity through the delay
+- [x] **A `<Suspense>` boundary or `loading.tsx` for `/stats`** was proposed here, and it is **answered
+      rather than outstanding: built, measured, and withdrawn** (decision 123). 844 ms under CPU ×4 +
+      100 ms RTT made it look like the one screen where streaming pays. The repository still has **zero**
+      `loading.tsx` files and zero `<Suspense>` boundaries, and it is true *because* the boundary was
+      reverted rather than because nobody has got to it. **Do not re-open it from this line, and do not
+      shorten the reason to « no streaming on these screens », which leaves a rule nobody can reason
+      with.** The argument is in decision 123 and in `docs/PLAN.md` § Amendments → « UX audit of the
+      preview deployment » → « Properties to protect » item 4, and it turns on *when* a boundary engages,
+      not on whether streaming is allowed. Two further things recorded there: the skeleton promised three
+      cards where the true answer on a new team is often zero, and the measurement that the boundary
+      committed the shell before the 180 ms delay elapsed, so it would have taken the hairline away
+      rather than composing with it. `/stats`'s 844 ms stays open under this heading as a query to make
+      faster, not a wait to decorate
+- [x] **`Promise.all` on the two tab pages #111's « 17 of 21 » audit left on the table.** Tens of
+      milliseconds, and **not** to be described as the fix for anything, exactly as #111 refused to let the
+      `dal.ts` prefix joins be. `/calendrier`'s two awaits are genuinely serial — `getCalendar` needs
+      `team` — and are not an opportunity. **One of the two shipped in #114 and the other is closed as
+      « will not do », and the asymmetry is the point** (decision 123). `/moi`'s `getUserTeams` and
+      `getPlayerProfile` share no input, so they are one `Promise.all` now
+      (`app/(app)/moi/page.tsx:29`), with the `null` for a non-playing coach passed straight through so
+      the condition stays a condition instead of becoming a query that returns nothing. `/stats` cannot:
+      `getSeasonStats` (`app/(app)/stats/page.tsx:75`) consumes the competition id that
+      `parseCompetitionId` has just validated against `getTeamCompetitions` (`:66`), and that validation
+      is what drops an id naming a deleted or a foreign competition — parallelising them would mean
+      trusting the id from the query string
+- [ ] **Two device-only suspicions, written down rather than acted on**, because neither can be settled
+      from source and both are outside the four iOS suspects #111 cleared: iOS Safari's own bottom
+      toolbar consuming the first tap under `viewportFit: "cover"` (`app/layout.tsx:27`) with a 56 px bar
+      at `bottom-0`, and `html { overflow-x: hidden }` (`app/globals.css:249`) against a `fixed` bar. The
+      instrument for the first is what `document.elementFromPoint` returns at the centre of each tab on
+      the owner's phone. **Still open and still unsettled**: #114 shipped the two acknowledgements above
+      without touching either suspicion, and neither can be closed from a Linux session — decision 123's
+      own residual risk is the same shape and is named there. **What is no longer a suspicion:** there is
+      no overlay, no pseudo-element, no transform and no `backdrop-filter` over the tab bar, and nothing
+      competing with it in z-order — checked through the whole ancestor chain, so the classic iOS
+      « transformed ancestor breaks fixed hit-testing » bug is absent rather than unexamined
+
+### The tooling this batch broke its nose on
+
+- [ ] **`npm run test:e2e` will silently test another session's code.** The port is
+      `Number(process.env.E2E_PORT ?? 3000)` (`playwright.config.ts:25`) and the server is
+      `reuseExistingServer: !process.env.CI` (`:80`), so a local run attaches to whatever is already
+      answering on 3000 instead of starting the working tree's own dev server — and says nothing about
+      it, because reusing a server is the normal, documented, deliberately cheap path. **Several sessions
+      share this machine**, sometimes with different branches checked out in different worktrees, so the
+      failure mode is not theoretical: a run during this batch produced a screenshot of a defect that had
+      already been fixed in the tree the run was launched from, and the screenshot was believed before the
+      port was. A pass is as dangerous as a failure here, and neither can be told apart from the real
+      thing by looking at the report. **The workaround is to pin `E2E_PORT`** to something nobody else is
+      on — the variable exists for exactly this and the comment above it says so — and the thing worth
+      deciding is whether the suite should refuse a server it did not start, or at least print which one
+      it attached to. Not started: CI is unaffected (`E2E_WEB_SERVER` and `CI` both set), so this costs
+      only local sessions, which is also why it will keep happening until something checks
