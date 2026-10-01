@@ -7,6 +7,26 @@
  * without a browser.
  */
 
+export {
+  ACTION_ICONS,
+  BadPassIcon,
+  CommentIcon,
+  GoalAgainstIcon,
+  GoalForIcon,
+  GoodEffortIcon,
+  GoodPositioningIcon,
+  GoodTrackBackIcon,
+  InjuryIcon,
+  LostBallIcon,
+  MoreIcon,
+  NiceSkillIcon,
+  OwnGoalIcon,
+  PenaltyMissedIcon,
+  PenaltyScoredIcon,
+  PositionChangeIcon,
+  REMARK_ICONS,
+  SubstitutionIcon,
+} from "./action-icons";
 export { ActionMenu, type ActionChoice, type ActionMenuProps } from "./action-menu";
 export { ConfirmSheet, type ConfirmSheetProps } from "./confirm-sheet";
 export {
