@@ -20,7 +20,7 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       `useActionState` call sites share — neither could ever recover. « Recharger la page » is the
       primary button now, offered for **every** error rather than only the one it was found on,
       because a reload is never wrong advice for « this screen could not display »; a skew-specific
-      sentence may change the copy and never whether the button is there (decision NNN). Five states
+      sentence may change the copy and never whether the button is there (decision 127). Five states
       walked at 390 × 844 in both themes, and the full Playwright suite run for it
 - [x] `npm run audit:screens` — 23 screens of the demo season walked at 390 px in both themes, as a
       coach and as a non-coach player, screenshotted, with the mechanical defects failing the command:
@@ -741,7 +741,7 @@ the reachable-turf finding below an **under**-statement on device rather than an
       review checklist: « vous » and « votre » were already clean, and these two hid behind that.
       **A third has since been found and fixed** — « Réessay**ez** ; si cela se reproduit, pass**ez** par
       un autre écran » on the shared error screen, two vouvoiements in one sentence, on the one screen a
-      user only ever reads when something has already gone wrong (decision NNN). Three for three behind
+      user only ever reads when something has already gone wrong (decision 127). Three for three behind
       the `-ez` imperative is the argument for the grep, not a coincidence
 - [ ] « À **Les** grosses courges », on every away fixture whose opponent's name opens with an
       article. `lib/calendar/labels.ts:111` is `` `${isHome ? "contre" : "à"} ${opponentName}` `` with
@@ -950,7 +950,7 @@ the reachable-turf finding below an **under**-statement on device rather than an
       `UnrecognizedActionError`, which every one of the app's 42 `useActionState` call sites is exposed
       to — and it is **not** this: the owner's crash survived a force-quit, a force-quit is a document
       navigation, and a document navigation is always served by the latest deployment, so skew cannot
-      survive one. Decision NNN made the recovery screen's advice true and bought a real exposure a
+      survive one. Decision 127 made the recovery screen's advice true and bought a real exposure a
       recovery; it closed nothing about the report. Another session is investigating, so coordinate
       before duplicating the hunt
 

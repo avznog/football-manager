@@ -4036,7 +4036,7 @@ overrode `safe-pb`: the bar is `md:static` there, so there is no home indicator 
 changes. The unit suite (1324) and the browser suite (5 specs) both pass, the second because this is a
 screen the happy path walks.
 
-## NNN — The error screen offers a reload unconditionally, and classifies nothing in order to be correct
+## 127 — The error screen offers a reload unconditionally, and classifies nothing in order to be correct
 
 **2026-10-01** · accepted · follows 058
 

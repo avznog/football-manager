@@ -3318,7 +3318,7 @@ exists — a document reload — was the one thing the screen did not offer.
 
 So **« Recharger la page » is now the primary button, unconditionally, on every error this screen
 shows**, with « Réessayer » second for the cold-Neon case a re-render really does fix, and « Retour au
-calendrier » as a ghost on the root boundary. The design argument is in decision **NNN** and is worth
+calendrier » as a ghost on the root boundary. The design argument is in decision **127** and is worth
 reading before touching the file, because it is the reason the branch survived its own premise being
 refuted: a reload is never *wrong* advice for « this screen could not display », whereas retrying is
 wrong specifically, so the screen does not have to classify the failure in order to be correct.
