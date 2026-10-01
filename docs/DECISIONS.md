@@ -3963,3 +3963,51 @@ single pass. That is the mechanism demonstrated from both ends, and it is why th
 gets a sentence and the player gets an instruction » — both strings are correct, present, French and
 tutoied, and a snapshot of either passes. It is a looking rule, like the theme rule, and it is cheap
 for the same reason: the cost is one extra login, and it catches a class rather than an instance.
+
+## 125 — The second instance of 124, and the sweep that says there is no third
+
+**Date** 2026-10-01 · **Status** accepted · extends 124
+
+**Decision.** The sticky ActionBar in game mode
+(`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx:1040`) drops `safe-pb py-2` for `sticky-pb pt-2`,
+where `sticky-pb` is a new utility in `app/globals.css` declaring
+`padding-bottom: calc(calc(var(--spacing) * 2) + env(safe-area-inset-bottom, 0px))`. Every other
+`safe-*` user in the repository was checked against the same shape and left alone.
+
+**Why.** Decision 124 is about `safe-px px-5`; this is the same defect on the other axis, and it was
+live on the screen the coach uses for ninety minutes. `safe-pb` sets `padding-bottom`, `py-2` compiles
+to `padding-block`, both land in `@layer utilities` with equal specificity, and emission order decides:
+`.py-2` is emitted before `.safe-pb`, so the pair resolves to the bare inset. Measured in a browser at
+390 px: **`pb 0px`** before, `pb 8px` after. On a phone with a home indicator the inset happens to be
+larger than the 8 px that was lost, which is why this was never visible on the device most likely to be
+looked at — and 0 px on everything else, directly under « Coup d'envoi » and « TERRAIN ».
+
+**The repair is not the obvious one, and that is the reusable part.** `safe-pb pb-2` fails identically:
+`.pb-2` is emitted *before* `.safe-pb` too. What is wanted here is not a `max()` of the two — 124's
+shape, where the inset and the gutter are alternatives — but their **sum**: the buttons should clear the
+home indicator rather than sit on it. A sum of a token and an `env()` cannot be written as two
+utilities at all, whatever the order, because two declarations of one property can only ever replace
+each other. So it is one declaration, following the `tabbar-pb` precedent, which composes exactly this
+shape for exactly this reason. An arbitrary value was tried first and rejected: `calc()` requires
+whitespace around `+`, so it has to be smuggled through Tailwind's `_` escape, and a bracketed
+expression that breaks silently when someone removes an underscore is worse than a named utility whose
+comment says what it is for.
+
+**`sticky-pb` is not immune to a stray `safe-pb`, it is merely lucky.** Measured, `sticky-pb safe-pb`
+gives `pb 8px` — the new utility wins, because `.sticky-pb` is emitted at 2016 and `.safe-pb` at 2012.
+That is the opposite of how `gutter-px` sits relative to `safe-px`, and it is the same mechanism:
+within a property group the order is not the source order and not « custom after built-in ». It is a
+fact about these two names today, not a property of the design, and nobody should rely on it.
+
+**The sweep is the part worth keeping.** Every `safe-pb` / `safe-pt` / `safe-px` user, all five:
+`game-mode.tsx:1040` was the defect; `components/ui/sheet.tsx:153` is `safe-pb shrink-0`;
+`match-bar.tsx:105` is `safe-pt` beside `px-3`, a different axis; `app-shell.tsx:76` is `safe-pt` alone;
+`bottom-nav.tsx:53` is `safe-pb safe-px` with no shorthand and is deliberately bezel-to-bezel (124).
+So four are clean for one reason — a lone longhand with no shorthand competing for the same property —
+and that sentence is the whole test. Decisions 124 and 125 found two instances between them and the
+repository has no third.
+
+**Consequences.** `md:py-3` still overrides the bottom padding above `md`, exactly as it already
+overrode `safe-pb`: the bar is `md:static` there, so there is no home indicator to clear and nothing
+changes. The unit suite (1324) and the browser suite (5 specs) both pass, the second because this is a
+screen the happy path walks.

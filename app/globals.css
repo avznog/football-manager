@@ -212,6 +212,20 @@
 @utility tabbar-pb {
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
 }
+/* The inside bottom padding of a bar that is itself stuck to the bottom of the
+   viewport and holds controls: the home-indicator inset **plus** breathing room
+   above it, so the buttons clear the indicator instead of merely touching it.
+
+   One declaration rather than `safe-pb py-2`, for the reason decision 124 gives
+   about `safe-px px-5`: both want `padding-bottom`, they land in the same
+   `@layer utilities` with equal specificity, and emission order decides. `.py-2`
+   is emitted before `.safe-pb`, and so is `.pb-2` — so either pair resolves to
+   the bare inset, which is 0 px on every device without a home indicator. The
+   sticky ActionBar in game mode lost its 8 px that way, under the two buttons
+   the coach taps most. A sum cannot be written as two utilities here. */
+@utility sticky-pb {
+  padding-bottom: calc(calc(var(--spacing) * 2) + env(safe-area-inset-bottom, 0px));
+}
 
 @layer base {
   html {
