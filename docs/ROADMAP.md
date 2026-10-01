@@ -1131,3 +1131,142 @@ Ordered by harm, which is not the order they are cheapest to fix.
       named « UX Audit H »/« retro »/« retro 2 » on the preview database. Ids in the report's last
       section. The matches cannot be deleted through the UI and should not be — `deleteMatch` refuses once
       an event log exists, which is invariant 1 working
+---
+
+## The fourth batch from the owner's iPhone — 2026-10-01
+
+Four remarks, after the owner installed the beta and used it as a coach would. They are written up as a
+batch in `docs/PLAN.md` under « Amendments » — two of them are scope rather than defects, which is why
+the plan had to grow a section for them.
+
+**Two of the four are narrower than the words**, and both were audited before anything was changed.
+That is the part worth reading if you are new to this batch: a remark acted on literally, when the
+literal reading is already satisfied, produces a diff that changes nothing and a session that believes
+it shipped something.
+
+### The retro-entry screen is one list, with the button underneath
+
+The owner, on typing up a match played without the phone: the add button must sit under the actions and
+not over them; the score must not be editable; the same actions as in game mode must be available; and
+« Changements » and « Actions du match » must become one block. They are one redesign, not four items.
+
+- [ ] **The « Score » card keeps its scoreline and loses its two buttons.** « We must not be able to
+      edit the score directly » does not describe a typed score — there is **no score input anywhere in
+      this repository**, and `retro-form.tsx:186` has derived the scoreline through `reduceMatch` since
+      it was written, as its own header says at `:12-14`. What it describes is `addGoal`
+      (`retro-form.tsx:157-162`) behind « + But pour nous » / « + But encaissé », inside a card titled
+      « Score », above everything else: tap, and the number above goes up. That is editing the score as
+      far as a thumb can tell, and it is the one way to add a goal that cannot name a scorer
+- [ ] **Both « + Ajouter » buttons move below their lists.** They are passed as the `Card` `action`
+      prop (`retro-form.tsx:251` and `:343`) and `components/ui/card.tsx:61` renders that inside the
+      `<header>`, before `{children}`. Typing up a match is a loop, so the control that starts the next
+      iteration has to be where the last one left the thumb; above a growing list it walks backwards up
+      the screen on every action
+- [ ] **One list, not two: a substitution is just another action.** `buildRetroLog` has always emitted
+      a change as an ordinary `SUBSTITUTION` event (`lib/retro/log.ts:351-361`), so the two blocks are a
+      distinction the model never made. Note the merge the owner asked for is a merge of the **screen**:
+      `retroPitch`, `findRetroIssues` and the minute-defaulting are all built on `entry.changes`, and
+      keeping that as the internal representation is cheaper and no less honest
+- [ ] **The action set gains `SUBSTITUTION` and `POSITION_CHANGE`, and nothing else.** « The same
+      actions as during a game » cannot mean identical, in either direction. `FOUL` is offered in retro
+      and is deliberately **not** a game-mode tile (decision 114). `REMARK` and `COMMENT` are live-only
+      by design — `RETRO_FACT_TYPES` (`lib/retro/log.ts:63`) and `isAmendableEventType`
+      (`lib/retro/amend.ts:55`) both already say so, and whether a remark made from memory a week later
+      is worth recording is a product question the owner has not answered. It stays open under M4 rather
+      than being answered by an array literal. Whatever is added has to be added in **two** places: that
+      constant and the duplicated `z.enum` at `lib/retro/validation.ts:141`
+- [ ] **A match typed up with no actions at all must say so, not print « 0 – 0 ».** Making the scoreline
+      the only score surface makes this case easier to reach, not harder, and it is the defect the third
+      batch already paid for once
+
+### Dates and times — audited, and already right everywhere the app controls
+
+- [x] **Every date the app formats itself is `DD/MM/YYYY`, and every time is 24h.** Decision 109 did
+      this. Audited end to end for this batch: `lib/calendar/time.ts` is the only module that formats an
+      instant and `lib/player/injury.ts` the only one that formats a `date` column; all twenty-odd call
+      sites go through them; 24h is pinned twice over, by the `fr-FR` locale **and** an explicit
+      `hour12: false` (`time.ts:195`), with a test looping all 24 hours; there is no
+      `toLocaleDateString` in the repository and `MONTHS_FR` is gone. The tests pin the literal strings
+- [ ] **The five native pickers render in the browser's locale, not the app's** — the three
+      `<input type="date">` in the injury forms (`injury-declare-form.tsx:63`, `:85`,
+      `injuries-card.tsx:102`) and the two `<input type="datetime-local">` in the match and training
+      forms (`match-form.tsx:98`, `training-form.tsx:53`). On a phone set to English the owner sees
+      `MM/DD/YYYY` and an AM/PM clock in the one place a formatter cannot reach. Decision 109 saw this
+      and declined to act — « offered to the owner, not taken » — and this batch is him coming back to
+      it. **His answer: keep the native control, which is still the best thing under a thumb, and print
+      the value it holds underneath it in the app's own shape.** Not a custom picker
+
+### Preferred positions belong to the player, and the picker offers eight
+
+- [ ] **The coach must not be able to edit a player's preferred positions.** `assertCanActFor`
+      (`lib/player/actions.ts:43-51`) tries the self action and then falls back to `member:update`,
+      which is a coach permission (`lib/auth/can.ts:89`) — so a coach rewriting a teammate's wishes is
+      deliberate, documented, and now wrong. It has to go in **three** places or it half-goes: the
+      fallback at `actions.ts:104`, `canEditPositions` at `app/(app)/joueur/[id]/page.tsx:50-51`, and
+      the coach wording at `positions-editor.tsx:83`. Removing only the first would leave a coach an
+      enabled save button whose submit throws. Note `profile:editShirtName` has the same fallback by the
+      same reasoning and is **not** in scope: the owner asked about positions
+- [ ] **The picker offers eight positions, not eleven: `GB DG DC DD MG MC MD AT`.** `MOC`, `AG` and
+      `AD` are 11-a-side positions this team never fields. The owner asked for « only 7, as we are
+      playing with 7 players », and that is not expressible — `1-2-3-1` is `GB,DC,DC,MG,MC,MD,AT` and
+      `1-3-2-1` is `GB,DG,DC,DD,MC,MC,AT`, which is seven slots each but **six** distinct codes each and
+      **eight** in union. Put to him, and he chose the union
+- [ ] **Narrow the picker, not `POSITION_CODES`.** The constant at `db/reference.ts:50-62` is read by
+      `lib/composition/validation.ts:89` (`z.enum(POSITION_CODES)` on every saved lineup slot),
+      `components/composition/composition-editor.tsx:69`, `lib/formation/shape.ts` and
+      `lib/stats/best-seven-input.ts`. Narrowing it would make every built-in formation containing a
+      dropped code **unsavable** — `1-3-3-0` has `MOC`, `1-2-1-3` has `AG` and `AD` — and would silently
+      drop existing declarations through the `isPositionCode` filters at `lib/player/queries.ts:131-137`
+      and `lib/team/queries.ts:88`. The composition editor keeps all seven built-in formations: « only
+      two compositions » was about the picker, confirmed with the owner
+- [ ] **The app crashes on select-and-save, reported from the phone.** The first crash in the beta
+      rather than a wrong sentence, so the reproduction is worth writing down whatever the fix turns out
+      to be. `updatePlayerPositions` has **no try/catch**, so anything it throws reaches the error
+      boundary instead of becoming a French message — including the `ForbiddenError` from
+      `assertCanActFor`. Ruled out while hunting it: Neon imposes no transaction limitation here
+      (`db/client.ts` is postgres.js over TCP in both environments, so `db.transaction` is fine), the
+      local `positions` reference table holds all eleven rows, `player_positions` is one row per
+      position rather than an array column, and `revalidatePath` is present
+- [ ] **`toFormState` and the editor disagree about a field name, so a rejected position is silent.**
+      `lib/auth/validation.ts:72-79` builds keys with `issue.path.join(".")`, producing `secondary.0`,
+      while `positions-editor.tsx:101` reads `state?.fieldErrors?.secondary`. A validation rejection on
+      a position code therefore renders **nothing at all**. Found while reading for the crash; it is not
+      the crash
+
+### A tap on the bottom tab bar is acknowledged
+
+PR #111 measured this and deliberately changed no production code; its numbers are in `docs/SESSIONS.md`
+under « Where the two seconds on the iPhone actually are ». **Do not re-measure.** The items it
+prescribed are below, in its order. (Decision 111 is an older, unrelated entry that happens to share the
+number with the pull request — it is the `iad1` → `lhr1` region pin, not #111's write-up.)
+
+- [ ] **A pressed state on `components/nav/bottom-nav.tsx`, in plain CSS.** This is #111's own
+      conclusion and the reason the order matters: **a pressed state renders before hydration, a router
+      pending state does not.** #111 found that under CPU ×4 a tap landing before hydration produced a
+      full native document navigation in **5 of 5** samples on Calendrier — the bar is a client
+      component reading `usePathname`, so until it hydrates a tab tap is a cold document load whose
+      first paint is seconds away with nothing on screen. That is the owner's « I click and nothing
+      happens, I need to click a few times ». Every `Button` variant in `components/ui/button.tsx` has
+      an `active:` class and the tab bar has none
+- [ ] **`useLinkStatus` for the post-hydration half**, called from a component inside the `<Link>`.
+      There is no `useLinkStatus`, `useTransition` or `useOptimistic` anywhere in `app/` or
+      `components/` today. Keep it quiet, and keep it out of each tab's accessible name
+- [ ] **A `<Suspense>` boundary or `loading.tsx` for `/stats`**, the one screen where #111's 844 ms
+      under CPU ×4 + 100 ms RTT makes it pay. The repository has **zero** `loading.tsx` files and zero
+      `<Suspense>` boundaries, so this sets the house pattern — and the fallback must not state anything
+      untrue: no « 0 » figures, no fake rows
+- [ ] **`Promise.all` on the two tab pages #111's « 17 of 21 » audit left on the table** —
+      `app/(app)/stats/page.tsx:66,75` (`getTeamCompetitions` then `getSeasonStats`) and
+      `app/(app)/moi/page.tsx:23,28` (`getUserTeams` then `getPlayerProfile`). Tens of milliseconds, and
+      **not** to be described as the fix for anything, exactly as #111 refused to let the `dal.ts` prefix
+      joins be. `/calendrier`'s two awaits are genuinely serial — `getCalendar` needs `team` — and are
+      not an opportunity
+- [ ] **Two device-only suspicions, written down rather than acted on**, because neither can be settled
+      from source and both are outside the four iOS suspects #111 cleared: iOS Safari's own bottom
+      toolbar consuming the first tap under `viewportFit: "cover"` (`app/layout.tsx:27`) with a 56 px bar
+      at `bottom-0`, and `html { overflow-x: hidden }` (`app/globals.css:185`) against a `fixed` bar. The
+      instrument for the first is what `document.elementFromPoint` returns at the centre of each tab on
+      the owner's phone. **What is no longer a suspicion:** there is no overlay, no pseudo-element, no
+      transform and no `backdrop-filter` over the tab bar, and nothing competing with it in z-order —
+      checked through the whole ancestor chain, so the classic iOS « transformed ancestor breaks fixed
+      hit-testing » bug is absent rather than unexamined
