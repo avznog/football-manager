@@ -56,9 +56,33 @@ import type { MatchEventRecord } from "@/lib/match/reducer";
 /* -------------------------------------------------------------------------- */
 
 /**
- * The event types the retro screen can produce as "facts of the match". Deliberately excludes the
- * clock events — those are the synthesiser's own job — and `SUBSTITUTION`, `POSITION_CHANGE` and
+ * **The correctable set**, and that is the question it answers: *which events may be amended on a
+ * finished match?*
+ *
+ * It is also the event types the retro screen can produce as "facts of the match" — deliberately
+ * excluding the clock events, which are the synthesiser's own job, and `SUBSTITUTION` and
  * `LINEUP_APPLIED`, which are deduced from the starting seven and the substitution rows.
+ *
+ * **Adding a type here silently makes it correctable.** `isAmendableEventType` (`amend.ts`) is
+ * `isRetroFactType(type) || type === "SUBSTITUTION"`, so a new member of this list immediately gets
+ * a « Corriger » button and a `VOID` that the action will accept on a frozen match. Decision 049
+ * says only football facts may be corrected — the frame of the match (`KICKOFF`, `PERIOD_END`,
+ * `FINAL_WHISTLE`, `LINEUP_APPLIED`) may not, because annulling one of those does not fix a mistake,
+ * it changes what every minute in the log means. `amend.test.ts` pins
+ * `isAmendableEventType("POSITION_CHANGE") === false` — game mode writes position changes and none of
+ * them may be corrected; that is this list's boundary, not a detail of that file.
+ *
+ * So this is **not** « what the entry form offers » — see `RETRO_ACTION_TYPES` below — and the two
+ * must not be merged.
+ *
+ * `FOUL` stays here deliberately. Decision 114 stopped offering the « Faute » tile in game mode's
+ * menu and explicitly kept the type in `MATCH_EVENT_TYPES` and in this list: `match_events` is
+ * append-only (invariant 1), so the fouls already in a log must still render, still count and still
+ * be voidable — and retro entry still asks for them, because a coach writing up a match two weeks
+ * later is doing data entry and not watching football. Which means « the same actions as live mode »
+ * is **additive only, and can never be literally symmetric in either direction**: retro offers
+ * `FOUL`, which the live menu does not, and the live menu offers `COMMENT` (decision 114), which
+ * this form does not.
  */
 export const RETRO_FACT_TYPES = [
   "GOAL_FOR",
@@ -74,6 +98,41 @@ export type RetroFactType = (typeof RETRO_FACT_TYPES)[number];
 
 export function isRetroFactType(value: string): value is RetroFactType {
   return (RETRO_FACT_TYPES as readonly string[]).includes(value);
+}
+
+/**
+ * **The enterable set**, and that is the question it answers: *what can the retro entry form put
+ * into a log?* Used by the entry form only.
+ *
+ * The facts above plus `SUBSTITUTION`, the one row the form reads as « X sort, Y entre » and whose
+ * slot it deduces rather than asks for. It deliberately stops short of the frame — `KICKOFF`,
+ * `PERIOD_END`, `FINAL_WHISTLE`, `LINEUP_APPLIED` — which `buildRetroLog` writes itself from the
+ * periods and the starting seven.
+ *
+ * **`POSITION_CHANGE` is not here, and that is a decision and not an omission** (decision 134). Game
+ * mode records a shirt that moved without anybody leaving the pitch; the retro sheet does not, because
+ * a position change typed up from memory a week later is the action least likely to be remembered, its
+ * slot labels are not even unique within a formation, and an undated one would be a label floating in
+ * the middle of a spell. So game mode keeps one action this form does not — and, with `FOUL` going the
+ * other way (see above), « the same actions as live mode » is symmetric in neither direction. Do not
+ * add it back to make the two lists match.
+ *
+ * **Kept apart from `RETRO_FACT_TYPES` even though it is now that list plus one**, because the two
+ * answer different questions and only one of them is a permission: being enterable on a sheet the coach
+ * is still filling in says nothing about being correctable on a match that is already frozen
+ * (decision 049). `isAmendableEventType` reads the *fact* list, so merging the two would silently hand
+ * a « Corriger » button to whatever is only enterable — today `SUBSTITUTION`, whose amendability is
+ * granted explicitly and separately, and tomorrow anything a session adds here.
+ */
+export const RETRO_ACTION_TYPES = [
+  ...RETRO_FACT_TYPES,
+  "SUBSTITUTION",
+] as const satisfies readonly MatchEventType[];
+
+export type RetroActionType = (typeof RETRO_ACTION_TYPES)[number];
+
+export function isRetroActionType(value: string): value is RetroActionType {
+  return (RETRO_ACTION_TYPES as readonly string[]).includes(value);
 }
 
 /** Types whose payload requires a player: the reducer refuses them without one. */
@@ -98,26 +157,70 @@ export type RetroStarter = {
 };
 
 /**
- * One substitution as the coach types it. `minute` is null for « je ne sais plus », which resolves
- * to the period break — the moment an amateur seven-a-side side actually makes its changes.
+ * **One row of the sheet**, whatever kind of row it is. A substitution is just another action the
+ * coach types up, which is what the screen says too.
+ *
+ * A **discriminated union**, not one widened record, and that is the point. A goal does not carry an
+ * empty `outId`/`inId` pair it can never mean, and `memberId` means « the scorer » in every arm it
+ * appears in rather than « the outgoing player » on one row and « the scorer » on the next. The price
+ * is a `switch (action.type)` wherever the two shapes diverge — the payload builder, the stamp
+ * resolver, the idempotency seed and `findRetroIssues` — and the price is what buys the guarantee:
+ * adding an arm is a compile error at exactly those places and nowhere else.
+ *
+ * `minute` is null for « je ne sais plus » on either arm, but **where an undated row lands is not one
+ * rule**: decision 048 gives a substitution the break and a fact the middle of its player's own spell.
+ * See `breakClockMs` and `resolveFactClockMs`, which stay two functions on purpose.
  */
-export type RetroChange = {
-  /** Row identity, stable for the lifetime of the form. Never stored. */
-  key: string;
-  outId: string;
-  inId: string;
-  minute: number | null;
-};
+export type RetroAction =
+  | {
+      /** Row identity, stable for the lifetime of the form. Never stored. */
+      key: string;
+      type: RetroFactType;
+      /** Scorer, fouler, injured player. Null when unknown or when the type takes nobody. */
+      memberId: string | null;
+      assistId: string | null;
+      minute: number | null;
+    }
+  | {
+      key: string;
+      type: "SUBSTITUTION";
+      outId: string;
+      inId: string;
+      minute: number | null;
+    };
 
-/** One fact of the match. Every field but `type` may be absent. */
-export type RetroFact = {
-  key: string;
-  type: RetroFactType;
-  /** Scorer, fouler, injured player. Null when unknown or when the type takes nobody. */
-  memberId: string | null;
-  assistId: string | null;
-  minute: number | null;
-};
+/**
+ * One substitution as the coach types it — the `SUBSTITUTION` arm of `RetroAction` under its own
+ * name, never a parallel declaration, so the two cannot drift apart.
+ *
+ * The name stays because a whole module is built on it: `retroPitch` replays substitutions and
+ * nothing else, `RetroResolvedChange`, `outWasOn` and `inAlreadyOn` are about them, and three of
+ * `findRetroIssues`' rules only ever ask about this arm.
+ */
+export type RetroChange = Extract<RetroAction, { type: "SUBSTITUTION" }>;
+
+/**
+ * One football fact of the match — the other arm, likewise named rather than redeclared.
+ *
+ * `retroFactPayload` and `buildAmendment` take this and not `RetroAction`: a correction may only ever
+ * be a fact (decision 049), so handing either of them a substitution has to be a type error.
+ */
+export type RetroFact = Extract<RetroAction, { type: RetroFactType }>;
+
+/** The substitution rows of a sheet, in the order the coach typed them. */
+export function retroSubstitutions(actions: readonly RetroAction[]): readonly RetroChange[] {
+  return actions.filter((action): action is RetroChange => action.type === "SUBSTITUTION");
+}
+
+/**
+ * The football-fact rows of a sheet, in the order the coach typed them.
+ *
+ * Asks `isRetroFactType` rather than « anything that is not a substitution », so a third arm added to
+ * `RetroAction` is excluded here by default instead of being silently treated as a goal.
+ */
+export function retroFacts(actions: readonly RetroAction[]): readonly RetroFact[] {
+  return actions.filter((action): action is RetroFact => isRetroFactType(action.type));
+}
 
 export type RetroEntry = {
   /**
@@ -132,8 +235,12 @@ export type RetroEntry = {
   /** The planned initial composition this seven came from, when it is unchanged. */
   lineupId: string | null;
   starters: readonly RetroStarter[];
-  changes: readonly RetroChange[];
-  facts: readonly RetroFact[];
+  /**
+   * Everything that happened, substitutions included, in the order the coach typed it. One array,
+   * because « un changement est une action comme une autre » — and because the order inside it is
+   * data: two actions that land on the same stamp are emitted in it (see `buildRetroLog`).
+   */
+  actions: readonly RetroAction[];
 };
 
 /* -------------------------------------------------------------------------- */
@@ -202,7 +309,9 @@ export function retroPitch(entry: RetroEntry): RetroPitch {
     onPitch.set(starter.memberId, { fromMs: 0, slotId: starter.slotId });
   }
 
-  const ordered = entry.changes
+  // The substitutions and nothing else: the pitch is replayed from the rows that move players, and
+  // `resolveChangeClockMs` below is the half of decision 048 that only applies to them.
+  const ordered = retroSubstitutions(entry.actions)
     .map((change, index) => ({ change, index, clockMs: resolveChangeClockMs(change, periods) }))
     // Stable on the coach's typing order, so two changes at the same minute keep their sequence.
     .sort((a, b) => a.clockMs - b.clockMs || a.index - b.index);
@@ -250,6 +359,11 @@ export type RetroStamp = { clockMs: number; guessed: boolean };
  *
  * A minute the coach typed is taken as given (clamped to regulation). A minute he does not have is
  * the midpoint of the window the event must have fallen in — see the note at the top of the file.
+ *
+ * It takes **`RetroFact`, not `RetroAction`**, and that is the mechanism and not a preference. Decision
+ * 048 gives an undated substitution the break and an undated fact the middle of its player's spell;
+ * now that the two travel in one array, « just resolve the stamp of an action » is an easy and wrong
+ * thing to write. Passing a substitution here does not compile.
  */
 export function resolveFactClockMs(fact: RetroFact, pitch: RetroPitch): RetroStamp {
   const endMs = regulationMs(pitch.periods);
@@ -338,24 +452,38 @@ export function buildRetroLog(entry: RetroEntry): RetroLog {
 
   const pending: Pending[] = [];
 
-  entry.facts.forEach((fact, index) => {
+  /*
+   * `order` is **two buckets, not the index in `entry.actions`** — facts first, substitutions after —
+   * and that is load-bearing rather than tidy. Within one stamp the facts of a minute must be emitted
+   * before the substitutions of that minute, so a player replaced at 30′ is still on the pitch when a
+   * 30′ goal is read and the one who came on is not. `onPitchAt` in `validation.ts` encodes that same
+   * boundary, and `validation.test.ts` pins it. Merging the two arrays into one array made this the
+   * typing order, which would flip it for a coach who writes the change down before the goal.
+   */
+  const facts = retroFacts(entry.actions);
+
+  facts.forEach((fact, index) => {
+    // The fact half of decision 048: the middle of this player's own spell on the pitch.
     const stamp = resolveFactClockMs(fact, pitch);
     pending.push({
       clockMs: stamp.clockMs,
       order: index,
-      build: () => ({ type: fact.type, payload: retroFactPayload(fact) }),
+      build: () => ({ type: fact.type, payload: retroActionPayload(fact, null) }),
     });
   });
 
-  pitch.changes.forEach((change, index) => {
+  const resolvedByKey = new Map(pitch.changes.map((change) => [change.key, change]));
+  retroSubstitutions(entry.actions).forEach((action, index) => {
+    // The substitution half: the break, already resolved by `retroPitch` — which also worked out the
+    // slot the outgoing player was standing in, and that is not something the row itself knows.
+    const resolved = resolvedByKey.get(action.key);
+    if (!resolved) return;
     pending.push({
-      clockMs: change.clockMs,
-      order: entry.facts.length + index,
+      clockMs: resolved.clockMs,
+      order: facts.length + index,
       build: () => ({
         type: "SUBSTITUTION" as MatchEventType,
-        payload: change.slotId
-          ? { outId: change.outId, inId: change.inId, slotId: change.slotId }
-          : { outId: change.outId, inId: change.inId },
+        payload: retroActionPayload(action, resolved.slotId),
       }),
     });
   });
@@ -395,7 +523,7 @@ export function buildRetroLog(entry: RetroEntry): RetroLog {
   }
 
   const guessedStamps =
-    entry.facts.filter((fact) => fact.minute === null).length +
+    facts.filter((fact) => fact.minute === null).length +
     pitch.changes.filter((change) => change.guessed).length;
 
   return {
@@ -428,8 +556,32 @@ function toEventInput(draft: Draft, index: number, entry: RetroEntry): MatchEven
 }
 
 /**
+ * The `payload` of any row of the sheet.
+ *
+ * One of the four places the union is taken apart. The `default` arm hands `retroFactPayload` a value
+ * narrowed to `RetroFact`, so a third member of `RetroAction` does not quietly fall through here as a
+ * goal — it fails to compile on this line, which is the whole bargain of the discriminated union.
+ *
+ * `slotId` is not a field of the action: it is the slot `retroPitch` worked out the outgoing player
+ * was standing in, which is why the substitution payload is built from a *resolved* change.
+ */
+export function retroActionPayload(
+  action: RetroAction,
+  slotId: string | null,
+): Record<string, unknown> {
+  switch (action.type) {
+    case "SUBSTITUTION":
+      return slotId
+        ? { outId: action.outId, inId: action.inId, slotId }
+        : { outId: action.outId, inId: action.inId };
+    default:
+      return retroFactPayload(action);
+  }
+}
+
+/**
  * The `payload` of one fact. Shared with the amendment builder, so a corrected goal is written in
- * exactly the same shape as the one it replaces.
+ * exactly the same shape as the one it replaces — which is why it keeps taking the narrowed arm.
  */
 export function retroFactPayload(fact: {
   type: RetroFactType;
@@ -524,6 +676,11 @@ function fnv1a(input: string, base: number): number {
  *
  * The row keys are deliberately left out — they are DOM bookkeeping, and re-adding a row the coach
  * deleted must not turn an identical sheet into a different submission.
+ *
+ * **Every field of every arm has to appear here.** Invariant 6 keys idempotent ingestion on this
+ * string: two sheets that hash identically produce the same `client_event_id`s, so the second one is
+ * swallowed by `on conflict do nothing` and the coach is told nothing. A field left out of the seed is
+ * therefore a field the coach can change without the app noticing.
  */
 export function retroEntrySeed(matchId: string, entry: Omit<RetroEntry, "submissionId">): string {
   return [
@@ -532,11 +689,26 @@ export function retroEntrySeed(matchId: string, entry: Omit<RetroEntry, "submiss
     entry.periods.periodsCount ?? "",
     entry.periods.periodMinutes ?? "",
     entry.starters.map((starter) => `${starter.slotId}=${starter.memberId}`).join(","),
-    entry.changes.map((change) => `${change.outId}>${change.inId}@${change.minute ?? "?"}`).join(","),
-    entry.facts
-      .map((fact) => `${fact.type}:${fact.memberId ?? ""}:${fact.assistId ?? ""}@${fact.minute ?? "?"}`)
-      .join(","),
+    entry.actions.map(retroActionSeed).join(","),
   ].join("|");
+}
+
+/**
+ * One row of the sheet as a seed fragment. The third of the four places the union is taken apart, and
+ * the `default` arm narrows to `RetroFact` before reading `memberId`/`assistId`, so a new arm with
+ * different fields cannot be seeded as a half-empty fact.
+ */
+function retroActionSeed(action: RetroAction): string {
+  switch (action.type) {
+    case "SUBSTITUTION":
+      return `SUBSTITUTION:${action.outId}>${action.inId}@${action.minute ?? "?"}`;
+    default:
+      return retroFactSeed(action);
+  }
+}
+
+function retroFactSeed(fact: RetroFact): string {
+  return `${fact.type}:${fact.memberId ?? ""}:${fact.assistId ?? ""}@${fact.minute ?? "?"}`;
 }
 
 /* -------------------------------------------------------------------------- */

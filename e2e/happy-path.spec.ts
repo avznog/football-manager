@@ -831,16 +831,55 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   await expect(page.getByRole("heading", { level: 1, name: "Saisie du match" })).toBeVisible();
   await expect(page.getByText("Ce match n’a pas encore eu lieu")).toHaveCount(0);
 
+  // An untouched sheet states no score. The Vitest test on `retroScoreLineFr` pins the sentence;
+  // this pins that the component is the thing using it, which no unit test can see.
+  //
+  // `exact` matters, and is not a weakening: the « Actions du match » card legitimately says « Un
+  // 0 – 0 sans rien à signaler, ça existe. » (`RETRO_NO_FACTS_FR`), so a substring match finds that
+  // paragraph and would fail for the wrong reason. What must not exist is an element that *is* the
+  // scoreline — which is exactly the 36 px « 0 – 0 » this slice removed from the Score card.
+  await expect(page.getByText("0 – 0", { exact: true })).toHaveCount(0);
+
   // Typing it up derives the score, so the row stops saying « Rien saisi » — and the fact that this
   // works at all is the whole point: nothing downstream knows the match never had a live clock.
   // Positionally and by value: the 1-3-2-1 has two slots both captioned « Milieu », and the options
   // are labelled « 8. Nom » rather than by name alone. Which post each player took is not what this
   // test is about — that one distinct player lands in each slot is.
-  const slots = page.locator("select");
+  //
+  // Scoped to the starter fields by name rather than « every `<select>` on the page ». A bare
+  // `locator("select")` was correct only because nothing happened to render a `<select>` above the
+  // Composition card, and the next card added above it would have renumbered all seven silently.
+  const slots = page.locator('select[name^="starter:"]');
+  await expect(slots).toHaveCount(STARTERS.length);
   for (const [index, [key]] of STARTERS.entries()) {
     await slots.nth(index).selectOption(playerOf(fixture, key).membershipId);
   }
+
+  // The literal label stays, because the assertion is about that button and not about any button.
   await page.getByRole("button", { name: "+ But pour nous" }).click();
+  // And the row the tap creates has to exist and be rendered — UX audit D6 as a test. Today it is
+  // created 487 px below the fold in the « Actions du match » card, which is the defect; what this
+  // pins is that the tap produces an editable goal row at all, wherever that row ends up living.
+  // `action-type:` is now every row of the sheet, substitutions included: one card holds one list and
+  // each row chooses its own type, so a `<select>` with that name is one action and nothing else.
+  const actionRows = page.locator('select[name^="action-type:"]');
+  await expect(actionRows).toHaveCount(1);
+  await expect(actionRows.first()).toBeVisible();
+
+  // A substitution is added exactly like a goal — a row, then its type — which is the whole point of
+  // merging the two cards. The add button is under the list, where the thumb left off.
+  await page.getByRole("button", { name: "+ Ajouter une action" }).click();
+  await expect(actionRows).toHaveCount(2);
+  await actionRows.nth(1).selectOption("SUBSTITUTION");
+  // Choosing the type swaps the row's fields: two players instead of a scorer and an assister.
+  await expect(page.getByLabel("Joueur sortant")).toHaveCount(1);
+  await expect(page.getByLabel("Buteur")).toHaveCount(1); // the goal row's, not this one's
+  await page
+    .getByLabel("Joueur sortant")
+    .selectOption(playerOf(fixture, "cm2").membershipId);
+  await page.getByLabel("Joueur entrant").selectOption(playerOf(fixture, "sub").membershipId);
+  await page.getByLabel("Minute du changement").fill("30");
+
   await page.getByRole("button", { name: "Enregistrer le match" }).click();
 
   // The action redirects here itself, so wait for *its* navigation rather than starting one: a
@@ -849,6 +888,9 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap\\?saisie=1$`));
   await expect(page.getByText("rien saisi")).toHaveCount(0);
   await expect(page.getByText("1 – 0").first()).toBeVisible();
+  // The substitution typed in the merged list reached the log: without this, a row the new type
+  // `<select>` failed to post would simply be dropped and the save would still look like a success.
+  await expect(timelineLine(page, playerOf(fixture, "sub").displayName).first()).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Terminer le match" })).toHaveCount(0);
 });
 

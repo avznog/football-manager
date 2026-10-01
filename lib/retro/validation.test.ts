@@ -2,15 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import type { SlotInfo } from "@/lib/match/lineup";
 
-import { type RetroEntry, buildRetroLog } from "./log";
+import { RETRO_FACT_TYPES, type RetroEntry, buildRetroLog } from "./log";
 import {
   type RetroIssueCode,
   type RetroMember,
   blockingRetroIssues,
   findRetroIssues,
-  readChangeFields,
-  readFactFields,
+  readActionFields,
   readStarterFields,
+  retroActionSchema,
+  retroFactSchema,
   retroLogIssuesFr,
   retroSubmitSchema,
 } from "./validation";
@@ -62,8 +63,7 @@ function entry(overrides: Partial<RetroEntry> = {}): RetroEntry {
     kickoffAtMs: Date.UTC(2026, 8, 12, 17, 0, 0),
     lineupId: null,
     starters: STARTERS,
-    changes: [],
-    facts: [],
+    actions: [],
     ...overrides,
   };
 }
@@ -99,51 +99,100 @@ describe("reading the form", () => {
     ]);
   });
 
-  it("gathers a change row from its three controls, in DOM order", () => {
-    const changes = readChangeFields(
+  it("gathers a substitution row from its controls, in DOM order", () => {
+    const actions = readActionFields(
       form([
-        ["change-out:r1", P.mcl],
-        ["change-in:r1", P.sub1],
-        ["change-minute:r1", "38"],
-        ["change-out:r2", P.at],
-        ["change-in:r2", P.sub2],
-        ["change-minute:r2", ""],
+        ["action-type:r1", "SUBSTITUTION"],
+        ["action-out:r1", P.mcl],
+        ["action-in:r1", P.sub1],
+        ["action-minute:r1", "38"],
+        ["action-type:r2", "SUBSTITUTION"],
+        ["action-out:r2", P.at],
+        ["action-in:r2", P.sub2],
+        ["action-minute:r2", ""],
       ]),
     );
 
-    expect(changes).toEqual([
-      { key: "r1", outId: P.mcl, inId: P.sub1, minute: 38 },
+    expect(actions).toEqual([
+      { key: "r1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 38 },
       // An empty minute is « je ne sais plus », not zero.
-      { key: "r2", outId: P.at, inId: P.sub2, minute: null },
+      { key: "r2", type: "SUBSTITUTION", outId: P.at, inId: P.sub2, minute: null },
     ]);
   });
 
-  it("ignores a change row the coach added and never filled", () => {
+  it("ignores a substitution row the coach added and never filled", () => {
     expect(
-      readChangeFields(form([["change-out:r1", ""], ["change-in:r1", ""], ["change-minute:r1", ""]])),
+      readActionFields(
+        form([
+          ["action-type:r1", "SUBSTITUTION"],
+          ["action-out:r1", ""],
+          ["action-in:r1", ""],
+          ["action-minute:r1", ""],
+        ]),
+      ),
     ).toEqual([]);
   });
 
-  it("reads the facts, and refuses a type it does not know", () => {
-    const facts = readFactFields(
+  it("keeps a half-filled substitution rather than making the row disappear", () => {
+    // One side chosen is a row the coach started. Dropping it here would save the match as though it
+    // had never been typed; `findRetroIssues` is what says « il manque le joueur entrant » (D22).
+    expect(
+      readActionFields(
+        form([
+          ["action-type:r1", "SUBSTITUTION"],
+          ["action-out:r1", P.mcl],
+          ["action-in:r1", ""],
+          ["action-minute:r1", ""],
+        ]),
+      ),
+    ).toEqual([{ key: "r1", type: "SUBSTITUTION", outId: P.mcl, inId: "", minute: null }]);
+  });
+
+  it("reads the facts, and drops a row whose type it does not know", () => {
+    const actions = readActionFields(
       form([
-        ["fact-type:f1", "GOAL_FOR"],
-        ["fact-member:f1", P.at],
-        ["fact-assist:f1", P.mcr],
-        ["fact-minute:f1", "11"],
-        ["fact-type:f2", "FOUL"],
-        ["fact-member:f2", P.dd],
-        ["fact-assist:f2", ""],
-        ["fact-minute:f2", ""],
-        // Not a retro fact: a clock event has no business coming from this form.
-        ["fact-type:f3", "FINAL_WHISTLE"],
-        ["fact-member:f3", P.gk],
+        ["action-type:f1", "GOAL_FOR"],
+        ["action-member:f1", P.at],
+        ["action-assist:f1", P.mcr],
+        ["action-minute:f1", "11"],
+        ["action-type:f2", "FOUL"],
+        ["action-member:f2", P.dd],
+        ["action-assist:f2", ""],
+        ["action-minute:f2", ""],
+        // Not enterable: a clock event has no business coming from this form, crafted or not.
+        ["action-type:f3", "FINAL_WHISTLE"],
+        ["action-member:f3", P.gk],
+        // Not enterable either: the retro sheet records no position change (decision 134), so a row
+        // claiming one can only have been crafted.
+        ["action-type:f4", "POSITION_CHANGE"],
+        ["action-member:f4", P.gk],
       ]),
     );
 
-    expect(facts).toEqual([
+    expect(actions).toEqual([
       { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: P.mcr, minute: 11 },
       { key: "f2", type: "FOUL", memberId: P.dd, assistId: null, minute: null },
+    ]);
+  });
+
+  it("reads one mixed sheet, both arms, in the order the browser posted them", () => {
+    expect(
+      readActionFields(
+        form([
+          ["action-type:c1", "SUBSTITUTION"],
+          ["action-out:c1", P.mcl],
+          ["action-in:c1", P.sub1],
+          ["action-minute:c1", "38"],
+          ["action-type:f1", "GOAL_FOR"],
+          ["action-member:f1", ""],
+          ["action-assist:f1", ""],
+          ["action-minute:f1", "11"],
+        ]),
+      ),
+    ).toEqual([
+      { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 38 },
+      // « Buteur inconnu » and « Sans passe décisive » are nulls, not invalid ids (decisions 017, 036).
+      { key: "f1", type: "GOAL_FOR", memberId: null, assistId: null, minute: 11 },
     ]);
   });
 });
@@ -155,8 +204,7 @@ describe("retroSubmitSchema", () => {
     submissionId: uuid("ccc", 3),
     lineupId: null,
     starters: STARTERS,
-    changes: [],
-    facts: [],
+    actions: [],
   };
 
   it("accepts a plausible submission", () => {
@@ -177,6 +225,35 @@ describe("retroSubmitSchema", () => {
   it("refuses a submission with no starting seven at all", () => {
     expect(retroSubmitSchema.safeParse({ ...payload, starters: [] }).success).toBe(false);
   });
+
+  it("takes substitutions and facts in one actions array", () => {
+    const result = retroSubmitSchema.safeParse({
+      ...payload,
+      actions: [
+        { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 38 },
+        { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 11 },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("caps the sheet well under the 200 events the ingestion boundary accepts", () => {
+    const row = (n: number) => ({
+      key: `f${n}`,
+      type: "FOUL" as const,
+      memberId: P.at,
+      assistId: null,
+      minute: 1,
+    });
+    expect(
+      retroSubmitSchema.safeParse({ ...payload, actions: Array.from({ length: 100 }, (_, n) => row(n)) })
+        .success,
+    ).toBe(true);
+    expect(
+      retroSubmitSchema.safeParse({ ...payload, actions: Array.from({ length: 101 }, (_, n) => row(n)) })
+        .success,
+    ).toBe(false);
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -188,8 +265,8 @@ describe("findRetroIssues", () => {
     expect(
       codes(
         entry({
-          changes: [{ key: "c1", outId: P.mcl, inId: P.sub1, minute: 38 }],
-          facts: [
+          actions: [
+            { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 38 },
             { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: P.mcr, minute: 11 },
             { key: "f2", type: "GOAL_AGAINST", memberId: null, assistId: null, minute: 24 },
             { key: "f3", type: "FOUL", memberId: P.sub1, assistId: null, minute: 50 },
@@ -228,26 +305,96 @@ describe("findRetroIssues", () => {
 
   it("blocks a player who leaves the pitch without being on it", () => {
     expect(
-      codes(entry({ changes: [{ key: "c1", outId: P.sub2, inId: P.sub1, minute: 20 }] })),
+      codes(
+        entry({
+          actions: [{ key: "c1", type: "SUBSTITUTION", outId: P.sub2, inId: P.sub1, minute: 20 }],
+        }),
+      ),
     ).toEqual(["change-out-not-on"]);
   });
 
   it("blocks a player coming on who is already playing", () => {
     expect(
-      codes(entry({ changes: [{ key: "c1", outId: P.mcl, inId: P.at, minute: 20 }] })),
+      codes(
+        entry({
+          actions: [{ key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.at, minute: 20 }],
+        }),
+      ),
     ).toEqual(["change-in-already-on"]);
   });
 
   it("blocks a player replacing himself", () => {
     expect(
-      codes(entry({ changes: [{ key: "c1", outId: P.mcl, inId: P.mcl, minute: 20 }] })),
+      codes(
+        entry({
+          actions: [{ key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.mcl, minute: 20 }],
+        }),
+      ),
     ).toEqual(["change-same-player"]);
+  });
+
+  /* ---- the half-filled substitution row (UX audit D22) ------------------- */
+
+  it("names the missing side of a substitution rather than the row's other problems", () => {
+    const issues = findRetroIssues({
+      entry: entry({
+        actions: [{ key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: "", minute: 38 }],
+      }),
+      members: MEMBERS,
+      slots: SLOTS,
+    });
+
+    expect(issues.map((issue) => issue.code)).toEqual(["missing-substitute-in"]);
+    expect(issues[0].messageFr).toBe("Il faut dire qui est entré sur le terrain.");
+    expect(issues[0].rowKey).toBe("c1");
+    expect(blockingRetroIssues(issues)).toHaveLength(1);
+  });
+
+  it("blocks a substitution whose outgoing player was never chosen", () => {
+    const issues = findRetroIssues({
+      entry: entry({
+        actions: [{ key: "c1", type: "SUBSTITUTION", outId: "", inId: P.sub1, minute: 38 }],
+      }),
+      members: MEMBERS,
+      slots: SLOTS,
+    });
+
+    expect(issues.map((issue) => issue.code)).toEqual(["missing-substitute-out"]);
+    expect(issues[0].messageFr).toBe("Il faut dire qui est sorti du terrain.");
+  });
+
+  it("asks for both players of a row the coach has only just added", () => {
+    // The state a fresh « + Ajouter une action » row typed as a substitution is in. Both sides are
+    // reported, and neither « ce joueur ne fait plus partie de l’effectif » nor « il ne peut pas se
+    // remplacer lui-même » — which is what an empty-string id used to produce.
+    expect(
+      codes(
+        entry({
+          actions: [{ key: "c1", type: "SUBSTITUTION", outId: "", inId: "", minute: null }],
+        }),
+      ),
+    ).toEqual(["missing-substitute-out", "missing-substitute-in"]);
+  });
+
+  it("judges the other rows of a sheet holding a half-filled substitution", () => {
+    // The unfinished row must not swallow the sheet: a goal by somebody who never played is still
+    // reported, which is what tells the coach the two problems are two.
+    expect(
+      codes(
+        entry({
+          actions: [
+            { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: "", minute: null },
+            { key: "f1", type: "GOAL_FOR", memberId: P.sub2, assistId: null, minute: 12 },
+          ],
+        }),
+      ),
+    ).toEqual(["missing-substitute-in", "player-not-on-pitch"]);
   });
 
   it("blocks a minute that does not exist in this match", () => {
     const issues = findRetroIssues({
       entry: entry({
-        facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 75 }],
+        actions: [{ key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 75 }],
       }),
       members: MEMBERS,
       slots: SLOTS,
@@ -261,8 +408,10 @@ describe("findRetroIssues", () => {
   it("blocks a goal by somebody who was not on the pitch yet", () => {
     const issues = findRetroIssues({
       entry: entry({
-        changes: [{ key: "c1", outId: P.mcl, inId: P.sub1, minute: 40 }],
-        facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.sub1, assistId: null, minute: 12 }],
+        actions: [
+          { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 40 },
+          { key: "f1", type: "GOAL_FOR", memberId: P.sub1, assistId: null, minute: 12 },
+        ],
       }),
       members: MEMBERS,
       slots: SLOTS,
@@ -275,7 +424,7 @@ describe("findRetroIssues", () => {
   it("blocks a goal by somebody who never appears on the sheet, and says so differently", () => {
     const issues = findRetroIssues({
       entry: entry({
-        facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.sub2, assistId: null, minute: 12 }],
+        actions: [{ key: "f1", type: "GOAL_FOR", memberId: P.sub2, assistId: null, minute: 12 }],
       }),
       members: MEMBERS,
       slots: SLOTS,
@@ -290,8 +439,10 @@ describe("findRetroIssues", () => {
     expect(
       codes(
         entry({
-          changes: [{ key: "c1", outId: P.at, inId: P.sub1, minute: 45 }],
-          facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 45 }],
+          actions: [
+            { key: "c1", type: "SUBSTITUTION", outId: P.at, inId: P.sub1, minute: 45 },
+            { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 45 },
+          ],
         }),
       ),
     ).toEqual([]);
@@ -299,8 +450,10 @@ describe("findRetroIssues", () => {
     expect(
       codes(
         entry({
-          changes: [{ key: "c1", outId: P.at, inId: P.sub1, minute: 45 }],
-          facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.sub1, assistId: null, minute: 45 }],
+          actions: [
+            { key: "c1", type: "SUBSTITUTION", outId: P.at, inId: P.sub1, minute: 45 },
+            { key: "f1", type: "GOAL_FOR", memberId: P.sub1, assistId: null, minute: 45 },
+          ],
         }),
       ),
     ).toEqual(["player-not-on-pitch"]);
@@ -309,7 +462,7 @@ describe("findRetroIssues", () => {
   it("insists on a name where the fact is about a person", () => {
     const issues = findRetroIssues({
       entry: entry({
-        facts: [
+        actions: [
           { key: "f1", type: "OWN_GOAL", memberId: null, assistId: null, minute: 20 },
           { key: "f2", type: "PENALTY_MISSED", memberId: null, assistId: null, minute: 21 },
           { key: "f3", type: "FOUL", memberId: null, assistId: null, minute: 22 },
@@ -346,8 +499,8 @@ describe("findRetroIssues", () => {
 
   it("never blocks an entry whose minutes were all left blank", () => {
     const blank = entry({
-      changes: [{ key: "c1", outId: P.mcl, inId: P.sub1, minute: null }],
-      facts: [
+      actions: [
+        { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: null },
         { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: null },
         { key: "f2", type: "GOAL_FOR", memberId: P.sub1, assistId: null, minute: null },
         { key: "f3", type: "GOAL_AGAINST", memberId: null, assistId: null, minute: null },
@@ -371,8 +524,8 @@ describe("retroLogIssuesFr", () => {
   it("passes a log the app synthesised itself", () => {
     const built = buildRetroLog(
       entry({
-        changes: [{ key: "c1", outId: P.mcl, inId: P.sub1, minute: 38 }],
-        facts: [
+        actions: [
+          { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 38 },
           { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: P.mcr, minute: 11 },
           { key: "f2", type: "PENALTY_SCORED", memberId: P.sub1, assistId: null, minute: 55 },
         ],
@@ -405,5 +558,84 @@ describe("retroLogIssuesFr", () => {
   it("does not object to a match played without a goalkeeper", () => {
     const built = buildRetroLog(entry({ starters: STARTERS.slice(1) }));
     expect(retroLogIssuesFr(built.events, { periods, slots: SLOTS })).toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The fact schema, now built from the list instead of repeating it            */
+/* -------------------------------------------------------------------------- */
+
+describe("retroFactSchema", () => {
+  const fact = (type: string) => ({
+    key: "f1",
+    type,
+    memberId: null,
+    assistId: null,
+    minute: null,
+  });
+
+  it("accepts every member of the correctable set, with no second copy of the list", () => {
+    for (const type of RETRO_FACT_TYPES) {
+      expect(retroFactSchema.safeParse(fact(type)).success, type).toBe(true);
+    }
+  });
+
+  it("refuses the type the form deduces rather than asks for as a fact", () => {
+    // `SUBSTITUTION` is *enterable* (`RETRO_ACTION_TYPES`) and is never a « fact » row, which is why
+    // this schema is built from the narrower list. `POSITION_CHANGE` is neither (decision 134).
+    expect(retroFactSchema.safeParse(fact("SUBSTITUTION")).success).toBe(false);
+    expect(retroFactSchema.safeParse(fact("POSITION_CHANGE")).success).toBe(false);
+  });
+
+  it("refuses the frame of the match", () => {
+    expect(retroFactSchema.safeParse(fact("FINAL_WHISTLE")).success).toBe(false);
+  });
+});
+
+describe("retroActionSchema", () => {
+  const sub = (overrides: Record<string, unknown> = {}) => ({
+    key: "c1",
+    type: "SUBSTITUTION",
+    outId: P.mcl,
+    inId: P.sub1,
+    minute: 38,
+    ...overrides,
+  });
+
+  it("accepts both arms of one sheet", () => {
+    expect(retroActionSchema.safeParse(sub()).success).toBe(true);
+    expect(
+      retroActionSchema.safeParse({
+        key: "f1",
+        type: "GOAL_FOR",
+        memberId: null,
+        assistId: null,
+        minute: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires both players of a substitution, unlike a goal's", () => {
+    // « Buteur inconnu » is a real answer; « sortant inconnu » is an unfinished row.
+    expect(retroActionSchema.safeParse(sub({ inId: null })).success).toBe(false);
+    expect(retroActionSchema.safeParse(sub({ outId: "" })).success).toBe(false);
+  });
+
+  it("refuses a substitution that carries a goal's fields and nothing else", () => {
+    expect(
+      retroActionSchema.safeParse({
+        key: "c1",
+        type: "SUBSTITUTION",
+        memberId: P.mcl,
+        assistId: null,
+        minute: 38,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("still refuses the frame of the match, and the action the sheet does not record", () => {
+    expect(retroActionSchema.safeParse({ ...sub(), type: "FINAL_WHISTLE" }).success).toBe(false);
+    // Not « not yet »: decision 134 is that the retro sheet never records a position change.
+    expect(retroActionSchema.safeParse({ ...sub(), type: "POSITION_CHANGE" }).success).toBe(false);
   });
 });

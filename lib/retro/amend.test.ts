@@ -46,9 +46,8 @@ const BASE: RetroEntry = {
     slotId: slot.id,
     memberId: [P.gk, P.dg, P.dc, P.dd, P.mcl, P.mcr, P.at][index],
   })),
-  changes: [],
   // The match as it was first entered: Karim (the striker) credited with the 27th-minute goal.
-  facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 27 }],
+  actions: [{ key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 27 }],
 };
 
 /**

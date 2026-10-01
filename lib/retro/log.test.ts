@@ -4,9 +4,14 @@ import { matchEventBatchSchema } from "@/lib/match/events";
 import type { SlotInfo } from "@/lib/match/lineup";
 import { reduceMatch, playerState } from "@/lib/match/reducer";
 
+import { isAmendableEventType } from "./amend";
 import {
+  RETRO_ACTION_TYPES,
+  RETRO_FACT_TYPES,
   type RetroEntry,
   buildRetroLog,
+  isRetroActionType,
+  isRetroFactType,
   retroEntrySeed,
   retroEventId,
   retroEventRecords,
@@ -61,8 +66,7 @@ function entry(overrides: Partial<RetroEntry> = {}): RetroEntry {
     kickoffAtMs: KICKOFF_AT_MS,
     lineupId: null,
     starters: STARTERS,
-    changes: [],
-    facts: [],
+    actions: [],
     ...overrides,
   };
 }
@@ -86,7 +90,7 @@ describe("buildRetroLog", () => {
   it("produces a batch the ingestion boundary accepts unchanged", () => {
     const built = buildRetroLog(
       entry({
-        facts: [
+        actions: [
           { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: P.mcr, minute: 11 },
           { key: "f2", type: "GOAL_AGAINST", memberId: null, assistId: null, minute: 24 },
           { key: "f3", type: "PENALTY_SCORED", memberId: P.at, assistId: null, minute: 44 },
@@ -94,8 +98,8 @@ describe("buildRetroLog", () => {
           { key: "f5", type: "PENALTY_MISSED", memberId: P.mcl, assistId: null, minute: 58 },
           { key: "f6", type: "FOUL", memberId: P.dd, assistId: null, minute: 19 },
           { key: "f7", type: "INJURY", memberId: P.dg, assistId: null, minute: 40 },
+          { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 38 },
         ],
-        changes: [{ key: "c1", outId: P.mcl, inId: P.sub1, minute: 38 }],
       }),
     );
 
@@ -132,7 +136,7 @@ describe("buildRetroLog", () => {
     const state = reduce(
       buildRetroLog(
         entry({
-          facts: [
+          actions: [
             { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: P.mcr, minute: 11 },
             { key: "f2", type: "GOAL_AGAINST", memberId: null, assistId: null, minute: 24 },
             { key: "f3", type: "PENALTY_SCORED", memberId: P.at, assistId: null, minute: 44 },
@@ -158,7 +162,11 @@ describe("buildRetroLog", () => {
 
   it("derives minutes from the substitutions instead of asking for them", () => {
     const state = reduce(
-      buildRetroLog(entry({ changes: [{ key: "c1", outId: P.mcl, inId: P.sub1, minute: 38 }] })),
+      buildRetroLog(
+        entry({
+          actions: [{ key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 38 }],
+        }),
+      ),
     );
 
     expect(playerState(state, P.gk)?.minutes).toBe(60);
@@ -173,7 +181,7 @@ describe("buildRetroLog", () => {
     const state = reduce(
       buildRetroLog(
         entry({
-          facts: [{ key: "f1", type: "GOAL_AGAINST", memberId: null, assistId: null, minute: 24 }],
+          actions: [{ key: "f1", type: "GOAL_AGAINST", memberId: null, assistId: null, minute: 24 }],
         }),
       ),
     );
@@ -189,7 +197,7 @@ describe("buildRetroLog", () => {
     const state = reduce(
       buildRetroLog(
         entry({
-          facts: [{ key: "f1", type: "GOAL_FOR", memberId: null, assistId: null, minute: 20 }],
+          actions: [{ key: "f1", type: "GOAL_FOR", memberId: null, assistId: null, minute: 20 }],
         }),
       ),
     );
@@ -202,7 +210,7 @@ describe("buildRetroLog", () => {
   it("puts the events of a 2×30 in the right period, the boundary included", () => {
     const built = buildRetroLog(
       entry({
-        facts: [
+        actions: [
           { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 0 },
           { key: "f2", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 30 },
           { key: "f3", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 60 },
@@ -226,7 +234,11 @@ describe("buildRetroLog", () => {
 
 describe("the stamp of an event the coach cannot date", () => {
   it("puts a substitution at the break", () => {
-    const pitch = retroPitch(entry({ changes: [{ key: "c1", outId: P.mcl, inId: P.sub1, minute: null }] }));
+    const pitch = retroPitch(
+      entry({
+        actions: [{ key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: null }],
+      }),
+    );
     expect(pitch.changes[0].clockMs).toBe(30 * MINUTE);
     expect(pitch.changes[0].guessed).toBe(true);
   });
@@ -234,7 +246,7 @@ describe("the stamp of an event the coach cannot date", () => {
   it("puts a team event with no player at the middle of regulation", () => {
     const built = buildRetroLog(
       entry({
-        facts: [{ key: "f1", type: "GOAL_AGAINST", memberId: null, assistId: null, minute: null }],
+        actions: [{ key: "f1", type: "GOAL_AGAINST", memberId: null, assistId: null, minute: null }],
       }),
     );
 
@@ -248,8 +260,10 @@ describe("the stamp of an event the coach cannot date", () => {
   it("puts a goal at the middle of its scorer's own time on the pitch", () => {
     const built = buildRetroLog(
       entry({
-        changes: [{ key: "c1", outId: P.mcl, inId: P.sub1, minute: 40 }],
-        facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.sub1, assistId: null, minute: null }],
+        actions: [
+          { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 40 },
+          { key: "f1", type: "GOAL_FOR", memberId: P.sub1, assistId: null, minute: null },
+        ],
       }),
     );
 
@@ -261,12 +275,12 @@ describe("the stamp of an event the coach cannot date", () => {
   it("narrows the window to the overlap between the scorer and the assister", () => {
     const built = buildRetroLog(
       entry({
-        changes: [
-          { key: "c1", outId: P.mcl, inId: P.sub1, minute: 20 },
-          { key: "c2", outId: P.at, inId: P.sub2, minute: 50 },
+        actions: [
+          { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: 20 },
+          { key: "c2", type: "SUBSTITUTION", outId: P.at, inId: P.sub2, minute: 50 },
+          // The substitute scored, the striker assisted: only on together from 20′ to 50′.
+          { key: "f1", type: "GOAL_FOR", memberId: P.sub1, assistId: P.at, minute: null },
         ],
-        // The substitute scored, the striker assisted: they were only on together from 20′ to 50′.
-        facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.sub1, assistId: P.at, minute: null }],
       }),
     );
 
@@ -278,7 +292,7 @@ describe("the stamp of an event the coach cannot date", () => {
     const state = reduce(
       buildRetroLog(
         entry({
-          facts: [
+          actions: [
             { key: "f1", type: "GOAL_FOR", memberId: null, assistId: null, minute: null },
             { key: "f2", type: "GOAL_AGAINST", memberId: null, assistId: null, minute: null },
             { key: "f3", type: "GOAL_FOR", memberId: null, assistId: null, minute: null },
@@ -301,10 +315,73 @@ describe("the stamp of an event the coach cannot date", () => {
     const pitch = retroPitch(
       entry({
         periods: { periodsCount: 1, periodMinutes: 50 },
-        changes: [{ key: "c1", outId: P.mcl, inId: P.sub1, minute: null }],
+        actions: [
+          { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: null },
+        ],
       }),
     );
     expect(pitch.changes[0].clockMs).toBe(25 * MINUTE);
+  });
+
+  it("keeps the two landing rules apart inside one actions array (decision 048)", () => {
+    /*
+     * The regression test for « somebody unified the two resolvers ». One sheet, one array, two
+     * undated rows, and the two rules decision 048 gives them are different numbers: the substitution
+     * lands at the break and the goal in the middle of the scorer's own spell. Before the merge these
+     * two could not be written side by side, because they lived in separate fields.
+     *
+     * `resolveFactClockMs` taking the narrowed fact arm is what *enforces* this — passing it a
+     * substitution does not compile. This is the arithmetic that proves the enforcement is still wired
+     * to two different answers rather than one.
+     */
+    const built = buildRetroLog(
+      entry({
+        actions: [
+          { key: "c1", type: "SUBSTITUTION", outId: P.mcl, inId: P.sub1, minute: null },
+          { key: "f1", type: "GOAL_FOR", memberId: P.sub1, assistId: null, minute: null },
+        ],
+      }),
+    );
+
+    // The break of a 2×30, which is also where `breakClockMs` puts it.
+    expect(built.events.find((event) => event.type === "SUBSTITUTION")?.minute).toBe(30);
+    // The substitute came on at 30′ and stayed to 60′, so the middle of *his* spell is 45′ — not 30′,
+    // which is where one shared resolver would have put it, and which would be a `scorer-off-pitch`.
+    expect(built.events.find((event) => event.type === "GOAL_FOR")?.minute).toBe(45);
+    expect(built.guessedStamps).toBe(2);
+    expect(reduce(built).anomalies).toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The order the events come out in                                           */
+/* -------------------------------------------------------------------------- */
+
+describe("the emission order of one minute", () => {
+  it("emits a minute's facts before its substitutions, whichever the coach typed first", () => {
+    /*
+     * The non-symmetric boundary `validation.ts`' `onPitchAt` is built on, now that the two kinds of
+     * row share an array and a typing order. `buildRetroLog` keeps `order` as **two buckets** — the
+     * index among the facts, then `facts.length +` the index among the substitutions — precisely so
+     * this does not depend on which row the coach wrote down first.
+     *
+     * Were `order` the index in the merged array, the substitution below would be emitted first, the
+     * striker would already be off at 45′, and the goal he actually scored would become a
+     * `scorer-off-pitch` anomaly on a log the app wrote itself.
+     */
+    const built = buildRetroLog(
+      entry({
+        actions: [
+          { key: "c1", type: "SUBSTITUTION", outId: P.at, inId: P.sub1, minute: 45 },
+          { key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 45 },
+        ],
+      }),
+    );
+
+    const types = built.events.map((event) => event.type);
+    expect(types.indexOf("GOAL_FOR")).toBeLessThan(types.indexOf("SUBSTITUTION"));
+    expect(reduce(built).anomalies).toEqual([]);
+    expect(playerState(reduce(built), P.at)?.goals).toBe(1);
   });
 });
 
@@ -324,7 +401,7 @@ describe("retroEventId", () => {
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
     const matchId = uuid("ccc", 1);
     const sheet = entry({
-      facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 11 }],
+      actions: [{ key: "f1", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 11 }],
     });
 
     const id = retroSubmissionId([retroEntrySeed(matchId, sheet)]);
@@ -335,13 +412,13 @@ describe("retroEventId", () => {
 
     // The row keys are DOM bookkeeping: re-adding a deleted row must not change the submission.
     const renamed = entry({
-      facts: [{ key: "f9", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 11 }],
+      actions: [{ key: "f9", type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 11 }],
     });
     expect(retroSubmissionId([retroEntrySeed(matchId, renamed)])).toBe(id);
 
     // A different sheet is a different submission, so nothing is swallowed as a false duplicate.
     const different = entry({
-      facts: [{ key: "f1", type: "GOAL_FOR", memberId: P.mcl, assistId: null, minute: 11 }],
+      actions: [{ key: "f1", type: "GOAL_FOR", memberId: P.mcl, assistId: null, minute: 11 }],
     });
     expect(retroSubmissionId([retroEntrySeed(matchId, different)])).not.toBe(id);
 
@@ -350,11 +427,11 @@ describe("retroEventId", () => {
   });
 
   it("makes a double submission of the same form produce the same ids (invariant 6)", () => {
-    const facts = [
+    const actions = [
       { key: "f1", type: "GOAL_FOR" as const, memberId: P.at, assistId: null, minute: 11 },
     ];
-    const first = buildRetroLog(entry({ facts }));
-    const second = buildRetroLog(entry({ facts }));
+    const first = buildRetroLog(entry({ actions }));
+    const second = buildRetroLog(entry({ actions }));
 
     expect(second.events.map((event) => event.clientEventId)).toEqual(
       first.events.map((event) => event.clientEventId),
@@ -362,5 +439,72 @@ describe("retroEventId", () => {
     expect(new Set(first.events.map((event) => event.clientEventId)).size).toBe(
       first.events.length,
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The two lists, and why they are two                                        */
+/* -------------------------------------------------------------------------- */
+
+describe("RETRO_FACT_TYPES — the correctable set", () => {
+  it("still holds exactly its seven members", () => {
+    expect(RETRO_FACT_TYPES).toEqual([
+      "GOAL_FOR",
+      "PENALTY_SCORED",
+      "PENALTY_MISSED",
+      "OWN_GOAL",
+      "GOAL_AGAINST",
+      "FOUL",
+      "INJURY",
+    ]);
+  });
+
+  it("still contains FOUL, which decision 114 removed from a menu and not from the model", () => {
+    // `match_events` is append-only: the fouls already logged must render, count and be voidable.
+    expect(RETRO_FACT_TYPES).toContain("FOUL");
+    expect(isRetroFactType("FOUL")).toBe(true);
+  });
+
+  it("is what decides amendability, so POSITION_CHANGE must stay out of it (decision 049)", () => {
+    // Asserted next to the constant as well as in `amend.test.ts`: this is where the coupling bites.
+    // Adding POSITION_CHANGE above would give it a « Corriger » button nobody decided to give it.
+    expect(RETRO_FACT_TYPES as readonly string[]).not.toContain("POSITION_CHANGE");
+    expect(isAmendableEventType("POSITION_CHANGE")).toBe(false);
+    expect(isAmendableEventType("SUBSTITUTION")).toBe(true);
+  });
+});
+
+describe("RETRO_ACTION_TYPES — the enterable set", () => {
+  it("is RETRO_FACT_TYPES plus exactly SUBSTITUTION", () => {
+    expect(RETRO_ACTION_TYPES).toEqual([...RETRO_FACT_TYPES, "SUBSTITUTION"]);
+  });
+
+  it("is a strict superset of the correctable set", () => {
+    for (const type of RETRO_FACT_TYPES) {
+      expect(isRetroActionType(type), type).toBe(true);
+    }
+    expect(RETRO_ACTION_TYPES.length).toBe(RETRO_FACT_TYPES.length + 1);
+  });
+
+  it("does not offer POSITION_CHANGE, which the owner decided not to build (decision 134)", () => {
+    // Game mode records a shirt that moved; the retro sheet does not, so nothing can produce such a
+    // row and the list must not claim it can. Re-adding it to make the two modes symmetric is the
+    // mistake this assertion exists to catch — `FOUL` already goes the other way.
+    expect(isRetroActionType("POSITION_CHANGE")).toBe(false);
+    expect(RETRO_ACTION_TYPES as readonly string[]).not.toContain("POSITION_CHANGE");
+  });
+
+  it("does not make anything new correctable: being enterable is not being amendable", () => {
+    // The one type that is enterable without being a fact is amendable only because
+    // `isAmendableEventType` names it, not because this list holds it.
+    expect(isRetroActionType("SUBSTITUTION")).toBe(true);
+    expect(isRetroFactType("SUBSTITUTION")).toBe(false);
+    expect(isAmendableEventType("POSITION_CHANGE")).toBe(false);
+  });
+
+  it("stops short of the frame of the match, which buildRetroLog writes itself", () => {
+    for (const type of ["KICKOFF", "PERIOD_END", "FINAL_WHISTLE", "LINEUP_APPLIED"]) {
+      expect(isRetroActionType(type), type).toBe(false);
+    }
   });
 });

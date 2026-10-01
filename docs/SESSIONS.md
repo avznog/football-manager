@@ -3673,3 +3673,78 @@ product change about what the app assumes a séance is, not a date-format fix.
 **Next:** nothing is blocked. The decision entry is deliberately headed `## NNN` — 123 is spoken for by a
 decision already written on `perf/acknowledge-tab-taps`, so the merging session assigns the number, as
 `COORDINATION.md` asks.
+
+## The owner's fourth batch, and the migration that was missing eleven rows
+
+**2026-10-01** · `feat/retro-one-action-list`, and the three branches before it
+
+Four remarks, after the owner installed the beta and used it as a coach would. **Three are on `main`**:
+the tab-bar tap acknowledgement as #114 (decision 123), the preferred positions as #125 (decisions 129,
+130 and 131), and the native-picker echo as #116 (decision 133). The fourth is the retro-entry redesign,
+PR #127, which is this branch and the reason for this entry. Two of the four turned out to be narrower
+than the words — the dates were already right everywhere the app formats one, and « we must not be able
+to edit the score » did not describe a score input, because there has never been one — and in both cases
+the audit came before the diff. A remark acted on literally, when the literal reading is already
+satisfied, produces a diff that changes nothing and a session that believes it shipped something.
+
+**The retro sheet is one list of actions, with the button underneath.** « Changements » and « Actions du
+match » were a distinction `buildRetroLog` never made: it has emitted a substitution as an ordinary
+`SUBSTITUTION` event since screen 8 was written. They are one `RetroAction` discriminated union now, one
+`actions` array, one `<ul>` in the order the coach typed it, and one « + Ajouter une action » passed as a
+**child after the list** rather than through `Card`'s `action` prop, which renders inside the header. The
+list is never sorted by minute — rows would jump under the thumb, and the undated row is the common case
+(decision 048). The score card keeps its two one-tap goal shortcuts, which were never score editing,
+and `retroScoreLineFr` now returns `null` for a sheet holding no scoring row, so an untouched sheet no
+longer prints « 0 – 0 ». **`POSITION_CHANGE` is not built, by the owner's decision**, and has been taken
+out of `RETRO_ACTION_TYPES` and out of `readActionFields` rather than left as a claim nothing could
+honour: its slot labels are not unique within a formation, `retroPitch`'s slot bookkeeping would go
+stale, an unstamped position change states nothing, and it is the action least likely to be reconstructed
+a week later. So game mode keeps one action the sheet does not, and `FOUL` goes the other way. All of it
+is decision 134, whose « why two constants » paragraph is the one to read before tidying anything in
+`lib/retro/log.ts`: `isAmendableEventType` reads `RETRO_FACT_TYPES`, so merging the two near-identical
+lists would grant a « Corriger » button nobody decided to grant.
+
+**The positions crash, and its actual cause.** Saving a player's preferred positions raised `23503` on a
+database that had been migrated and never seeded: **no migration ever inserted the `positions` rows.**
+The foreign key `player_positions.position_code → positions.code` existed from `0000` with none of its
+targets, so every read worked perfectly — the picker rendered its eleven codes, which come from a
+TypeScript constant and not from the table — and every write failed. That is why the screen is correct
+right up until a tap, and why nothing in the repository could have caught it: the vocabulary lived in two
+places and only one of them was in version control. `db/migrations/0006_seed_positions.sql` inserts the
+eleven rows idempotently. **A peer session independently confirmed from its own machine that
+production's `positions` table is empty while dev's holds all eleven codes, in rows belonging to real
+players** — that observation is theirs, not ours, and it is what turned a narrowing question into a
+migration question.
+
+**`formations` and `formation_slots` are also empty on a migrated database, so no composition can be
+planned on production at all — and that was deliberately left alone.** The eleven `positions` rows are
+**vocabulary**: a closed set the code already names, which the database merely has to agree with, so a
+migration is the right instrument and there is no decision to make. A formation is **editable content**
+with a product decision behind it — which formations, with which slots, at which coordinates, and whether
+a team may add its own — so seeding it from a migration would be a session choosing the product. It is
+the owner's call, and it is named here rather than fixed.
+
+**A trap for the next session on this machine: `npm run test:e2e` must be given `E2E_PORT`.**
+`playwright.config.ts` falls back to port 3000 and reuses an existing server, and on this machine port
+3000 is **another session's dev server from a different checkout** — it has already produced a screenshot
+of a failure in code that was already fixed. A green or a red run on the default port means nothing. This
+session's dev server is on 3451 from this worktree, so every run here was `E2E_PORT=3451 npm run
+test:e2e`, and the browser review went through `http://localhost:3451` (never `127.0.0.1`, decision 043).
+
+**One mistake worth logging, because it cost hours.** Three pull requests — #114, #116 and #118 — were
+attributed to another session and recorded as « not mine to merge », and that attribution survived two
+context compactions before it was questioned. Every session pushes under the same git identity, so the
+committer and the author prove nothing about which session produced a branch. **The per-worktree `HEAD`
+reflog is what settles it**, and it showed all three branched and left from this worktree. The method,
+for next time: when ownership of a branch is in doubt, read `git reflog show HEAD` in each worktree
+before reading any commit metadata.
+
+**Checks.** `npm run typecheck`, `npm run lint` and `npm test` green — **1414 unit tests across 65
+files**, which includes `tutoiement.test.ts` (23 tests, decision 128) now that it is collected from the
+repository root. `E2E_PORT=3451 npm run test:e2e` green, 5 tests in 53 s.
+
+**Two things still open and named as open.** A half-filled substitution is reported well in the browser
+and badly without it: `findRetroIssues` has `missing-substitute-out` / `missing-substitute-in`, but
+`retroChangeSchema` requires two uuids on that arm, so a no-JS or crafted POST is answered « Ce joueur
+n'est pas valide. » before the issue finder is asked. The fix is the order of operations in
+`submitRetroMatch`, not this slice. And the audit's `D18` reproduces, untouched by this work.
