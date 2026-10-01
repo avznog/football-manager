@@ -896,6 +896,18 @@ the reachable-turf finding below an **under**-statement on device rather than an
       (thirteen filled dark-slate pills) and the quietest in dark, for a state that means *nothing
       decided yet*. `attendance-list.tsx:53` paints it `peer-checked:bg-ink-muted`, where
       `components/ui/segmented-control.tsx` documents a `neutral` tone built for this exact case
+- [ ] **The same shorthand-versus-longhand cascade bug decision 124 fixed is still live in game mode.**
+      `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx:1040` carries `safe-pb py-2` on the sticky
+      ActionBar. `safe-pb` is the longhand `padding-bottom`, `py-2` the `padding-block` shorthand, and
+      `.safe-pb` is emitted at byte 26410 against `.py-2` at 25104 — so on every device whose bottom
+      inset is 0 the bar loses the 8 px of bottom padding it asks for, which is the padding under the
+      buttons the coach taps most. Not a `gutter-px` call site: this one wants `env()` **plus** 8 px
+      unconditionally, so it is one composed `padding-bottom` and `py-2` has to go. Measure at 390 and
+      375 in both themes rather than trusting the arithmetic
+- [ ] `isUuid()` (`lib/player/validation.ts:23-25`) tests the lax regex at `:17`, while the actions
+      validate the same ids with `z.uuid()`, which in Zod 4 enforces the RFC variant nibble — so a page
+      can load for an id the action then silently rejects. Latent only: every real row is a
+      `gen_random_uuid()` v4, which is exactly what hides it
 
 ### The audit tooling itself
 

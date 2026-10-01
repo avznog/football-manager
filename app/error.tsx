@@ -24,7 +24,7 @@ export default function RootError({
   reset: () => void;
 }) {
   return (
-    <main className="safe-px flex min-h-svh flex-col items-center justify-center px-5">
+    <main className="gutter-px flex min-h-svh flex-col items-center justify-center">
       <ErrorScreen digest={error.digest} reset={reset} withHomeLink />
     </main>
   );

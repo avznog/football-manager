@@ -18,7 +18,7 @@ import { buttonClassName } from "@/components/ui";
 
 export default function NotFound() {
   return (
-    <main className="safe-px flex min-h-svh flex-col items-center justify-center gap-4 px-5 py-10 text-center">
+    <main className="gutter-px flex min-h-svh flex-col items-center justify-center gap-4 py-10 text-center">
       <p className="text-5xl font-bold tracking-tight text-ink-muted/60" aria-hidden="true">
         404
       </p>
