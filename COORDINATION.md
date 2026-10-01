@@ -97,6 +97,14 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   « `<Suspense>` on `/stats` » one is **withdrawn and must not be re-opened** — it removes the no-JS path
   that decisions 100 and 116 built, see #114 — and the auth prefix joins are untouched and still a
   tidiness item.
+- **In flight · the iphone-analyser worktree** — `feat/iphone-trace-sink`, a diagnostic sink so the owner's
+  iPhone 16 can be watched live against preview. In these files and no others: `lib/dev/trace.ts` (+ test),
+  `app/api/dev/trace/route.ts`, `proxy.ts` (one `PUBLIC_PATHS` line), `scripts/iphone-trace/*`. No schema
+  change, no migration, no infrastructure, and **nothing in the client bundle** — the capture is a
+  bookmarklet, which is what keeps decision 127 and `audit:screens` true. Left open for the gatekeeper,
+  per rule 1. The files I am staying out of are the ones
+  **`feat/a-dock-of-players-and-buttons`** holds in the main checkout: that branch is two commits ahead of
+  `origin/main` and **unpushed**, so `git fetch` does not reveal it. One of those commits edits this file.
 
 **Who writes which line — because two machines rewriting one block is exactly the conflict the two Log
 lanes were invented to avoid.** The gatekeeper machine, the owner's, owns every line above except the
@@ -1231,3 +1239,41 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   formation templates, so an unseeded table shows up as « the composition editor offers no formations at
   all ». If that is what he sees, it is the FK.
   **Next: the preferred-positions slice, then the retro match entry.**
+
+### From the iphone-analyser worktree
+
+A third lane, opened for the same mechanical reason the first two were split: two sessions appending to
+one tail conflict on that tail. If this worktree is folded back into another machine's lane later,
+nothing here needs rewriting — it is dated history either way.
+
+- **2026-10-01 17:37 · iphone-analyser worktree · `feat/iphone-trace-sink`** — Building a diagnostic
+  sink so the owner's iPhone 16 can be watched live against preview. **Files I am in, so nobody else
+  takes them:** `lib/dev/trace.ts` (+ test), `app/api/dev/trace/route.ts`, `proxy.ts` (one line added to
+  `PUBLIC_PATHS`), `scripts/iphone-trace/*`. **No database, no table, no migration** — the sink writes
+  JSON lines to the server console and I read them with `vercel logs`, which is what lets it skip both a
+  new `Action` member for `can()` and the preview/production migration asymmetry of decision 119. The
+  capture code is a **bookmarklet**, not production code, so decision 127's « the absence of a digest is
+  itself a diagnosis » stays true and `audit:screens` (decision 059) sees no new console output. First
+  target is the two unsettled tab-bar suspicions at `docs/ROADMAP.md:935`, by the `elementFromPoint`
+  method that section already prescribes. **I deliberately did not touch** `app/error.tsx`,
+  `app/(app)/error.tsx`, `components/errors/error-screen.tsx`, `app/globals.css` or `game-mode.tsx`.
+  Per rule 1 I will **not** merge my own branch — it will be left open for the gatekeeper. Per rule 3 I
+  touched no infrastructure: the gate reads `VERCEL_ENV`, which Vercel populates by itself, so there is no
+  new variable for the owner to set.
+- **2026-10-01 18:05 · iphone-analyser worktree** — Two corrections to what I wrote an hour ago, both
+  because I had read `origin` and not the machine. I named
+  `fix/error-screen-offers-a-reload` and `fix/action-bar-bottom-padding` as the unmerged branches holding
+  the five files I was avoiding; **both have since merged** (#118 and #123). The branch actually in flight
+  is **`feat/a-dock-of-players-and-buttons`**, checked out in the *main* checkout, two commits ahead of
+  `origin/main` and **never pushed** — so no `git fetch`, and nothing in this file, could have revealed it.
+  One of its two commits edits this file. The general lesson, and the reason this is written down rather
+  than quietly fixed: **on a machine running several sessions, `git worktree list` and `ListAgents` are
+  evidence and `origin` is not.** Second correction: I said `main` was at `1efe7de`; `origin/main` had
+  already moved to `bd938e9`, and local `main` — checked out in `ux-analyser` — is **twelve commits
+  behind** it, which is a live trap for anyone who branches from it, as I did.
+- **2026-10-01 17:37 · iphone-analyser worktree** — One thing verified in passing that `## NOW` and
+  `docs/DEPLOY.md` §4 both still hedge as « expected, not seen »: `vercel inspect
+  https://dev.7orteils.bgonzva.fr` resolves to `dpl_6PrsBKkc9hUv23Q7qYcWHFf65ZD2`, `target preview`,
+  `status Ready`, aliased to that domain. So **the pinned domain does take the CLI preview deployment**,
+  observed directly rather than inferred from byte-identical bodies. I am not the gatekeeper, so per rule
+  1 I am leaving the `## NOW` line alone and recording it here instead.
