@@ -142,10 +142,23 @@ export function MoreIcon() {
 }
 
 /**
- * The ten tiles of the ACTION menu, keyed as the menu keys them.
+ * A flag: something worth noting about one player. Deliberately not the star of « beau geste » —
+ * the tile that opens the remarks must not wear the drawing of one of the six inside it, or the
+ * grid says « beau geste » twice and means two different things.
+ */
+export function RemarkIcon() {
+  return (
+    <Icon>
+      <path d="M6 21.5V3m0 1.5 12 3.5-12 3.5" />
+    </Icon>
+  );
+}
+
+/**
+ * The eleven tiles of the ACTION menu, keyed as the menu keys them.
  *
  * Here so that the game-mode screen wires one icon per tile with `icon: ACTION_ICONS.GOAL_FOR`
- * rather than importing ten components. The keys are the `MatchEventType`s the menu offers, plus
+ * rather than importing eleven components. The keys are the `MatchEventType`s the menu offers, plus
  * `MORE` for « Autre… », which records nothing.
  */
 export const ACTION_ICONS = {
@@ -153,6 +166,7 @@ export const ACTION_ICONS = {
   GOAL_AGAINST: <GoalAgainstIcon />,
   SUBSTITUTION: <SubstitutionIcon />,
   COMMENT: <CommentIcon />,
+  REMARK: <RemarkIcon />,
   MORE: <MoreIcon />,
   OWN_GOAL: <OwnGoalIcon />,
   PENALTY_SCORED: <PenaltyScoredIcon />,
