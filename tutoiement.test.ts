@@ -88,6 +88,10 @@ import { describe, expect, it } from "vitest";
  * flagged. A lookaround on `\p{L}` is the honest boundary. The hyphen is deliberately not a letter, so
  * « ouvrez-la » and « relâchez-le » still match the verb in front of the enclitic.
  *
+ * One consequence of spelling the boundary as `(?<![\p{L}\p{N}_])` / `(?![\p{L}\p{N}_])` under `u`: a
+ * decomposed (NFD) accented character puts a combining mark exactly where the regex expects a boundary,
+ * so NFD input can read differently from the NFC this repository's files are written in.
+ *
  * Neither regex is global: `RegExp.test` on a `/g` regex carries `lastIndex` from one call to the next.
  */
 function wholeWords(words: string[]): RegExp {
@@ -119,6 +123,11 @@ const ALLOWED_PRONOUN_SPELLINGS = /rendez-vous/giu;
  *   Its only non-imperative reading is the feminine plural participle, « des choses bien faites », which
  *   needs a plural feminine noun in front of it — write that sentence and the exception can be added
  *   then, with the example to hand.
+ * - **`veuillez` belongs here and not with the pronouns**, although it addresses the reader as plainly
+ *   as « vous » does: it is a verb form, so the whole-word machinery and the baseline are the same ones
+ *   the rest of this list needs. It is the commonest politeness form in French interface copy —
+ *   « Veuillez patienter », « Veuillez réessayer » — and the tree has never contained it, which is the
+ *   reason to add it before it appears rather than after.
  * - **`notez` is kept**, despite « noter » being a domain verb here: the ratings screen already writes
  *   the imperative as « Note tes coéquipiers » (`recap/_components/ratings-panel.tsx`), so the `tu` form
  *   is the one in use and the `vous` form is free to be a breach. The nouns are different words and
@@ -180,6 +189,7 @@ const IMPERATIVES = [
   "invitez",
   "rejoignez",
   "quittez",
+  "veuillez",
 ];
 
 const IMPERATIVE = wholeWords(IMPERATIVES);
@@ -194,8 +204,13 @@ const IMPERATIVE = wholeWords(IMPERATIVES);
  * tracking is per line and does not follow a template literal across a newline; the failure mode of
  * that is a comment marker inside a multi-line French template, which would hide a breach rather than
  * invent one. Preferring the hidden breach to the invented one is the same trade as everything above.
+ *
+ * The one state that must not survive a file is the block one: a source that ends with `/*` still open
+ * has every remaining line stripped, and the scan then reports nothing about a whole screen. The
+ * optional `state` is how the suite checks that no file in the tree does that — an out-parameter rather
+ * than a changed return type, so that every existing caller reads exactly as before.
  */
-function withoutComments(source: string): string[] {
+function withoutComments(source: string, state?: { openAtEof: boolean }): string[] {
   const out: string[] = [];
   let inBlock = false;
 
@@ -243,6 +258,8 @@ function withoutComments(source: string): string[] {
     out.push(kept);
   }
 
+  if (state) state.openAtEof = inBlock;
+
   return out;
 }
 
@@ -272,24 +289,29 @@ function breaches(source: string, rule: RegExp): { line: number; text: string }[
  * mirrors the UI's, so it carries no copy of its own: if the UI is clean, a « vous » in a selector
  * matches nothing and the Playwright run already fails on it; if the UI is dirty, the screen is flagged
  * here and the selector flag would be the same finding twice. And a spec is free to assert the
- * *absence* of the word, as five unit tests do below, which a scan cannot tell from its presence.
+ * *absence* of the word, as several unit tests under `lib/` do, which a scan cannot tell from its
+ * presence.
  * Scanning it would therefore buy a duplicate alarm at the price of a false one.
  */
 const ROOTS = ["app", "components", "lib", "db"];
 
-const SKIP_DIRECTORIES = new Set(["node_modules", ".next", ".git", "migrations"]);
+const SKIP_DIRECTORIES = new Set(["node_modules", ".next", ".git", "db/migrations"]);
 
 /**
  * Test files are out, all of them rather than a list of the ones that trip today. Five already contain
  * the word legitimately while asserting its absence — the four named at the top plus
  * `lib/team/membership.test.ts`, which a hand-written exclusion list had already missed once. A test is
  * not copy: whatever it asserts about lives in the module next to it, and that module is scanned.
+ *
+ * An entry of `SKIP_DIRECTORIES` is matched against the name *and* against the path from the repository
+ * root, so that it can name one place — `db/migrations` is the directory meant, and a bare `migrations`
+ * would have skipped any directory anywhere that happened to be called that.
  */
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
-    if (SKIP_DIRECTORIES.has(entry)) continue;
     const path = join(dir, entry);
+    if (SKIP_DIRECTORIES.has(entry) || SKIP_DIRECTORIES.has(relative(process.cwd(), path))) continue;
     if (statSync(path).isDirectory()) {
       out.push(...sourceFiles(path));
     } else if (/\.tsx?$/.test(entry) && !entry.includes(".test.")) {
@@ -381,14 +403,60 @@ describe("the tutoiement, over the whole tree (decision 074)", () => {
     expect(stale).toEqual([]);
   });
 
+  /**
+   * The baseline is capped, because it is an allow-list and an allow-list with no ceiling silences the
+   * guard by the same edit that would appease it: append a line and the new breach is excused. The two
+   * entries below are a record of what was already in the tree the day the rule landed, not a place to
+   * put new work — and a reviewer reading a diff on that array cannot tell an added line from a deleted
+   * one without a number here that has to be raised deliberately, in writing, to let one in.
+   */
+  it("cannot grow its known-breach baseline", () => {
+    expect(KNOWN_IMPERATIVE_BREACHES.length).toBeLessThanOrEqual(2);
+  });
+
   /** Proof the scan reads the tree, so a bad path or an empty glob cannot make it vacuously green. */
   it("reads every shipped directory", () => {
-    expect(files.length).toBeGreaterThan(200);
+    // Counted per root, not in total, because the total has slack and a skipped subtree fits in it: on
+    // **2026-10-01** the scan saw 87 files under `app/`, 46 under `components/`, 90 under `lib/` and 9
+    // under `db/`, 232 in all, so one string added to SKIP_DIRECTORIES — `"(jeu)"`, the whole of game
+    // mode, or `"[id]"`, 32 files — stayed inside a floor of 200 with every test still green. The floors
+    // sit just under each count instead of on it, so that neither adding a file nor deleting one is a
+    // failure and hiding a directory is. A skip cannot be smuggled past this.
+    expect(files.length).toBeGreaterThanOrEqual(225);
+    const perRoot = new Map(
+      ROOTS.map((root) => [root, sourceFiles(join(process.cwd(), root)).length]),
+    );
+    expect(perRoot.get("app")).toBeGreaterThanOrEqual(80);
+    expect(perRoot.get("components")).toBeGreaterThanOrEqual(42);
+    expect(perRoot.get("lib")).toBeGreaterThanOrEqual(84);
+    expect(perRoot.get("db")).toBeGreaterThanOrEqual(8);
     for (const root of ROOTS) {
       expect(files.some((path) => path.includes(`${root}/`))).toBe(true);
     }
     expect(files.some((path) => path.endsWith("components/errors/error-screen.tsx"))).toBe(true);
     expect(files.every((path) => !path.includes(".test."))).toBe(true);
+  });
+
+  /**
+   * The other way to be vacuously green, and the quiet one: a file whose last `/*` is never closed has
+   * every line after it stripped, so the scan reads a screen's worth of copy as comment and reports
+   * nothing. No file in the tree does that today, which makes this a latent hole rather than a live one —
+   * and the cheapest moment to close a latent hole is before it swallows the sentence somebody is looking
+   * for.
+   */
+  it("leaves no file with a block comment still open at its end", () => {
+    const open = files.filter((path) => {
+      const state = { openAtEof: false };
+      withoutComments(readFileSync(path, "utf8"), state);
+      return state.openAtEof;
+    });
+
+    expect(open.map((path) => relative(process.cwd(), path))).toEqual([]);
+
+    // And the state is really reported, so the empty array above means what it says.
+    const unterminated = { openAtEof: false };
+    withoutComments('const a = 1;\n/* "Appuyez ici"\n', unterminated);
+    expect(unterminated.openAtEof).toBe(true);
   });
 });
 
@@ -508,6 +576,13 @@ describe("the detector — the imperatives", () => {
     expect(
       breaches("/**\n * It said « Appuyez sur un poste », and nothing failed.\n */", IMPERATIVE),
     ).toEqual([]);
+  });
+
+  it("catches « veuillez », the politeness form that carries no pronoun either", () => {
+    expect(breaches('"Veuillez patienter pendant le chargement."', IMPERATIVE)).toHaveLength(1);
+    expect(breaches("<p>Veuillez réessayer plus tard.</p>", IMPERATIVE)).toHaveLength(1);
+    // The copy that replaces it names the action instead, and the rule has nothing to say about that.
+    expect(breaches('"Patiente pendant le chargement."', IMPERATIVE)).toEqual([]);
   });
 
   it("does not flag « allez », which this team's app says as an interjection", () => {
