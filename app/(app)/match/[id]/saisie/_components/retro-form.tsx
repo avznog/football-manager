@@ -34,12 +34,17 @@ import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/components/ui/cn";
-import { EVENT_LABELS_FR } from "@/lib/match/events";
-import { scoreLineFr } from "@/lib/calendar/labels";
+import { EVENT_LABELS_FR, SCORING_EVENT_TYPES } from "@/lib/match/events";
 import { regulationMinutes } from "@/lib/match/clock";
 import { reduceMatch } from "@/lib/match/reducer";
 import { submitRetroMatch } from "@/lib/retro/actions";
-import { RETRO_NO_FACTS_FR, retroChangesEmptyFr } from "@/lib/retro/labels";
+import {
+  RETRO_NO_FACTS_FR,
+  RETRO_SCORE_EMPTY_FR,
+  retroChangesEmptyFr,
+  retroRecordedSummaryFr,
+  retroScoreLineFr,
+} from "@/lib/retro/labels";
 import {
   RETRO_FACT_TYPES,
   buildRetroLog,
@@ -142,6 +147,19 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
   const warnings = issues.filter((issue) => !issue.blocking);
   const issuesOfRow = (rowKey: string) => issues.filter((issue) => issue.rowKey === rowKey);
 
+  /**
+   * How many rows on the sheet can move the score. Zero of them means the Score card has nothing to
+   * state yet — and the 0 – 0 it used to print there was the only untrue thing on the screen.
+   */
+  const goalActions = entry.facts.filter((fact) =>
+    (SCORING_EVENT_TYPES as readonly string[]).includes(fact.type),
+  ).length;
+  const scoreLine = retroScoreLineFr({
+    goalActions,
+    goalsFor: preview.state.goalsFor,
+    goalsAgainst: preview.state.goalsAgainst,
+  });
+
   const nameOf = (memberId: string) =>
     view.players.find((player) => player.memberId === memberId)?.displayName ?? "—";
   const chosen = new Set(Object.values(starters).filter((value) => value !== ""));
@@ -178,14 +196,19 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
 
       {/* ---- The score, derived ------------------------------------------- */}
 
-      <Card
-        title="Score"
-        description="Déduit des buts que tu ajoutes ci-dessous. Un appui par but."
-      >
+      {/*
+        « Un appui par but » is gone from the description on purpose (UX audit D6): the tap adds a
+        *row*, in a card the coach cannot see from here, and the sentence was confirming the opposite.
+      */}
+      <Card title="Score" description="Déduit des buts que tu ajoutes ci-dessous.">
         <div className="space-y-3">
-          <p className="text-center font-mono text-4xl font-bold text-ink tabular-nums">
-            {scoreLineFr(preview.state.goalsFor, preview.state.goalsAgainst)}
-          </p>
+          {scoreLine !== null ? (
+            <p className="text-center font-mono text-4xl font-bold text-ink tabular-nums">
+              {scoreLine}
+            </p>
+          ) : (
+            <p className="text-center text-sm text-ink-muted">{RETRO_SCORE_EMPTY_FR}</p>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <Button type="button" variant="secondary" onClick={() => addGoal("GOAL_FOR")}>
               + But pour nous
@@ -452,11 +475,11 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
       <Card title="Ce qui sera enregistré" as="h2">
         <div className="space-y-2 text-sm text-ink-muted">
           <p>
-            {preview.state.players.filter((player) => player.minutes > 0).length} joueurs avec des
-            minutes
-            {preview.guessedStamps > 0
-              ? ` · ${preview.guessedStamps} action${preview.guessedStamps > 1 ? "s" : ""} sans minute précise, placée${preview.guessedStamps > 1 ? "s" : ""} au mieux`
-              : ""}
+            {retroRecordedSummaryFr({
+              playersWithMinutes: preview.state.players.filter((player) => player.minutes > 0)
+                .length,
+              guessedStamps: preview.guessedStamps,
+            })}
           </p>
           <ul className="space-y-1">
             {preview.state.players
