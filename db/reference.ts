@@ -102,10 +102,25 @@ export const POSITIONS: readonly PositionDefinition[] = [
   { code: "AD", labelFr: "Ailier droit", line: "ATT", defaultX: 800, defaultY: 850, sort: 11 },
 ];
 
-/** Lookup by code. */
-export const POSITION_BY_CODE = Object.fromEntries(
-  POSITIONS.map((position) => [position.code, position]),
-) as Record<PositionCode, PositionDefinition>;
+/**
+ * Lookup by code.
+ *
+ * The type is `Partial<Record<...>>` and not `Record<PositionCode, PositionDefinition>`: the
+ * object is built from an `Object.fromEntries` whose key type the compiler cannot verify, and the
+ * codes that reach this lookup come from `player_positions.code` and `formation_slots.position_code`,
+ * `text` columns that reference `positions.code` rather than this closed list. A row holding a code
+ * this module does not know is therefore possible, and the old cast turned it into
+ * `TypeError: Cannot read properties of undefined` at the first `.sort` or `.labelFr` — which could
+ * 500 a player's profile, `/moi`, `/equipe` and the composition editor from a single bad row.
+ *
+ * Not `Record<string, PositionDefinition | undefined>`, which would make the values honest but let
+ * `POSITION_BY_CODE["LIBERO"]` type-check and lose key checking entirely — one unsoundness traded
+ * for another. `Partial<Record<PositionCode, …>>` keeps the keys closed *and* the values optional,
+ * so the churn it causes is the point: the compiler enumerates every reader for us, instead of a
+ * human hand-listing them and missing one.
+ */
+export const POSITION_BY_CODE: Partial<Record<PositionCode, PositionDefinition>> =
+  Object.fromEntries(POSITIONS.map((position) => [position.code, position]));
 
 /** French name of the four lines, for group headings and accessible labels. */
 export const LINE_LABELS_FR: Record<PositionLine, string> = {
@@ -125,7 +140,20 @@ export function isPositionCode(value: string): value is PositionCode {
 
 /** The full French name of a position, or the raw code if it is unknown. */
 export function positionLabelFr(code: string): string {
-  return isPositionCode(code) ? POSITION_BY_CODE[code].labelFr : code;
+  return POSITION_BY_CODE[code as PositionCode]?.labelFr ?? code;
+}
+
+/**
+ * Display rank of a position; an unknown code sorts after every known one.
+ *
+ * `Number.MAX_SAFE_INTEGER` and not `Infinity`, reusing the rule `orderShape` in
+ * `lib/formation/shape.ts` already settled on rather than inventing a second one: `Infinity -
+ * Infinity` is `NaN`, a comparator returning `NaN` leaves the order implementation-defined, and two
+ * unknown codes among one player's rows would then make `sortPreferredPositions` non-deterministic —
+ * which would make `positionsSignature` unstable and remount the profile editor at random.
+ */
+export function positionRankOf(code: string): number {
+  return POSITION_BY_CODE[code as PositionCode]?.sort ?? Number.MAX_SAFE_INTEGER;
 }
 
 /**

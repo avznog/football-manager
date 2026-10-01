@@ -15,7 +15,7 @@
  * and a phone screen in direct sunlight.
  */
 
-import { POSITIONS, POSITION_BY_CODE } from "@/db/reference";
+import { POSITIONS, positionLabelFr } from "@/db/reference";
 import { cn } from "@/components/ui/cn";
 import {
   type PositionPreference,
@@ -121,7 +121,7 @@ export function PositionPicker({
 
       <p className="text-sm text-ink-muted">
         {primary
-          ? `Poste principal : ${POSITION_BY_CODE[primary].labelFr}.`
+          ? `Poste principal : ${positionLabelFr(primary)}.`
           : "Aucun poste principal choisi."}
       </p>
     </div>

@@ -14,6 +14,7 @@ import {
   POSITION_BY_CODE,
   POSITION_CODES,
   type PositionCode,
+  type PositionDefinition,
   DEFAULT_FORMATION_LABEL,
   formationByLabel,
   formationDistribution,
@@ -21,12 +22,24 @@ import {
   isPositionCode,
   atPositionFr,
   positionLabelFr,
+  positionRankOf,
 } from "./reference";
 import {
   MIN_MARKER_DISTANCE,
   isValidPitchPoint,
   pitchDistance,
 } from "@/lib/pitch/geometry";
+
+/**
+ * `POSITION_BY_CODE` is honestly typed `Partial<Record<…>>`, so a test that wants a definition has
+ * to assert it is there. That assertion is the point rather than a formality: it is what the
+ * « every code has a definition » test below proves for the whole vocabulary.
+ */
+function definitionOf(code: PositionCode): PositionDefinition {
+  const definition = POSITION_BY_CODE[code];
+  expect(definition, `${code} has no definition`).toBeDefined();
+  return definition as PositionDefinition;
+}
 
 describe("positions", () => {
   it("is exactly the seven-a-side vocabulary, and nothing more", () => {
@@ -60,7 +73,7 @@ describe("positions", () => {
     expect(POSITIONS.map((position) => position.sort)).toEqual(
       [...POSITIONS].map((_, index) => index + 1),
     );
-    const lineRank = (code: PositionCode) => LINE_ORDER.indexOf(POSITION_BY_CODE[code].line);
+    const lineRank = (code: PositionCode) => LINE_ORDER.indexOf(definitionOf(code).line);
     for (let i = 1; i < POSITIONS.length; i += 1) {
       expect(lineRank(POSITIONS[i].code)).toBeGreaterThanOrEqual(lineRank(POSITIONS[i - 1].code));
     }
@@ -100,8 +113,8 @@ describe("positions", () => {
       ["AG", "AD"],
     ];
     for (const [left, right] of pairs) {
-      const l = POSITION_BY_CODE[left];
-      const r = POSITION_BY_CODE[right];
+      const l = definitionOf(left);
+      const r = definitionOf(right);
       expect(l.defaultX).toBeLessThan(500);
       expect(r.defaultX).toBeGreaterThan(500);
       expect(l.defaultY).toBe(r.defaultY);
@@ -116,8 +129,8 @@ describe("positions", () => {
       expect(position.labelFr[0]).toBe(position.labelFr[0].toUpperCase());
     }
     expect(positionLabelFr("MOC")).toBe("Milieu offensif central");
-    expect(POSITION_BY_CODE.DG.labelFr).toBe("Défenseur gauche");
-    expect(POSITION_BY_CODE.DC.labelFr).toBe("Défenseur central");
+    expect(positionLabelFr("DG")).toBe("Défenseur gauche");
+    expect(positionLabelFr("DC")).toBe("Défenseur central");
   });
 
   it("never lets two canonical positions overlap — the picker shows all eleven at once", () => {
@@ -141,6 +154,35 @@ describe("positions", () => {
     expect(isPositionCode("MOC")).toBe(true);
     expect(isPositionCode("CF")).toBe(false);
     expect(positionLabelFr("CF")).toBe("CF");
+  });
+
+  it("has a definition for every code in the vocabulary", () => {
+    // Asserted rather than assumed: `POSITION_BY_CODE` used to claim this through a cast.
+    for (const code of POSITION_CODES) {
+      expect(POSITION_BY_CODE[code], `${code} has no definition`).toBeDefined();
+      expect(POSITION_BY_CODE[code]?.code).toBe(code);
+    }
+    expect(Object.keys(POSITION_BY_CODE)).toHaveLength(POSITION_CODES.length);
+  });
+});
+
+describe("positionRankOf", () => {
+  it("returns the display rank of a known code", () => {
+    expect(positionRankOf("GB")).toBe(1);
+    expect(positionRankOf("AD")).toBe(POSITION_CODES.length);
+  });
+
+  it("sorts an unknown code after every known one", () => {
+    for (const code of POSITION_CODES) {
+      expect(positionRankOf("LIBERO")).toBeGreaterThan(positionRankOf(code));
+    }
+  });
+
+  it("gives two unknown codes the same finite rank, so a comparator stays deterministic", () => {
+    // Not `Infinity`: `Infinity - Infinity` is `NaN` and a `NaN` comparator orders arbitrarily.
+    expect(positionRankOf("LIBERO")).toBe(positionRankOf("TRQ"));
+    expect(positionRankOf("LIBERO") - positionRankOf("TRQ")).toBe(0);
+    expect(Number.isFinite(positionRankOf("LIBERO"))).toBe(true);
   });
 });
 
@@ -213,7 +255,7 @@ describe("built-in formations", () => {
       const ordered = [...formation.slots].sort((a, b) => a.sort - b.sort);
       expect(ordered[0].positionCode).toBe("GB");
       for (let i = 1; i < ordered.length; i += 1) {
-        const rank = (code: PositionCode) => LINE_ORDER.indexOf(POSITION_BY_CODE[code].line);
+        const rank = (code: PositionCode) => LINE_ORDER.indexOf(definitionOf(code).line);
         expect(rank(ordered[i].positionCode)).toBeGreaterThanOrEqual(
           rank(ordered[i - 1].positionCode),
         );

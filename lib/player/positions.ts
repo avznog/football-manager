@@ -10,7 +10,13 @@
  * the way into the database, as well as by the picker on the way out.
  */
 
-import { POSITIONS, POSITION_BY_CODE, isPositionCode, type PositionCode } from "@/db/reference";
+import {
+  POSITIONS,
+  isPositionCode,
+  positionLabelFr,
+  positionRankOf,
+  type PositionCode,
+} from "@/db/reference";
 import type { PositionPreference, PositionSelection } from "@/lib/pitch/preferences";
 
 /** One `player_positions` row, as the UI reads it. */
@@ -19,9 +25,13 @@ export type PreferredPosition = {
   preference: PositionPreference;
 };
 
-/** Display rank of a position: goalkeeper first, then back to front (`POSITIONS.sort`). */
-function rankOf(code: PositionCode): number {
-  return POSITION_BY_CODE[code].sort;
+/**
+ * Display rank of a position: goalkeeper first, then back to front (`POSITIONS.sort`). An unknown
+ * code sorts last — the rule, and the reason it is `Number.MAX_SAFE_INTEGER`, lives in
+ * `positionRankOf`.
+ */
+function rankOf(code: string): number {
+  return positionRankOf(code);
 }
 
 /**
@@ -129,15 +139,16 @@ export function positionsSummaryFr(positions: readonly PreferredPosition[]): str
   const secondary = secondaryCodesOf(positions);
   const parts: string[] = [];
 
+  // Through `positionLabelFr`, so a code the reference data does not know prints as itself —
+  // « Poste principal : LIBERO » — which is this module's existing convention for an unknown code
+  // rather than a second French vocabulary to keep in sync.
   if (primary) {
-    parts.push(`Poste principal : ${POSITION_BY_CODE[primary].labelFr}`);
+    parts.push(`Poste principal : ${positionLabelFr(primary)}`);
   }
   if (secondary.length === 1) {
-    parts.push(`poste secondaire : ${POSITION_BY_CODE[secondary[0]].labelFr}`);
+    parts.push(`poste secondaire : ${positionLabelFr(secondary[0])}`);
   } else if (secondary.length > 1) {
-    parts.push(
-      `postes secondaires : ${secondary.map((code) => POSITION_BY_CODE[code].labelFr).join(", ")}`,
-    );
+    parts.push(`postes secondaires : ${secondary.map(positionLabelFr).join(", ")}`);
   }
 
   if (parts.length === 0) return "Aucun poste préféré indiqué";
