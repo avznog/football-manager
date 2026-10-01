@@ -23,6 +23,7 @@ import type { SlotInfo } from "@/lib/match/lineup";
 import { type MatchAnomalyCode, reduceMatch } from "@/lib/match/reducer";
 
 import {
+  RETRO_FACT_TYPES,
   type RetroChange,
   type RetroEntry,
   type RetroFact,
@@ -138,7 +139,9 @@ const idSchema = z.uuid("Ce joueur n’est pas valide.");
 
 export const retroFactSchema = z.object({
   key: z.string().min(1).max(64),
-  type: z.enum(["GOAL_FOR", "PENALTY_SCORED", "PENALTY_MISSED", "OWN_GOAL", "GOAL_AGAINST", "FOUL", "INJURY"]),
+  // The list itself, not a second copy of it: this was seven literals hand-kept in step with
+  // `RETRO_FACT_TYPES`, which is the kind of duplication decision 064 exists about.
+  type: z.enum(RETRO_FACT_TYPES),
   memberId: idSchema.nullable(),
   assistId: idSchema.nullable(),
   minute: minuteSchema,

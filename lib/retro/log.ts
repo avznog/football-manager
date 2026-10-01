@@ -56,9 +56,34 @@ import type { MatchEventRecord } from "@/lib/match/reducer";
 /* -------------------------------------------------------------------------- */
 
 /**
- * The event types the retro screen can produce as "facts of the match". Deliberately excludes the
- * clock events — those are the synthesiser's own job — and `SUBSTITUTION`, `POSITION_CHANGE` and
- * `LINEUP_APPLIED`, which are deduced from the starting seven and the substitution rows.
+ * **The correctable set**, and that is the question it answers: *which events may be amended on a
+ * finished match?*
+ *
+ * It is also the event types the retro screen can produce as "facts of the match" — deliberately
+ * excluding the clock events, which are the synthesiser's own job, and `SUBSTITUTION`,
+ * `POSITION_CHANGE` and `LINEUP_APPLIED`, which are deduced from the starting seven and the
+ * substitution rows.
+ *
+ * **Adding a type here silently makes it correctable.** `isAmendableEventType` (`amend.ts`) is
+ * `isRetroFactType(type) || type === "SUBSTITUTION"`, so a new member of this list immediately gets
+ * a « Corriger » button and a `VOID` that the action will accept on a frozen match. Decision 049
+ * says only football facts may be corrected — the frame of the match (`KICKOFF`, `PERIOD_END`,
+ * `FINAL_WHISTLE`, `LINEUP_APPLIED`) may not, because annulling one of those does not fix a mistake,
+ * it changes what every minute in the log means. `amend.test.ts` pins
+ * `isAmendableEventType("POSITION_CHANGE") === false`; that is this list's boundary, not a detail of
+ * that file.
+ *
+ * So this is **not** « what the entry form offers » — see `RETRO_ACTION_TYPES` below — and the two
+ * must not be merged.
+ *
+ * `FOUL` stays here deliberately. Decision 114 stopped offering the « Faute » tile in game mode's
+ * menu and explicitly kept the type in `MATCH_EVENT_TYPES` and in this list: `match_events` is
+ * append-only (invariant 1), so the fouls already in a log must still render, still count and still
+ * be voidable — and retro entry still asks for them, because a coach writing up a match two weeks
+ * later is doing data entry and not watching football. Which means « the same actions as live mode »
+ * is **additive only, and can never be literally symmetric in either direction**: retro offers
+ * `FOUL`, which the live menu does not, and the live menu offers `COMMENT` (decision 114), which
+ * this form does not.
  */
 export const RETRO_FACT_TYPES = [
   "GOAL_FOR",
@@ -74,6 +99,32 @@ export type RetroFactType = (typeof RETRO_FACT_TYPES)[number];
 
 export function isRetroFactType(value: string): value is RetroFactType {
   return (RETRO_FACT_TYPES as readonly string[]).includes(value);
+}
+
+/**
+ * **The enterable set**, and that is the question it answers: *what can the retro entry form put
+ * into a log?* Used by the entry form only.
+ *
+ * The facts above plus the two the form deduces rather than asks for: `SUBSTITUTION`, from the
+ * « X sort, Y entre » rows, and `POSITION_CHANGE`, for a shirt that moved without anybody leaving
+ * the pitch. It deliberately stops short of the frame — `KICKOFF`, `PERIOD_END`, `FINAL_WHISTLE`,
+ * `LINEUP_APPLIED` — which `buildRetroLog` writes itself from the periods and the starting seven.
+ *
+ * Kept apart from `RETRO_FACT_TYPES` because the two answer different questions and only one of them
+ * is a permission: being enterable on a sheet the coach is still filling in says nothing about being
+ * correctable on a match that is already frozen (decision 049). Merging them would hand
+ * `POSITION_CHANGE` a « Corriger » button nobody decided to give it.
+ */
+export const RETRO_ACTION_TYPES = [
+  ...RETRO_FACT_TYPES,
+  "SUBSTITUTION",
+  "POSITION_CHANGE",
+] as const satisfies readonly MatchEventType[];
+
+export type RetroActionType = (typeof RETRO_ACTION_TYPES)[number];
+
+export function isRetroActionType(value: string): value is RetroActionType {
+  return (RETRO_ACTION_TYPES as readonly string[]).includes(value);
 }
 
 /** Types whose payload requires a player: the reducer refuses them without one. */

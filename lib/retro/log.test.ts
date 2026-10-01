@@ -4,9 +4,14 @@ import { matchEventBatchSchema } from "@/lib/match/events";
 import type { SlotInfo } from "@/lib/match/lineup";
 import { reduceMatch, playerState } from "@/lib/match/reducer";
 
+import { isAmendableEventType } from "./amend";
 import {
+  RETRO_ACTION_TYPES,
+  RETRO_FACT_TYPES,
   type RetroEntry,
   buildRetroLog,
+  isRetroActionType,
+  isRetroFactType,
   retroEntrySeed,
   retroEventId,
   retroEventRecords,
@@ -362,5 +367,61 @@ describe("retroEventId", () => {
     expect(new Set(first.events.map((event) => event.clientEventId)).size).toBe(
       first.events.length,
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The two lists, and why they are two                                        */
+/* -------------------------------------------------------------------------- */
+
+describe("RETRO_FACT_TYPES — the correctable set", () => {
+  it("still holds exactly its seven members", () => {
+    expect(RETRO_FACT_TYPES).toEqual([
+      "GOAL_FOR",
+      "PENALTY_SCORED",
+      "PENALTY_MISSED",
+      "OWN_GOAL",
+      "GOAL_AGAINST",
+      "FOUL",
+      "INJURY",
+    ]);
+  });
+
+  it("still contains FOUL, which decision 114 removed from a menu and not from the model", () => {
+    // `match_events` is append-only: the fouls already logged must render, count and be voidable.
+    expect(RETRO_FACT_TYPES).toContain("FOUL");
+    expect(isRetroFactType("FOUL")).toBe(true);
+  });
+
+  it("is what decides amendability, so POSITION_CHANGE must stay out of it (decision 049)", () => {
+    // Asserted next to the constant as well as in `amend.test.ts`: this is where the coupling bites.
+    // Adding POSITION_CHANGE above would give it a « Corriger » button nobody decided to give it.
+    expect(RETRO_FACT_TYPES as readonly string[]).not.toContain("POSITION_CHANGE");
+    expect(isAmendableEventType("POSITION_CHANGE")).toBe(false);
+    expect(isAmendableEventType("SUBSTITUTION")).toBe(true);
+  });
+});
+
+describe("RETRO_ACTION_TYPES — the enterable set", () => {
+  it("is RETRO_FACT_TYPES plus exactly SUBSTITUTION and POSITION_CHANGE", () => {
+    expect(RETRO_ACTION_TYPES).toEqual([...RETRO_FACT_TYPES, "SUBSTITUTION", "POSITION_CHANGE"]);
+  });
+
+  it("is a strict superset of the correctable set", () => {
+    for (const type of RETRO_FACT_TYPES) {
+      expect(isRetroActionType(type), type).toBe(true);
+    }
+    expect(RETRO_ACTION_TYPES.length).toBe(RETRO_FACT_TYPES.length + 2);
+  });
+
+  it("does not make anything new correctable: being enterable is not being amendable", () => {
+    expect(isRetroActionType("POSITION_CHANGE")).toBe(true);
+    expect(isAmendableEventType("POSITION_CHANGE")).toBe(false);
+  });
+
+  it("stops short of the frame of the match, which buildRetroLog writes itself", () => {
+    for (const type of ["KICKOFF", "PERIOD_END", "FINAL_WHISTLE", "LINEUP_APPLIED"]) {
+      expect(isRetroActionType(type), type).toBe(false);
+    }
   });
 });

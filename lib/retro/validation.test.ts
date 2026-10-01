@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SlotInfo } from "@/lib/match/lineup";
 
-import { type RetroEntry, buildRetroLog } from "./log";
+import { RETRO_FACT_TYPES, type RetroEntry, buildRetroLog } from "./log";
 import {
   type RetroIssueCode,
   type RetroMember,
@@ -11,6 +11,7 @@ import {
   readChangeFields,
   readFactFields,
   readStarterFields,
+  retroFactSchema,
   retroLogIssuesFr,
   retroSubmitSchema,
 } from "./validation";
@@ -405,5 +406,36 @@ describe("retroLogIssuesFr", () => {
   it("does not object to a match played without a goalkeeper", () => {
     const built = buildRetroLog(entry({ starters: STARTERS.slice(1) }));
     expect(retroLogIssuesFr(built.events, { periods, slots: SLOTS })).toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The fact schema, now built from the list instead of repeating it            */
+/* -------------------------------------------------------------------------- */
+
+describe("retroFactSchema", () => {
+  const fact = (type: string) => ({
+    key: "f1",
+    type,
+    memberId: null,
+    assistId: null,
+    minute: null,
+  });
+
+  it("accepts every member of the correctable set, with no second copy of the list", () => {
+    for (const type of RETRO_FACT_TYPES) {
+      expect(retroFactSchema.safeParse(fact(type)).success, type).toBe(true);
+    }
+  });
+
+  it("refuses the two types the form deduces rather than asks for as facts", () => {
+    // Both are *enterable* (`RETRO_ACTION_TYPES`) — as substitution rows and as position changes —
+    // and neither is ever a « fact » row, which is why this schema is built from the narrower list.
+    expect(retroFactSchema.safeParse(fact("SUBSTITUTION")).success).toBe(false);
+    expect(retroFactSchema.safeParse(fact("POSITION_CHANGE")).success).toBe(false);
+  });
+
+  it("refuses the frame of the match", () => {
+    expect(retroFactSchema.safeParse(fact("FINAL_WHISTLE")).success).toBe(false);
   });
 });
