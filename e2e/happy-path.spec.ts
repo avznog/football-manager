@@ -831,16 +831,39 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   await expect(page.getByRole("heading", { level: 1, name: "Saisie du match" })).toBeVisible();
   await expect(page.getByText("Ce match n’a pas encore eu lieu")).toHaveCount(0);
 
+  // An untouched sheet states no score. The Vitest test on `retroScoreLineFr` pins the sentence;
+  // this pins that the component is the thing using it, which no unit test can see.
+  //
+  // `exact` matters, and is not a weakening: the « Actions du match » card legitimately says « Un
+  // 0 – 0 sans rien à signaler, ça existe. » (`RETRO_NO_FACTS_FR`), so a substring match finds that
+  // paragraph and would fail for the wrong reason. What must not exist is an element that *is* the
+  // scoreline — which is exactly the 36 px « 0 – 0 » this slice removed from the Score card.
+  await expect(page.getByText("0 – 0", { exact: true })).toHaveCount(0);
+
   // Typing it up derives the score, so the row stops saying « Rien saisi » — and the fact that this
   // works at all is the whole point: nothing downstream knows the match never had a live clock.
   // Positionally and by value: the 1-3-2-1 has two slots both captioned « Milieu », and the options
   // are labelled « 8. Nom » rather than by name alone. Which post each player took is not what this
   // test is about — that one distinct player lands in each slot is.
-  const slots = page.locator("select");
+  //
+  // Scoped to the starter fields by name rather than « every `<select>` on the page ». A bare
+  // `locator("select")` was correct only because nothing happened to render a `<select>` above the
+  // Composition card, and the next card added above it would have renumbered all seven silently.
+  const slots = page.locator('select[name^="starter:"]');
+  await expect(slots).toHaveCount(STARTERS.length);
   for (const [index, [key]] of STARTERS.entries()) {
     await slots.nth(index).selectOption(playerOf(fixture, key).membershipId);
   }
+
+  // The literal label stays, because the assertion is about that button and not about any button.
   await page.getByRole("button", { name: "+ But pour nous" }).click();
+  // And the row the tap creates has to exist and be rendered — UX audit D6 as a test. Today it is
+  // created 487 px below the fold in the « Actions du match » card, which is the defect; what this
+  // pins is that the tap produces an editable goal row at all, wherever that row ends up living.
+  const goalRows = page.locator('select[name^="fact-type:"]');
+  await expect(goalRows).toHaveCount(1);
+  await expect(goalRows.first()).toBeVisible();
+
   await page.getByRole("button", { name: "Enregistrer le match" }).click();
 
   // The action redirects here itself, so wait for *its* navigation rather than starting one: a
