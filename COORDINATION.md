@@ -800,6 +800,17 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   and the owner's confirmation that Preview and Production `DATABASE_URL` differ. Still nothing touched in
   `vercel.json`, `.github/`, `package.json`'s `version`, Neon or Vercel, and **no tag cut**.
 
+- **2026-10-01 14:25 CEST · the owner's machine · `docs/neon-prefix-is-renameable`** — a loose end of my
+  own, and the correction of something I reported wrongly twice: the one commit about the Neon
+  integration's variable prefix was **never pushed**, not « pushed with no pull request » as my earlier
+  reports and this file both said. `git rev-parse origin/<branch>` is the two-second check neither report
+  ran. It is rebased off `9762369` and opened now. Six lines in `docs/DEPLOY.md` §4 saying the eighteen
+  prefixed variables sit under a prefix the integration **lets you rename** — `NEONDB_` today,
+  `FOOTBALL_MANAGER_` before — and that renaming it changes no code, because the application reads
+  `DATABASE_URL` and nothing else. Also still local and still unpushed: `ci/production-on-a-tag`, whose
+  content shipped as decision 119 via #108 and #110, so it is content-merged and only the branch is
+  stale; I am leaving it rather than deleting another lane's history from under it.
+
 ### From the other machine
 
 - **2026-09-23 11:15 · the other machine, in a loop · `feat/retro-empty-states`** — I am the session
