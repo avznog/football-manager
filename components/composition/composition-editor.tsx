@@ -64,7 +64,7 @@
  * The only stored state is what a gesture actually changes.
  */
 
-import { useActionState, useMemo, useRef, useState } from "react";
+import { useActionState, useId, useMemo, useRef, useState } from "react";
 
 import { POSITION_CODES, atPositionFr, positionLabelFr } from "@/db/reference";
 import type { SquadRole } from "@/db/schema";
@@ -281,6 +281,9 @@ export function CompositionEditor(props: CompositionEditorProps) {
    * and it is drawn *in front of* the bottom of the pitch.
    */
   const dockRef = useRef<HTMLDivElement | null>(null);
+
+  /** The bench strip's description — the count, which the strip itself no longer prints. */
+  const benchHintId = useId();
 
   const byId = useMemo(
     () => new Map(members.map((member) => [member.membershipId, member])),
@@ -877,35 +880,31 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
       {/* --- the dock: the bench and the confirm button, both always on screen --- */}
       <div ref={dockRef} className={cn(DOCK_CLASS, benchDropHint !== null && DOCK_TARGET_CLASS)}>
-        {/* One line for the two things that are true of the whole screen: what a thumb can do next,
-            and whether anything is unsaved. They were two blocks of their own before — 60 px between
-            the pitch and the bench for two short sentences. */}
-        <div className="flex items-start justify-between gap-2">
-          {/* While a player carried off the turf is over the dock the line says what releasing him
-              does, because the lifted disc cannot: `Pitch` is `overflow-hidden`, so it is clipped off
-              at the edge of the turf and the gesture looks like it lost him. `text-accent`, and the
-              ring on the dock, so the answer does not depend on reading a sentence mid-drag — and
-              both of them come from `benchDropHint`, which is `null` for a disc carried *from* the
-              bench: nothing was clipped, and letting go there moves nobody. */}
-          <p
-            className={cn(
-              "min-w-0 flex-1 text-xs leading-snug",
-              benchDropHint !== null ? "font-medium text-accent" : "text-ink-muted",
-            )}
-          >
-            {benchDropHint ?? benchHintFr({ mode, benchCount: bench.length, freeSlots })}
-          </p>
-          {/* `editorSaveStateFr`, not a ternary on `dirty`: a composition being created has never
-              been saved whether or not it has been touched, and it now opens with seven pre-filled
-              discs that look exactly like a plan (decision 106). Allowed to wrap — the sentence is
-              longer than « À jour. » and the dock has a couple of lines to give. */}
-          <p
-            aria-live="polite"
-            className="max-w-[9rem] shrink-0 text-right text-xs font-medium text-ink-subtle"
-          >
-            {editorSaveStateFr({ isNew: props.lineupId === null, dirty })}
-          </p>
-        </div>
+        {/* The dock carries the players and the buttons, and nothing else. The two status lines that
+            used to sit here — the bench count with the tap instruction, and the save state — were
+            permanent text above a strip of discs on the one screen with no vertical room to spare,
+            and both of them restate something the reader is already looking at: the discs are the
+            bench, the empty postes are on the turf a centimetre up, and a composition with nothing
+            recorded is one whose button still says « Créer la composition ». They are kept for a
+            screen reader below, where they are the only account of either.
+
+            The one sentence still allowed on screen is the drop hint, and only while a player from
+            the pitch is actually over the dock: `Pitch` is `overflow-hidden`, so the lifted disc is
+            clipped at the bottom of the turf and the gesture reads as having lost him. The ring says
+            *here*; this says what letting go does. `benchDropHint` is `null` for a disc carried
+            *from* the bench — nothing was clipped, and releasing it moves nobody — so the line is
+            absent for every state of the screen except the one that cannot explain itself. */}
+        {benchDropHint !== null ? (
+          <p className="text-xs leading-snug font-medium text-accent">{benchDropHint}</p>
+        ) : null}
+
+        {/* `editorSaveStateFr`, not a ternary on `dirty`: a composition being created has never been
+            saved whether or not it has been touched, and it opens with seven pre-filled discs that
+            look exactly like a plan (decision 106). Announced rather than drawn, now — the button is
+            what says it on screen. */}
+        <p aria-live="polite" className="sr-only">
+          {editorSaveStateFr({ isNew: props.lineupId === null, dirty })}
+        </p>
 
         {/* The gesture commentary is `sr-only` now, where it used to be a visible line under the
             pitch. Everything it says — a player placed, two swapped, the turf emptied — is already
@@ -916,12 +915,22 @@ export function CompositionEditor(props: CompositionEditorProps) {
           {announcement}
         </p>
 
+        {/* How many are waiting and how many postes are free, announced only. On screen the strip is
+            the count and the turf is the free postes; off it, the strip scrolls sideways and about
+            five of its discs fit, so the number is the one thing nothing else carries. It describes
+            the list rather than living inside it, so a reader moving through the discs is not told
+            the total between two of them. */}
+        <p id={benchHintId} className="sr-only">
+          {benchHintFr({ mode, benchCount: bench.length, freeSlots })}
+        </p>
+
         {/* The bench itself: one strip, titulaires then remplaçants, scrolling sideways when there
             are more than the five that fit. `benchPlayerLabelFr` is what says which is which to a
             screen reader, since the strip carries it by order alone. */}
         {bench.length > 0 ? (
           <ul
             aria-label="Banc : appuie sur un joueur puis sur un poste, ou fais-le glisser sur le terrain."
+            aria-describedby={benchHintId}
             className="flex snap-x gap-2 overflow-x-auto overscroll-x-contain pb-1"
           >
             {starters.map((member) => (
@@ -957,7 +966,22 @@ export function CompositionEditor(props: CompositionEditorProps) {
             {state.error}
           </p>
         ) : null}
-        <FieldError>{blocking.map((issue) => issue.messageFr)}</FieldError>
+        {/* `incomplete` is dropped here and nowhere else: « Il reste 3 postes à pourvoir. » counts
+            the empty postes on the turf directly above, which are drawn empty, so in the dock it is
+            a caption for a picture. It still blocks the save (`canSave`), it is still announced
+            below, and it is still printed on the compositions list, where there is no turf to read
+            it off. Every other blocking issue stays visible: « Personne n’est dans les buts. » names
+            *which* empty poste is the fatal one, and that the turf does not say. */}
+        <FieldError>
+          {blocking.filter((issue) => issue.code !== "incomplete").map((issue) => issue.messageFr)}
+        </FieldError>
+        {/* …and the one that no longer prints is announced, so a save refused is never silent. */}
+        <p aria-live="polite" className="sr-only">
+          {blocking
+            .filter((issue) => issue.code === "incomplete")
+            .map((issue) => issue.messageFr)
+            .join(" ")}
+        </p>
 
         {/* Grid, not a flex row: `Button` is `shrink-0`, and the flex version of this row is how a
             confirm button ended up 8 px off a 390 px screen once already. */}

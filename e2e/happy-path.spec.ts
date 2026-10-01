@@ -264,8 +264,16 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
      * asserted before he touches anything, because they are the two ways a pre-filled pitch could
      * lie: it must not claim to be saved (nothing exists until the submit below, invariant 3), and
      * the deduced changes must be empty rather than « 7 changements ».
+     *
+     * The first of those is now said by the button rather than by a sentence — the dock holds the
+     * players and the buttons and nothing else — so it is checked where it is made: the form offers
+     * to *create*, and the word a saved composition's form carries is absent. « Rien n'est encore
+     * enregistré. » survives for a screen reader, which is why this asserts it is attached and not
+     * that it is visible.
      */
-    await expect(page.getByText("Rien n’est encore enregistré.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Créer la composition" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Enregistrer", exact: true })).toHaveCount(0);
+    await expect(page.getByText("Rien n’est encore enregistré.")).toBeAttached();
     await expect(page.getByText("déplace seulement ce qui change")).toBeVisible();
     await expect(page.getByText("Aucun changement.")).toBeVisible();
 

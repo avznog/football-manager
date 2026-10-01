@@ -3748,3 +3748,38 @@ and badly without it: `findRetroIssues` has `missing-substitute-out` / `missing-
 `retroChangeSchema` requires two uuids on that arm, so a no-JS or crafted POST is answered « Ce joueur
 n'est pas valide. » before the issue finder is asked. The fix is the order of operations in
 `submitRetroMatch`, not this slice. And the audit's `D18` reproduces, untouched by this work.
+
+## The composition dock, down to the players and the buttons
+
+The owner's instruction was one sentence — *« The banner on the bottom is too big … Basically, I only want
+the players, the buttons »* — and the three sentences named in it are now off that screen: the bench count
+with its tap instruction, the save state, and « Il reste N postes à pourvoir. » **Decision 135** has the
+reasoning, including why « Personne n'est dans les buts. » stays and the drag hint stays for exactly as
+long as a finger is over the dock.
+
+**No French was deleted.** `benchHintFr`, `editorSaveStateFr` and `findPlanIssues`' `incomplete` message
+are untouched in `lib/composition/`, still unit-tested branch by branch — all three moved to `sr-only`
+with `aria-live`, and the bench count became the strip's `aria-describedby` rather than a line in the flow.
+That is the only reason this was a twenty-line change and not a negotiation with sixteen verbatim-`toBe`
+copy tests: **the strings are rendered somewhere else now, and `lib/composition/plan.test.ts` asserts the
+functions, not the layout.** 1414 unit tests green, unchanged in number.
+
+One e2e assertion had to move rather than be deleted. `e2e/happy-path.spec.ts` checked that a pre-filled
+editor does not claim to be saved by looking for « Rien n'est encore enregistré. » and calling it visible.
+That claim is now made by the button, so the step asserts the button offers to **create** and that
+« Enregistrer » is absent, and keeps the sentence as `toBeAttached` — deliberately not `toBeVisible`, which
+Tailwind's `sr-only` would have satisfied by accident with a 1×1 box and left the step passing while
+testing nothing.
+
+**Checks.** `npm run typecheck`, `npx eslint` on both touched files, `npm test` (1414 across 65 files) and
+`npm run test:e2e` (5 tests, 1.1 min) green — and the last of those was **green once before it meant
+anything**. The previous entry in this file says to pass `E2E_PORT=3451` because port 3000 belongs to
+another session; on this machine it is the other way round. **3000 is this checkout and 3451 is the peer's
+worktree**, `playwright.config.ts` reuses an existing server outside CI, and so the first full run — plus
+the first pair of screenshots, which showed all three removed sentences still on screen — exercised the
+peer's code. `ls -l /proc/<pid>/cwd` on what `ss -ltnp` lists is what settles it, and `COORDINATION.md`
+now says so, because a port number is not a fact about a machine.
+
+**Looked at, at 390 px, in both themes**, which on this screen is the whole point: the dock is the five
+discs plus the two buttons, and the turf grows by about 44 px — enough that the attacker's poste is on
+screen with the pitch at rest, where before it was under the banner.
