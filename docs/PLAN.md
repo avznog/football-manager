@@ -293,3 +293,169 @@ Each one ends with something usable, and with `docs/ROADMAP.md` and `docs/SESSIO
 - **On a real phone**: `vercel deploy` a preview, then run through a full match on an iPhone and an
   Android in daylight. Check the turf pitch is legible outdoors, the ACTION button is reachable
   one-handed, and dragging a player onto a slot works with a thumb.
+
+---
+
+## Amendments
+
+Appended after the plan was approved, newest batch last. A batch records work the plan did not
+anticipate and the evidence it rests on. It does not rewrite the sections above; where it contradicts
+one, it says so.
+
+### UX audit of the preview deployment — 2026-10-01
+
+**Evidence.** `docs/UX_AUDIT_2026-10-01.md`, committed in #122. Every claim below has a measurement, a
+screenshot and a file-and-line reference there; this batch carries the work items and the ranking, not
+the proof. Read the report before implementing any slice — several fixes are one line in a place that
+is not where the symptom appears.
+
+**What it was.** Eight parallel audits drove `dev.7orteils.bgonzva.fr` at 390×844 and 320 px, light and
+dark, Chromium and WebKit, as a coach and as a player, with writes allowed on data the audits created
+themselves. 52 defects, 11 scope questions, 8 absences, 24 properties worth protecting, 13 stated
+limits. Four seeded states were declared observe-only. Measured on `646b830`, re-checked against
+`b5a6ddb` (#114) and `c0bfab6` (#119); nothing in it was already fixed.
+
+**One finding that changes the plan rather than adding to it.** The report's `D1`, `D3`, `D18` and `D30`
+are all the same shape: **a mutation reports success, or reports a refusal, and destroys or discards what
+the user typed in the same breath.**
+The plan's verification section tests the reducer, the lineup diff and permissions — the pure logic —
+and walks one happy path end to end. None of those four defects fails a single existing test, and all
+four are reachable in two taps on a documented path. The gap is not coverage of the logic, it is that
+**nothing tests a second submit of a form the server has already re-rendered.** Slice 10 below is the
+amendment to « Verification », and it is the one item here that is about the plan rather than the code.
+
+#### Ten slices, ranked by harm
+
+**Slice 1 — Stop losing attendance.** `D1` (« Tout le monde est là » writes 13 rows, leaves 13 radios
+reading « — », and the next save deletes eleven of them — uncontrolled `defaultChecked` in a Server
+Component is not reset by reconciliation after `revalidatePath`), `D4` (losing signal discards the whole
+list and offers a « Réessayer » that cannot work), `A4` (no outbox, though game mode has one), `A3` (no
+pending state on either save button). Make the shortcut a second `<button formAction>` inside the single
+form so there is one submit model and no way to hold stale radio state. **Done when** the four-step
+sequence in `D1` is a passing test and an offline pointage survives a reconnect.
+
+**Slice 2 — Acknowledge the tap, everywhere, from one token.** `D2`: instrumented from `pointerdown`,
+"first DOM change after tap" and "new screen content" are the same number in all eighteen throttled
+samples; the served stylesheet contains **no `:active` rule outside a `pointer-events` utility block**.
+TTFB is 3–27 ms, so this is not a speed problem and making navigation faster will not fix it — which is
+why the `lhr1` region pin (decision 111), which worked, did not help. #114 (decision 123) adds the first
+such surface on the bottom nav; the comment at `components/nav/bottom-nav.tsx:22` is the reference
+implementation. Also `D47`, `A3`. **Done when** the acknowledgement comes from one shared utility applied
+to every control, rather than per-screen patches — « survivors, not coverage » is the failure mode to
+avoid repeating.
+
+**Slice 3 — Make the match sheet and the composition editor safe to use.** `D3` (the sheet saves 6 or 8
+starters silently, and a role change empties composition slots with no warning), `D14` (the editor opens
+with 193–221 px of the pitch behind its own dock: zero of seven slots tappable without scrolling, and a
+drag aimed at midfield is read as "return to bench"), `D15` (deleting a composition is a ghost button
+8 px from « Modifier », no danger styling, no confirmation), `D19` (« Aucun changement. » printed for an
+incomplete plan, when `draftChangesPendingFr` exists for exactly this case and only the editor calls
+it), `D20` (the starter count is always one save behind), `D51`. **Done when** `starters === 7` is a
+schema rule and the pitch is above the dock on mount at both 390 and 320 px.
+
+**Slice 4 — Guard the live match.** `D5` (« Fin du match » ends only the period, and `PERIOD_END` emits
+with no confirm while `FINAL_WHISTLE` gets a sheet — one stray tap freezes the clock, recoverable only by
+appending a `VOID`), `D6` (retro entry creates the scorer field 487 px below the button that creates it;
+the auditor saved without noticing and recorded « buteur non renseigné »), `D18` (every `<select>`
+visibly blanks after a rejected save while the data is still there), `D22` (a half-filled substitution is
+rejected by « Ce joueur n'est pas valide. » 650 px from the row at fault), `D34`, `D41`, `D52`. **Done
+when** no destructive or clock-affecting action in game mode is a single unconfirmed tap, and every
+server-side refusal lands on the row that caused it.
+
+**Slice 5 — Stop the calendar and the hub stating things that are not true.** `D9` (the chronologically
+next match is filed under « Déjà passé » and no one can answer availability for it), `D10` (a match
+« terminé » 17 days in the future loses its « Ta réponse » and « Disponibilités » cards entirely),
+`D11` (a match with an empty event log asserts « Saisi sans composition » and offers « Voir le résumé »
+above « Saisir le match »), `D37`. All four are consequences of decision 121 — a match can be declared
+over — meeting `isPast`, so they are one condition, not four fixes: **availability is open iff the match
+is neither finished nor kicked off, and "finished" and "played" are different facts.** Decision 120
+already established that a rule like this belongs in one place asked by all its callers.
+
+**Slice 6 — Ratings.** `D7` (eleven cards, both controls 253 px below the fold, and partial progress is
+lost on navigation with no guard — note the asymmetry: game mode protects the coach's taps with an
+IndexedDB outbox, the rating sheet's 23 taps have nothing), `D13` (the recap labels substitutes « entré
+en jeu » who never came on and contradicts its own minutes table one scroll down — `playedLabelFr` exists,
+is regression-tested, and was applied to `/notation` and not `/recap`), `D21`.
+
+**Slice 7 — The way in.** `D16` (the coach generates a code, the card tells him to send it on WhatsApp,
+and the app never builds the link — `/rejoindre?code=…` works), `D17` (`/rejoindre` names neither the team
+nor the role), `D31`, `D30`, `A7`. Plus `A6` as the largest single opportunity in the area: nothing
+welcomes a new member, and his first screen is « 14 sans réponse » and a column of « Sans réponse »
+badges. One sentence naming the team he just joined and one suggested first action.
+
+**Slice 8 — Roster, profiles and the self-inflicted footgun.** `D8` (a coach can demote himself out of
+the app with one tap; the removal card twenty lines below correctly carries `&& !isSelf` and the role
+button does not), `D29`, `D32`, `D33`, `D35`, `D36`, `D43`, `D44`, `D45`.
+
+**Slice 9 — Errors, readability and copy.** `D24` (a malformed id is HTTP 500 and the crash boundary;
+`/equipe` gets the same case right, so it is a slip, not a gap — and « Réessayer » cannot ever work
+there), `D48` (the only vouvoiement left in the app is on that crash screen), `D38` (9 px and 10 px type
+carrying load-bearing information), `D39`, `D40`, `D42`, `D46`, `D49`, `D50`.
+
+**Slice 10 — Amend « Verification ».** Add to the plan's test list: a **second submit** of a form whose
+Server Component has re-rendered after `revalidatePath` (the `D1` family, which no current test can
+catch); a unit test over the French string modules asserting **no second-person-plural imperative**, with
+an explicit allow-list — decision 074 is a convention with no test, which is why « Réessayez » shipped
+and why the audit's own first sweep missed it; and a shape guard on every `[id]` route, since `D24` is a
+missing `uuid` check rather than a missing branch.
+
+#### Eleven questions for the owner — unanswered, and not to be resolved by a developer
+
+These are in the report as `S1`–`S11`. They are listed here so the plan records that they are open, with
+no default implied: `/stats` at 6658 px opening on its own footnotes · the shrinkage estimator seating
+five players who scored nothing in « La meilleure équipe », and estimates not being marked as estimates
+at the point of use · eleven font sizes, four off the design scale · « Nouveau match » being the loudest
+thing on the calendar · the pointage being last on the page the evening it is the only thing that matters
+· « — » being the loudest thing in every attendance row · cancelling a session costing thirteen taps and
+a theme field · a player seeing the lineup on `/jeu` but a 404 on `/composition` · the read-only positions
+card stating the same fact three times · the match hub's visual primary on an upcoming match being the
+action that ends it · and **`S11`: a match played in the app can never be deleted.** That last one is
+invariant 1 and decision 003 working exactly as designed — the question is only whether a match with a
+typo in its name should be permanent for the season, and the report offers three answers ranked by cost.
+
+#### Eight absences — roadmap, not bugs
+
+`A1` **no way to change a password anywhere, and no admin reset** (this app writes its own auth; a player
+who shared a password has no recourse — the one to decide first) · `A2` man of the match computed and
+never surfaced · `A3` no pending state on the attendance saves · `A4` no attendance outbox · `A5`
+« parti » unexplained on first use · `A6` nothing welcomes a new member · `A7` « Utilisations »
+unexplained · `A8` no « (toi) » marker in the leaderboards.
+
+#### Properties to protect — do not refactor these away
+
+The report's `G1`–`G24` exist because several of these are better than commercial equivalents and are
+cheap to lose in a refactor that looks like a simplification. The four that would cost the most:
+
+1. **The app refuses to state a number it cannot justify** (`G1`), naming each reason separately rather
+   than once and generically. On `/stats`, three distinct caveats; on `/stats/equipe-type`, four. The only
+   change the audit asks for is to its rank on the page (`S1`), never its content.
+2. **The permission model holds at the door** (`G13`, the strongest result): eight coach-only routes, an
+   honest 404 on each naming the real reason, zero leaked controls in the DOM, and zero links anywhere to
+   a door a player cannot open.
+3. **The append-only log is explained to the user, not merely honoured** (`G21`): « Une correction ne
+   réécrit rien : l'action fautive est annulée et la bonne est ajoutée. Les deux restent dans le déroulé. »
+4. **The no-JavaScript paths work** (`G23`), which is why #114's `<Suspense>` boundary on `/stats` was
+   withdrawn rather than patched (decision 123) — a streaming boundary ships the fallback in the HTML, and
+   it engages only when the query outruns the shell flush, so the slow case loses the no-JS path while the
+   fast case keeps it. Any future boundary on a screen whose controls must work without JavaScript inherits
+   that argument.
+
+Also: the offline queue is genuinely idempotent, verified by replay (`G22`); retroactive entry is the
+best-written feature in the app, and the sentence quoted at `G20` is the model every caveat in this
+product should follow.
+
+#### What the audit could not establish
+
+Thirteen limits are stated in the report. The three that matter for anyone acting on this batch: **no
+real iPhone** (CDP throttling, not a phone at a touchline — the owner's device is 393×852 at DPR 3, and
+the audit ran at 390×844), **contrast was not measured with a meter**, and **five findings were raised
+and then disproved** — a theme-drift bug that was a concurrent write on the shared preview database, an
+arithmetic contradiction that was a documented shrinkage estimator, escaped markup that was a
+`<noscript>` fallback, and two contrast blockers measured against a 15 %-alpha colour as though it were
+opaque. Those five are kept in the report deliberately: the method that produced them is the same method
+that produced the other 52, and a reader needs to see where it failed.
+
+**Owner action, outside any slice.** The preview database holds an orphaned `users` row for `auditg` and
+three matches named « UX Audit H », « UX Audit H retro » and « UX Audit H retro 2 »; the ids are in the
+report's final section. The matches cannot be removed through the UI and should not be — `deleteMatch`
+refuses once an event log exists — so clearing them is a manual `DELETE` and the owner's call.
