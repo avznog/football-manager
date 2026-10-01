@@ -159,6 +159,36 @@
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
+/* The side gutter of a screen that is its own page: `app/error.tsx`,
+   `app/not-found.tsx`, `app/(auth)/layout.tsx`. Use this instead of writing
+   `safe-px px-5`, which does not work.
+
+   `safe-px` above sets the *longhands* `padding-left` / `padding-right`, while
+   `px-5` compiles to the `padding-inline` *shorthand*, and a longhand after a
+   shorthand overrides it unconditionally — no specificity contest to win. So on
+   an upright phone, where both insets are 0, the pair resolves to a gutter of
+   zero and the `px-5` is dead. It cost nothing on the three screens that had it
+   except the thing it was there for: `/connexion` and `/rejoindre` measured
+   0 → 375 of a 375 px viewport, the form card flush against both bezels, and
+   `not-found.tsx` 0 → 390 because its text has no `max-w` to accidentally save
+   it. 390 px is where `max-w-sm` caps the card at 384 and leaves 3 px, which is
+   why nobody saw this: it is invisible at the width we test and visible at the
+   width the phone is.
+
+   Moving this block earlier in the file does not help. Tailwind v4 emits
+   `@utility` into `@layer utilities` *after* its own `px-*`, so source order
+   here is not what decides it.
+
+   `max()` rather than a plain `padding: 20px` because it keeps what
+   `safe-px px-5` was reaching for: in landscape the notch inset exceeds 20 px
+   and wins, which is the whole reason `safe-px` was on these elements. And
+   longhands rather than `padding-inline` so that a stray `safe-px` left behind
+   on the same element cannot reintroduce the bug — the two can no longer
+   disagree, which is the standard decision 118 set for the tab bar's height. */
+@utility gutter-px {
+  padding-left: max(env(safe-area-inset-left, 0px), calc(var(--spacing) * 5));
+  padding-right: max(env(safe-area-inset-right, 0px), calc(var(--spacing) * 5));
+}
 /* Height of the fixed bottom tab bar, home indicator NOT included: add
    `env(safe-area-inset-bottom)` yourself, because `BottomNav` pads itself with
    `safe-pb` and the inset is therefore *inside* the bar, not under it.
