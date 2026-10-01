@@ -302,6 +302,139 @@ Appended after the plan was approved, newest batch last. A batch records work th
 anticipate and the evidence it rests on. It does not rewrite the sections above; where it contradicts
 one, it says so.
 
+### Fourth batch from the beta on the owner's iPhone — 2026-10-01
+
+The owner installed the beta and used it as a coach would. Four things came back, and they are a
+different kind of thing from the three earlier batches: those were almost entirely screens stating
+something untrue, and two of these four are **scope** — the plan asked for something, the something
+got built, and the something is wrong. That is why they are here and not only in `docs/ROADMAP.md`.
+
+Two of the four also turned out, on reading the code, to be **narrower than the words suggest**, and
+both are written up below as what they actually are rather than as what they first sounded like. That
+is deliberate: a remark acted on literally, when the literal reading is already satisfied, produces a
+diff that changes nothing and a session that believes it shipped something.
+
+**1. Retro-entry is one list of actions, and its score is derived.** Amends screen 8 and the « Starting
+point » row of the planning table.
+
+Screen 8 asks for « score, scorers, assists, who played and how long », and that is what was built —
+but as **three** stacked cards: a « Score » card at the top with two big add-a-goal buttons, then
+« Changements », then « Actions du match », each with its own « + Ajouter » in its header. The four
+remarks are one redesign of that, and taking them one at a time misses it: there is **one** list of
+actions, and **one** add button, underneath it.
+
+- **The score card stops being the way goals are entered.** Read the first remark and the second
+  together and they are the same remark. `retro-form.tsx` already derives the scoreline from the rows
+  through `reduceMatch` — the score is *not* typed anywhere in this repository and never was, and the
+  file's own header says so. But the control that *adds* a goal is a pair of buttons inside a card
+  titled « Score », sitting above everything else, and from a thumb that is indistinguishable from
+  editing the score: tap, the number goes up. That is what « we must not be able to edit the score
+  directly » is pointing at. So the « Score » card keeps the derived scoreline and **loses its two
+  buttons**; a goal is added from the action list like every other action, which is the only place it
+  can carry the scorer the card never asked for.
+- **The add button goes under the list, not over it.** Both « + Ajouter » buttons are passed as the
+  `Card`'s `action` prop, and `Card` renders that in its `<header>`, above the children. Typing up a
+  match is a loop — add an action, add the next — so the control that starts the next iteration must
+  be where the last one left the thumb. Above a growing list it walks backwards up the screen on
+  every single action. Cheap to fix, and only sensible once there is one list rather than three.
+- **A substitution is just another action.** Two blocks exist because a change and a goal felt like
+  different kinds of thing when the screen was drawn. They are not: both are one row appended to one
+  event log at one minute, and `buildRetroLog` has always emitted a change as an ordinary
+  `SUBSTITUTION` event. One block, one list, one add button. Note the internal representation can
+  stay as it is — `retroPitch`, `findRetroIssues` and the minute-defaulting are all built on
+  `entry.changes`, and the merge the owner asked for is a merge of the **screen**, not of the model.
+- **The same actions as in game mode**, which is *not* every `MatchEventType`, and the gap is smaller
+  than it sounds. Against game mode's tiles, retro-entry is missing `SUBSTITUTION` (the bullet above)
+  and `POSITION_CHANGE`. Three things stay as they are, deliberately: `FOUL` is offered in retro and
+  is **not** a game-mode tile (decision 114 removed it there, on purpose — so « the same set » cannot
+  mean « identical »), and `REMARK` and `COMMENT` are **live-only by design**, which `RETRO_FACT_TYPES`
+  and `isAmendableEventType` both already state. Whether a remark made from memory a week later is
+  worth recording is a product question the owner has not answered; it stays open under M4 rather
+  than being answered by an array literal.
+- **The case this redesign makes easier to reach, and which belongs in the same slice:** a match typed
+  up with no actions at all. It says it has nothing recorded. It does **not** print « 0 – 0 » — that
+  is the defect the third batch already paid for once.
+
+**2. Dates are DD/MM/YYYY and times are 24h, everywhere.** Amends nothing above; the plan never said.
+
+**Audited, and every surface the app formats itself already complies** — so this item is not the
+change it looks like. Decision 109 made `DD/MM/YYYY` the one shape, `lib/calendar/time.ts` is the only
+module that formats an instant, `lib/player/injury.ts` the only one that formats a `date` column, all
+twenty-odd call sites go through them, 24h is pinned twice over (`fr-FR` **and** an explicit
+`hour12: false`) and the tests assert the literal strings. There is no `toLocaleDateString` in the
+repository and no month-name array left.
+
+**Which leaves exactly one surface that does not comply, and it is the one the owner was almost
+certainly looking at:** the five native pickers — `<input type="date">` in the three injury forms and
+`<input type="datetime-local">` in the match and training forms. A native control renders in the
+**browser's** locale, not the app's, so on a phone set to English the owner sees `MM/DD/YYYY` and an
+AM/PM clock in the one place the app cannot reach with a formatter. Decision 109 saw this and declined
+to act — « replacing the native control with our own is a real change with a real cost — offered to the
+owner, not taken ». This batch is the owner coming back to that offer, so it needs answering rather
+than re-declining: the native control is still the best thing under a thumb, so the app prints the
+value it holds underneath it in its own one shape instead of replacing it.
+
+**3. Preferred positions belong to the player, and there are seven of them.** Amends screens 9, 10
+and the Permissions section.
+
+- **The coach cannot edit them.** The Permissions section already says a player « sets position
+  preferences » and does not grant it to the coach — so this is the plan being enforced rather than
+  changed. A preference is a statement about what someone wants to play, and the only person who can
+  make that statement is the person it is about. The coach has the composition editor for what he
+  wants; that is a different question with a different screen.
+- **Seven positions, in two shapes, not eleven.** The picker offers an eleven-a-side pitch to a team
+  that plays seven. A player cannot prefer a position his team never fields. The two shapes the team
+  actually plays are **GK + 2-3-1** and **GK + 3-2-1**, so the picker offers the union of their slots
+  and nothing else. Note this is about the **preference picker only** — the « custom formations » of
+  the planning table and the composition editor's own templates are a separate surface and are not in
+  scope here.
+- **It crashes on select-and-save**, reported from the phone. The first crash in the beta rather than
+  a wrong sentence. The reproduction is worth writing down even if the fix is one line.
+
+**4. A tap on the bottom tab bar is acknowledged, and is not dropped.** Amends screen 1's tab bar.
+
+The owner's wording has two halves and only one of them is latency: « there is always a delay », and
+« sometimes nothing happens, I need to click a few times ». The second is a tap that did not do what
+it looked like it did, and no amount of making a navigation faster fixes it.
+
+**The measuring is already done and must not be repeated.** PR #111 changed no production code on
+purpose: it measured, and the numbers are in `docs/SESSIONS.md` under « Where the two seconds on the
+iPhone actually are » — 31–35 ms of server think time per tab, 126–217 ms tap-to-heading unthrottled,
+844 ms for `/stats` under CPU ×4 with a 100 ms RTT, and a 1.54 s cold start that is infrastructure and
+the owner's to fix. (Separately, decision 111 pinned the functions to `lhr1`; it is an older entry
+that happens to share the number with the pull request, and it is not #111's write-up.) It also
+cleared all four iOS suspects the brief named, each against a file. So what is left is building what
+it prescribed, in its order:
+
+- **Acknowledge the tap. Done — #114, decision 123.** The owner's observation was true when he made
+  it: `components/nav/bottom-nav.tsx` had no pressed state at all, while every `Button` variant in the
+  repo had an `active:` class, and `useLinkStatus` appeared nowhere. Both halves are now false, which
+  is the point — `active:bg-surface-2` and a `useLinkStatus` pending indicator both landed in #114.
+  Kept here rather than deleted because the remark is the provenance of the fix, and a reader who
+  only sees the fix cannot tell which items came from the owner on a phone.
+- **And this is the dropped tap, with a measurement behind it rather than a guess.** #111 found that
+  under CPU ×4 a tap landing *before hydration* produced a full native document navigation in five of
+  five samples on Calendrier. The bar is a client component reading `usePathname`, so until it
+  hydrates a tap is a cold page load whose first paint is seconds away with nothing on screen. That
+  is « I click and nothing happens », and the fix is the same one, now shipped with the bullet above:
+  **a pressed state renders before hydration, a router pending state does not.** Two device-only
+  suspicions stay written down rather
+  than acted on — iOS Safari's own bottom toolbar eating the first tap under `viewportFit: "cover"`,
+  and `html { overflow-x: hidden }` against a `fixed` bar — because neither can be settled from
+  source and both are outside the four #111 cleared.
+- **A `<Suspense>` boundary on `/stats` — proposed here, built, measured, and withdrawn. Do not
+  re-open it from this line.** 844 ms made it look like the one screen where streaming pays, and the
+  observation that the repository has zero `loading.tsx` files and zero `<Suspense>` boundaries is
+  still true today. It is true *because* the boundary was reverted: it ships the fallback in the HTML
+  and engages only when the query outruns the shell flush, so it would have broken the no-JavaScript
+  path in the slow case and kept it in the fast one. The full argument is four screens below, under
+  « Properties to protect » item 4, and in decision 123 — read it there before proposing a boundary
+  anywhere, because the reason is not « no streaming on these screens ».
+- **`Promise.all` on the two tab pages #111's audit left on the table** — `/stats` and `/moi` each
+  await two independent queries in sequence. Seventeen of twenty-one pages already do this. It is
+  worth a few tens of milliseconds and it will not be described as the fix for anything, any more
+  than #111 would let the auth-prefix joins be.
+
 ### UX audit of the preview deployment — 2026-10-01
 
 **Evidence.** `docs/UX_AUDIT_2026-10-01.md`, committed in #122. Every claim below has a measurement, a
@@ -340,7 +473,8 @@ samples; the served stylesheet contains **no `:active` rule outside a `pointer-e
 TTFB is 3–27 ms, so this is not a speed problem and making navigation faster will not fix it — which is
 why the `lhr1` region pin (decision 111), which worked, did not help. #114 (decision 123) adds the first
 such surface on the bottom nav; the comment at `components/nav/bottom-nav.tsx:22` is the reference
-implementation. Also `D47`, `A3`. **Done when** the acknowledgement comes from one shared utility applied
+implementation **for the CSS and not for the scope** — it acknowledges one surface because that was the
+slice, so copy its `-webkit-tap-highlight-color` reasoning and not its decision to stop at one component. Also `D47`, `A3`. **Done when** the acknowledgement comes from one shared utility applied
 to every control, rather than per-screen patches — « survivors, not coverage » is the failure mode to
 avoid repeating.
 
@@ -435,10 +569,15 @@ cheap to lose in a refactor that looks like a simplification. The four that woul
 3. **The append-only log is explained to the user, not merely honoured** (`G21`): « Une correction ne
    réécrit rien : l'action fautive est annulée et la bonne est ajoutée. Les deux restent dans le déroulé. »
 4. **The no-JavaScript paths work** (`G23`), which is why #114's `<Suspense>` boundary on `/stats` was
-   withdrawn rather than patched (decision 123) — a streaming boundary ships the fallback in the HTML, and
-   it engages only when the query outruns the shell flush, so the slow case loses the no-JS path while the
-   fast case keeps it. Any future boundary on a screen whose controls must work without JavaScript inherits
-   that argument.
+   withdrawn rather than patched (decision 123). **The argument is not « no streaming on these screens »,
+   and shortening it to that leaves a rule nobody can reason with.** It is this: a streaming boundary ships
+   the *fallback* in the HTML and swaps the real content in with an inline script, and it **engages only
+   when the query outruns the shell flush** — so the fast case keeps the no-JavaScript path and the slow
+   case loses it. **The normal case would have been the broken one**, which is worse than a uniform
+   limitation, because a uniform limitation is a trade-off somebody can accept and an intermittent one is
+   not. A boundary on a screen whose controls must work without JavaScript has to answer *that*, and a
+   boundary whose fallback is honest and whose screen does not depend on JS-free controls is not
+   forbidden by this at all.
 
 Also: the offline queue is genuinely idempotent, verified by replay (`G22`); retroactive entry is the
 best-written feature in the app, and the sentence quoted at `G20` is the model every caveat in this
