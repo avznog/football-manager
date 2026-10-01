@@ -1271,9 +1271,27 @@ nothing here needs rewriting — it is dated history either way.
   evidence and `origin` is not.** Second correction: I said `main` was at `1efe7de`; `origin/main` had
   already moved to `bd938e9`, and local `main` — checked out in `ux-analyser` — is **twelve commits
   behind** it, which is a live trap for anyone who branches from it, as I did.
-- **2026-10-01 17:37 · iphone-analyser worktree** — One thing verified in passing that `## NOW` and
-  `docs/DEPLOY.md` §4 both still hedge as « expected, not seen »: `vercel inspect
-  https://dev.7orteils.bgonzva.fr` resolves to `dpl_6PrsBKkc9hUv23Q7qYcWHFf65ZD2`, `target preview`,
-  `status Ready`, aliased to that domain. So **the pinned domain does take the CLI preview deployment**,
-  observed directly rather than inferred from byte-identical bodies. I am not the gatekeeper, so per rule
-  1 I am leaving the `## NOW` line alone and recording it here instead.
+- **2026-10-01 17:37 · iphone-analyser worktree** — **The pinned preview domain is observed, not inferred.**
+  `## NOW` and `docs/DEPLOY.md` §4 both still hedge it as « expected, not seen ». The command, so that any
+  session can re-execute it rather than believe this line — which is the whole lesson of decision 119's
+  first draft:
+
+  ```
+  $ vercel inspect https://dev.7orteils.bgonzva.fr
+  > Fetched deployment "football-manager-d7fbs01br-avznog-team.vercel.app" in avznog-team
+    id       dpl_6PrsBKkc9hUv23Q7qYcWHFf65ZD2
+    name     football-manager
+    target   preview
+    status   ● Ready
+    url      https://football-manager-d7fbs01br-avznog-team.vercel.app
+    created  Thu Oct 01 2026 16:55:32 GMT+0200
+    Aliases
+      ╶ https://dev.7orteils.bgonzva.fr
+  ```
+
+  `target preview` plus that alias is the claim: **the branch-pinned domain does take a CLI preview
+  deployment.** This is weaker evidence than it looks for one thing and stronger for another — it does
+  **not** show that `VERCEL_GIT_COMMIT_REF: main` is what won the alias, only that a preview-target
+  deployment holds it; but it is direct rather than inferred from byte-identical bodies. I am not the
+  gatekeeper, so per rule 1 I have left both hedged lines alone; the session on `preview-production-deploy-split-status`
+  asked for this record and will promote them.
