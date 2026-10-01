@@ -371,6 +371,23 @@ is a **deliberate human act**, four steps:
    Every version up to `v1.0.0-beta.5` is already tagged, so `v1.0.0-beta.6` is the next one that can
    actually be cut. A tag that already exists is not a way to ship again — see below.
 
+**Asking which commit a tag is on: `git rev-parse <tag>` is the wrong command.** `git tag -a` creates an
+annotated tag, which is an **object of its own**, and that object's hash is what `rev-parse` prints — not
+the commit. So `git rev-parse v1.0.0-beta.6` answers `3544bcd`, which is no commit at all, while the
+commit is `646b830`. Two things make this worth a paragraph rather than a footnote: it has already been
+written into this repository's own documents as fact, and the obvious way of checking the method
+**confirms it**, because `v1.0.0-beta.5` is lightweight — `git cat-file -t` says `commit` for that one and
+`tag` for the next — so the same command is right for one tag and wrong for the other. Ask instead:
+
+```bash
+git rev-parse v1.0.0-beta.6^{commit}   # the commit, for either kind of tag
+git log -1 v1.0.0-beta.6               # same, and prints the message with it
+```
+
+`git rev-list --count v1.0.0-beta.6..origin/main` dereferences on its own, so **how far behind the tag is
+stays right while the hash is wrong** — which is how a wrong hash sat next to a right count with nothing
+failing in between.
+
 Then **watch `release.yml`** — `gh run watch` or the Actions tab. It gates the tag, re-runs the same
 checks on the tagged commit, migrates production, builds and deploys production with the Vercel CLI, and
 publishes the GitHub release last, so a release page never names a version that failed to migrate or
