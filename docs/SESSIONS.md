@@ -3819,29 +3819,68 @@ anything typed into the address bar, so a bookmark is the only way in; open
 menu names in French and what each hit-test reading means, is `scripts/iphone-trace/README.md`.
 
 **What was verified.** `npm run typecheck` clean, `npm run lint` clean, `npm test` green at
-**1433 unit tests across 66 files** — 19 of them new, for `lib/dev/trace.ts`, including the one that
-matters most: `isTraceSinkEnabled` must return `false` for `VERCEL_ENV === "production"`. The 12 tests in
+**1446 unit tests across 66 files** — 32 of them new, for `lib/dev/trace.ts`, including the ones that
+matter most: `isTraceSinkEnabled` must return `false` for `VERCEL_ENV === "production"`, and the secret
+comparison must treat `undefined`, `""` and whitespace alike as absent, because an empty field in the
+Vercel UI is the realistic misconfiguration rather than a theoretical one. The 12 tests in
 `proxy.test.ts` still pass, which is the cover for the `PUBLIC_PATHS` change — additive, one entry.
+`npm run build` succeeds and lists `ƒ /api/dev/trace` alongside `ƒ /api/match-events`.
+
+**An operational trap found while getting that build to run, which will cost the next session an hour
+if it is not written down.** `npm run build` first failed here with « Could not find the Next.js package
+(next/package.json) », resolved from the worktree root. The cause is that **a fresh worktree's
+`node_modules` is an empty directory**, and Node's resolution walks *up* the tree to the main checkout's
+`node_modules` — so `typecheck`, `lint` and `vitest` all pass from a worktree that has no dependencies
+installed, silently using another checkout's. Turbopack refuses to, by design: « files outside of the
+workspace root are not compiled ». So a green `npm test` in a worktree does **not** imply the worktree is
+installed, and the fix is `npm ci` inside it. Worth knowing because this repository is worked from
+thirteen worktrees and the three cheap gates are exactly the ones that hide it.
 
 **What was not verified, and will not be papered over.** Three things.
 
-- **`npm run test:e2e` was not run**, deliberately. The local Postgres is shared with the other sessions
-  on this machine, and `playwright.config.ts` has `reuseExistingServer: !process.env.CI` against port
-  3000, which on this machine has already produced a **green** run against another checkout's code. A
-  pass under those conditions is not evidence, and the item under « The tooling this batch broke its nose
-  on » is exactly this. The change this branch makes to anything the suite walks is one additive
+- **`npm run test:e2e` was not run**, deliberately, and the honest reason is the dev server rather than
+  the database. `e2e/fixtures/seed.ts` creates a run-scoped team and prunes the previous run's, and
+  decision 044 keeps it off the demo season, so two sessions running it concurrently is survivable by
+  design. What is not survivable is a server this session did not start: `playwright.config.ts` has
+  `reuseExistingServer: !process.env.CI`, ports 3000 and 3451 belong to other sessions on this machine,
+  and reusing one has **already** produced a green run against another checkout's code — the item under
+  « The tooling this batch broke its nose on » is exactly that. A pass under those conditions is not
+  evidence, so none was claimed. The change this branch makes to anything the suite walks is one additive
   `PUBLIC_PATHS` entry, covered by `proxy.test.ts`; CI runs the browser suite on its own `postgres:17`
   service with `E2E_WEB_SERVER` and `CI` both set, and that is where this gets its real run.
-- **Whether iOS Safari accepts a bookmark address of 14 359 characters has not been observed.** That is
-  the length of the current minified URL. If the paste truncates it will look like it worked, which is why
-  the README says to scroll to the end of the field; and the repair, if it comes to that, is a shorter
-  capture rather than a more aggressive minifier.
+- **Whether iOS Safari accepts a long bookmark address has not been observed**, and the answer now
+  matters much less than it did an hour ago. The install the README leads with is a roughly 420-character
+  loader that sets `window.__fmTraceKey` and appends a `<script>` pointing at `GET /api/dev/trace`, so the
+  probe arrives over the network and the bookmark stays short enough that the question is moot. The inline
+  form is kept as a fallback and is about **15 100 characters** — it grew rather than shrank, because the
+  secret and the key plumbing are now in it. Both figures move with the length of the secret, so the build
+  script prints the exact one; do not quote these from here. If that paste truncates it will look like it
+  worked, which is why
+  the README says to scroll to the end of the field; and the repair is to use the loader.
 - **Nothing in this branch has run on the iPhone at all**, so the two tab-bar suspicions are exactly as
   open as they were this morning and no roadmap box moved to `[x]`.
 
-**One residual risk the owner should be told rather than find.** On the preview deployment the route is
-public and unauthenticated, on purpose: the middleware 307s any extension-less path without a session
-cookie, which would swallow the captures worth having most — `/connexion`, `/rejoindre`, and anything
-taken after an error killed the session. So anyone who knows the path can POST and write bounded noise
-into the preview log stream: schema-validated, capped at 200 entries per batch, read by nobody but him.
-On production the route answers 404 and is indistinguishable from one that was never deployed.
+**What the owner should be told rather than find.** Three things, in the order they bite.
+
+**The route is in `PUBLIC_PATHS`, and public is not open.** It has to be: the middleware 307s any
+extension-less path without a session cookie, which would swallow the captures worth having most —
+`/connexion`, `/rejoindre`, and anything taken after an error killed the session. What stands in for the
+session is a shared secret in `TRACE_SECRET`, compared with `crypto.timingSafeEqual` behind a
+byte-length guard, and **unset, empty or whitespace all mean a dead endpoint**. Off, unconfigured and
+wrong-key are one answer — `404`, with no body distinguishing them — so the route is indistinguishable
+from one that was never deployed, which is also exactly what production gets.
+**So nothing works until the owner sets `TRACE_SECRET` in Vercel's preview environment**, and that is
+his to do: infrastructure is not this session's to touch.
+
+**The loader puts the secret in a query string**, `?k=…` on the `GET`, because a bookmarklet cannot send
+a header for its own script tag. Query strings are the part of a URL that ends up in access logs, so that
+key should be treated as logged, rotated when the owner is done, and never reused for anything else. The
+`POST`s that follow use the `x-trace-secret` header instead.
+
+**What it actually logs is wider than « tab coordinates ».** It forwards console output from five
+methods, `window.onerror` messages with stacks, unhandled rejections, the four tab labels it hit-tests,
+and a label the owner types into the overlay. On a preview whose database holds real-looking data, a
+console line or an error message can carry a real player's name into the Vercel log stream. That is a
+deliberate trade for being able to see anything at all from the phone, not an oversight, and it is
+bounded by the same 200-entry cap and the preview-only gate — but it is the reason the endpoint should go
+back to dead the moment the two tab-bar questions are answered.
