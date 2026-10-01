@@ -3464,3 +3464,24 @@ written down were wrong: the timeline pair is `lib/calendar/timeline.test.ts`, t
 `lib/composition/plan.test.ts` (there is no `lib/match/plan.test.ts`), and the terrain pair is
 `lib/match/terrain.test.ts`. The fix is mechanical — `toContain` on the one discriminating fragment —
 and it is a separate concern from the guard, which is why it is a roadmap line.
+
+**Verified**: typecheck clean, `npx eslint app components lib e2e db tutoiement.test.ts` clean, **1347**
+unit tests green including the guard's own 23, and both CI jobs green on the pull request. `npm run lint`
+is not usable here and that is not this branch's fault: it reports ~1500 errors, every one of them under
+`.claude/worktrees/`, from stale agent worktrees' generated `.next/types/`. No `e2e/` selector or
+assertion names any of the eight rewritten strings — checked, rather than assumed, because that is the
+one thing a copy change can break silently.
+
+**Four corrections, all found by review and all after the merge, which is why they are a second pull
+request rather than a fixup.** Every one is prose, and three are the species this repository keeps
+producing — a true conclusion carried by a false mechanism. The decision entry said the two baseline
+entries « went in the same commit as this file's rebase »: they did not, the deletion is its own later
+commit, and the three rebased commits in between are red on the staleness test by construction, which is
+a better fact than the one it replaced. The roadmap's `e2e/` figures, « roughly 160 … about 54 », were a
+`getByRole` count relabelled as a count of copy; measured, it is 171 argument positions naming French
+copy, of which **13** are assertion-shaped, because 54 of the 67 `toHaveText` calls assert a clock or a
+score. The guard's own JSDoc still described a populated baseline in the present tense, next to a `//`
+note ten lines below saying it was empty. And `lib/match/presenter.ts:868` was quoted with the breach
+text at a line that now holds the fix. The fifth change is not a correction: the `db/` file floor goes
+from 8 to 5, because nine files with `db/migrations/` skipped left no room, and a floor that fails when
+somebody deletes two files reports a hidden directory that nobody hid.

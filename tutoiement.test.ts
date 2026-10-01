@@ -326,30 +326,30 @@ function sourceFiles(dir: string): string[] {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The known breaches, as of **2026-10-01**, each one keyed on the file and the exact line that carries
- * it. Every entry is a sentence somebody has to rewrite; none is a sentence this check got wrong.
+ * **Empty, and it held entries for less than a day.** An entry excuses one known breach, keyed on its
+ * file and the exact text of the line that carries it — a sentence somebody has to rewrite, never a
+ * sentence this check got wrong.
  *
- * The imperative rule landed on a tree that broke it in ten places across four files. Eight of them
- * were corrected in the same change as this file, which is the right way to land a guard; the two left
- * are in a file another session owns and has already fixed on an open pull request, so correcting them
- * here would be a conflict for nothing. Holding the whole guard until that merges was the alternative,
- * and it means not having the guard during the days when sentences are being rewritten, which is
- * exactly when it earns its keep.
+ * The imperative rule landed on a tree that broke it in ten places across four files. Eight were
+ * corrected in the same change as this file, which is the right way to land a guard. The other two were
+ * « Cet écran n’a pas pu s’afficher. Réessayez ; si cela se reproduit, passez par un autre écran et
+ * revenez. » on `components/errors/error-screen.tsx` — the breach this whole file was written in
+ * response to, wrapped over two lines and so two entries — in a file another session owned and had
+ * already rewritten on open pull request #118, where correcting it here would have been a conflict for
+ * nothing. The alternative was to hold the whole guard until that merged, that is, to have no guard
+ * during exactly the days when sentences are being rewritten, which is when it earns its keep.
  *
- * The usual objection to a baseline is that nobody remembers to shrink it. So it cannot rot: « every
- * known breach is still there » is itself asserted below, and the moment one of these sentences is
- * rewritten the suite goes red and names the entry to delete. The baseline shrinks under pressure or
- * not at all.
+ * **#118 merged first** (decision 127), so the two entries went rather than outliving what they
+ * excused, and the cap below went to zero. The usual objection to a baseline is that nobody remembers
+ * to shrink it; this one could not be forgotten. « Every known breach is still there » is asserted
+ * below, so the moment one of those sentences was rewritten the suite went red naming the entry to
+ * delete — which is precisely how these two left. The baseline shrinks under pressure or not at all,
+ * and a new entry now costs raising a number a reviewer can see.
  *
- * Keyed on the text and not the line number on purpose — an edit anywhere above a breach would move its
- * number and cost somebody an afternoon on a failure that means nothing.
+ * Keyed on the text and never on a line number, on purpose: an edit anywhere above a breach moves its
+ * number, and an entry that then excuses a line nobody chose is worse than a wrong failure, because it
+ * is a silence.
  */
-// Empty, and it stayed empty for less than a day. It held the two sentences on
-// `components/errors/error-screen.tsx` that this whole file was written in response to — « Cet écran
-// n’a pas pu s’afficher. Réessayez ; si cela se reproduit, passez par un autre écran et revenez. » —
-// excused by their text because they were another session's to rewrite, on open pull request #118.
-// #118 merged first (decision 127), so the two entries went with it rather than outliving it, and the
-// cap below went to zero in the same commit. Both of those are what the two tests under it are for.
 const KNOWN_IMPERATIVE_BREACHES: { file: string; text: string }[] = [];
 
 function scan(files: string[], rule: RegExp): { file: string; text: string; at: string }[] {
@@ -420,6 +420,11 @@ describe("the tutoiement, over the whole tree (decision 074)", () => {
     // mode, or `"[id]"`, 32 files — stayed inside a floor of 200 with every test still green. The floors
     // sit just under each count instead of on it, so that neither adding a file nor deleting one is a
     // failure and hiding a directory is. A skip cannot be smuggled past this.
+    //
+    // `db/` is the one root with no room: nine files, and `db/migrations/` is skipped, so the floor is 5
+    // rather than one short of nine. A floor of 8 would have made deleting two files from `db/` a
+    // failure reporting that a directory was hidden, which is a lie about a legitimate edit — and the
+    // per-root floors, not the slack-carrying total, are what actually catch a skipped subtree.
     expect(files.length).toBeGreaterThanOrEqual(225);
     const perRoot = new Map(
       ROOTS.map((root) => [root, sourceFiles(join(process.cwd(), root)).length]),
@@ -427,7 +432,7 @@ describe("the tutoiement, over the whole tree (decision 074)", () => {
     expect(perRoot.get("app")).toBeGreaterThanOrEqual(80);
     expect(perRoot.get("components")).toBeGreaterThanOrEqual(42);
     expect(perRoot.get("lib")).toBeGreaterThanOrEqual(84);
-    expect(perRoot.get("db")).toBeGreaterThanOrEqual(8);
+    expect(perRoot.get("db")).toBeGreaterThanOrEqual(5);
     for (const root of ROOTS) {
       expect(files.some((path) => path.includes(`${root}/`))).toBe(true);
     }
