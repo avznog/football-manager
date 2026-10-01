@@ -20,13 +20,19 @@ export const metadata = { title: "Moi" };
 
 export default async function MePage() {
   const [{ team }, user] = await Promise.all([requireTeamContext(), requireUser()]);
-  const teams = await getUserTeams(user.id);
 
-  // A non-playing coach has no player profile at all: no positions, no injuries, nothing to show.
-  const profile =
+  // The team list and the profile share no input — one is keyed on the user, the other on the
+  // membership this page already holds — so they ran one after the other for no reason. Tens of
+  // milliseconds, not the latency the owner feels: the server contributes 31–35 ms to a whole
+  // screen. `Promise.all` passes the `null` straight through for a coach who does not play, so the
+  // condition stays where it was rather than becoming a query that returns nothing.
+  const [teams, profile] = await Promise.all([
+    getUserTeams(user.id),
+    // A non-playing coach has no player profile at all: no positions, no injuries, nothing to show.
     team.isPlayer && team.membershipId
-      ? await getPlayerProfile(team.id, team.membershipId)
-      : null;
+      ? getPlayerProfile(team.id, team.membershipId)
+      : null,
+  ]);
   const today = parisDate(new Date());
   const status = injuryStatus(profile?.injuries ?? [], today);
 

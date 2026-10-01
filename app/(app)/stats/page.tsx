@@ -12,7 +12,9 @@
  */
 
 import Link from "next/link";
+import { Suspense, type ReactNode } from "react";
 
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { competitionLabelOf, statsFilterOptions } from "@/lib/competition/options";
@@ -72,7 +74,18 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
     sort: isPlayerSortKey(sortValue) ? sortValue : DEFAULT_SORT,
   };
 
-  const stats = await getSeasonStats(team.id, team.membershipId, {
+  /**
+   * Started here and awaited twice below, rather than awaited here.
+   *
+   * This is the slowest query in the app — 844 ms from tap to heading on an emulated 4G phone
+   * against 342–367 ms for the three other tabs, its own aggregation and not the shared auth prefix
+   * — and holding the whole document for it is what made the tab read as a tap that had missed.
+   * Awaited inside two `<Suspense>` boundaries instead, so the title, the scope and the competition
+   * chips are on screen while it runs and the chips stay tappable. One promise handed to both of
+   * them rather than two calls: `getSeasonStats` is `cache()`d, so two calls would also cost one
+   * pass, but a single promise says that in the code instead of relying on it.
+   */
+  const stats = getSeasonStats(team.id, team.membershipId, {
     competitionId: query.competitionId,
   });
 
@@ -80,32 +93,119 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
   const filterLabel = competitionLabelOf(competitions, query.competitionId);
   const scopeLabel = filterLabel?.toLocaleLowerCase("fr-FR") ?? "toutes compétitions";
 
+  /**
+   * Keyed on the filter so a chip tap shows the fallback again.
+   *
+   * Without a key, React keeps the previous competition's figures on screen until the new ones
+   * arrive — under a different chip, which now has `aria-current`. Two chips disagreeing about what
+   * the numbers below them count is the one thing this screen may not do.
+   */
+  const boundaryKey = query.competitionId ?? "toutes";
+
   return (
     <div className="space-y-6">
       <header className="space-y-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-ink">Statistiques</h1>
-          <p className="mt-0.5 text-sm text-ink-muted">
-            Saison en cours, {scopeLabel} · {matchCount(stats.matchesConsidered)} terminé
-            {stats.matchesConsidered > 1 ? "s" : ""}
-          </p>
+          {/* The scope is known before the count is, so it is said before the count is. The fallback
+              is the same sentence minus its second half, never a placeholder figure. */}
+          <Suspense
+            key={`scope-${boundaryKey}`}
+            fallback={<ScopeLine>Saison en cours, {scopeLabel}</ScopeLine>}
+          >
+            <ScopeWithCount stats={stats} scopeLabel={scopeLabel} />
+          </Suspense>
         </div>
         <CompetitionFilter query={query} competitions={competitions} />
       </header>
 
-      {/* Nothing at all: one honest empty state rather than eight cards full of dashes. */}
-      {stats.isEmpty ? (
-        <EmptyState
-          title="Pas encore de statistiques"
-          description={
-            filterLabel === null
-              ? "Dès qu’un match sera terminé ou qu’une séance sera pointée, les buts, les minutes et les présences apparaîtront ici."
-              : `Aucun match terminé en ${scopeLabel}, et aucune note à afficher. Choisis « Toutes » pour voir la saison entière.`
-          }
-        />
-      ) : (
-        <SeasonCards query={query} stats={stats} />
-      )}
+      <Suspense key={`season-${boundaryKey}`} fallback={<SeasonSkeleton />}>
+        <Season query={query} stats={stats} filterLabel={filterLabel} scopeLabel={scopeLabel} />
+      </Suspense>
+    </div>
+  );
+}
+
+type SeasonStats = Awaited<ReturnType<typeof getSeasonStats>>;
+
+/** The line under the title, in both its states, so the two cannot drift apart. */
+function ScopeLine({ children }: { children: ReactNode }) {
+  return <p className="mt-0.5 text-sm text-ink-muted">{children}</p>;
+}
+
+async function ScopeWithCount({
+  stats,
+  scopeLabel,
+}: {
+  stats: Promise<SeasonStats>;
+  scopeLabel: string;
+}) {
+  const { matchesConsidered } = await stats;
+  return (
+    <ScopeLine>
+      Saison en cours, {scopeLabel} · {matchCount(matchesConsidered)} terminé
+      {matchesConsidered > 1 ? "s" : ""}
+    </ScopeLine>
+  );
+}
+
+/** Everything that needs the season itself. */
+async function Season({
+  query,
+  stats,
+  filterLabel,
+  scopeLabel,
+}: {
+  query: StatsQuery;
+  stats: Promise<SeasonStats>;
+  filterLabel: string | null;
+  scopeLabel: string;
+}) {
+  const season = await stats;
+
+  // Nothing at all: one honest empty state rather than eight cards full of dashes.
+  if (season.isEmpty) {
+    return (
+      <EmptyState
+        title="Pas encore de statistiques"
+        description={
+          filterLabel === null
+            ? "Dès qu’un match sera terminé ou qu’une séance sera pointée, les buts, les minutes et les présences apparaîtront ici."
+            : `Aucun match terminé en ${scopeLabel}, et aucune note à afficher. Choisis « Toutes » pour voir la saison entière.`
+        }
+      />
+    );
+  }
+
+  return <SeasonCards query={query} stats={season} />;
+}
+
+/**
+ * The first `<Suspense>` fallback in this repository, and therefore the shape every later one should
+ * copy: card outlines, bars, and not one character of content.
+ *
+ * Every figure on this screen is a claim about a season somebody played, so a skeleton holding « 0 »,
+ * a dash or a plausible row would be the defect every wave of this audit found — a screen stating
+ * something it does not know — in the one place the reader cannot even dismiss it. The bars are the
+ * only thing that is true while the query runs: there will be cards here, about this many.
+ *
+ * `animate-pulse` is the one piece of motion, and it is functional rather than decorative: it is what
+ * separates « loading » from « three empty cards ». Under `prefers-reduced-motion` the block in
+ * `app/globals.css` freezes it at full opacity, which still reads as a shape and not as data.
+ */
+function SeasonSkeleton() {
+  return (
+    <div role="status" className="space-y-4">
+      <span className="sr-only">Chargement des statistiques…</span>
+      {[0, 1, 2].map((card) => (
+        <Card key={card} className="animate-pulse">
+          <div className="space-y-3">
+            <div className="h-4 w-1/3 rounded-full bg-surface-2" />
+            <div className="h-3 rounded-full bg-surface-2" />
+            <div className="h-3 w-5/6 rounded-full bg-surface-2" />
+          </div>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -116,7 +216,7 @@ function SeasonCards({
   stats,
 }: {
   query: StatsQuery;
-  stats: Awaited<ReturnType<typeof getSeasonStats>>;
+  stats: SeasonStats;
 }) {
   /**
    * A filter that excludes every match leaves nothing but the trainings, which carry no competition
