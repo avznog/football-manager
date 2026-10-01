@@ -1146,17 +1146,27 @@ it shipped something.
 
 **Where the work is, as of 2026-10-01.** This section was written before any of it was done, so the
 boxes below have been brought back in line with the repository more than once; read them, not this
-paragraph, for the detail. **Three of the owner's four remarks are now on `main`**, and each carries a
+paragraph, for the detail. **All four of the owner's remarks are now on `main`**, and each carries a
 decision entry that exists and is numbered: the tab-bar acknowledgement merged first as #114, decision
 123; the preferred positions merged as #125, decisions **129** (whose wish it is, and the empty
 `positions` table behind the crash — `db/migrations/0006_seed_positions.sql`), **130** (eight codes in
-the picker, eleven in the vocabulary) and **131** (an unknown code sorts last instead of throwing); and
-the native-picker echo merged as #116, decision **133**. **The retro redesign is the one remark still
-open**, as PR #127 `feat/retro-one-action-list` — which is why every `[~]` left in this section sits in
-that one subsection: written, pushed, under review, and not on `main`. After its fifth commit
-`280c6b5` the screen is the single list with the button underneath, so what remains in it is narrow and
-is stated in the item that owns it: **no `POSITION_CHANGE` row, because `RetroAction` still has no arm
-for one.** Each item names the commit, the pull request and the decision that did it, and where the plan
+the picker, eleven in the vocabulary) and **131** (an unknown code sorts last instead of throwing); the
+native-picker echo merged as #116, decision **133**; and the retro redesign merged last, as #127
+`feat/retro-one-action-list`, squashed into `e8bc983`, as decision **134** — which decision 049 now
+points at in one added clause, so the *enterable* / *correctable* split is findable from whichever entry
+a reader lands on first. **No `[~]` is left in this section.** The thing earlier versions of this
+paragraph named as the remainder — a `POSITION_CHANGE` row, waiting on a `RetroAction` arm — is not
+outstanding: the owner **decided against building it**, and #127's last commit took the type back out of
+the enterable list (decision 134).
+
+**Three small things are left over**, and none of them is the redesign. One: whether a `REMARK` or a
+`COMMENT` typed up from memory a week later is worth recording at all is a product question the owner
+has not answered, still open under M4, and named in the action-set item below. Two: on the positions
+form, a rejected `teamId` or `memberId` still leaves the screen silent while « Modifications non
+enregistrées. » claims the work is pending — the last item of the positions subsection says so, and it
+is open on `main`. Three: the two unticked boxes further down, the two device-only tab-bar suspicions no
+Linux session can settle and the `E2E_PORT` collision, which are open by their own statement rather than
+by omission. Each item names the commit, the pull request and the decision that did it, and where the plan
 recorded here turned out to be wrong, the item says so rather than being quietly replaced — the owner's
 observation is the provenance and stays as he made it.
 
@@ -1166,12 +1176,14 @@ The owner, on typing up a match played without the phone: the add button must si
 not over them; the score must not be editable; the same actions as in game mode must be available; and
 « Changements » and « Actions du match » must become one block. They are one redesign, not four items.
 
-- [~] **The « Score » card keeps its scoreline — and keeps its two buttons.** This line used to say it
+- [x] **The « Score » card keeps its scoreline — and keeps its two buttons.** This line used to say it
       would lose them, and that was the plan rather than the answer. The owner's remark stands as he
       made it: « we must not be able to edit the score directly ». It does not describe a typed score —
-      there is **no score input anywhere in this repository**, and `retro-form.tsx:186` has derived the
-      scoreline through `reduceMatch` since it was written, as its own header says at `:12-14`. What it
-      describes is `addGoal` (`retro-form.tsx:157-162`) behind « + But pour nous » / « + But encaissé »,
+      there is **no score input anywhere in this repository**, and `retro-form.tsx` has derived the
+      scoreline through `reduceMatch` since it was written, as the second bullet of its own header
+      comment says. What it describes is the one row-adding helper the two buttons share —
+      `addFactRow("GOAL_FOR")` and `addFactRow("GOAL_AGAINST")` in `retro-form.tsx`, which used to be a
+      separate `addGoal` — behind « + But pour nous » / « + But encaissé »,
       inside a card titled « Score », above everything else: tap, and the number above goes up. **The
       two shortcuts were deliberately kept.** They are one tap per goal — a 7–3 is ten taps, against ten
       `<select>` interactions if the only way in is an action row — and the tap was never score editing,
@@ -1181,13 +1193,15 @@ not over them; the score must not be editable; the same actions as in game mode 
       cannot name a scorer » is false. The tap creates a fact row with a scorer field — 487 px below
       the fold, which is the audit's `D6`, and why `dc8b952` takes « Un appui par but » out of the card
       description instead of leaving a sentence that confirmed the wrong mental model. All of that is on
-      PR #127, open and not merged
-- [~] **The two « + Ajouter » buttons become one, below the list.** They were passed as the `Card`
-      `action` prop — still visible on `main` at `retro-form.tsx:251` and `:343`, with
-      `components/ui/card.tsx:61` rendering that inside the `<header>`, before `{children}`. Typing up a
+      `main`: #127, squash-merged as `e8bc983`, decision 134
+- [x] **The two « + Ajouter » buttons become one, below the list.** They were passed as the `Card`
+      `action` prop, and `components/ui/card.tsx:61` renders that inside the `<header>`, before
+      `{children}` — which is the defect itself, and the reason `Card` is the one file not to touch
+      here. Typing up a
       match is a loop, so the control that starts the next iteration has to be where the last one left
       the thumb; above a growing list it walks backwards up the screen on every action. **Done by
-      `280c6b5` on PR #127, open and not merged**, and the *way* it was done is the part not to undo:
+      `280c6b5` on #127, now on `main` as part of `e8bc983` (decision 134)**, and the *way* it was done
+      is the part not to undo:
       the single « + Ajouter une action » is passed as a **child after the `<ul>`**, and `Card` itself was
       deliberately left untouched. One call site needs a footer and no other card in the app does, so a
       `footer` prop would reshape a component used everywhere to serve one screen. A sticky button was
@@ -1195,9 +1209,10 @@ not over them; the score must not be editable; the same actions as in game mode 
       `61bd777` had prepared the ground on the same branch — the end-to-end walk located the seven
       starter selects by `page.locator("select").nth(index)`, which would have gone red for nothing the
       moment a `select` appeared higher up the page, and is now scoped to `select[name^="starter:"]`
-- [~] **One list, not two: a substitution is just another action.** `buildRetroLog` has always emitted
-      a change as an ordinary `SUBSTITUTION` event (`lib/retro/log.ts:351-361`), so the two blocks are a
-      distinction the model never made. **Both halves have now shipped on PR #127 — open and not merged —
+- [x] **One list, not two: a substitution is just another action.** `buildRetroLog` has always emitted
+      a change as an ordinary `SUBSTITUTION` event — the `retroSubstitutions` loop inside it, in
+      `lib/retro/log.ts` — so the two blocks are a distinction the model never made. **Both halves are
+      now on `main` (#127, squashed into `e8bc983`, decision 134),
       in two commits on purpose: `79dbdee` the data and `280c6b5` the screen.** The first deliberately
       left the screen alone — the form went on rendering « Changements » and « Actions du match » as two
       cards reading and writing one array, because a visible string moving in that commit would have been
@@ -1216,38 +1231,60 @@ not over them; the score must not be editable; the same actions as in game mode 
       a type with a scorer and an assist — each with its own field prefix, decoder, schema, domain type
       and validation rules, converging only inside `buildRetroLog`. They are one `RetroAction`
       discriminated union now, `RetroEntry.changes`/`.facts` are one `actions` array, and `RetroChange`
-      and `RetroFact` survive as `Extract<…>` of it, so `retroPitch` kept its signature and its tests. The
-      return on the four exhaustive switch sites that replaced two loops is that the `POSITION_CHANGE`
-      arm below is a compile error at exactly those four lines instead of a silent omission
-- [~] **The action set gains `SUBSTITUTION` and `POSITION_CHANGE`, and nothing else.** « The same
-      actions as during a game » cannot mean identical, in either direction. `FOUL` is offered in retro
+      and `RetroFact` survive as `Extract<…>` of it, so `retroPitch` kept its signature and its tests.
+      The four exhaustive switch sites that replaced two loops are still the return, and the reason is no
+      longer an arm that is coming — there is none, by decision 134, as the item below now says. It is
+      that the four places the two shapes diverge are *named and enumerable*: the payload builder and the
+      idempotency seed in `lib/retro/log.ts`, `readActionFields` and `findRetroIssues` in
+      `lib/retro/validation.ts`. Any future arm is a compile error at exactly those four and nowhere else,
+      instead of a silent omission nobody can list — and the stamp resolver is the same guarantee by
+      narrowing rather than by `switch`: `resolveFactClockMs` takes `RetroFact`, so « just resolve the
+      stamp of an action » does not compile, which is what keeps decision 048's two rules two rules
+- [x] **The action set gains `SUBSTITUTION`, and `POSITION_CHANGE` was decided against.** This line read
+      « gains `SUBSTITUTION` and `POSITION_CHANGE`, and nothing else » for as long as that was the plan;
+      the owner's answer is narrower, and it is the answer. « The same actions as during a game » cannot
+      mean identical, in either direction. `FOUL` is offered in retro
       and is deliberately **not** a game-mode tile (decision 114). `REMARK` and `COMMENT` are live-only
       by design, and whether a remark made from memory a week later is worth recording is a product
       question the owner has not answered. It stays open under M4 rather than being answered by an array
-      literal. **Two things this line said are no longer true.** It is not « two places »: `947dbf1`
-      deleted the duplicated `z.enum` at `lib/retro/validation.ts:141`, which had the seven codes written
-      out a second time and accepted and refused independently of the constant it was meant to mirror, and
+      literal. **And the asymmetry now runs the other way too: `POSITION_CHANGE` is a game-mode tile and
+      is deliberately not a retro row.** The owner decided not to build it, so game mode keeps one action
+      the retro sheet does not — and that is **the trade, not a gap**. It is recorded as decision 134,
+      whose reasons a later session should read before « fixing » it: the slot select such a row needs has
+      non-unique labels (`labelFr` on a 1-3-2-1 gives two « Milieu »), `retroPitch`'s slot bookkeeping
+      would go stale, an unstamped position change is a label floating inside a spell, and it is the
+      action least likely to be reconstructed from memory a week later. Nothing in the repository is
+      waiting on it: #127's last commit (`3695da2` on the branch, in `main` as part of `e8bc983`) removed
+      `POSITION_CHANGE` from `RETRO_ACTION_TYPES` and deleted `readActionFields`'s explicit
+      `case "POSITION_CHANGE"`, and `lib/retro/log.test.ts` now asserts `isRetroActionType` refuses it,
+      with the test's own name saying that re-adding it for symmetry is the mistake it exists to catch.
+      **Two things this line said are no longer true.** It is not « two places »: `947dbf1`
+      deleted the duplicated `z.enum` in `retroFactSchema` (`lib/retro/validation.ts`), which had the
+      seven codes written out a second time and accepted and refused independently of the constant it was
+      meant to mirror, and
       `retroFactSchema` is now `z.enum(RETRO_FACT_TYPES)`. And it is not one list: putting
-      `POSITION_CHANGE` into `RETRO_FACT_TYPES` (`lib/retro/log.ts:63`) would have made it **correctable
+      a type the entry form offers into `RETRO_FACT_TYPES` (`lib/retro/log.ts`) makes it **correctable
       on a finished match**, because `isAmendableEventType` is `isRetroFactType(type) || type ===
       "SUBSTITUTION"` (`lib/retro/amend.ts:55`) — a permission change by accident, several files from the
       list that caused it, and a contradiction of decision 049's « only football facts may be corrected ».
-      So there are two constants answering two questions: `RETRO_ACTION_TYPES` is **enterable** and
-      already holds both new types, `RETRO_FACT_TYPES` stays **correctable**, and both carry that question
-      in their doc comment because that sentence is the only thing stopping a later session tidying two
-      near-identical lists into one. **Half of it shipped in `280c6b5` on PR #127, open and not merged:
-      `SUBSTITUTION` is offered in the per-row type select.** `POSITION_CHANGE` still is not, and the
-      reason is the one thing in this item a later session must not tidy away — the select is built from
-      `RETRO_FACT_TYPES` plus `"SUBSTITUTION"` **written out**, rather than from `RETRO_ACTION_TYPES`,
-      because `POSITION_CHANGE` has no `RetroAction` arm yet. Offering it would produce a row the decoder
-      cannot read and the server silently drops: a screen that accepts something and loses it, which is
-      worse than a type the screen does not offer. So
-      the shortest honest statement of what is left in this remark is **one union arm and the four switch
-      sites the previous item bought**, and the select then takes `RETRO_ACTION_TYPES` directly
-- [~] **A match typed up with no actions at all must say so, not print « 0 – 0 ».** Making the scoreline
+      **So the two constants stay two, and that is the clause in this item not to tidy away.**
+      `RETRO_ACTION_TYPES` is now *literally* `RETRO_FACT_TYPES` plus `SUBSTITUTION`, which makes the pair
+      look like pure duplication and is exactly why decision 134 spends a paragraph on it: merging them
+      would point `isAmendableEventType` at the array the entry form is built from, so the **next** type
+      added for data entry would silently become correctable on a frozen match. `RETRO_ACTION_TYPES`
+      answers « what may a coach type up? », `RETRO_FACT_TYPES` answers « what may he correct
+      afterwards? », only the second is a permission, and `SUBSTITUTION`'s amendability is granted
+      explicitly by name in that predicate. Both carry the question they answer in their doc comment, and
+      those comments are
+      load-bearing. **All of it is on `main` (#127, `e8bc983`): `SUBSTITUTION` is offered in the per-row
+      type select**, which maps over `RETRO_ACTION_TYPES` itself — the hand-written
+      `RETRO_FACT_TYPES` + `"SUBSTITUTION"` list the form used to keep, in order to subtract
+      `POSITION_CHANGE`, is gone, because there is nothing left to subtract and nothing left to keep in
+      step by hand
+- [x] **A match typed up with no actions at all must say so, not print « 0 – 0 ».** Making the scoreline
       the only score surface makes this case easier to reach, not harder, and it is the defect the third
-      batch already paid for once. Done by `dc8b952` on PR #127 — open and not merged, so
-      `lib/retro/labels.ts` on `main` still has neither function below. `retroScoreLineFr` returns `null`
+      batch already paid for once. Done by `dc8b952` on #127, now on `main` as part of `e8bc983`, so
+      `lib/retro/labels.ts` holds both functions below. `retroScoreLineFr` returns `null`
       unless the sheet holds a row of `SCORING_EVENT_TYPES`, and the card prints a sentence instead of a
       scoreline when it does not: not « any content at all », so a sheet with one foul and no goals still
       shows none, which is what lets the next card's « Un 0 – 0 sans rien à signaler, ça existe. » stay
