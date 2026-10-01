@@ -904,7 +904,7 @@ the reachable-turf finding below an **under**-statement on device rather than an
       `safe-pb-*` utility, used as `safe-pb-2`, measured `pb 8px` after — named rather than an inline
       bracketed value because an arbitrary `pb-*` is emitted before `.safe-pb` and would silently lose
       the sum to a stray, while the named one is emitted after it. The other four `safe-*` users were
-      swept and are clean: each is a lone longhand with no shorthand on the same property (decision 125)
+      swept and are clean: each is a lone longhand with no shorthand on the same property (decision 126)
 - [ ] `isUuid()` (`lib/player/validation.ts:23-25`) tests the lax regex at `:17`, while the actions
       validate the same ids with `z.uuid()`, which in Zod 4 enforces the RFC variant nibble — so a page
       can load for an id the action then silently rejects. Latent only: every real row is a

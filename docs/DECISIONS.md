@@ -3964,7 +3964,7 @@ gets a sentence and the player gets an instruction » — both strings are corre
 tutoied, and a snapshot of either passes. It is a looking rule, like the theme rule, and it is cheap
 for the same reason: the cost is one extra login, and it catches a class rather than an instance.
 
-## 125 — The second instance of 124, and the sweep that says there is no third
+## 126 — The second instance of 124, and the sweep that says there is no third
 
 **Date** 2026-10-01 · **Status** accepted · extends 124
 
@@ -4027,7 +4027,7 @@ names today, not a property of the design, and nobody should rely on it.
 `match-bar.tsx:105` is `safe-pt` beside `px-3`, a different axis; `app-shell.tsx:76` is `safe-pt` alone;
 `bottom-nav.tsx:53` is `safe-pb safe-px` with no shorthand and is deliberately bezel-to-bezel (124).
 So four are clean for one reason — a lone longhand with no shorthand competing for the same property —
-and that sentence is the whole test. Decisions 124 and 125 found **two patterns across four call
+and that sentence is the whole test. Decisions 124 and 126 found **two patterns across four call
 sites** between them — `safe-px px-5` on three screens, `safe-pb py-2` on one bar — and the repository
 has no fifth.
 

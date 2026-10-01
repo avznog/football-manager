@@ -3263,7 +3263,7 @@ the bare inset; the named utility is emitted *after* `.safe-pb` and survives one
 
 **The sweep is the deliverable, not the one-line fix.** All five `safe-*` users were checked against the
 same shape, and four are clean for one reason: a lone longhand with no shorthand competing for the same
-property. `sheet.tsx:153`, `match-bar.tsx:105`, `app-shell.tsx:76`, `bottom-nav.tsx:53`. So 124 and 125
+property. `sheet.tsx:153`, `match-bar.tsx:105`, `app-shell.tsx:76`, `bottom-nav.tsx:53`. So 124 and 126
 found **two patterns across four call sites** between them — three screens with `safe-px px-5`, one bar
 with `safe-pb py-2` — and there is no fifth, which is a better thing to have written down than either
 fix, because the next session's question will be « is this everywhere ».
