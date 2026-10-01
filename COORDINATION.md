@@ -20,19 +20,22 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `f13f27e`. The newest tag, `v1.0.0-beta.6`, is on `646b830`, one commit behind, so
-  **preview is ahead of production** by that commit and will stay ahead until the next tag — which is
-  normal and is what the split is for, not a thing to fix. Managed from **the owner's machine**, the
+- **`main`** — at `e634b21`. The newest tag, `v1.0.0-beta.6`, is on **`3544bcd`**, now **11 commits
+  behind**, so **preview is ahead of production** by all eleven and will stay ahead until the next tag —
+  which is normal and is what the split is for, not a thing to fix. Two things this line got wrong while
+  nobody re-derived it: the commit (`646b830` is the squash of #113, which the tag does not point at) and
+  « one commit behind », which was true for about a day in a month of merging. Managed from **the owner's machine**, the
   gatekeeper: it reviews and squash-merges, including work pushed from the other machine.
-- **Last shipped** — **`v1.0.0-beta.6`**, on `646b830`: the `REMARK` event and the drawn action tiles.
+- **Last shipped** — **`v1.0.0-beta.6`**, on `3544bcd`: the `REMARK` event and the drawn action tiles.
   A version is `package.json`'s `version`; the annotated tag, cut **by hand** on `main`, is the act
   that ships it and the only thing that migrates and deploys production (decision 119). Nothing cuts a
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **123**. The highest written anywhere is **122**, on `main`. The other
-  machine's `perf/acknowledge-tab-taps` carries the entry that will take 123, and it correctly left the
-  heading as `## NNN — …` rather than claiming the number. Do the same; the merging session numbers it.
+- **Next free decision number** — **129**. The highest on `main` is **127**; **128** is taken by #121,
+  which is merging as this is written. Leave your heading as `## NNN — …` rather than claiming a number;
+  the merging session fills it in. The other machine reports three `NNN` placeholders on PR #125 and two
+  more coming on `feat/retro-one-action-list`, and is not claiming a range.
 - **Live** — production `https://7orteils.bgonzva.fr`, deployed by `release.yml` on a tag. Preview
   `https://dev.7orteils.bgonzva.fr`, deployed by `ci.yml` on a push to `main`, after it migrates the
   preview database. Both go out through the **Vercel CLI**: `vercel.json` sets `git.deploymentEnabled`
@@ -754,6 +757,27 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   narrowing a migration question rather than a narrowing, and production being empty is a reason to get
   it right **cheaply**, not a reason to skip it: dev's rows are the only real test data either machine
   will ever have for it.
+- **2026-10-01 13:55 CEST · the owner's machine · `test/tutoiement-guard`** — merged **#123** (decision
+  126, the game-mode action bar's 8 px, which is 124's arithmetic one axis over) and **#118** (decision
+  127, the error screen offers a reload unconditionally and classifies nothing). **#121** merged as
+  `e634b21`, decision **128**: decision 074's tutoiement is a test, `tutoiement.test.ts` at the
+  repository root, scanning `app/`, `components/`, `lib/` and `db/` as text — eight live breaches fixed
+  with it, and `lib/match/presenter.test.ts:428` was *pinning* one of them, so a session that had fixed
+  the sentence would have been told it broke something. Two things for the other machine. **One:** the
+  guard will fail your branches if a new French string vouvoies, including `{ name: … }` copy in
+  `e2e/`-adjacent screens; it is one `node:fs` walk, the failure names file, line and the line, and a
+  `## NNN` entry does not exempt it. **Two:** the baseline it shipped with is **empty** — it held the
+  two `error-screen.tsx` sentences for one morning, and the staleness test forced them out the moment
+  #118 merged, which is what a baseline you are allowed to write looks like. A follow-up branch,
+  `docs/correct-the-tutoiement-entry`, carries four corrections the review found **after** #121 had
+  merged — all in prose, none from a rerun, and all the same species this repository keeps producing: a
+  `docs/` claim that the deletion rode in on the rebase commit (it did not; the three rebased commits in
+  between are red on that one test by construction), two `e2e/` counts that were a `getByRole` total
+  relabelled as a copy total, and a JSDoc describing in the present tense a baseline that no longer has
+  anything in it. It also lowers the `db/` file floor from 8 to 5, because nine files with `migrations/`
+  skipped left no room: deleting two files from `db/` would have failed reporting a hidden directory.
+  **Nothing touched** in `vercel.json`, `.github/`, `package.json`'s `version`, Neon or Vercel, and **no
+  tag cut**.
 
 ### From the other machine
 

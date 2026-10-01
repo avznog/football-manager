@@ -4178,11 +4178,15 @@ alternative was to hold the whole guard until #118 merged — that is, to have n
 days when sentences are being rewritten, which is when it earns its keep.
 
 **#118 merged first, as decision 127, so the baseline never shipped with anything in it.** The two
-entries and the cap's `2` went in the same commit as this file's rebase onto it, and the array is now
-`[]` with the cap at `0`. That is not a loose end tidied after the fact: the staleness test **forces**
-it. The moment that sentence became the infinitive « Réessayer », the two entries matched nothing and
-the suite went red naming them, so whichever of the two pull requests merged second had no way to leave
-them behind — `main` would have been red until they were deleted. A baseline that cannot outlive what it
+entries and the cap's `2` came out in their own commit, the last on the branch, and the array is now
+`[]` with the cap at `0`. Not a loose end tidied after the fact: the staleness test **forced** it. The
+moment that sentence became the infinitive « Réessayer » under the rebase, the two entries matched
+nothing and the suite went red naming them, so whichever pull request merged second had no way to leave
+them behind — `main` would have been red until they were deleted. **Be precise about the order, because
+the obvious shorter sentence is false:** the deletion was not part of the rebase. The three rebased
+commits in between carry the rebased tree *and* the two entries, so each of them is red on that one
+test by construction — which is what a guard that cannot be papered over looks like from the inside, and
+why the only state that ever reaches `main` is the squashed one. A baseline that cannot outlive what it
 excuses is the only kind worth writing, and this is the proof, on the first and only entries it ever had.
 
 The hazard is named rather than hoped away: **an allow-list is a place a future breach can be hidden**,

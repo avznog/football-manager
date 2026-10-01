@@ -732,8 +732,9 @@ the reachable-turf finding below an **under**-statement on device rather than an
 ### The French
 
 - [x] Two shipped vouvoiements, which decision 074 forbids without exception.
-      `lib/match/presenter.ts:868` « Renseign**ez**-la avant le coup d'envoi » — the line was `:787` when
-      this was written and the comments added since moved it — and on the player's
+      `lib/match/presenter.ts:868` « Renseign**ez**-la avant le coup d'envoi », now « Renseigne-la » —
+      the line was `:787` when this was written and the comments added since moved it, so `:868` is the
+      fixed sentence and the quoted one is what used to be there — and on the player's
       game-mode screen that sentence orders him to fill in a composition the banner above it says only
       the operator may touch, so the copy is the coach's, served to everyone.
       `components/action-sheet/terrain-sheet.tsx:206` « Appu**yez** sur un poste pour le placer » is a
@@ -794,8 +795,14 @@ the reachable-turf finding below an **under**-statement on device rather than an
       (not `lib/composition/`) `:364` (« 8 joueurs placés : il n'en faut que 7. ») and `:388`, which is a
       `toEqual` on a two-element array of whole sentences; `lib/retro/validation.test.ts:328`,
       `lib/rating/flow.test.ts:51`, `lib/player/validation.test.ts:102`, `lib/team/labels.test.ts:9`.
-      Beside them, `e2e/` carries roughly 160 French-text sites of which about 54 are assertion-shaped
-      (`toHaveText`, `toContainText`) rather than selectors — those stay, per the argument in
+      Beside them, `e2e/` names French copy literally in **171 argument positions** — 66 worded strings
+      passed to `getByText` / `getByLabel` / `hasText` and 105 `{ name: … }` role options, counted as
+      occurrences rather than lines — of which only **13** are assertion-shaped. That last figure is the
+      one that matters and it is small: `toHaveText` / `toContainText` occur 67 times, but 54 of those
+      assert a clock or a score (« 00:00 », « 0 – 3 », « 26’ »), not a sentence. An earlier draft of this
+      item said « roughly 160 … about 54 »; both numbers were wrong and the first was a `getByRole`
+      count, which really is 160 and is a count of **selectors**, not of copy. Those sites stay, per the
+      argument in
       `tutoiement.test.ts` for leaving `e2e/` out of the scan. The mitigation is mechanical: downgrade
       the 16 from `toBe` to `toContain` on the one fragment that discriminates the case. Not done in the
       pull request that added the guard, because it is a separate concern — the guard is about copy the
