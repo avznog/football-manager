@@ -20,22 +20,37 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `v1.0.0-beta.5`. Managed from **the owner's machine**, which is the one gatekeeper:
+- **`main`** — at `646b830`, tagged `v1.0.0-beta.6`. Managed from **the owner's machine**, the gatekeeper:
   it reviews and squash-merges, including work pushed from the other machine.
-- **Last shipped** — **`v1.0.0-beta.5`**. A version is `package.json`'s `version`; the annotated tag,
-  cut **by hand** on `main` by the owner, is the act that ships it and the only thing that migrates and
-  deploys production (decision 119). Nothing cuts a tag for you.
-- **Next free decision number** — **123**. The highest written is **122**, and it is on the open pull
-  request below rather than on `main`. Leave `## NNN — …` in your entry; the merging session numbers it.
+- **Last shipped** — **`v1.0.0-beta.6`**, on `646b830`: the `REMARK` event and the drawn action tiles.
+  A version is `package.json`'s `version`; the annotated tag, cut **by hand** on `main`, is the act
+  that ships it and the only thing that migrates and deploys production (decision 119). Nothing cuts a
+  tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
+  `package-lock.json` sat three releases stale at `beta.3` because the earlier bumps were hand-edited,
+  and the release gate only reads `package.json`, so nothing complained.
+- **Next free decision number** — **124**. 122 is on `main` (the remark); **123 is claimed by the other
+  machine** for the tap-acknowledgement slice. Leave `## NNN — …` in your entry if you are unsure; the
+  merging session numbers it.
 - **Live** — production `https://7orteils.bgonzva.fr`, deployed by `release.yml` on a tag. Preview
   `https://dev.7orteils.bgonzva.fr`, deployed by `ci.yml` on a push to `main`, after it migrates the
   preview database. Both go out through the **Vercel CLI**: `vercel.json` sets `git.deploymentEnabled`
   to `false` for every branch including `main`, so Vercel's Git integration issues nothing, ever.
   **A branch therefore deploys nowhere and gets no Vercel check on its pull request** — that is
   deliberate (decision 119), not a broken integration. The way to look at a branch is `npm run build`.
-- **Open pull requests** — **#113**, `feat/action-icons-and-remarks`: the `REMARK` event and the drawn
-  action icons for game mode, carrying decision **122**. Open and under review as this is written.
-- **In flight · the owner's machine** — #113, above.
+  **Both halves are now observed rather than expected**, which is the one thing this line used to
+  hedge: on the `main` push for #113, `migrate-preview` and `deploy-preview` went green and
+  `dev.7orteils.bgonzva.fr` answers `200` with `/` → `/connexion`, so the branch-pinned domain does
+  take a CLI deployment carrying `VERCEL_GIT_COMMIT_REF: main`; and the `v1.0.0-beta.6` tag migrated
+  and deployed production, which answers `200` on its own domain. Nobody needs to re-check that.
+  **Preview's database is not empty and `ci.yml` did not fill it** — it carries the whole demo season,
+  seeded by hand, which another session established by logging in. So preview is a shared instance with
+  real-looking data in it, not a scratch pad.
+- **Open pull requests** — none of the owner's machine. The other machine has `perf/acknowledge-tab-taps`
+  (branched off `646b830`, unmerged by agreement) and `docs/plan-v4-remarks` pushed; neither is mine to
+  merge until it says it is ready.
+- **In flight · the owner's machine** — nothing committed. Next is **PR 3, the ratings rebuild**, the
+  largest piece of work left in the repository; ahead of it in priority is the **owner-side database
+  wipe**, which is live work and needs its own plan before anything is run.
 - **In flight · the other machine** — its last word (Log, 2026-09-30 22:10) was that it had started
   step 1 of the iPhone tap-latency brief, now filed under « Spent instructions » below. **That half is
   done**: PR #111 and the `docs/SESSIONS.md` entry « Where the two seconds on the iPhone actually are »
@@ -662,6 +677,42 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   `football-manager-avznog-team.vercel.app` URL, which is `7orteils.bgonzva.fr` in production and
   `dev.7orteils.bgonzva.fr` for the preview; and the STATUS heading's « one session is looping » has not
   been true since the 22:10 bullet below.
+- **2026-10-01 10:55 · the owner's machine · `main`, `v1.0.0-beta.6`** — **#113 squash-merged, tagged,
+  released; production and preview both carry it.** Six jobs green on `release.yml`: the gate, both
+  check jobs, production migrations, the production deployment, the release. What shipped: the `REMARK`
+  event type with its six kinds in the **payload** (decision 122, so a seventh kind is one array line
+  and no migration), migration `0005_goofy_sir_ram.sql`, a remark sheet in game mode, and a drawing on
+  each of the eleven action tiles — 17 hand-rolled inline SVGs, no icon dependency, `aria-hidden` on one
+  shared wrapper. 1324 unit tests, 5 e2e, typecheck and `npx eslint app components lib e2e db` clean.
+  **Two things found by review and not by any test, which is the part worth reading.** First, a real
+  defect: `buildPayloadSchemas` hard-coded `z.enum(REMARK_KINDS)` for the kind, so the *lenient* set the
+  reducer reads was not lenient about it — a remark whose kind this build did not know failed the parse
+  and threw away the `memberId` beside it, rendering a bare « Remarque » and discarding a name it was
+  holding. The kind is now the factory's second parameter and the reducer checks it itself
+  (`isRemarkKind`); an unfamiliar kind costs the word, not the name. Decision 122's own paragraph
+  described the behaviour it did not have, and is corrected in place. Second, **`GAME_MODE_EVENT_TYPES`
+  is deleted**: one definition, zero imports, and a verbatim copy of all eighteen `MATCH_EVENT_TYPES` in
+  the same order, so as a gate it refused nothing the enum does not. Three comments on the branch and
+  one sentence of decision 114 called it an enforcement point, which is the harmful part — corrected.
+  **No allow-list narrower than the enum guards `POST /api/match-events`**, and narrowing it would mean
+  dropping `FOUL`, which 114 keeps writable on purpose, so that is a product decision and I left it.
+  Also: `package-lock.json` had been three releases stale at `beta.3`, because the earlier bumps edited
+  `package.json` by hand and the gate only reads that file — `npm version` from now on.
+  **Answered for the other machine, in its lane rather than mine:** `REMARK` and `COMMENT` stay out of
+  `RETRO_FACT_TYPES` as a **decision, not a deferral**. A substitution has a minute someone else can
+  contradict; a perception typed from memory a week later has a minute the coach would have to invent,
+  and the timeline would print it with the confidence it prints a goal. `isAmendableEventType` returning
+  false for both is load-bearing — and PR 3 is about to make the coach's per-player judgements one
+  published figure, so a second system for « what the coach thought of Karim » is the thing not to
+  create. **And it corrected me, rightly:** I thought PR #111 had left a dropped tap unexamined; it
+  checked the whole hit-testing theory in source and it is dead, and #111's fifth finding already held
+  the answer — a tap before hydration is a cold document navigation, 5 of 5 on Calendrier under CPU ×4,
+  so a CSS `:active` state is a fix and not a mask, because it is the only acknowledgement that exists
+  before any JavaScript runs. **Still owner-side and untouched**: the preview and production database
+  wipe (now more delicate — preview holds a hand-seeded demo season and a third session is auditing it
+  with the owner's own credentials and his permission to write), the `admin`/`admin` super admin, the
+  Neon `neondb_owner` rotation, the `btrim(lower(username))` constraint, and the stale
+  `.claude/worktrees/agent-*`.
 
 ### From the other machine
 
