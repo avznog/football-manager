@@ -4734,3 +4734,87 @@ between two of them. This is where decision 097 is narrowed rather than contradi
 sentence that is true of only some states of the screen belongs in a pure function a test can walk. It
 says nothing about the sentence having to be *drawn*, and the version of this screen that printed all of
 them was the one that proved a true sentence can still be the wrong 20 px.
+## 136 — The owner's iPhone gets a trace sink, and it ships nothing
+
+**2026-10-01** · accepted · **amends decision 127** · follows the precedent decision 123 set in
+PR #111 · supersedes nothing
+
+*(Numbering: 136 was taken rather than left as `## NNN`, which coordination rule 2 would otherwise
+require, because the session holding `docs/DECISIONS.md` said so directly — nothing else was in flight
+on this file and a session holding it should name its own number. Derived, not assumed:
+`grep -c '^## ' docs/DECISIONS.md` on `1bcd754` gives 135, whose last entry is 135. The `## NOW` line
+claiming 123 was stale by thirteen.)*
+
+Three of the four device-only questions this repository is carrying cannot be answered from a Linux
+session, and all three are the same shape: the evidence is on a phone that is not the machine running
+the session, and iOS Safari has no console a session can read. The two tab-bar suspicions are told
+apart by what `document.elementFromPoint` returns at the centre of each tab — that is the roadmap's own
+prescription, not a new idea here. The positions crash was a `23503` reaching an error boundary with
+nothing written down anywhere a session could read. And the audit walks 390 × 844 while the owner's
+phone is 393 × 852 at DPR 3, which is a claim about the device nobody has ever measured on the device.
+So: the owner taps a capture into the page, it POSTs a batch, and a session watches it come out of
+`vercel logs`.
+
+**Nothing is stored, and that is the load-bearing choice rather than a shortcut.** A `traces` table
+would need a new `Action` member in `lib/auth/can.ts` to satisfy invariant 4, and its migration would
+reach preview on merge and production on the next tag by decision 119 — so a *preview-only* table is
+not expressible at all, and the thing a diagnostic most needs to be is deletable. Decisions 115 and 122
+are the standing bias against a new table and this follows them. The route therefore `console.log`s one
+`[iphone-trace] <single-line JSON>` per entry and the reader is `vercel logs … | grep '[iphone-trace]'`.
+The cost, stated rather than buried: **there is no durability.** A trace lives as long as the log stream
+and no longer, so a finding worth keeping has to be copied into `docs/` by hand, by the session that read
+it. Deleting three files deletes the feature, and that is the property being bought.
+
+**The capture is a bookmarklet, not production code, and that is what keeps decision 127 true.**
+`scripts/iphone-trace/capture.js` is built by `build-bookmarklet.mjs` into a `javascript:` URL in the
+gitignored `audit/`; nothing in `app/`, `components/` or `lib/` imports it, and it runs only in a tab the
+owner injected it into himself. This is the amendment: decision 127 reasoned that the **absence** of a
+Next error digest means the throw happened in the browser, and a shipped client-side error sink would
+have made that sentence false the day it merged — every browser throw would have left a server-side
+trace and the digest's absence would have stopped meaning anything. It still means what 127 says it
+means, because the sink is never in the bundle. For the same reason decision 059's `audit:screens`
+console gate still sees nothing new on any of the 23 walked screens: the capture wraps the five
+`console` methods and always calls through to the original, but it is not there during an audit run.
+Decision 123 set this precedent in PR #111 — instrumentation that deliberately changed no production
+code — and this is the second use of it.
+
+**The gate reads `VERCEL_ENV`, which Vercel populates by itself.** `isTraceSinkEnabled`
+(`lib/dev/trace.ts`) is `false` for `production`, `true` for `preview` and `development`, and falls
+back to `NODE_ENV` off Vercel. No new environment variable, so coordination rule 3 — infrastructure is
+the owner's — is respected without a trip to the dashboard. `VERCEL_ENV` appeared nowhere in the
+repository before this. It is a pure function taking the environment as an argument and never reading
+`process.env`, and the route reads the environment **inside** the handler, so the production case is a
+unit test rather than a claim and a build does not depend on the environment being populated (decision
+075). Disabled answers **404 and not 403**: on production the endpoint must be indistinguishable from
+one that was never deployed, and a 403 would confirm it is there.
+
+**The route is unauthenticated and listed in `proxy.ts`'s `PUBLIC_PATHS`, deliberately.** The middleware
+307s any extension-less path carrying no session cookie, which would swallow exactly the captures worth
+having most — the ones from `/connexion` and `/rejoindre`, and the one taken after an error killed the
+session. It calls no `can()` because it performs no mutation: it writes no row, reads no row and never
+touches a database client, so there is nothing for `can()` to authorise, and invariant 4 is about
+mutations. **The residual risk, named rather than argued away: on a preview deployment anyone who knows
+the path can POST and write bounded noise into the log stream.** Bounded by the Zod contract's per-field
+length limits and by `MAX_TRACE_ENTRIES` at 200, read by nobody but the owner, and absent from
+production entirely — but it is a real consequence of a public route and the owner should be told it
+rather than discover it.
+
+**The overlay sits above the tab bar, not across it, and excludes itself from its own results.** The
+panel is French, tutoies, and carries « Test » and « Envoyer » because there is no console under a thumb
+and no devtools to open. It is positioned clear of the bar and of the home indicator, it is transparent
+to taps except on its two buttons, and the hit test skips it — a probe that covers what it measures
+reports its own presence as the defect, which is the `/equipe` theme-drift mistake in another costume.
+If `(overlay du traceur — à ignorer)` ever appears in a reading, that line is the tool's fault and not
+the app's.
+
+**Two things are not verified, and nothing downstream may assume them.** First, the minified bookmarklet
+URL is **14 359 characters** and whether iOS Safari accepts a bookmark address that long **has not been
+observed** — Safari refuses a `javascript:` URL typed into the address bar at all, so a bookmark is the
+only install path, and a silently truncated paste is the one failure that looks like success. The
+README says to scroll to the end of the field and check. If it turns out not to fit, the fix is a shorter
+capture and not a cleverer minifier: the one in `build-bookmarklet.mjs` strips comments and indentation
+and nothing else, on purpose, because a clever minifier is a bug in a tool whose whole job is to be
+believed. Second, **the two tab-bar suspicions remain open.** This entry builds the instrument the
+roadmap asked for and settles neither suspicion; the roadmap's own rule — nothing is written up as fixed
+until it has been seen on the device — applies to the instrument too, which has itself never been run on
+the device.
