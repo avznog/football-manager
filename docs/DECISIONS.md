@@ -3765,3 +3765,87 @@ drawing and light and dark are free, `aria-hidden` so the accessible name stays 
 alone, and no icon dependency in this repository, which is a position and not an omission. They were
 rasterised at 16 px and four of them were redrawn, because a 24-unit grid stroked at 1.75 holds about
 four strokes before it turns to mud.
+
+## NNN — Two acknowledgements of a tap, split by what can run before hydration
+
+**2026-10-01** · accepted · acts on #111's findings 3 and 5
+
+The owner, from his iPhone: « there is always a delay when I tap the tabs, and sometimes nothing
+happens and I have to tap several times ». Pull request #111 measured that and deliberately changed no
+production code, and its fifth finding is what this entry acts on: under CPU ×4, a tap landing the
+instant the previous screen's heading appeared produced a **native document navigation rather than a
+router navigation in 5 of 5 samples on Calendrier**, and 1 of 5 on Stats. So « nothing happens » is not
+a tap the page failed to receive. It is a tap that started the slowest navigation the app has, and then
+said nothing at all while it ran. (This is pull request #111; **decision 111 in this file is the
+unrelated `iad1` → `lhr1` region pin** and has nothing to do with it. The next free decision number
+here is 123.)
+
+**Decision. The tab bar acknowledges a tap twice, and the split is not cosmetic — it is which of the
+two can run at all in the window where the owner's taps are being lost.** The pressed state is plain
+CSS, `active:bg-surface-2` at `components/nav/bottom-nav.tsx:55`, so it paints with no JavaScript
+having executed; that is the *only* feedback available before hydration, and the pre-hydration window
+is precisely where finding 5 says the lost taps happen. The tab deliberately carries no
+`transition-colors`, so the fill lands in the same frame as the touch rather than waiting on an
+animation — and the fill itself is the one every `ghost` and `secondary` variant in
+`components/ui/button.tsx` already uses, because the tab bar was the single tappable surface in the app
+with no `active:` class of any kind. The second acknowledgement is `useLinkStatus`, in `TabPending`
+(`components/nav/bottom-nav.tsx:81`): a 2 px hairline across the top of the tab that started the
+navigation, which exists only after hydration and means something the pressed state cannot say — the
+router took the tap and the navigation is in flight. It is `aria-hidden` and wordless on purpose;
+decisions 116 and 117 are both about a sentence added for a sighted reader ending up inside a control's
+accessible name, and a tab's accessible name is its label and nothing else.
+
+**The 180 ms delay in `.fm-pending` (`app/globals.css:260`) is what keeps the second from firing on the
+navigations the first has already answered.** A tab tap measured 126–217 ms unthrottled (#111's table),
+and an indicator that appears and vanishes inside that is noise on a screen held at arm's length. So
+the animation is `120ms linear 180ms both`, and `both` is load-bearing: without it the hairline would
+sit at full opacity through the delay instead of being held invisible. The `prefers-reduced-motion`
+block above it only shortens durations and iteration counts, so the delay survives there and the
+hairline appears rather than fades — which is the right behaviour for somebody who asked for less
+motion, and the reason this does not need `.fm-spinner`'s exemption.
+
+**Measured consequence worth recording, because it was not the expected one: the two compose rather
+than stack.** With the `<Suspense>` boundaries on `/stats` the router commits the new shell before the
+180 ms has elapsed, so the hairline never paints on that tab at all — **0 hairlines observed at 100 ms
+after the tap on `/stats` with its query slowed by 2.5 s**, against **1 at 300 ms on `/calendrier` with
+the response itself held**. In other words the hairline only ever shows up where the shell genuinely
+cannot arrive, the pressed state covers everything faster than that, and nothing was tuned to make that
+true — it falls out of the delay. A future session must not read « no hairline on `/stats` » as a bug.
+
+**`/stats` took two `<Suspense>` boundaries and not a `loading.tsx`.** A `loading.tsx` replaces the
+whole route segment, which blanks the competition chips along with the figures — and those chips carry
+`scroll={false}` for exactly one reason, that they only replace the numbers already under the reader's
+thumb. Blanking and re-mounting them is the opposite of that promise, and it also takes away the one
+control the coach might want while the slow query runs. So the title, the scope line and the chips stay
+on screen and stay tappable (`app/(app)/stats/page.tsx:88` starts the promise, `:113` and `:122` await
+it in two places). Both boundaries are keyed on the filter (`:103`), because without a key React holds
+the previous competition's figures under a chip that has already taken `aria-current` — two things on
+one screen disagreeing about what the numbers count, which is the failure this screen least may have.
+And **the fallback states no figure and no plausible row**: card outlines, bars, a `role="status"` with
+an `sr-only` sentence, and not one character of content (`SeasonSkeleton`, `:196`). Every defect of
+waves 3 and 4 was a screen stating something untrue — « 0 – 0 » for a match nobody recorded, « 7
+changements » for the starting seven — and a skeleton holding a zero or a dash would be that defect in
+the one place the reader cannot dismiss it. The bars are the only true claim available while the query
+runs: there will be cards here, about this many. `animate-pulse` is the single piece of motion and it is
+functional, since it is what separates « loading » from « three empty cards »; reduced motion freezes it
+at full opacity, which still reads as a shape rather than as data.
+
+**`/moi`'s two queries were combined and `/stats`'s were not, and the asymmetry is deliberate.**
+`getUserTeams` and `getPlayerProfile` share no input — one is keyed on the user, the other on the
+membership the page already holds — so they ran in sequence for no reason and are now one `Promise.all`
+(`app/(app)/moi/page.tsx`), with the `null` for a non-playing coach passed straight through so the
+condition stays a condition instead of becoming a query that returns nothing. `/stats` cannot do the
+same: `getSeasonStats` consumes the competition id that `parseCompetitionId` has just validated against
+`getTeamCompetitions`, and that validation is what drops an id naming a deleted or a foreign
+competition. Parallelising those two would mean trusting the id from the query string. Either way it is
+tens of milliseconds, and **per #111 none of this is the latency fix**: the server contributes 31–35 ms
+to a whole screen, and the 1.54 s number in that entry is a cold function start, which is
+infrastructure and the owner's lane.
+
+**The one residual risk, and it cannot be cleared from a Linux session.** iOS Safari has historically
+applied `:active` on a tap to `<a>` and `<button>` elements but not to a plain `<div>`, which is why the
+pressed state is on the `<Link>`'s own `<a>` and not on a wrapper — and every `Button` variant in this
+repository already relies on `active:` the same way, so if this did not work there, a good deal more
+than the tab bar would be silently inert. That is an argument, not an observation. **Only the owner's
+iPhone can confirm that the fill actually paints under his thumb**, and until he says so that is
+expected behaviour rather than verified behaviour.

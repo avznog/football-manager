@@ -784,16 +784,45 @@ the reachable-turf finding below an **under**-statement on device rather than an
       — and the first browser check of it was void while reporting the expected result, because a
       three-migration-stale local database made the page throw and « ×0 » agreed for the wrong reason
       (decision 120)
-- [ ] Nothing in the app acknowledges a tap, so every wait looks like a tap that missed. Zero
+- [x] Nothing in the app acknowledged a tap, so every wait looked like a tap that missed. Zero
       `loading.tsx` files, no `useLinkStatus`, no `<Suspense>`, no `useTransition`; the tab bar at
-      `components/nav/bottom-nav.tsx:32` is a bare `<Link>` with a colour for the tab you are on and no
-      pressed state. Measured: 342–367 ms per tab tap on an emulated 4G phone, 844 ms for `/stats`, and
-      **1.54 s for a cold function start** — which is what the owner feels, because a coach opens this
-      app once a week and pays that on the first tap every time. The fix makes nothing faster and is
-      the difference between « c'est lent » and « ça n'a pas marché ». Numbers in `docs/SESSIONS.md`
-- [ ] `/stats` costs 844 ms of the 844 ms it takes to appear on an emulated 4G phone — 2.4× its
+      `components/nav/bottom-nav.tsx:32` was a bare `<Link>` with a colour for the tab you are on and
+      no pressed state. Measured: 342–367 ms per tab tap on an emulated 4G phone, 844 ms for `/stats`,
+      and **1.54 s for a cold function start** — which is what the owner feels, because a coach opens
+      this app once a week and pays that on the first tap every time. The fix makes nothing faster and
+      is the difference between « c'est lent » and « ça n'a pas marché ». Numbers in
+      `docs/SESSIONS.md`. The tab bar now acknowledges a tap twice, and the split is which of the two
+      can run before hydration — `active:bg-surface-2` is plain CSS and paints in the window where a
+      tap becomes a native document navigation instead of a routed one (5 of 5 samples on Calendrier
+      under CPU ×4), and `useLinkStatus` adds a wordless 2 px hairline after hydration, held invisible
+      for 180 ms so it never fires on the 126–217 ms navigations the pressed state already answered.
+      The two compose rather than stack: 0 hairlines at 100 ms on `/stats`, 1 at 300 ms on
+      `/calendrier` (decision NNN)
+- [x] `/stats` cost 844 ms of the 844 ms it took to appear on an emulated 4G phone — 2.4× its
       neighbours, and 314 ms against 109 ms as a local load. Its own aggregation, not the shared auth
-      prefix, and the one screen where a `<Suspense>` boundary pays for itself
+      prefix, and the one screen where a `<Suspense>` boundary pays for itself. It has two of them
+      now, keyed on the competition filter, and **not** a `loading.tsx`: that would blank the chips,
+      which carry `scroll={false}` because they only replace the numbers already under the reader's
+      thumb. The title, the scope line and all five chips stay on screen and stay tappable, and the
+      fallback holds card outlines and not one character of content — a skeleton with a « 0 » or a
+      dash in it would be the wave-3 untruth in the one place the reader cannot dismiss it
+      (decision NNN)
+- [ ] **Two things about the tab bar that only the owner's phone can answer**, both written as checks
+      to run rather than as defects. First, whether iOS Safari's own bottom toolbar is consuming the
+      first tap: the viewport is `viewportFit: "cover"` at `app/layout.tsx:27`, so the bar sits in the
+      region Safari's chrome occupies and then collapses out of, and « sometimes nothing happens »
+      would be explained entirely by a tap landing on Safari rather than on the app. Instrument it the
+      way the composition-editor probe did — `document.elementFromPoint` at each of the four tab
+      centres, before and after a scroll that collapses the toolbar, recording what it actually
+      returns. Second, whether `html { overflow-x: hidden }` at `app/globals.css:185` interacts badly
+      with a `fixed` bar: on iOS that combination has historically shifted or detached fixed children,
+      and nothing on Linux reproduces it. Neither check needs a code change to perform, and neither
+      should be written up as fixed until it has been seen on the device
+- [ ] The `/stats` filter and sort chips have `hover:` and `transition-colors` and **no** `active:`
+      either — `app/(app)/stats/_components/filters.tsx:70` and `:152` — so on a phone, where
+      `hover:` never fires (decision 072), a chip tap has no pressed state at all. Found while giving
+      the tab bar one and deliberately left alone: it is the same defect on a different surface, and
+      it belongs to a pass over every tappable chip row rather than to the tab-bar slice
 - [ ] The auth prefix is four *dependent* database round trips before any page's own first query:
       `readSession` → `users` → `teamMembers` → `teams`, in `lib/auth/dal.ts`. Two of the four collapse
       into joins. In-region that is single-digit milliseconds, so this is a tidiness item and must not
