@@ -566,8 +566,8 @@ export function enterableCardFr(input: {
     titleFr: "Qui peut entrer",
     hintFr:
       notSubstitutes === 0
-        ? "Touchez un joueur pour le faire entrer."
-        : "Touchez un joueur pour le faire entrer. Les remplaçants d’abord, puis le reste du groupe.",
+        ? "Touche un joueur pour le faire entrer."
+        : "Touche un joueur pour le faire entrer. Les remplaçants d’abord, puis le reste du groupe.",
     emptyFr: "Tous les joueurs sont sur le terrain.",
   };
 }
@@ -865,7 +865,7 @@ export function emptyPitchFr(input: {
     return {
       title: "Aucune composition enregistrée.",
       description:
-        "Sans composition, personne n’accumule de minutes. Renseignez-la avant le coup d’envoi.",
+        "Sans composition, personne n’accumule de minutes. Renseigne-la avant le coup d’envoi.",
     };
   }
   if (input.isProposed) {
@@ -879,7 +879,7 @@ export function emptyPitchFr(input: {
   return {
     title: "Personne n’est encore sur le terrain.",
     description: input.canOperate
-      ? "La composition est enregistrée mais pas encore appliquée : ouvrez-la pour faire entrer les joueurs."
+      ? "La composition est enregistrée mais pas encore appliquée : ouvre-la pour faire entrer les joueurs."
       : "La composition est enregistrée mais pas encore appliquée.",
   };
 }

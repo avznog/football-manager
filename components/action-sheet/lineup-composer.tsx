@@ -99,7 +99,7 @@ export function LineupComposer({
 
   const problem =
     assignments.length === 0
-      ? "Placez au moins un joueur."
+      ? "Place au moins un joueur."
       : duplicated.size > 0
         ? `${[...duplicated].map(nameOf).join(", ")} ${duplicated.size > 1 ? "sont placés" : "est placé"} à deux postes.`
         : null;
