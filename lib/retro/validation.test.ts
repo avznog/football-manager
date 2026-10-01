@@ -162,7 +162,8 @@ describe("reading the form", () => {
         // Not enterable: a clock event has no business coming from this form, crafted or not.
         ["action-type:f3", "FINAL_WHISTLE"],
         ["action-member:f3", P.gk],
-        // Enterable per `RETRO_ACTION_TYPES`, but `RetroAction` has no arm for it yet.
+        // Not enterable either: the retro sheet records no position change (decision 134), so a row
+        // claiming one can only have been crafted.
         ["action-type:f4", "POSITION_CHANGE"],
         ["action-member:f4", P.gk],
       ]),
@@ -579,9 +580,9 @@ describe("retroFactSchema", () => {
     }
   });
 
-  it("refuses the two types the form deduces rather than asks for as facts", () => {
-    // Both are *enterable* (`RETRO_ACTION_TYPES`) — as substitution rows and as position changes —
-    // and neither is ever a « fact » row, which is why this schema is built from the narrower list.
+  it("refuses the type the form deduces rather than asks for as a fact", () => {
+    // `SUBSTITUTION` is *enterable* (`RETRO_ACTION_TYPES`) and is never a « fact » row, which is why
+    // this schema is built from the narrower list. `POSITION_CHANGE` is neither (decision 134).
     expect(retroFactSchema.safeParse(fact("SUBSTITUTION")).success).toBe(false);
     expect(retroFactSchema.safeParse(fact("POSITION_CHANGE")).success).toBe(false);
   });
@@ -632,8 +633,9 @@ describe("retroActionSchema", () => {
     ).toBe(false);
   });
 
-  it("still refuses the frame of the match, and the arm that has not landed yet", () => {
+  it("still refuses the frame of the match, and the action the sheet does not record", () => {
     expect(retroActionSchema.safeParse({ ...sub(), type: "FINAL_WHISTLE" }).success).toBe(false);
+    // Not « not yet »: decision 134 is that the retro sheet never records a position change.
     expect(retroActionSchema.safeParse({ ...sub(), type: "POSITION_CHANGE" }).success).toBe(false);
   });
 });

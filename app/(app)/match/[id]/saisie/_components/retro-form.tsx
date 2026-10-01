@@ -49,7 +49,7 @@ import {
   retroScoreLineFr,
 } from "@/lib/retro/labels";
 import {
-  RETRO_FACT_TYPES,
+  RETRO_ACTION_TYPES,
   buildRetroLog,
   retroEventRecords,
   retroFactNeedsMember,
@@ -76,12 +76,13 @@ const nextKey = (prefix: string) => `${prefix}${(rowSeq += 1)}`;
 /**
  * What the one type `<select>` offers, in the order of the domain's own list.
  *
- * `RETRO_ACTION_TYPES` minus `POSITION_CHANGE`, written out rather than filtered: that type is
- * enterable in principle but `RetroAction` has no arm for it yet, so `readActionFields` drops it, and
- * offering it would be a row the server throws away without saying so. When the arm lands this list
- * is one of the places it has to appear — a filter would have quietly offered it a slice too early.
+ * **`RETRO_ACTION_TYPES` itself**, not a local subset of it: the enterable list and the options of this
+ * select are the same question, so they are the same array. It used to be that list minus
+ * `POSITION_CHANGE`, which was enterable in principle and decodable nowhere; decision 134 took the type
+ * out of the domain list instead, so there is nothing left to subtract and nothing left to keep in step
+ * by hand.
  */
-const RETRO_ROW_TYPES = [...RETRO_FACT_TYPES, "SUBSTITUTION"] as const;
+const RETRO_ROW_TYPES = RETRO_ACTION_TYPES;
 type RetroRowType = (typeof RETRO_ROW_TYPES)[number];
 
 export function RetroForm({ teamId, view }: RetroFormProps) {

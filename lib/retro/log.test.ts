@@ -475,19 +475,30 @@ describe("RETRO_FACT_TYPES — the correctable set", () => {
 });
 
 describe("RETRO_ACTION_TYPES — the enterable set", () => {
-  it("is RETRO_FACT_TYPES plus exactly SUBSTITUTION and POSITION_CHANGE", () => {
-    expect(RETRO_ACTION_TYPES).toEqual([...RETRO_FACT_TYPES, "SUBSTITUTION", "POSITION_CHANGE"]);
+  it("is RETRO_FACT_TYPES plus exactly SUBSTITUTION", () => {
+    expect(RETRO_ACTION_TYPES).toEqual([...RETRO_FACT_TYPES, "SUBSTITUTION"]);
   });
 
   it("is a strict superset of the correctable set", () => {
     for (const type of RETRO_FACT_TYPES) {
       expect(isRetroActionType(type), type).toBe(true);
     }
-    expect(RETRO_ACTION_TYPES.length).toBe(RETRO_FACT_TYPES.length + 2);
+    expect(RETRO_ACTION_TYPES.length).toBe(RETRO_FACT_TYPES.length + 1);
+  });
+
+  it("does not offer POSITION_CHANGE, which the owner decided not to build (decision 134)", () => {
+    // Game mode records a shirt that moved; the retro sheet does not, so nothing can produce such a
+    // row and the list must not claim it can. Re-adding it to make the two modes symmetric is the
+    // mistake this assertion exists to catch — `FOUL` already goes the other way.
+    expect(isRetroActionType("POSITION_CHANGE")).toBe(false);
+    expect(RETRO_ACTION_TYPES as readonly string[]).not.toContain("POSITION_CHANGE");
   });
 
   it("does not make anything new correctable: being enterable is not being amendable", () => {
-    expect(isRetroActionType("POSITION_CHANGE")).toBe(true);
+    // The one type that is enterable without being a fact is amendable only because
+    // `isAmendableEventType` names it, not because this list holds it.
+    expect(isRetroActionType("SUBSTITUTION")).toBe(true);
+    expect(isRetroFactType("SUBSTITUTION")).toBe(false);
     expect(isAmendableEventType("POSITION_CHANGE")).toBe(false);
   });
 

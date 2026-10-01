@@ -138,11 +138,6 @@ export function readActionFields(entries: Entries): RetroAction[] {
           // An untouched row the coach added and left alone is not a mistake to report.
           return row.outId === "" && row.inId === "" ? null : row;
         }
-        case "POSITION_CHANGE":
-          // Enterable per `RETRO_ACTION_TYPES`, but `RetroAction` has no arm for it yet: the form
-          // offers no such row, so one can only have been crafted. Dropped like an unknown type until
-          // the arm lands, at which point this case is where it is decoded.
-          return null;
         default:
           return {
             key,
@@ -177,8 +172,8 @@ const rowKeySchema = z.string().min(1).max(64);
  * `retroActionSchema` below is what the entry form posts. This one survives for `amendSubmitSchema`,
  * which is a different question: `RETRO_FACT_TYPES` is what a coach may *correct* on a frozen match and
  * `RETRO_ACTION_TYPES` is what he may *type up* on a sheet (decision 049). Building the amendment
- * schema out of the wider list would hand `SUBSTITUTION` and `POSITION_CHANGE` a correction payload
- * nobody decided to give them.
+ * schema out of the wider list would hand `SUBSTITUTION` a correction payload nobody decided to give
+ * it — a substitution is annulled and re-entered, never edited in place (decision 049).
  *
  * It is also the fact arm of the union below, rather than a second copy of those five fields: one
  * declaration, so « corriger un but » and « saisir un but » cannot drift apart in shape while staying

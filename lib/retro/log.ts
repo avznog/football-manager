@@ -60,9 +60,8 @@ import type { MatchEventRecord } from "@/lib/match/reducer";
  * finished match?*
  *
  * It is also the event types the retro screen can produce as "facts of the match" — deliberately
- * excluding the clock events, which are the synthesiser's own job, and `SUBSTITUTION`,
- * `POSITION_CHANGE` and `LINEUP_APPLIED`, which are deduced from the starting seven and the
- * substitution rows.
+ * excluding the clock events, which are the synthesiser's own job, and `SUBSTITUTION` and
+ * `LINEUP_APPLIED`, which are deduced from the starting seven and the substitution rows.
  *
  * **Adding a type here silently makes it correctable.** `isAmendableEventType` (`amend.ts`) is
  * `isRetroFactType(type) || type === "SUBSTITUTION"`, so a new member of this list immediately gets
@@ -70,8 +69,8 @@ import type { MatchEventRecord } from "@/lib/match/reducer";
  * says only football facts may be corrected — the frame of the match (`KICKOFF`, `PERIOD_END`,
  * `FINAL_WHISTLE`, `LINEUP_APPLIED`) may not, because annulling one of those does not fix a mistake,
  * it changes what every minute in the log means. `amend.test.ts` pins
- * `isAmendableEventType("POSITION_CHANGE") === false`; that is this list's boundary, not a detail of
- * that file.
+ * `isAmendableEventType("POSITION_CHANGE") === false` — game mode writes position changes and none of
+ * them may be corrected; that is this list's boundary, not a detail of that file.
  *
  * So this is **not** « what the entry form offers » — see `RETRO_ACTION_TYPES` below — and the two
  * must not be merged.
@@ -105,20 +104,29 @@ export function isRetroFactType(value: string): value is RetroFactType {
  * **The enterable set**, and that is the question it answers: *what can the retro entry form put
  * into a log?* Used by the entry form only.
  *
- * The facts above plus the two the form deduces rather than asks for: `SUBSTITUTION`, from the
- * « X sort, Y entre » rows, and `POSITION_CHANGE`, for a shirt that moved without anybody leaving
- * the pitch. It deliberately stops short of the frame — `KICKOFF`, `PERIOD_END`, `FINAL_WHISTLE`,
- * `LINEUP_APPLIED` — which `buildRetroLog` writes itself from the periods and the starting seven.
+ * The facts above plus `SUBSTITUTION`, the one row the form reads as « X sort, Y entre » and whose
+ * slot it deduces rather than asks for. It deliberately stops short of the frame — `KICKOFF`,
+ * `PERIOD_END`, `FINAL_WHISTLE`, `LINEUP_APPLIED` — which `buildRetroLog` writes itself from the
+ * periods and the starting seven.
  *
- * Kept apart from `RETRO_FACT_TYPES` because the two answer different questions and only one of them
- * is a permission: being enterable on a sheet the coach is still filling in says nothing about being
- * correctable on a match that is already frozen (decision 049). Merging them would hand
- * `POSITION_CHANGE` a « Corriger » button nobody decided to give it.
+ * **`POSITION_CHANGE` is not here, and that is a decision and not an omission** (decision 134). Game
+ * mode records a shirt that moved without anybody leaving the pitch; the retro sheet does not, because
+ * a position change typed up from memory a week later is the action least likely to be remembered, its
+ * slot labels are not even unique within a formation, and an undated one would be a label floating in
+ * the middle of a spell. So game mode keeps one action this form does not — and, with `FOUL` going the
+ * other way (see above), « the same actions as live mode » is symmetric in neither direction. Do not
+ * add it back to make the two lists match.
+ *
+ * **Kept apart from `RETRO_FACT_TYPES` even though it is now that list plus one**, because the two
+ * answer different questions and only one of them is a permission: being enterable on a sheet the coach
+ * is still filling in says nothing about being correctable on a match that is already frozen
+ * (decision 049). `isAmendableEventType` reads the *fact* list, so merging the two would silently hand
+ * a « Corriger » button to whatever is only enterable — today `SUBSTITUTION`, whose amendability is
+ * granted explicitly and separately, and tomorrow anything a session adds here.
  */
 export const RETRO_ACTION_TYPES = [
   ...RETRO_FACT_TYPES,
   "SUBSTITUTION",
-  "POSITION_CHANGE",
 ] as const satisfies readonly MatchEventType[];
 
 export type RetroActionType = (typeof RETRO_ACTION_TYPES)[number];

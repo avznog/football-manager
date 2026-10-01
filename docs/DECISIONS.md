@@ -851,7 +851,9 @@ correction.
 
 **Consequences.** A substitution can only be annulled and re-entered, because its two players and its
 minute are one fact. The `VOID` carrying its target's stamp is what makes the two lines sit together in
-the timeline. Every amendment is previewed through `reduceMatch` before it is written, which is how
+the timeline. And because `isAmendableEventType` reads `RETRO_FACT_TYPES` and not the retro sheet's
+wider `RETRO_ACTION_TYPES`, **what a coach may type up and what he may correct are two lists on
+purpose** — decision 134 says why they must not be merged, and that is how this rule is enforced in code. Every amendment is previewed through `reduceMatch` before it is written, which is how
 « Ce joueur n'était pas sur le terrain à cette minute. » can be refused — and how voiding a
 substitution whose substitute had scored is refused too.
 
@@ -4576,3 +4578,113 @@ uses `DateInput` and not `Input` — a bare native picker is now the exception t
 The Playwright suite addresses these inputs by their label (`e2e/happy-path.spec.ts:162` and two more,
 `e2e/offline.spec.ts:83`), which the wrapper does not change, because the `<label for>` / `id` pairing
 still comes from `Field`.
+
+## 134 — The retro sheet has one list of actions, and *enterable* is not *correctable*
+
+**2026-10-01** · accepted · amends the retro half of decision 047 · narrows nothing in decision 049,
+and exists partly to stop a later session widening it by accident
+
+The owner, on typing up a match played without his phone: the add button must sit **under** the actions
+and not over them; the score must not be editable directly; the same actions as in game mode must be
+available; and « Changements » and « Actions du match » must become **one** block. Four sentences, one
+redesign — and the one below the waterline is the fourth, because « one block » is a statement about the
+data model before it is a statement about the screen.
+
+**Why one list.** The two cards were never two things. `buildRetroLog` has emitted a substitution as an
+ordinary `SUBSTITUTION` event since screen 8 was written — the same type, through the same ingestion, as
+a goal or an injury (decision 047) — so « Changements » and « Actions du match » were a distinction the
+data model did not make, maintained by two field prefixes, two decoders, two schemas, two domain types
+and two sets of validation rules that converged only inside one function. One `<ul>` in the order the
+coach typed it is not a simplification of the screen; it is the screen finally agreeing with the log it
+writes.
+
+**Why a discriminated union and not one widened record.** The obvious cheap move is a single row type
+with nullable `outId` / `inId`, and it is the wrong one. A goal would then carry an empty pair of fields
+it can never mean, `memberId` would mean « the scorer » on one row and nothing on the next, and every
+validation rule — « sort quelqu'un qui n'était pas sur le terrain », « buteur inconnu est une réponse,
+sortant inconnu est une ligne inachevée » — would open with a null check standing in for a type check.
+`RetroAction` is instead a union discriminated on `type`, with `RetroChange` and `RetroFact` surviving as
+`Extract<…>` of it rather than as parallel declarations, so `retroPitch` kept its signature and its
+tests. The price is a `switch (action.type)` at the four places the two shapes diverge — the payload
+builder, the stamp resolver, the idempotency seed and `findRetroIssues` — and the price **is** the
+guarantee: adding an arm is a compile error at exactly those four lines and nowhere else. That is also
+why `resolveFactClockMs` takes `RetroFact` and not `RetroAction`: decision 048 gives an undated
+substitution the break and an undated fact the middle of its player's own spell, and now that both
+travel in one array, « just resolve the stamp of an action » is an easy and wrong thing to write.
+Passing a substitution there does not compile.
+
+**Why two constants, which is the paragraph that matters.** `RETRO_ACTION_TYPES` and
+`RETRO_FACT_TYPES` now differ by exactly one member — `SUBSTITUTION` — and they are **not** to be merged
+on that basis. They answer two different questions. `RETRO_ACTION_TYPES` answers « what may a coach
+**type up** on a sheet he is still filling in? » `RETRO_FACT_TYPES` answers « what may he **correct**
+afterwards, on a match that is already frozen? » Only the second is a permission, and
+`isAmendableEventType` (`lib/retro/amend.ts`) is literally `isRetroFactType(type) || type ===
+"SUBSTITUTION"` — it reads the **fact** list. So putting a type into the action list does not make it
+correctable, and that asymmetry is the whole point: decision 049 says only football facts may be
+corrected, because annulling anything else does not fix a mistake, it changes what every minute in the
+log means. Collapsing the two lists into one near-identical array would grant a « Corriger » button to
+whatever is merely enterable, several files away from the list that caused it, with no screen and no
+test naming the permission that moved. `SUBSTITUTION`'s amendability is granted **explicitly, by name,
+in that predicate**, which is exactly how a permission should look. Both constants carry the question
+they answer in their doc comment, and those comments are load-bearing rather than decorative: they are
+the only thing standing between a later session's tidy-up and a silent permission change.
+
+**Why the add button is a child and not a `Card` prop.** Typing up a match is a loop, so the control
+that starts the next iteration has to be where the last one left the thumb. The two « + Ajouter »
+buttons were passed as `Card`'s `action` prop, which `components/ui/card.tsx` renders inside the
+`<header>` before `{children}` — so the button walked backwards up the screen as the list grew. The
+single « + Ajouter une action » is therefore passed as a **child after the `<ul>`**, and `Card` itself
+was deliberately left alone. One call site in the app needs a footer and no other does; a `footer` prop
+would reshape a component used on every screen to serve one. A sticky button was rejected for a reason
+worth writing down so it is not rediscovered: at the bottom of this screen it would cover
+« Enregistrer ».
+
+**Why the list is never sorted by minute.** It renders in the order the coach added rows, and nothing
+re-orders it. Sorting would make a row jump out from under the thumb the moment its minute is typed —
+the one gesture a coach performs most on this screen — and an undated row, which decision 048 makes the
+**common** case rather than the exception, would have no defined place in such an order at all. The log
+is sorted; the sheet is not. `buildRetroLog` is where order becomes chronology, and it keeps its own
+two-bucket rule (facts before substitutions within one stamp) precisely so the coach's typing order
+cannot change what the reducer reads.
+
+**`POSITION_CHANGE`: the owner has decided not to build it.** Earlier drafts of this work treated the
+missing union arm as the one thing left to do, and the type sat in `RETRO_ACTION_TYPES` on that
+assumption with `readActionFields` holding an explicit `case "POSITION_CHANGE": return null`. It is
+removed from both: a constant that says a type is enterable while nothing in the repository can produce
+a row of it is a claim the code does not keep. The honest reasons it is not worth building, in order of
+how quickly each would bite:
+
+- the slot select it would need has **non-unique labels**. `labelFr` on a 1-3-2-1's slots gives two
+  « Milieu », so the control would ask the coach to choose between two options reading the same word;
+- `retroPitch`'s slot bookkeeping would **go stale**. It tracks which slot each player is standing in so
+  a substitution's payload can name the slot the outgoing player vacated; a position change would have to
+  rewrite that map mid-replay, and every rule built on it would have to be re-checked;
+- an **unstamped** position change is a label floating in the middle of a spell. Decision 048's midpoint
+  guess works because a goal at the middle of its scorer's stint cannot contradict the log; « he moved to
+  the right wing, roughly half-way through his time on the pitch » contradicts nothing and states
+  nothing either;
+- it is the action **least likely to be reconstructed** from memory a week later. A coach remembers
+  « Momo came on for Ali at half-time ». Nobody remembers which shirt drifted from centre to right
+  without a substitution.
+
+So, stated plainly for the reader who arrives at an apparent oversight: **game mode keeps one action the
+retro sheet does not, deliberately.** And `FOUL` goes the other way — offered on the sheet, not offered
+in game mode's menu (decision 114). « The same actions as live mode » is therefore symmetric in neither
+direction and never will be, and the asymmetry is not a bug to fix by adding an array member at either
+end. The select on the sheet is now built from `RETRO_ACTION_TYPES` itself rather than from a local
+subset, so there is no longer a second list to keep in step by hand.
+
+**What is still open, named rather than implied.** Two things.
+
+- **A half-filled substitution is reported well in the browser and badly without JavaScript.**
+  `findRetroIssues` names « Sort… » chosen with « Entre… » empty by its own code
+  (`missing-substitute-out` / `missing-substitute-in`), and `readActionFields` deliberately keeps such a
+  row rather than swallowing it, so the row does not vanish on submit (audit `D22`). But
+  `retroChangeSchema` requires two uuids on the substitution arm, so a POST that reaches the server with
+  a half-filled row — a no-JS submit, or a crafted one — is answered « Ce joueur n'est pas valide. » by
+  the schema before the issue finder is ever asked. The two new messages are therefore reachable from
+  the browser and not from the server. The fix is for the server to run `findRetroIssues` on a sheet
+  parsed with a laxer substitution arm, which is a change to `submitRetroMatch`'s order of operations
+  and not to this slice.
+- **`D18` reproduces and is untouched here.** It is listed under slice 4 of the UX audit and this work
+  neither fixed nor worsened it.
