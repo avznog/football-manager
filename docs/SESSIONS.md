@@ -3229,3 +3229,11 @@ state was deliberately *not* filed as its own defect and remains that session's 
 and `docs/SESSIONS.md` were being edited concurrently in another worktree; both appends here are at the
 very end of each file, by agreement, because two appends at the end conflict cleanly whereas an insertion
 above someone else's insertion point silently drops a paragraph.
+
+**Addendum, same day: the audit produced one process change rather than only defects.** Four of the
+findings — the positions chip and the secondary-positions summary from the positions slice, `D25` and
+`S8` from the audit — are one missing review step, not four bugs: a screen that branches on role was
+read one role at a time, by people who had seen both. The definition of done in `CLAUDE.md` now asks
+for both roles **side by side in one pass**, alongside the existing both-themes-at-390 px rule, and
+the reasoning is a decision entry. The owner approved the wording; two sessions agreeing with each
+other is not authority to edit a project instruction, and neither of us did until he chose it.

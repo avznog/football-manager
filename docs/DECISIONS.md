@@ -3933,3 +3933,33 @@ other — padding that is correct for one parent and wrong for another is paddin
 place. And `tabbar-pb` was checked for the same shape and is clean: it is a lone `padding-bottom` with
 no shorthand competitor, it now reads `var(--tabbar-h)`, and it is used nowhere at all because
 `app-shell.tsx:142` writes the value inline for the `md:` variant.
+
+## NNN — A role-dependent screen is reviewed in both roles at once, or it is not reviewed
+
+The definition of done in `CLAUDE.md` already requires both themes **actually looked at, at 390 px**.
+This adds the same kind of rule for the other axis the app branches on: **every screen with a
+role-dependent branch gets looked at in both roles, side by side, in one pass.**
+
+**Four defects, one blindness.** The UX audit of 2026-10-01 and the positions slice found these
+separately and they are the same thing. A player asked to give up a position wish reads the bare
+two-letter code while the coach's card spells out « Ailier gauche ». The coach reads a player's
+secondary positions in prose — « Poste principal : Gardien de but · postes secondaires : Défenseur
+central, Milieu droit » — while the editable card spends that same slot on the instruction « Appuie
+sur un poste… », so the player decodes their own wishes from the colours of a pitch diagram. `D25`: a
+player can never find out whether he was marked present. `S8`: a player sees the lineup on `/jeu` and
+a 404 on `/composition`. **Every one of them survived a reader who had seen both code paths.** Both
+branches were individually defensible; the defect existed only in the comparison.
+
+**« In one pass » is the whole rule, and dropping it makes it unenforceable.** « Looked at in both
+roles » is satisfied by two sessions a day apart, which is what already happened four times. The
+evidence that the pass matters is in the audit on both sides: `/equipe` appeared 69 px taller in dark
+than in light and was being written up as theme drift, and re-measured with both arms in the *same*
+pass the delta was zero — seven browsers shared one preview database and a concurrent write looks
+exactly like a layout bug. The same method produced a false finding sequentially and a true one in a
+single pass. That is the mechanism demonstrated from both ends, and it is why the 390 px rule says
+« actually looked at » rather than « checked ».
+
+**What this is not.** It is not a request for a test. There is no assertion that catches « the coach
+gets a sentence and the player gets an instruction » — both strings are correct, present, French and
+tutoied, and a snapshot of either passes. It is a looking rule, like the theme rule, and it is cheap
+for the same reason: the cost is one extra login, and it catches a class rather than an instance.
