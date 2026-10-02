@@ -5,9 +5,11 @@
  * minutes played and the timeline come from `reduceMatch` over the append-only log (invariant 2), and
  * the man of the match from the ratings (decision 007). Nothing here is stored.
  *
- * The ratings section is gated in the query, not here: a player who has not finished rating his
- * teammates gets a `visible: false` result whose payload contains no score at all
- * (`lib/rating/queries.ts`).
+ * The ratings section is gated in the query, not here, and under decision 137 the gate asks a
+ * different question: not « has this reader earned the notes » but « are this match's means published
+ * at all », plus « is this reader the coach ». An unpublished match comes back as `published: false`
+ * with no score in the payload, and a reader who is not the coach never receives an individual note or
+ * the count behind a mean (`lib/rating/queries.ts`).
  *
  * This lives at its own route rather than inside `/match/[id]`: the match page is the *organising*
  * page — availability, composition, game mode — and this is the *reading* page, with a different
@@ -26,8 +28,7 @@ import { requireTeamContext } from "@/lib/auth/dal";
 import { entryModeBadgeFr, venueSideLabel } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import type { MatchRow } from "@/lib/match/queries";
-import { MOTM_MIN_RATINGS } from "@/lib/rating/aggregate";
-import { isOnRateableSheet } from "@/lib/rating/progress";
+import { MIN_NOTES_FOR_MEAN } from "@/lib/rating/aggregate";
 import { getMatchRecap, getRatingResults, getRatingWindow } from "@/lib/rating/queries";
 import { ratingDeadlineFr } from "@/lib/rating/window";
 import { ManOfTheMatchCard } from "./_components/man-of-the-match";
@@ -48,7 +49,9 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
   const view = await getMatchRecap({ teamId: team.id, matchId: id });
   if (!view) notFound();
 
-  const { match, recap, sheet } = view;
+  // The sheet is not read here any more: who rates is the log's answer (decision 137), and the one
+  // thing this page used it for was `isOnRateableSheet`, which is gone with the rule.
+  const { match, recap } = view;
   const kickoff = new Date(match.kickoffAt);
   const now = new Date();
 
@@ -95,7 +98,11 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
     );
   }
 
-  // Invariant 4: the permission comes from `can()`, and the sheet decides the rest (decision 007).
+  /*
+   * Invariant 4: every one of these is an answer from `can()` and none of them is a role read here.
+   * The three are genuinely three: `rating:submit` is self-scoped and false for a coach who did not
+   * play, while `rating:readNotes` and `rating:publish` are his and his alone (decision 137).
+   */
   const canSubmit = can(actor, "rating:submit", { teamId: team.id });
   const [results, window] = await Promise.all([
     getRatingResults({
@@ -103,13 +110,20 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
       matchId: match.id,
       membershipId: team.membershipId,
       canSubmit,
+      canSeeNotes: can(actor, "rating:readNotes", { teamId: team.id }),
+      canPublish: can(actor, "rating:publish", { teamId: team.id }),
     }),
     getRatingWindow(match),
   ]);
 
-  const mayRate = canSubmit && isOnRateableSheet(sheet, team.membershipId);
-  const canStillRate = mayRate && window.isOpen;
-  const gated = results !== null && !results.visible;
+  /*
+   * Whether he is *asked* for notes is the log's answer, not the sheet's (decision 137): a named
+   * substitute who never came on has nothing to judge. `progress.requiredCount` carries it — it is
+   * built from `ratingTargetsFor`, which is empty for anybody who did not play — so the sheet is no
+   * longer read here at all.
+   */
+  const canStillRate =
+    canSubmit && window.isOpen && results !== null && results.progress.requiredCount > 0;
   const deadline = ratingDeadlineFr(window.closesAtMs, now.getTime());
 
   return (
@@ -141,32 +155,37 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
         </Card>
       ) : null}
 
-      {/* The prompt of screen 6: the recap asks for the notes, it does not wait to be found. */}
-      {canStillRate && gated ? (
+      {/* The prompt of screen 6: the recap asks for the notes, it does not wait to be found. It no
+          longer promises anything in return — « tu verras les notes de tout le monde dès que tu auras
+          fini » was decision 021's trade, and under 137 his own notes unlock nothing for him
+          (`ratings-panel.tsx`). What is left is the deadline, which is the honest reason to do it now. */}
+      {canStillRate && results !== null && !results.progress.complete ? (
         <Card title="À toi de noter" as="h2" className="border-accent/40 bg-accent/10">
           <div className="space-y-3">
             <p className="text-sm text-ink-muted">
-              Mets une note à chaque joueur de la feuille de match, toi compris. Tu verras les notes
-              de tout le monde dès que tu auras fini.
+              Une note pour chaque joueur qui était sur le terrain avec toi. L’équipe lira une
+              moyenne par joueur, jamais ta note à toi.
             </p>
-            {/* « dès que tu auras fini » has a closing time, and this card never said it
-                (decision 079). */}
+            {/* The window has a closing time and this card never said it (decision 079). */}
             {deadline ? <p className="text-sm font-medium text-ink">{deadline}</p> : null}
             <ButtonLink href={`/match/${match.id}/notation`}>
-              {results !== null && !results.visible && results.progress.submittedCount > 0
-                ? "Finir mes notes"
-                : "Noter mes coéquipiers"}
+              {results.progress.submittedCount > 0 ? "Finir mes notes" : "Noter mes coéquipiers"}
             </ButtonLink>
           </div>
         </Card>
       ) : null}
 
-      {results?.visible ? (
-        <ManOfTheMatchCard manOfTheMatch={results.manOfTheMatch} minRatings={MOTM_MIN_RATINGS} />
+      {results?.published ? (
+        <ManOfTheMatchCard manOfTheMatch={results.manOfTheMatch} minRatings={MIN_NOTES_FOR_MEAN} />
       ) : null}
 
       {results ? (
-        <RatingsPanel results={results} matchId={match.id} canStillRate={canStillRate} />
+        <RatingsPanel
+          results={results}
+          teamId={team.id}
+          matchId={match.id}
+          canStillRate={canStillRate}
+        />
       ) : null}
 
       {/* With an empty log every man on the sheet would be listed « non entré » at 0’, which is not

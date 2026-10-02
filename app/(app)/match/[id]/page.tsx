@@ -108,12 +108,16 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   // (decision 004). Invariant 4: the permission is `can()`'s answer.
   const mayAmend = can(actor, "match:amend", { teamId: team.id });
   /**
-   * This viewer's rating duty, or null when he has none: not on the sheet, window shut, or not
-   * allowed to rate at all. Invariant 4 — the permission is `can()`'s answer, not a role read here.
+   * This viewer's rating duty, or null when he has none: he did not play, the window is shut, or he
+   * is not allowed to rate at all. Invariant 4 — the permission is `can()`'s answer, not a role read
+   * here.
+   *
+   * `notation.played` where it used to be `notation.onSheet`: under decision 137 a named substitute
+   * who never came on owes nothing, and the sheet cannot tell. The log can.
    */
   const ratingDuty =
     notation !== null &&
-    notation.onSheet &&
+    notation.played &&
     notation.window.state === "open" &&
     can(actor, "rating:submit", { teamId: team.id })
       ? notation.progress
@@ -262,10 +266,14 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
           <div className="space-y-3">
             {ratingDuty && !ratingDuty.complete ? (
               <>
+                {/* Both sentences used to end in the bargain decision 021 struck — « tu verras
+                    celles des autres quand tu auras fini », « les notes des autres restent cachées
+                    jusque-là ». Decision 137 pays nobody for rating: the means come out when the
+                    whole team has, so what is left is the duty and its deadline. */}
                 <p className="text-sm text-ink-muted">
                   {ratingDuty.partial
-                    ? `Il te reste ${ratingDuty.missingIds.length} note${ratingDuty.missingIds.length > 1 ? "s" : ""} à donner. Tu verras celles des autres quand tu auras fini.`
-                    : "Tu n’as pas encore noté tes coéquipiers. Les notes des autres restent cachées jusque-là."}
+                    ? `Il te reste ${ratingDuty.missingIds.length} note${ratingDuty.missingIds.length > 1 ? "s" : ""} à donner.`
+                    : "Tu n’as pas encore noté les joueurs qui étaient sur le terrain avec toi."}
                 </p>
                 {/* The comment above calls this « the one that expires at the next kick-off », and
                     the card never said when that was (decision 079). */}
@@ -280,7 +288,8 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
 
             {ratingDuty?.complete ? (
               <p className="text-sm text-ink-muted">
-                Tu as noté tout le monde&nbsp;: les notes de l’équipe sont visibles dans le résumé.
+                Tu as noté tout le monde&nbsp;: les moyennes sortiront dans le résumé quand le reste
+                de l’équipe aura noté.
               </p>
             ) : null}
 

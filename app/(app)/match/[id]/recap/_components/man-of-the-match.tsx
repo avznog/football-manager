@@ -4,11 +4,15 @@
  * The second half of the one celebratory moment: an accent-tinted card with a trophy and the name.
  * A tie shows **both** names rather than inventing a winner, and when nobody has enough notes the
  * card says so instead of crowning whoever one teammate happened to like.
+ *
+ * It used to end « 8,5 de moyenne sur 7 notes », and the count is gone (decision 137): how many
+ * people rated a player is the coach's figure, not the team's, and this card is read by everybody. The
+ * floor the card refuses on is still stated in the empty state — « il en faut au moins 3 » is a rule
+ * about the title, which is a different thing from how many notes one named player collected.
  */
 
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { pluralize } from "@/lib/calendar/labels";
 import type { ManOfTheMatchView } from "@/lib/rating/queries";
 
 function Trophy() {
@@ -66,8 +70,7 @@ export function ManOfTheMatchCard({
             <span className="font-mono font-semibold text-ink tabular-nums">
               {manOfTheMatch.averageLabel}
             </span>{" "}
-            de moyenne sur {pluralize(manOfTheMatch.count, "note")}
-            {manOfTheMatch.tied ? " — ex æquo" : ""}
+            de moyenne{manOfTheMatch.tied ? " — ex æquo" : ""}
           </p>
         </div>
       </div>
