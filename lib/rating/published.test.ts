@@ -1,100 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { meanOfNotes, ratingsPublication, type RatingsPublicationInput } from "./published";
+import { meanOfNotes, meansAreVisible } from "./published";
 
-function publication(overrides: Partial<RatingsPublicationInput> = {}) {
-  return ratingsPublication({
-    expectedRaterIds: ["hugo", "karim", "yanis"],
-    completeRaterIds: [],
-    publishedAtMs: null,
-    ...overrides,
-  });
-}
-
-describe("ratingsPublication", () => {
-  it("holds everything back while the squad still owes notes", () => {
-    expect(publication({ completeRaterIds: ["hugo", "karim"] })).toEqual({
-      published: false,
-      reason: "pending",
-      owingRaterIds: ["yanis"],
-    });
+describe("meansAreVisible", () => {
+  it("hides a match nobody has released", () => {
+    // The default state of every match, and the one decision 139 made permanent until somebody acts:
+    // no amount of notes coming in publishes anything by itself any more.
+    expect(meansAreVisible(null)).toBe(false);
   });
 
-  it("publishes the moment the last set comes in", () => {
-    expect(publication({ completeRaterIds: ["hugo", "karim", "yanis"] })).toEqual({
-      published: true,
-      reason: "every-set-in",
-      owingRaterIds: [],
-    });
+  it("shows a match the coach has released", () => {
+    expect(meansAreVisible(Date.parse("2026-10-02T18:00:00Z"))).toBe(true);
   });
 
-  it("publishes when the coach releases them, and still names who never rated", () => {
-    // The escape hatch for the straggler who never will. The owing list survives publication
-    // because the coach is the one person entitled to know who is missing.
-    expect(
-      publication({ completeRaterIds: ["hugo"], publishedAtMs: Date.parse("2026-10-02T18:00:00Z") }),
-    ).toEqual({
-      published: true,
-      reason: "coach-published",
-      owingRaterIds: ["karim", "yanis"],
-    });
-  });
-
-  /**
-   * The clause decision 138 removed. A match played weeks ago, with notes still owed and nothing
-   * published, stays **pending** — and that is what keeps its rating window open, which is the whole
-   * of what was asked for. Under decision 137 the passing of the next kick-off published this.
-   */
-  it("does not publish a long-finished match on its own", () => {
-    expect(publication({ completeRaterIds: ["hugo"] })).toEqual({
-      published: false,
-      reason: "pending",
-      owingRaterIds: ["karim", "yanis"],
-    });
-  });
-
-  it("prefers the squad's own doing to the coach's button, when both are true", () => {
-    // Both clauses hold; the reason reported is the one that explains the most, because « toute
-    // l'équipe a noté » is a better thing to tell a reader than « le coach les a sorties », and it
-    // is also the one that left nobody out.
-    expect(
-      publication({
-        completeRaterIds: ["hugo", "karim", "yanis"],
-        publishedAtMs: 1,
-      }).reason,
-    ).toBe("every-set-in");
-  });
-
-  it("publishes a match nobody played, vacuously", () => {
-    // A match nobody recorded (decision 013) has no expected raters, so there is no set to wait
-    // for. That is not a claim that there is a mean to show: the three-note floor downstream is
-    // what stops a figure printing, and keeping the two apart is why this function has no idea how
-    // many notes exist.
-    expect(publication({ expectedRaterIds: [] })).toEqual({
-      published: true,
-      reason: "every-set-in",
-      owingRaterIds: [],
-    });
-  });
-
-  it("ignores a complete set from somebody who was not expected", () => {
-    // A man whose minutes a retro amendment took to zero may have rated everybody first. His set
-    // does not fill anybody else's hole.
-    expect(publication({ completeRaterIds: ["momo"] }).owingRaterIds).toEqual([
-      "hugo",
-      "karim",
-      "yanis",
-    ]);
-  });
-
-  it("keeps the owing list in the order it was given, so two screens agree on who is first", () => {
-    expect(
-      ratingsPublication({
-        expectedRaterIds: ["yanis", "hugo", "karim"],
-        completeRaterIds: ["hugo"],
-        publishedAtMs: null,
-      }).owingRaterIds,
-    ).toEqual(["yanis", "karim"]);
+  it("asks whether there is an instant, never whether it has passed", () => {
+    // Hiding writes null back, so presence is the whole question. An instant in the future would be a
+    // clock skew between the server and Postgres, not a scheduled publication, and treating it as
+    // « not yet » would hide a match the coach had just shown.
+    expect(meansAreVisible(Date.parse("2099-01-01T00:00:00Z"))).toBe(true);
+    expect(meansAreVisible(0)).toBe(true);
   });
 });
 

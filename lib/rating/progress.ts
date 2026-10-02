@@ -1,30 +1,35 @@
 /**
- * Who rates, whom they owe a note, and how far through they are.
+ * Who is rated, whom one rater owes a note, and how far through he is.
  *
  * Pure. What it no longer holds is the *gate*: « has this reader earned the right to see the notes »
  * was decision 007's question and this module used to answer it. Decision 137 removed the question —
- * nobody reads an individual note but the coach, and the mean is published or it is not, for
- * everybody at once. `lib/rating/published.ts` holds that, and `ratingProgress` below feeds it: « has
- * every set come in » is the sum of these.
+ * nobody reads an individual note but the coach — and decision 139 made the answer a single column the
+ * coach writes. `lib/rating/published.ts` holds that; nothing here feeds it any more.
  *
- * ## Who rates, and the sheet's demotion
+ * ## Two sets, and they are no longer the same one
  *
- * Decision 007 read the **match sheet**: `starter` or `substitute` could rate and be rated, a
- * `supporter` could not. Decision 137 reads the **log** instead — `minutes > 0`. The two differ in
- * exactly the case that matters: a named substitute who sat out the whole hour. The sheet says he was
- * there; the log says he did not play. He has no performance to be judged on, and he watched the same
- * match as the supporters who are not asked either.
+ * This module used to answer « who may rate » and « who may be rated » with one list, and the two have
+ * come apart (decision 139):
  *
- * That makes the rule a fact about `match_events` rather than about `match_squad`, so it cannot be a
- * database constraint and cannot be read off the sheet the UI already has. It is derived from
- * `match_player_stats.minutes` (frozen) or from the reducer's `PlayerMatchState` (live), and the
- * Server Action re-derives it rather than trusting the form: the set of legal targets is exactly what
- * a crafted post would try to widen.
+ * - **who may be rated: the players with `minutes > 0`.** Unchanged since decision 137, and still read
+ *   from the **log** rather than from the match sheet — the two differ in exactly the case that
+ *   matters, a named substitute who sat out the whole hour. The sheet says he was there; the log says
+ *   he did not play, and he has no performance to be judged on. That makes the rule a fact about
+ *   `match_events` rather than about `match_squad`, so it cannot be a database constraint and cannot be
+ *   read off the sheet the UI already has: it is derived from `match_player_stats.minutes` (frozen) or
+ *   from the reducer's `PlayerMatchState` (live), and the Server Action re-derives it rather than
+ *   trusting the form, because the set of legal targets is exactly what a crafted post would widen;
+ * - **who may rate: anybody in the team.** Decision 007 asked for `starter` or `substitute`, decision
+ *   137 for `minutes > 0`, and decision 139 for nobody in particular. A supporter on the touchline
+ *   watched the same hour the players did and has an opinion worth as much; a member who was not even
+ *   on the sheet may rate too. So there is no `hasPlayed` test in `ratingTargetsFor` any more, and
+ *   `hasPlayed` below is left for what a screen *says* rather than for what it allows.
  *
  * **Nobody rates himself.** Decision 007 required it — a self-note was part of the full set and the
  * recap printed « tu t'es mis 8 ». Decision 137 drops it: the published figure is « the mean of the
  * notes the others gave him », and a man's own note has no place in that. `ratings_no_self` in the
- * schema is the half of this that a constraint can state.
+ * schema is the half of this that a constraint can state, and it is also why a rater who played gets a
+ * set one shorter than a supporter's.
  */
 
 /** Who played, and so who rates and is rated. One row per member with minutes on the clock. */
@@ -47,7 +52,14 @@ export function playedMemberIds(played: readonly PlayedEntry[]): string[] {
   return [...ids].sort();
 }
 
-/** Whether this member played, and so may rate and be rated. */
+/**
+ * Whether this member played, and so is **rated**.
+ *
+ * It no longer decides whether he may rate: under decision 139 everybody may. It is kept because the
+ * notation screen says a different thing to a man who was on the pitch than to one who watched, and
+ * because a rater who played is in the rated set and so gets a list one name shorter than everybody
+ * else's.
+ */
 export function hasPlayed(played: readonly PlayedEntry[], membershipId: string | null | undefined): boolean {
   if (!membershipId) return false;
   return played.some((entry) => entry.teamMemberId === membershipId && entry.minutes > 0);
@@ -56,14 +68,15 @@ export function hasPlayed(played: readonly PlayedEntry[], membershipId: string |
 /**
  * Whom one rater owes a note: everybody who played, **minus himself**.
  *
- * Returns an empty list for a member who did not play, rather than throwing — a supporter opening the
- * notation URL by hand is a reader, not an error, and the screen says so.
+ * No test on the rater at all — decision 139: a supporter, a member who was not on the sheet, and the
+ * coach all get the same list, and a player gets it minus his own name. An empty list therefore means
+ * one thing only, « nobody played this match », which is a match the log is empty for (decision 013)
+ * and never a statement about who is asking.
  */
 export function ratingTargetsFor(
   played: readonly PlayedEntry[],
   raterMembershipId: string | null | undefined,
 ): string[] {
-  if (!hasPlayed(played, raterMembershipId)) return [];
   return playedMemberIds(played).filter((id) => id !== raterMembershipId);
 }
 
