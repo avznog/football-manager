@@ -20,8 +20,9 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `171ae41`. The newest tag, `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
-  now **23 commits behind**, so **preview is ahead of production** by all twenty-three and will stay ahead
+- **`main`** — at `b9a2974`, the squash of **#138, the ratings rebuild**. The newest tag,
+  `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
+  now **24 commits behind**, so **preview is ahead of production** by all twenty-four and will stay ahead
   until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
   **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
   other machine. Re-derive the two numbers rather than reading them: `git log -1 origin/main` and
@@ -49,9 +50,8 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **138**. The highest on `main` is **136** (the trace sink, the other
-  machine); **137 is taken** by the ratings rebuild and is on `feat/ratings-rebuild`, not yet merged, so a
-  session that greps `main` will be told 136 and must not write a second `## 137`.
+- **Next free decision number** — **138**. The highest on `main` is now **137**, the ratings rebuild,
+  merged; the number and the pull request happen to share a figure and nothing follows from that.
   **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
   believing**, and this line is why: it said 133 when 133 *and* 134 were already on `main` — the other
   machine's two placeholders, the ones this line itself called "coming on `feat/retro-one-action-list`,
@@ -87,20 +87,26 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   open is merged. **#137 was closed without merging**: it was a lone `1.0.0-beta.7` bump, and the owner
   ships this release by hand, so `package.json` stays at **`1.0.0-beta.6`** and the bump belongs to
   whichever pull request the owner decides earns it.
-- **In flight · the owner's machine** — **PR 3, the ratings rebuild**, on `feat/ratings-rebuild`, five
-  commits pushed and the branch green locally; the pull request is not opened yet. It is decision **137**:
-  a note is the mean of what the others gave you, the means come out once the notes are in, and the
-  individual notes are the coach's alone. It **supersedes 021 and 024 entirely, 102 entirely, 007 on three
-  of its four clauses**, and renames `MIN_RATINGS` to `MIN_RATED_MATCHES` because the unit changed from
-  notes to matches. Migration **`0007_chubby_silver_samurai.sql`** is in it and three of its statements are
-  irreversible on purpose (`score` → `numeric(3,1)`, `comment` dropped, every self-rating deleted), so a
-  session on the other machine with a local database should expect `db:migrate` to take its seeded ratings
-  with it. **What is still owed before it is opened**: both themes at 390 px in both roles in one pass, and
-  the walk on a reset database as three users including the crafted form post for the two refusals. Ahead
-  of it there is nothing: the **database wipe is closed without being done**, along with the super-admin
-  password reset and the Neon `neondb_owner` rotation, by the owner's decision (**132**). Do not re-propose
-  any of the three. The facts behind them are all still true and still rediscoverable, which is exactly why
-  they were raised in every session report for weeks — read 132 instead of raising them a fifth time.
+- **The ratings rebuild is merged** — **#138**, decision **137**, squashed to `b9a2974`. A note is the
+  mean of what the others gave you, the means come out once the notes are in, and the individual notes are
+  the coach's alone. It **supersedes 021 and 024 entirely, 102 entirely, 007 on three of its four
+  clauses**, and renames `MIN_RATINGS` to `MIN_RATED_MATCHES` because the unit changed from notes to
+  matches. **Migration `0007_chubby_silver_samurai.sql` is now on `main` and three of its statements are
+  irreversible on purpose** (`score` → `numeric(3,1)`, `comment` dropped, every self-rating deleted), so a
+  session on the other machine should expect its next `db:migrate` to take its local seeded ratings with
+  it — `npm run db:reset` afterwards is the cheap answer, and the seed now holds one match for each of the
+  three rating states. **One thing is still owed and is in `docs/ROADMAP.md`**: the crafted form post
+  proving the *server* refuses a self-note and a note on a 0-minute substitute. The hand walk at 390 px in
+  both roles is done and found three defects, all fixed before the merge.
+- **The database wipe is closed without being done**, along with the super-admin password reset and the
+  Neon `neondb_owner` rotation, by the owner's decision (**132**). Do not re-propose any of the three. The
+  facts behind them are all still true and still rediscoverable, which is exactly why they were raised in
+  every session report for weeks — read 132 instead of raising them a fifth time.
+- **In flight · the owner's machine** — **nothing.** The checkout is on the merged, deleted
+  `feat/ratings-rebuild` because `main` is checked out in the `.claude/worktrees/ux-analyser` worktree and
+  two worktrees cannot hold one branch; it is clean and fully merged, and `git -C .claude/worktrees/ux-analyser`
+  is where `main` lives until somebody moves it. **The `1.0.0-beta.7` bump and its hand-cut tag are the
+  owner's**, and nothing on `main` is tagged, so production is still serving `beta.6`.
 - **In flight · the other machine** — **the owner's fourth batch of iPhone remarks**, four areas, planned
   in `docs/PLAN.md`'s new `## Amendments` and `docs/ROADMAP.md`'s « The fourth batch from the owner's
   iPhone ». Open and waiting on the gatekeeper: **#114** (tap acknowledgement, released for merge),
@@ -880,6 +886,26 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   hand, and the pull request for this branch is not opened yet. What it is waiting on is the half no suite
   can give: both themes at 390 px in both roles in one pass, and the walk on a reset database as three
   users, including the crafted form post for « not yourself » and « not a man with 0 minutes ».
+- **2026-10-02 14:45 · owner's machine · `main`** — **The ratings rebuild is merged: #138, squashed to
+  `b9a2974`.** The walk that the entry above said it was waiting on happened, and it is the reason this
+  line exists rather than a merge notice: it found three defects, in a milestone whose docs had already
+  been written as done. (1) `ratingDeadlineFr` still ended « tu ne verras pas celles de l'équipe » — the
+  punishment decision 024 carried and 137 abolished — and **three unit assertions pinned that whole
+  sentence and all three passed**, because they had been updated to match the code instead of the
+  decision. A screenshot caught it. (2) `db/seed.ts` printed « notes : J7 complètes » for a match with
+  four raters of nine and an open window, and more seriously **no match in the demo season showed a
+  published mean for anybody**: nobody rates himself, so a rater is rated by the *other* raters only, and
+  J3's three raters each sat at two notes, under `MIN_NOTES_FOR_MEAN`. A fourth full rater puts the raters
+  on 3 and everybody else on 4; the three rating states now have one match each, verified by querying the
+  table after `db:reset` rather than by rereading the prose. (3) `ratings-panel.tsx` showed « pas encore
+  assez de notes » to **both** readers whenever every mean was below the floor, so on J5 the coach — the
+  only person entitled to the eight notes sitting in the table — saw an empty state. The floor is about
+  the figure, not the notes. If you take one thing from this: **a doc written before the walk is a
+  hypothesis, and this repo's own rule about looking at the screen is what the three of these have in
+  common.** `npm test` 1451/66, `test:e2e` 5, eslint silent, typecheck clean, CI green on both jobs
+  before the merge. **Nothing is shipped** — `package.json` is still `1.0.0-beta.6` and the bump and the
+  hand-cut tag are the owner's. Still owed and recorded in `docs/ROADMAP.md`: the crafted form post that
+  proves the server, and not the screen, refuses a self-note and a note on a 0-minute substitute.
 
 ### From the other machine
 
