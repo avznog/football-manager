@@ -4983,3 +4983,67 @@ the only shape in which a leak of the kind 021 allowed can fail a test.
 stays. Showing a player who gave him what: explicitly the coach's alone. And the number this entry
 does not settle — whether 5,0 as a default produces a squad of average players — is a question for the
 owner after a real Sunday, not for a session.
+
+---
+
+## 138 — Rating stays open until the means come out, and the coach's button is the only deadline
+
+**2026-10-02** · accepted · **supersedes decision 137's third publication clause and decision 079's
+deadline sentence** · amends decision 007's reciprocity window, what little of it decision 137 left ·
+leaves decision 021's anti-anchoring property standing, which is the whole reason this has a limit at all
+
+The owner's request, in one line: **when a match has already been played, we must be able to fill in our
+notes if we have not done it yet.** It was answered by a single choice — the window shuts when the means
+are out, and not before.
+
+**The rule.** A played match is rateable for as long as its means are pending, however old it is. It
+stops being rateable the moment they are published, which happens two ways and only two: the last
+expected rater finishes, or the coach taps « Sortir les moyennes maintenant ». So `ratingWindow` has two
+inputs, `finished` and `published`, and no clock.
+
+**What was there before, and why it was the wrong lock.** Decision 007 shut the window at the **next
+kick-off**, and 137 kept that as its third publication clause. It punished the wrong thing. A man who
+missed a week because he was away came back to a match he could no longer rate, not because anybody had
+read a mean — none was out — but because a fixture he had nothing to do with had started. And it was no
+backstop either, which is the part 137 had already written down: a season's last match has no next
+kick-off, so the one match a team most wants its notes for was the one whose window never closed on its
+own. A clause that fires when it should not and fails to fire when it should is not a deadline; it is a
+calendar coincidence.
+
+**Why the window has a limit at all.** Decision 021 existed for one property — nobody writes his notes
+after reading the team's — and it is the only thing standing between « rate whenever you like » and a
+figure that can be moved by a man who has already seen it. Publication is exactly the moment that
+property starts to bite, so publication is exactly where the window ends. Before it, a late note changes
+nothing anybody has read; after it, it would move a number the squad has already discussed. **The
+guarantee kept: nobody ever reads a mean before writing his own notes.** That is the same guarantee as
+before, now held by the one event that can actually break it.
+
+**It breaks a circle, and that is why it is a deletion rather than a condition.** `ratingsPublication`
+used to take the window state; the new rule needs the window to take publication. Both cannot be true,
+so clause 3 is gone and publication has two clauses — « every set in » and « the coach published ». The
+dependency runs one way, publication → window, and `lib/rating/queries.ts` answers « are the means out? »
+in one place (`publicationOf`) so the recap and the notation screen cannot disagree about it.
+
+**The calendar leaves the rating tree entirely.** `getNextKickoffAfter`, `getLatestStartedKickoffMs` and
+`getSeasonStats`'s `nowMs` are all deleted, so *whether a season's means are out is now a question about
+rows only* — two fewer round trips, and one fewer answer that changes between two renders of the same
+page. `ratingDeadlineFr`, `closesAtMs` and `nextKickoffAtMs` go with them: there is no date left to
+print. What replaces them is one unconditional sentence, `ratingUrgencyFr`, true for every played match:
+« Tu peux encore noter : les moyennes ne sont pas sorties. Elles sortiront dès que tout le monde aura
+noté, ou quand le coach décidera de les sortir — et tes notes ne compteront plus. » The old sentence
+named the next kick-off, and for a season's last match it named nothing and printed nothing at all.
+
+**The weight this puts on one button.** « Sortir les moyennes maintenant » used to be a shortcut past a
+deadline the calendar would have reached anyway; it **is** the deadline now, and the only one. So the
+form says both halves — « elles ne bougeront plus, **et plus personne ne pourra noter ce match** » —
+because a coach who is not told that is being asked to end something without knowing it. That wording
+was found by the 390 px pass, not by a test, and it is the third defect in this slice that only a
+screenshot could have caught.
+
+**What stays true.** A note is still final (`onConflictDoNothing`, decision 023): the window reopening
+is not a thing, because a published mean is never unpublished, and `ratings_published_at` is now read as
+« when the notes came out **and** when the rating ended ». Rating still opens at the final whistle, not
+before — a match nobody played publishes vacuously, and the screen must still say « la notation ouvrira
+au coup de sifflet final » rather than « c'est fermé ». And the demo season now carries the case the old
+seed could not: J3 and J5 are published and closed, while **J2, J6 and J7 are rateable whatever their
+age** — J2 is five weeks old and is the match to open `/notation` on to see this decision working.

@@ -509,7 +509,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [x] Rating flow: one teammate per card, 0–10, optional comment
 - [x] Results hidden until you have submitted your own
-- [x] Window closes at the next kick-off
+- [x] Window closes at the next kick-off — **deleted by decision 138**, see the block at the end of this
+      section: the window now closes when the means come out, and not on a date
 - [x] Derived man of the match
 - [x] Celebratory post-match recap screen
 - [x] The rating card states what a player did, not what the coach planned — « 60’ » or
@@ -524,7 +525,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] …and the window says when it shuts: « À finir avant le coup d’envoi du match suivant, dimanche
       27 septembre à 10:30 ». `closesAtMs` had been computed since M6 and read by nobody, so three
       screens promised « tu verras les notes des autres quand tu auras fini » without mentioning that
-      finishing has a closing time — and `progress.ts` makes missing it permanent (decision 079)
+      finishing has a closing time — and `progress.ts` makes missing it permanent (decision 079). **That
+      sentence no longer exists**: decision 138 removed the date it named, and `ratingUrgencyFr` names the
+      two events that end the rating instead
 - [x] …and the recap's rating list calls the reader « toi » wherever he appears in it. He appears
       twice — as the author of the notes he gave and as the subject of his own row — and only the
       first had a rule, so his own row said « il s'est mis 8 » and « lui-même » three rows under
@@ -566,8 +569,10 @@ it stands.
       half lives in `lib/rating/validation.ts` and in `submitRatings`, which is where a crafted form post
       is caught rather than at the screen. The `comment` column and its `Textarea` are gone
 - [x] **Published, or « en attente » — one question with no viewer in it.** `lib/rating/published.ts`:
-      the means are out when every expected rater has submitted, **or** the coach has published, **or**
-      the window has closed at the next kick-off. `matches.ratings_published_at` is the coach's escape
+      the means are out when every expected rater has submitted, **or** the coach has published. (It
+      shipped with a third clause — the window closing at the next kick-off — which decision 138 deleted
+      a day later, for the very hole the next sentence already names.) `matches.ratings_published_at` is
+      the coach's escape
       hatch (`publishRatings`, `rating:publish`, idempotent), and it exists because the automatic
       backstop has a hole the size of a season's last match — no next kick-off, so the team that most
       wants its notes would be the team whose notes wait for ever. The coach reads who is missing before
@@ -633,6 +638,33 @@ it stands.
       floor is about the figure, not about the notes: the coach now reads his rows with « — » where the
       mean is withheld, and the card says « Aucune moyenne n'est sortie » beside the count. The player's
       screen is unchanged, because for him there genuinely is nothing
+- [x] **A played match stays rateable until its means come out, however old it is** (decision 138, the
+      owner's request: « when we are on a match that has already been played, we must have the
+      possibility to fill up the notes if we have not yet done it »). `ratingWindow` takes `finished` and
+      `published` and no clock; the next-kick-off deadline is gone, with `ratingDeadlineFr`, `closesAtMs`,
+      `nextKickoffAtMs`, `getNextKickoffAfter`, `getLatestStartedKickoffMs` and `getSeasonStats`'s
+      `nowMs`. **Whether a season's means are out is now a question about rows only** — two fewer round
+      trips, and one fewer answer that moves between two renders of the same page
+- [x] **The circle was broken by a deletion, not by a condition.** `ratingsPublication` used to take the
+      window state and the new rule needs the window to take publication, so publication's third clause
+      went — it was the unreliable one, which the docblock had already said never fires for a season's
+      last match. The dependency runs one way now, publication → window, and `publicationOf` in
+      `lib/rating/queries.ts` is the single place that answers « are the means out? », so the recap and
+      the notation screen cannot disagree about it
+- [x] **One unconditional sentence replaces the date.** `ratingUrgencyFr`: « Tu peux encore noter : les
+      moyennes ne sont pas sorties. Elles sortiront dès que tout le monde aura noté, ou quand le coach
+      décidera de les sortir — et tes notes ne compteront plus. » True for every played match, so the
+      three screens print it unconditionally; the old one named the next kick-off and, for a season's last
+      match, printed nothing at all
+- [x] **The seed carries the case it could not before.** `RatingsFixture` gained `publishedAt`, set after
+      the notes so a row is never published over notes that failed the half-point check. J3 and J5 are
+      published and closed; **J2, J6 and J7 are rateable whatever their age**, and J2 — five weeks old —
+      is the match to open `/notation` on to see this working. Verified by SQL against a reset database
+      rather than by rereading the prose: J3 published/34 notes, J5 published/8, J7 unpublished/32
+- [x] **The coach is told that his tap is now the deadline.** Found by the 390 px pass and by nothing
+      else: the publish form said « elles ne bougeront plus » and stopped, which was the whole consequence
+      when the calendar would have closed the window anyway and is half of it now. It reads « …et plus
+      personne ne pourra noter ce match », in both the singular and the plural branch
 - [ ] **The crafted form post is still not tried by hand.** `lib/rating/validation.ts` and
       `submitRatings` refuse a note on yourself and a note on a 0-minute substitute, and unit tests cover
       both, but nobody has posted the form fields directly to prove the server and not the screen is what
