@@ -39,10 +39,13 @@ export async function logout(page: Page): Promise<void> {
 /* -------------------------------------------------------------------------- */
 
 /**
- * `SegmentedControl` and the rating pad hide their radios (`sr-only`) and dress the `<label>` up as
- * the button. A 1×1 clipped input is not what a user taps, so neither do we: the label carries the
- * `for`, and the ids are derived from the field name — `status-yes`, `role:<membershipId>-starter`,
- * `score:<membershipId>-9`.
+ * `SegmentedControl` hides its radios (`sr-only`) and dresses the `<label>` up as the button. A 1×1
+ * clipped input is not what a user taps, so neither do we: the label carries the `for`, and the ids
+ * are derived from the field name — `status-yes`, `role:<membershipId>-starter`.
+ *
+ * It no longer reaches the ratings. Notation used to be an eleven-radio pad per teammate and is one
+ * slider each now (decision 137): a range has no label to tap in its place, so it is driven by its
+ * accessible name and `fill` (`rateEveryone` in `happy-path.spec.ts`).
  */
 export function segment(scope: Page | Locator, inputId: string): Locator {
   return scope.locator(`label[for="${cssAttrValue(inputId)}"]`);
