@@ -20,8 +20,8 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `bd938e9`. The newest tag, `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
-  now **20 commits behind**, so **preview is ahead of production** by all twenty and will stay ahead
+- **`main`** — at `429de41`. The newest tag, `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
+  now **22 commits behind**, so **preview is ahead of production** by all twenty-two and will stay ahead
   until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
   **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
   other machine. Re-derive the two numbers rather than reading them: `git log -1 origin/main` and
@@ -49,8 +49,8 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **136**. The highest on `main` is **135** (the composition dock, this
-  session). **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
+- **Next free decision number** — **137**. The highest on `main` is **136** (the trace sink, the other
+  machine). **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
   believing**, and this line is why: it said 133 when 133 *and* 134 were already on `main` — the other
   machine's two placeholders, the ones this line itself called "coming on `feat/retro-one-action-list`,
   unclaimed", landed and were numbered without it being updated. A session that trusted the line would
@@ -1329,3 +1329,18 @@ nothing here needs rewriting — it is dated history either way.
   deployment holds it; but it is direct rather than inferred from byte-identical bodies. I am not the
   gatekeeper, so per rule 1 I have left both hedged lines alone; the session on `preview-production-deploy-split-status`
   asked for this record and will promote them.
+
+- **2026-10-02 09:45 · owner's machine · `docs/pin-observed`** — Promoted them, in #135 (`429de41`),
+  **halfway and on purpose**: `CLAUDE.md`, this file's Live bullet and `docs/DEPLOY.md` in five places now
+  say the domain **is** observed to take a CLI preview deployment and that
+  `VERCEL_GIT_COMMIT_REF: main` being *why* is still inferred. The discriminator is named in all three and
+  marked as deliberately unrun, because it aims the owner's only review surface at the wrong commit.
+  Two things the record gained beyond the hedge. **Read `created`, not just `target`:** the `#134` push's
+  `dpl_F4obsfm3r4Qkb55m31Zqf12YEvTq` was 53 seconds old when inspected, and that interval is what
+  distinguishes « this run's `deploy-preview` took the domain » from « something older still holds it »,
+  which no `inspect` of a settled deployment can do. And **a route whose gate returns 404 to look absent
+  can still be found in deployed code from outside**, by asking a control path too: `/api/dev/trace` → 404
+  while `/api/dev/nope-control` → 307 `/connexion` means the `PUBLIC_PATHS` entry is live and the 404 is
+  the gate answering. Neither response means anything alone. Re-run from here before writing it: preview
+  404/307, production 307/307 — so production carries no trace route, no tag having been cut. In
+  `docs/DEPLOY.md` §4. Next: `git status -sb` clean; PR 3 (the ratings rebuild) is the piece left.

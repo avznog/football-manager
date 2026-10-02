@@ -3909,3 +3909,49 @@ recording is the failure mode, because **two sessions in a row mischaracterised 
 either one opening it** — one from a heading, one from the other's summary. It is the same error as asserting
 a security primitive's shape from memory of the intention rather than from the function, which happened in
 this same batch and was caught by the same reviewer. A citation is a claim; `grep` the entry.
+
+---
+
+## Expected, then observed, then only halfway
+
+PR #135 (`429de41`), docs only. Three files — `CLAUDE.md`'s git-workflow paragraph, `COORDINATION.md`'s
+Live bullet and `docs/DEPLOY.md` in five places — said that a CLI-issued preview deployment taking
+`dev.7orteils.bgonzva.fr` was **expected to work and had not been observed**. It has been observed for a
+while; nobody had promoted the sentence. This is that commit, and the interesting part is how much of the
+claim stayed hedged.
+
+**Two claims live in one sentence, and only one of them has been checked.** That the branch-pinned domain
+takes a `--prod`-less CLI deployment is observed: `vercel inspect` prints a `target preview` deployment
+holding the alias, and the `main` push for #113 corroborated it a second way. That
+`VERCEL_GIT_COMMIT_REF: main` is *why* is **not** observed, and everything observed is equally consistent
+with the pin being irrelevant and the domain simply going to the latest preview. The discriminator — a CLI
+preview deploy carrying a different ref and failing to take the domain — is named in all three files and
+marked **deliberately unrun**: it would point the one preview surface the owner reviews at the wrong
+commit, which is the state the whole preview/production split exists to prevent. So the files now say
+« keep setting the variable, do not upgrade the reason to a fact ». Decision 119's first draft asserted a
+mechanism from intent and was wrong; splitting the sentence in two is the cheap way not to repeat it.
+
+**Read `created`, not just `target`.** The sharper observation came from the `#134` push (run
+36979080977): `dpl_F4obsfm3r4Qkb55m31Zqf12YEvTq`, `target preview`, holding the alias, **53 seconds old**
+when inspected. That interval is the evidence, and it is the thing a single `inspect` of a long-settled
+deployment cannot give — it distinguishes « *this run's* `deploy-preview` took the domain » from « some
+earlier deployment still holds it ». A later session re-checking this should read the timestamp.
+
+**A route built to look absent can still be located in deployed code, from outside, with no secret.** The
+trace sink's gate returns 404 on purpose, indistinguishable from an unrouted path, so the deploy looked
+unverifiable from the internet. It is not — provided you ask **two** paths. `/api/dev/trace` answers 404;
+a control path that is *not* in `PUBLIC_PATHS`, `/api/dev/nope-control`, answers 307 to
+`/connexion?suivant=…`. The control's redirect is the proxy refusing an unauthenticated request; the real
+path not redirecting means it was let through, reached its handler, and the 404 is the handler's own gate.
+**Neither response says anything alone** — that is the whole method, and why it reads as a non-result if
+you run half of it. Re-run from this machine before writing it down rather than copying the numbers:
+preview 404 and 307, production **307 and 307**, so production carries no trace route at all, no tag
+having been cut since it was added. Written up in `docs/DEPLOY.md` §4 as a general technique for
+confirming that a `proxy.ts` change reached a deployment.
+
+Worth separating, in that production result: the absent code and the unset `TRACE_SECRET` are
+*circumstances*, which a tag changes; `isTraceSinkEnabled` refusing `VERCEL_ENV === "production"` is the
+*gate*. Three reasons production is dead, one of which is load-bearing. Only count the gate.
+
+No decision entry. An observation that promotes a hedge is not a decision, and 136 was already taken by
+the other machine's trace sink; 137 is free.
