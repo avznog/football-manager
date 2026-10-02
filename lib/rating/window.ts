@@ -84,14 +84,21 @@ export function ratingWindow(input: RatingWindowInput): RatingWindow {
  *   (`state === "closed"`). Printing a deadline in the past would be the very thing this fixes.
  *
  * Only for a viewer whose notes are unfinished: the second half of the sentence is about notes he
- * will not see, which is false for somebody who has already rated everybody.
+ * will not get to give, which is nothing to say to somebody who has already rated everybody.
+ *
+ * **What the second half may not say any more.** It used to be « tu ne verras pas celles de
+ * l’équipe » — the window closing left a man who had not rated with the match's notes hidden for
+ * ever, which is decision 024's second edge and the thing decision 137 reversed. The window closing
+ * now *publishes* the means, so that sentence would threaten a punishment the app no longer carries
+ * out, and the deadline has to earn its urgency on what is actually lost: his say. The notes come out
+ * without him.
  */
 export function ratingDeadlineFr(closesAtMs: number | null, nowMs: number): string | null {
   if (closesAtMs === null || closesAtMs <= nowMs) return null;
 
   const when = formatWhen(new Date(closesAtMs), new Date(nowMs));
   return (
-    `À finir avant le coup d’envoi du match suivant, ${when} : après, les notes de ce match ne ` +
-    "bougent plus et tu ne verras pas celles de l’équipe."
+    `À finir avant le coup d’envoi du match suivant, ${when} : après, tu ne peux plus noter et les ` +
+    "moyennes sortent sans tes notes."
   );
 }

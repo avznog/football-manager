@@ -76,7 +76,16 @@ export function RatingsPanel({
 
   const rated = results.players.filter((player) => player.average !== null);
 
-  if (rated.length === 0) {
+  /**
+   * A published match can hold notes and still produce no mean at all: `MIN_NOTES_FOR_MEAN` is about
+   * the **figure**, not about the notes. The coach is the one reader the notes belong to, so he keeps
+   * them and reads « — » where the mean is withheld; for everybody else there is genuinely nothing on
+   * the screen, and they get the sentence instead. Hiding the notes from the coach here would mean the
+   * one state in which he most wants to know what little came in is the one state he cannot look at.
+   */
+  const hasRows = rated.length > 0 || (results.canSeeNotes && results.ratingCount > 0);
+
+  if (!hasRows) {
     return (
       <Card title="Les notes" as="h2">
         <EmptyState
@@ -99,7 +108,10 @@ export function RatingsPanel({
          collection, and `raterTotal` is 0 for everybody else. */
       description={
         results.canSeeNotes
-          ? `${pluralize(results.ratingCount, "note")} sur ${pluralize(results.raterTotal, "joueur")} à noter.`
+          ? `${pluralize(results.ratingCount, "note")} sur ${pluralize(results.raterTotal, "joueur")} à noter.` +
+            (rated.length === 0
+              ? ` Aucune moyenne n’est sortie : il en faut ${MIN_NOTES_FOR_MEAN} sur un même joueur.`
+              : "")
           : "La moyenne des notes des coéquipiers, pour chaque joueur qui était sur le terrain."
       }
       as="h2"

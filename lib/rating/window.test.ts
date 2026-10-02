@@ -61,16 +61,22 @@ describe("ratingDeadlineFr", () => {
    */
   it("names the instant the window shuts", () => {
     expect(ratingDeadlineFr(NOW + 48 * HOUR, NOW)).toBe(
-      "À finir avant le coup d’envoi du match suivant, jeudi 24/09/2026 à 20:00 : après, les " +
-        "notes de ce match ne bougent plus et tu ne verras pas celles de l’équipe.",
+      "À finir avant le coup d’envoi du match suivant, jeudi 24/09/2026 à 20:00 : après, tu ne " +
+        "peux plus noter et les moyennes sortent sans tes notes.",
     );
   });
 
-  /** Both halves of what missing it costs — the notes freeze, *and* the others stay hidden. */
-  it("says what happens after, not only when", () => {
+  /**
+   * Both halves of what missing it costs, and the second half is the one decision 137 rewrote: the
+   * window closing used to hide the match's notes from a man who had not rated, for ever, and now it
+   * publishes the means. So what he loses is his say and not his sight, and the sentence must not
+   * contain the old threat — a promise the app would no longer keep.
+   */
+  it("says what is lost after, not only when", () => {
     const sentence = ratingDeadlineFr(NOW + 48 * HOUR, NOW);
-    expect(sentence).toContain("ne bougent plus");
-    expect(sentence).toContain("tu ne verras pas celles de l’équipe");
+    expect(sentence).toContain("tu ne peux plus noter");
+    expect(sentence).toContain("les moyennes sortent sans tes notes");
+    expect(sentence).not.toContain("tu ne verras pas");
   });
 
   /**
@@ -79,8 +85,8 @@ describe("ratingDeadlineFr", () => {
    */
   it("uses the relative day when the next match is tomorrow, with the date behind it", () => {
     expect(ratingDeadlineFr(NOW + 24 * HOUR, NOW)).toBe(
-      "À finir avant le coup d’envoi du match suivant, demain, 23/09/2026 à 20:00 : après, les " +
-        "notes de ce match ne bougent plus et tu ne verras pas celles de l’équipe.",
+      "À finir avant le coup d’envoi du match suivant, demain, 23/09/2026 à 20:00 : après, tu ne " +
+        "peux plus noter et les moyennes sortent sans tes notes.",
     );
   });
 

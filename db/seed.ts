@@ -22,8 +22,9 @@
  * Sunday. So this fixture contains, on purpose, one instance of each case the application claims to
  * handle — a defeat, a draw, a keeper swapped at half time who then concedes, a goal with nobody to
  * credit, a match nobody ever recorded, a supporter on a sheet, a member who has left but still
- * holds a goal, a voided event, and ratings that are complete for one viewer and incomplete for
- * another. Each match below carries the figures it is supposed to produce, so a human reading a
+ * holds a goal, a voided event, and one match of each rating state there is: means out (J3), means
+ * out but too few notes to mean anything (J5), and means still awaited (J7). Each match below carries
+ * the figures it is supposed to produce, so a human reading a
  * screen can tell at a glance whether it is lying.
  *
  * ## How a played match is written
@@ -241,8 +242,8 @@ async function seedDemo(): Promise<void> {
     .returning({ id: users.id });
 
   // The super admin runs this team as a non-playing coach: that is the account you log into.
-  // He is on no match sheet, so he is the one viewer the rating gate never applies to
-  // (decision 024) — useful for checking that a screen is hiding notes for the right reason.
+  // He is on no match sheet, so he never rates and is never rated — and he is the viewer who reads
+  // the individual notes and their authors, which under decision 137 nobody else ever does.
   await db
     .insert(teamMembers)
     .values({
@@ -517,8 +518,9 @@ async function seedDemo(): Promise<void> {
    *   pitch when we conceded, and his second spell starts clean** (reducer rule 3), so his
    *   `conceded_while_on` is 0; Ali 24′ of 30′ with `conceded_while_on` 1.
    * - Hugo: 60′ in goal, 44′ gk-clean, conceded 1 → no clean sheet.
-   * - No ratings at all for this match: it must therefore *not* be counted as « masqué » for
-   *   anybody (there is nothing to hide).
+   * - No ratings at all for this match, and its window shut weeks ago: the recap says « pas encore
+   *   assez de notes » and `/stats` counts it among the matches still **awaiting notes**, for every
+   *   reader alike. Nothing here is hidden *from* anybody — there is nothing to hide (decision 137).
    */
   await seedPlayedMatch({
     ...common,
@@ -571,9 +573,10 @@ async function seedDemo(): Promise<void> {
   });
 
   /**
-   * J3 — **coupe, à l'extérieur, DÉFAITE 1-3.** The only defeat of the season, and the match that
-   * gates Karim: he submitted **three notes out of ten** and must therefore still see nothing of
-   * this match's ratings, anywhere (decisions 021 / 023).
+   * J3 — **coupe, à l'extérieur, DÉFAITE 1-3.** The only defeat of the season, and **the match whose
+   * means are out** (decision 137): its window shut weeks ago at J4's kick-off, so the means are
+   * published without the two men who never rated, and every player has the three notes
+   * `MIN_NOTES_FOR_MEAN` asks for. It is the fixture to look at to see the feature working.
    *
    * Expected — score **1-3**, conceded at 8′, 26′ and 49′:
    * - Julien 1 but (21′), Léo 1 passe, Karim 1 faute.
@@ -582,11 +585,14 @@ async function seedDemo(): Promise<void> {
    * - Clean minutes: 8′ for everyone who started (we conceded early), Thomas 13′ (36′→49′),
    *   Momo 7′ (53′→60′).
    * - Hugo: 60′ in goal, 8′ gk-clean, conceded 3.
-   * - Ratings: Hugo and Julien each submitted a **complete** set of ten; Karim only rated Hugo,
-   *   Samir and himself. So Hugo and Julien see the results and Karim does not — and `/stats` must
-   *   tell Karim one match is withheld and why.
-   * - Man of the match: **Léo and Julien share it at 7,5 over 2 notes** (7 from Hugo, 8 from
-   *   Julien). A shared award is decision 025 working; a single name here is a bug.
+   * - Ratings: Hugo, Julien, Samir and Léo each submitted a **complete** set; Karim rated Hugo and
+   *   Samir and stopped. So the four raters carry **3** notes each and everybody else **4**, which is
+   *   on or above `MIN_NOTES_FOR_MEAN`: every mean on this screen is a real figure. The coach alone
+   *   reads the notes and the counts; everybody reads the means — including Karim, who did not finish,
+   *   and Yanis, who never came on and is in no list at all.
+   * - Man of the match: **Léo and Julien share it at 7,0**. A shared award is decision 025 working;
+   *   a single name here is a bug. The card says « 7,0 de moyenne » and no count, for every reader
+   *   (decision 137).
    */
   await seedPlayedMatch({
     ...common,
@@ -639,12 +645,20 @@ async function seedDemo(): Promise<void> {
         thomas: 6,
       },
       raters: [
+        // **Four** full rounds, not three, and the reason is the one thing in this fixture that is
+        // easy to get wrong. `MIN_NOTES_FOR_MEAN` is 3 (decision 137), and nobody rates himself, so a
+        // rater is rated by the *other* raters only: with three full rounds the three raters would
+        // each hold two notes and three of the nine means on this screen would be withheld. Four
+        // rounds puts every player on or above the floor — the raters at 3, everybody else at 4.
         { username: "hugo", delta: 0 },
         { username: "julien", delta: 1 },
-        // A partial set. It hides nothing from anybody now (decision 021 is gone); it is how this
-        // fixture holds a match whose notes are not all in, so the means stay unpublished until the
-        // coach releases them — the state decision 137's escape hatch exists for.
-        { username: "karim", delta: 2, only: ["hugo", "samir"] },
+        { username: "samir", delta: -1 },
+        { username: "leo", delta: 0 },
+        // A partial set. It hides nothing from anybody now (decision 021 is gone); it is how a
+        // fixture holds a match **published without everybody**, which is what the window closing
+        // does here — the next match has long since kicked off. He is the last rater of the two men
+        // he did rate, so he absorbs their spread and his own delta never applies.
+        { username: "karim", delta: 0, only: ["hugo", "samir"] },
       ],
     },
   });
@@ -714,10 +728,12 @@ async function seedDemo(): Promise<void> {
    * - Minutes: Samir/Thomas/Nico/Léo/Karim 60′, Hugo 30′, Mehdi 30′, Julien 50′, Momo 10′,
    *   Yanis/Ali 0′ — sum 420′.
    * - Julien 1 but (12′), Karim 1 but (40′) + 2 passes (12′, 57′), Momo 1 but (57′), Léo 1 passe.
-   * - Ratings: **Mehdi alone** submitted, and his set is complete. Every player therefore has
-   *   exactly **one** note, so the recap must say « pas encore assez de notes » rather than name a
-   *   man of the match (decision 025), while still listing the notes with their count of 1.
-   *   Mehdi sees them; Karim and Hugo, who were on the sheet and never rated, see nothing.
+   * - Ratings: **Mehdi alone** submitted, and his set is complete. Its window shut at J6's kick-off,
+   *   so the match **is published** — and every player still has exactly **one** note, Mehdi himself
+   *   none at all, since nobody rates himself. One note is below `MIN_NOTES_FOR_MEAN`, so this is the
+   *   fixture for « pas encore assez de notes »: no mean, no man of the match (decision 025), and the
+   *   same sentence for every reader — Mehdi, who rated, and Karim and Hugo, who did not, see
+   *   identical screens (decision 137 killed the gate that used to tell them apart).
    */
   await seedPlayedMatch({
     ...common,
@@ -814,9 +830,10 @@ async function seedDemo(): Promise<void> {
 
   /**
    * J7 — **championnat, à l'extérieur, victoire 2-0**, the most recent match and the only
-   * **clean sheet** of the season. It is also the match whose ratings are *complete* for Karim, so
-   * he sees this one and not J3 or J5 — the rating gate exercised in both directions by the same
-   * viewer (decisions 007 / 021 / 024).
+   * **clean sheet** of the season. It is also the match **whose means are not out** (decision 137):
+   * four of the nine men who played have rated, the window is still open and the coach has not
+   * published, so every reader — coach included — is told the notes are « en attente », and the
+   * coach's « Sortir les moyennes maintenant » is the only way to the figures below.
    *
    * Because it is the last played match and the next fixture is next Sunday, **its rating window is
    * open**: `/match/<id>/notation` is usable here and nowhere else.
@@ -828,13 +845,15 @@ async function seedDemo(): Promise<void> {
    *   Yanis/Fabien 0′, Brice (supporter) 0′ — sum 420′.
    * - Nothing conceded, so **clean minutes = minutes** for everybody, and Hugo has 60′ gk-clean →
    *   his **second** clean sheet of the season.
-   * - Ratings: Karim, Hugo, Julien and Samir each submitted a complete set of the eleven rateable
-   *   members. Deltas are 0 / +1 / −1 / 0, so **every average is exactly its base**:
+   * - Ratings: Karim, Hugo, Julien and Samir each submitted a complete set of the **nine** men who
+   *   played — Yanis and Fabien were named and never came on, so they are neither raters nor rated
+   *   (decision 137). Every average is exactly its base, so once the coach publishes:
    *   Julien 9,0 · Karim 8,0 · Hugo 8,0 · Ali 8,0 · Léo 7,0 · Samir 7,0 · Thomas 7,0 ·
-   *   Nico 6,0 · Momo 6,0 · Yanis 5,0 · Fabien 5,0, over **4** notes each.
-   *   Man of the match: **Julien, 9,0**.
-   * - **Brice is a supporter**: he may not rate, may not be rated, and appears in no rating card —
-   *   while still being allowed to read the results, since he had no set to submit (decision 024).
+   *   Nico 6,0 · Momo 6,0 — over **3** notes for the four raters, who are not rated by themselves,
+   *   and **4** for the five others. Man of the match: **Julien, 9,0**. Until then, nothing.
+   * - **Brice is a supporter**: he may not rate, may not be rated, and appears in no rating card.
+   *   He reads exactly what everybody else reads, which is now the whole of the question
+   *   (decision 137 removed the gate that made « may he read this? » depend on who he was).
    */
   await seedPlayedMatch({
     ...common,
@@ -1007,8 +1026,8 @@ async function seedDemo(): Promise<void> {
   console.log("  saison : 4 V · 1 N · 1 D · 1 match non enregistré · 13 buts pour, 10 contre");
   console.log("           1 but sans buteur · 1 but annulé · 1 but encaissé annulé");
   console.log("           Hugo 2 clean sheets (dont une mi-temps, J5) · Mehdi 0 sur 2 matchs");
-  console.log("           notes : J7 complètes (HDM Julien 9,0) · J3 partielles pour Karim ·");
-  console.log("                   J5 un seul notateur (« pas encore assez de notes »)");
+  console.log("           notes : J3 moyennes sorties (HDM Léo et Julien, 7,0) · J5 une seule note");
+  console.log("                   par joueur (« pas encore assez de notes ») · J7 en attente");
   console.log(`  connexion : ${adminUsername} / ${process.env.SUPER_ADMIN_PASSWORD ?? "change-me"} (coach)`);
   console.log(`              karim / ${DEMO_PASSWORD} (joueur-coach) · hugo / ${DEMO_PASSWORD} (joueur)`);
 }

@@ -4043,3 +4043,41 @@ stays. Showing a player who gave him what: explicitly the coach's alone. And `D7
 the UX audit survives the rewrite in a new shape — nothing on the notation screen survives a navigation
 away, and the « 11 notes choisies, pas encore envoyées » warning the old flow printed went with the card
 counter it counted, so there is now no warning at all.
+
+**The hand walk, and the three things it found.** The entry above said the walk was the next session's
+first job; it was this one's, and the cost of having written the milestone up before doing it is three
+corrections rather than three fresh features. On a reset database, at 390 px, both themes, coach and
+player side by side: the J3 recap (means out), the J5 recap (published, one note each, no mean), the J7
+recap (« en attente » and the coach's publish button) and the J7 notation screen as Léo, who had not
+rated — the shots are in `audit/ratings/`.
+
+1. **`ratingDeadlineFr` still threatened a punishment the app had stopped carrying out.** It ended
+   « après, tu ne peux plus noter et **tu ne verras pas celles de l'équipe** »: decision 024's second
+   edge, which 137 reversed in the same breath as it wrote « the window closing publishes the means ».
+   Three unit assertions pinned that whole sentence and all three passed, because they had been updated
+   to match the code rather than the decision — the screenshot is what caught it. It now says « les
+   moyennes sortent sans tes notes », and one test asserts the old clause is *absent*.
+2. **`db/seed.ts` asserted a fixture it no longer held, and the fixture itself was wrong.** It printed
+   « notes : J7 complètes (HDM Julien 9,0) » while J7 has four raters of nine and an open window, so
+   nothing is out at all; three docblocks still described the 021 gate. The substantive half: **no match
+   showed a published mean for anybody.** J3's three raters looked like enough, but nobody rates himself,
+   so a rater is rated by the *other* raters only and each of the three sat at two notes — under
+   `MIN_NOTES_FOR_MEAN`. A fourth full rater puts the raters on 3 and everybody else on 4. J3 now
+   publishes nine real means with Léo and Julien sharing at 7,0, and each of the three states has exactly
+   one match: J3 out, J5 published but too thin, J7 awaited. Confirmed by querying the table after
+   `npm run db:reset`, not by reading the new prose.
+3. **The coach lost notes that existed.** `ratings-panel.tsx` returned « pas encore assez de notes »
+   whenever every mean was below the floor — for both readers. So on J5, with eight notes in the table,
+   the one person entitled to read them saw an empty state. The floor is about the figure, not about the
+   notes: the coach now gets his rows with « — » where the mean is withheld and « Aucune moyenne n'est
+   sortie » beside the count. The player's screen is untouched, because for him there genuinely is
+   nothing to show.
+
+**What this walk verified.** `npm test` 1451 across 66 files, `npm run test:e2e` 5, `npx eslint app
+components lib e2e db scripts` silent, `npm run typecheck` clean. The two screens that carry the whole
+decision were read in both roles in one pass, and the difference between them is exactly the count line
+and the author chips — which is the decision, on screen.
+
+**Still not verified.** The crafted form post. `lib/rating/validation.ts` and `submitRatings` refuse a
+note on yourself and on a 0-minute substitute, and unit tests cover both, but nobody has posted the
+fields directly to prove it is the server rather than the screen that refuses.

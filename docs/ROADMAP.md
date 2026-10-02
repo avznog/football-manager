@@ -606,10 +606,37 @@ it stands.
       published screen is then read by the coach and by a player — « 28 notes sur 8 joueurs à noter »
       and the author chips for him, « 9,0 » and nothing else for the player. Half of that assertion is
       an absence, which is the only shape in which a leak of the kind 021 allowed can fail a test
-- [ ] **Not yet walked by hand.** Both themes at 390 px in both roles in one pass, and the end-to-end
-      walk on a reset database as three users — including crafted form data proving a player cannot rate
-      himself or anybody with 0 minutes, which is the half no screen can demonstrate. The suite is green
-      and nothing below `npm run test:e2e` is evidence about the phone
+- [x] **Walked by hand**, on a reset database, at 390 px, both themes, coach and player side by side in
+      one pass: the J3 recap (means out), the J5 recap (published, one note each, no mean), the J7 recap
+      (« en attente » plus the coach's publish button) and the J7 notation screen as a player who had not
+      rated. The player's rows carry a mean and nothing else; the coach's carry the count and the author
+      chips, and the difference between the two screens is exactly those two things. It found the three
+      defects below, all three fixed in the same walk
+- [x] **The deadline sentence still threatened a punishment the app had stopped carrying out.**
+      `ratingDeadlineFr` ended « après, tu ne peux plus noter et **tu ne verras pas celles de l'équipe** » —
+      decision 024's second edge, which 137 reversed in the same breath as it wrote « the window closing
+      publishes the means ». Found by reading `audit/light-joueur-notation.png`, not by a test: three unit
+      assertions pinned the whole sentence and all three passed, because they had been updated to match
+      the code rather than the decision. Now « les moyennes sortent sans tes notes », and the third test
+      asserts the old clause is *absent*
+- [x] **The seed asserted a fixture it no longer held.** `db/seed.ts` printed « notes : J7 complètes
+      (HDM Julien 9,0) » and its docblocks described decision 021's gate in three places, while the data
+      said something else entirely: J7 has four raters of nine and an open window, so nothing is out at
+      all. Worse, **no match showed a published mean for anybody** — the J3 round had three raters, and a
+      rater is rated by the *other* raters only, so each of the three sat at two notes, below
+      `MIN_NOTES_FOR_MEAN`. A fourth full rater fixes it: the raters land on 3 and everybody else on 4,
+      J3 now publishes nine real means (Léo and Julien share at 7,0), and the three states each have
+      exactly one match — J3 out, J5 published but too thin, J7 awaited
+- [x] **The coach lost notes that existed, on a published match with no mean.** `ratings-panel.tsx`
+      returned « pas encore assez de notes » whenever every mean was below the floor, for both readers —
+      so on J5, where eight notes are in the table, the one person entitled to read them saw nothing. The
+      floor is about the figure, not about the notes: the coach now reads his rows with « — » where the
+      mean is withheld, and the card says « Aucune moyenne n'est sortie » beside the count. The player's
+      screen is unchanged, because for him there genuinely is nothing
+- [ ] **The crafted form post is still not tried by hand.** `lib/rating/validation.ts` and
+      `submitRatings` refuse a note on yourself and a note on a 0-minute substitute, and unit tests cover
+      both, but nobody has posted the form fields directly to prove the server and not the screen is what
+      refuses. That is the half no screenshot can demonstrate
 - [ ] **Whether 5,0 as a default produces a squad of average players** is a question for the owner after
       a real Sunday, and not one a session can answer. If it does, the answer is not a « passer sans
       noter » button — it is a different control
