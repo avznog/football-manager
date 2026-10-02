@@ -69,6 +69,15 @@ describe("isTraceSinkEnabled", () => {
   it("refuses an environment name it does not know, rather than guessing", () => {
     expect(isTraceSinkEnabled({ VERCEL_ENV: "staging", NODE_ENV: "development" })).toBe(false);
   });
+
+  it("refuses a padded environment name too, rather than trimming its way to a guess", () => {
+    // Unlike `TRACE_SECRET`, `VERCEL_ENV` is written by the platform and never pasted by hand, so
+    // there is nothing here to make diagnosable and the honest answer to an unrecognised spelling is
+    // still « off ». Asserted rather than assumed, because the one thing this function must never do
+    // is let something that reads as production through.
+    expect(isTraceSinkEnabled({ VERCEL_ENV: " production ", NODE_ENV: "development" })).toBe(false);
+    expect(isTraceSinkEnabled({ VERCEL_ENV: "preview\n", NODE_ENV: "development" })).toBe(false);
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -86,6 +95,35 @@ describe("traceSecretMatches", () => {
     expect(traceSecretMatches(undefined, undefined)).toBe(false);
     // The empty string presented against an unset secret must not read as « both empty, equal ».
     expect(traceSecretMatches("", "")).toBe(false);
+  });
+
+  it("treats a whitespace-only secret as never configured, not as a live key", () => {
+    // What this guards against is a paste into the Vercel dashboard that landed as a space or a
+    // newline: the sink must be dead, the way it is when the variable was never set at all.
+    expect(traceSecretMatches(" ", " ")).toBe(false);
+    expect(traceSecretMatches("\n", "\n")).toBe(false);
+    expect(traceSecretMatches("\t", "\t")).toBe(false);
+    expect(traceSecretMatches("  \n ", "  \n ")).toBe(false);
+    // And it is the *expected* side that decides: nothing a caller presents can revive it.
+    expect(traceSecretMatches(" ", "anything")).toBe(false);
+    expect(traceSecretMatches("\n", "")).toBe(false);
+  });
+
+  it("trims both sides, because a pasted secret arrives with a trailing newline", () => {
+    // Off, unconfigured and wrong-key are one identical 404 by design, so a stray newline would be
+    // a symptom the owner has no way to tell from a disabled sink. Hence the trim, on both sides:
+    // the corruption lands on whichever one he pasted into.
+    expect(traceSecretMatches("s3cret-de-trace\n", "s3cret-de-trace")).toBe(true);
+    expect(traceSecretMatches(" s3cret-de-trace ", "s3cret-de-trace")).toBe(true);
+    expect(traceSecretMatches("s3cret-de-trace", "s3cret-de-trace\n")).toBe(true);
+    expect(traceSecretMatches("s3cret-de-trace", "  s3cret-de-trace\t")).toBe(true);
+    expect(traceSecretMatches("\ts3cret-de-trace\n", "\n s3cret-de-trace ")).toBe(true);
+  });
+
+  it("trims the ends only: interior whitespace is part of the secret", () => {
+    expect(traceSecretMatches("s3cret de trace", "s3cretdetrace")).toBe(false);
+    expect(traceSecretMatches("s3cret de trace", "s3cret  de trace")).toBe(false);
+    expect(traceSecretMatches("s3cret de trace", "s3cret\tde trace")).toBe(false);
   });
 
   it("refuses a missing, empty or wrong presentation", () => {
@@ -128,6 +166,21 @@ describe("isTraceRequestAllowed", () => {
     expect(isTraceRequestAllowed({ NODE_ENV: "development" }, "")).toBe(false);
     // Local development is not an exception: unset means off there too.
     expect(isTraceRequestAllowed({ NODE_ENV: "development", TRACE_SECRET: "" }, "x")).toBe(false);
+    // A variable holding nothing but a keypress is unset, not configured with a one-space key.
+    expect(isTraceRequestAllowed({ VERCEL_ENV: "preview", TRACE_SECRET: " " }, " ")).toBe(false);
+    expect(isTraceRequestAllowed({ VERCEL_ENV: "preview", TRACE_SECRET: "\n" }, "\n")).toBe(false);
+  });
+
+  it("allows a secret the dashboard stored with a trailing newline", () => {
+    // The realistic corruption, end to end: the variable carries what was pasted and the header
+    // carries the clean value, and the two still have to agree.
+    expect(
+      isTraceRequestAllowed(
+        { VERCEL_ENV: "preview", TRACE_SECRET: "s3cret-de-trace\n" },
+        "s3cret-de-trace",
+      ),
+    ).toBe(true);
+    expect(isTraceRequestAllowed(preview, " s3cret-de-trace ")).toBe(true);
   });
 
   it("refuses a wrong or absent presentation on an otherwise healthy deployment", () => {

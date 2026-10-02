@@ -86,6 +86,16 @@ answers 404 to all three on purpose: the key in the bookmark is not the one in V
 is unset on the deployment, or you are on production (where the sink does not exist). Check the Vercel
 variable first, then rebuild the loader with the key you actually set.
 
+**If it 404s and you are certain `TRACE_SECRET` is set, retype the value rather than debug it.** The
+three cases above are one identical 404 with nothing in the body to tell them apart — that is the
+design, not a gap — so from the outside there is no observation that separates « wrong character in the
+key » from « sink off ». That makes a mistyped key the first thing to rule out, and the cheapest way to
+rule it out is to set the variable again from a fresh `openssl rand`, redeploy, and rebuild the loader
+with the same value. Both sides of the comparison are now trimmed, so a stray leading or trailing
+newline — the usual casualty of pasting into the dashboard — is no longer a possible cause. A wrong
+character still is, and so is whitespace *inside* the key: only the ends are forgiven. A value that is
+nothing but whitespace counts as unset, and the sink stays dead.
+
 ### The inline fallback
 
 `audit/iphone-trace-bookmarklet.txt` is the whole capture script in the bookmark, ~15 000 characters,

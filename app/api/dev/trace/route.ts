@@ -18,8 +18,9 @@
  *
  * The handler is thin, like `app/api/match-events/route.ts`: read the environment, parse the JSON,
  * delegate. The gate, the schema and the formatting all live in `lib/dev/trace.ts`, where Vitest can
- * reach them — decision 114's warning about a guard that merely *looks* like a gate applies to
- * exactly this kind of endpoint.
+ * reach them: `vitest.config.ts` collects `lib/**`, `db/**` and root `*.test.ts` and nothing under
+ * `app/`, so a guard written in this file would be a guard no test can read — decisions 090 and 096
+ * are the same lesson about a sentence and a filter that had been left where nothing could check them.
  *
  * ## No session, and no `can()` — a shared secret instead
  *
@@ -31,9 +32,12 @@
  *
  * What stands in for a session is a **shared secret**, `TRACE_SECRET`, which the owner sets in
  * Vercel's *preview* environment and nowhere else. The gate is `isTraceRequestAllowed` and it is
- * three conditions, all required: `VERCEL_ENV` is not `production`, `TRACE_SECRET` is set and
- * non-empty, and the request presents exactly it. **Absent secret means disabled** — a deployment
- * somebody forgot to configure is a dead endpoint, never an open one.
+ * three conditions, all required: `VERCEL_ENV` is not `production`, `TRACE_SECRET` is set to something
+ * that is not blank once trimmed, and the request presents exactly it. **Absent secret means
+ * disabled** — a deployment somebody forgot to configure is a dead endpoint, never an open one, and a
+ * variable holding one space is forgotten rather than configured. Both sides of the comparison are
+ * trimmed, because the 404 below says nothing about *which* of the three conditions failed and a
+ * trailing newline in the dashboard field would therefore be undiagnosable; see `traceSecretMatches`.
  *
  * Both verbs accept the secret two ways. `x-trace-secret` is the real one. `?k=<secret>` exists
  * because a bookmarklet cannot set a header on the `<script src>` it injects, and it is **the weaker

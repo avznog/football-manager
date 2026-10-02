@@ -17,9 +17,10 @@
  * is deleted.
  *
  * Everything testable lives in this file rather than in the route, because Vitest only collects
- * `lib/**`, `db/**` and root `*.test.ts` — a gate that cannot be unit-tested is a gate that merely
- * *looks* like one (decision 114), and `isTraceSinkEnabled` is exactly the kind of guard that
- * warning is about. It therefore takes its environment as an argument and never reads `process.env`.
+ * `lib/**`, `db/**` and root `*.test.ts` — the `include` list in `vitest.config.ts`, around line 12 —
+ * so a gate written under `app/` is a gate no test can read. Decision 090 states that for a sentence
+ * inline in JSX and decision 096 for a filter inline at a call site, and `isTraceSinkEnabled` is the
+ * same shape: it therefore takes its environment as an argument and never reads `process.env`.
  */
 
 import { timingSafeEqual } from "node:crypto";
@@ -34,9 +35,12 @@ import { z } from "zod";
  * Whether the sink answers at all, decided from the environment alone.
  *
  * `VERCEL_ENV` is populated automatically by Vercel on every deployment — `production`,
- * `preview` or `development` — so this gate needs **no dashboard change and no new variable**.
- * That is the point: coordination rule 3 reserves infrastructure for the owner, and a diagnostic
- * endpoint is not worth a trip to the dashboard. Off Vercel (a local `next dev`, a Vitest run)
+ * `preview` or `development` — so **this half of the gate costs no dashboard trip and no new
+ * variable**, which is why the environment half is the one that carries the production refusal:
+ * coordination rule 3 reserves infrastructure for the owner, and a gate he has to go and configure is
+ * a gate that can arrive unconfigured. The other half does cost one — `TRACE_SECRET` is a new
+ * variable and the owner has set it by hand, in Preview only — and that is exactly why
+ * `traceSecretMatches` fails closed on an absent value. Off Vercel (a local `next dev`, a Vitest run)
  * `VERCEL_ENV` is absent and `NODE_ENV` decides.
  *
  * Pure, and taking the environment as a parameter, so the production case is a unit test rather
@@ -52,19 +56,30 @@ export function isTraceSinkEnabled(env: { VERCEL_ENV?: string; NODE_ENV?: string
 /**
  * Whether a presented secret is the expected one, compared in constant time.
  *
- * **An absent or empty `expected` is a refusal.** That is the whole point of the signature taking it
- * as an argument that may be `undefined`: a deployment where `TRACE_SECRET` was never set is a
- * deployment whose sink is dead, not one whose sink is open. Fail closed, because the failure mode of
- * the other choice — a forgotten variable turning a diagnostic endpoint into an anonymous write
- * channel into the log stream — is the one nobody notices until it is being used.
+ * **An absent, empty or whitespace-only `expected` is a refusal.** That is the whole point of the
+ * signature taking it as an argument that may be `undefined`: a deployment where `TRACE_SECRET` was
+ * never set is a deployment whose sink is dead, not one whose sink is open. Fail closed, because the
+ * failure mode of the other choice — a forgotten variable turning a diagnostic endpoint into an
+ * anonymous write channel into the log stream — is the one nobody notices until it is being used.
+ * A value of `" "` is « never set » with a stray keypress on top, and reading it as a live secret
+ * would be the same forgotten-variable failure wearing a disguise.
+ *
+ * **Both sides are trimmed before they are compared.** That is a deliberate trade, and the thing it
+ * buys is diagnosability: off, unconfigured and wrong-key are one identical 404 with no
+ * distinguishing body, on purpose, so a value pasted into the Vercel dashboard with a trailing
+ * newline gives the owner a symptom he has *no way whatsoever* to tell from a disabled sink. What it
+ * costs is that a secret can no longer carry significant leading or trailing whitespace, which
+ * narrows the key space a little, and that the length guard below now runs on the post-trim lengths.
+ * Both are theoretical next to half an evening spent debugging an endpoint that was working. An
+ * endpoint whose entire purpose is temporary diagnostics is the one place that trade is easy.
  *
  * `timingSafeEqual` throws on buffers of unequal length, so the length is checked first and a
  * mismatch returns early. That early return does leak the secret's length to a very patient prober,
  * which is the standard and accepted shape of this comparison: the length of a random secret is not
  * the secret, and the alternative (hashing both sides to a fixed width) buys nothing here.
  *
- * Pure, and reading no `process.env`, for the same reason `isTraceSinkEnabled` does not: decision
- * 114 — a gate that cannot be unit-tested is a gate that merely *looks* like one.
+ * Pure, and reading no `process.env`, for the same reason `isTraceSinkEnabled` does not: see this
+ * file's header, and `vitest.config.ts`'s `include` list that is the mechanism behind it.
  */
 export function traceSecretMatches(
   expected: string | undefined,
@@ -72,8 +87,12 @@ export function traceSecretMatches(
 ): boolean {
   if (!expected || !presented) return false;
 
-  const a = Buffer.from(expected, "utf8");
-  const b = Buffer.from(presented, "utf8");
+  const wanted = expected.trim();
+  const given = presented.trim();
+  if (!wanted || !given) return false;
+
+  const a = Buffer.from(wanted, "utf8");
+  const b = Buffer.from(given, "utf8");
   if (a.length !== b.length) return false;
 
   return timingSafeEqual(a, b);
@@ -84,9 +103,10 @@ export function traceSecretMatches(
  * carries the shared secret.
  *
  * Three independent conditions, all of which must hold: `VERCEL_ENV` is not `production`,
- * `TRACE_SECRET` is set and non-empty, and the request presents exactly it. Any of them failing is
- * the same answer — a 404 with `TRACE_ERRORS.disabled`. Off, misconfigured and probed with a wrong
- * key are deliberately indistinguishable from never deployed; see the route's doc comment.
+ * `TRACE_SECRET` is set to something that is not blank once trimmed, and the request presents exactly
+ * it, give or take the whitespace around either. Any of them failing is the same answer — a 404 with
+ * `TRACE_ERRORS.disabled`. Off, misconfigured and probed with a wrong key are deliberately
+ * indistinguishable from never deployed; see the route's doc comment.
  */
 export function isTraceRequestAllowed(
   env: { VERCEL_ENV?: string; NODE_ENV?: string; TRACE_SECRET?: string },
