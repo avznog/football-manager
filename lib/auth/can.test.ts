@@ -58,6 +58,17 @@ describe("can — players", () => {
     expect(can(player, "team:read", { teamId: TEAM })).toBe(true);
   });
 
+  it("never reads an individual note, not even one of his own match's", () => {
+    // Decision 137's whole point: he reads the mean and cannot work out who gave what. `team:read`
+    // does not reach this, which is why it is its own action and not « a read, so anybody ».
+    expect(can(player, "rating:readNotes", { teamId: TEAM })).toBe(false);
+    expect(can(player, "rating:publish", { teamId: TEAM })).toBe(false);
+    // Nor by claiming to be acting on himself, the way the self-scoped actions work.
+    expect(can(player, "rating:readNotes", { teamId: TEAM, targetMemberId: "m-player" })).toBe(
+      false,
+    );
+  });
+
   it("may act on themselves", () => {
     expect(can(player, "availability:declare", { teamId: TEAM })).toBe(true);
     expect(can(player, "profile:editPositions", { teamId: TEAM })).toBe(true);
@@ -117,6 +128,14 @@ describe("can — coaches", () => {
 
   it("cannot create a team", () => {
     expect(can(coach, "team:create", { teamId: TEAM })).toBe(false);
+  });
+
+  it("reads the individual notes, and may release a match's means", () => {
+    // Decision 137: the raw notes are the coach's alone, and he is the escape hatch for a straggler
+    // who never rates. Both have to work for a coach who did not play himself — which is why they
+    // are coach actions and not self-scoped ones like `rating:submit` two tests down.
+    expect(can(coach, "rating:readNotes", { teamId: TEAM })).toBe(true);
+    expect(can(coach, "rating:publish", { teamId: TEAM })).toBe(true);
   });
 
   it("who does not play has nothing to declare for themselves", () => {

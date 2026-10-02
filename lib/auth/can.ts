@@ -53,6 +53,20 @@ export type Action =
   | "match:manageLineups"
   | "match:operate"
   | "match:amend"
+  /**
+   * Read the individual notes of a match, with the name of whoever wrote each one — and the count a
+   * mean rests on. **The coach's alone** (decision 137): every other reader gets one settled figure
+   * per player and no way to work out who gave what. It is a *read*, and it is in `can()` rather
+   * than in a `isCoachOf` call at the page because the query layer is where it is enforced, and a
+   * second way of asking the same question is how the two drift apart.
+   */
+  | "rating:readNotes"
+  /**
+   * Release a match's means with notes still owed — the escape hatch for the straggler who never
+   * will. A coach action, not a self-scoped one: `rating:submit` is self-scoped and therefore false
+   * for a coach who did not play, and he is exactly the person who has to be able to do this.
+   */
+  | "rating:publish"
   // Self-scoped
   | "availability:declare"
   | "profile:editPositions"
@@ -100,6 +114,8 @@ const COACH_ACTIONS = new Set<Action>([
   "match:manageLineups",
   "match:operate",
   "match:amend",
+  "rating:readNotes",
+  "rating:publish",
   "injury:declare",
   "team:read",
 ]);

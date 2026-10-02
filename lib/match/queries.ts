@@ -45,6 +45,12 @@ export type MatchRow = {
    * did not type owes him that sentence.
    */
   entryMode: EntryMode;
+  /**
+   * When the coach released this match's rating means with notes still owed, ISO 8601 — or null,
+   * which is the normal state (decision 137). It is on the match row rather than fetched where it is
+   * needed because every screen that shows a rating has to know whether it may.
+   */
+  ratingsPublishedAt: string | null;
 };
 
 const MATCH_COLUMNS = {
@@ -61,6 +67,7 @@ const MATCH_COLUMNS = {
   status: matches.status,
   operatorUserId: matches.operatorUserId,
   entryMode: matches.entryMode,
+  ratingsPublishedAt: matches.ratingsPublishedAt,
 };
 
 function toMatchRow(row: {
@@ -77,8 +84,13 @@ function toMatchRow(row: {
   status: MatchStatus;
   operatorUserId: string | null;
   entryMode: EntryMode;
+  ratingsPublishedAt: Date | null;
 }): MatchRow {
-  return { ...row, kickoffAt: row.kickoffAt.toISOString() };
+  return {
+    ...row,
+    kickoffAt: row.kickoffAt.toISOString(),
+    ratingsPublishedAt: row.ratingsPublishedAt?.toISOString() ?? null,
+  };
 }
 
 /** Every match of the season, oldest first. A team plays a few dozen a year — no pagination. */
