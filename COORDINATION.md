@@ -102,11 +102,14 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   Neon `neondb_owner` rotation, by the owner's decision (**132**). Do not re-propose any of the three. The
   facts behind them are all still true and still rediscoverable, which is exactly why they were raised in
   every session report for weeks — read 132 instead of raising them a fifth time.
-- **In flight · the owner's machine** — **nothing.** The checkout is on the merged, deleted
-  `feat/ratings-rebuild` because `main` is checked out in the `.claude/worktrees/ux-analyser` worktree and
-  two worktrees cannot hold one branch; it is clean and fully merged, and `git -C .claude/worktrees/ux-analyser`
-  is where `main` lives until somebody moves it. **The `1.0.0-beta.7` bump and its hand-cut tag are the
-  owner's**, and nothing on `main` is tagged, so production is still serving `beta.6`.
+- **In flight · the owner's machine** — **nothing.** The checkout is on `main`, clean, level with
+  `origin`. It briefly was not: `.claude/worktrees/ux-analyser` held the `main` branch, two worktrees
+  cannot hold one branch, and `gh pr merge --delete-branch` therefore failed its *local* half after the
+  merge had already succeeded on GitHub — a half-done command that reports only the failure. The worktree
+  is detached at the same commit now and `main` is back in the primary checkout. **If `gh pr merge` ever
+  prints `'main' is already used by worktree at …`, read `gh pr view <n> --json state` before retrying:
+  the merge is probably done.** **The `1.0.0-beta.7` bump and its hand-cut tag are the owner's**, and
+  nothing on `main` is tagged, so production is still serving `beta.6`.
 - **In flight · the other machine** — **the owner's fourth batch of iPhone remarks**, four areas, planned
   in `docs/PLAN.md`'s new `## Amendments` and `docs/ROADMAP.md`'s « The fourth batch from the owner's
   iPhone ». Open and waiting on the gatekeeper: **#114** (tap acknowledgement, released for merge),
