@@ -3819,10 +3819,16 @@ anything typed into the address bar, so a bookmark is the only way in; open
 menu names in French and what each hit-test reading means, is `scripts/iphone-trace/README.md`.
 
 **What was verified.** `npm run typecheck` clean, `npm run lint` clean, `npm test` green at
-**1446 unit tests across 66 files** — 32 of them new, for `lib/dev/trace.ts`, including the ones that
+**1451 unit tests across 66 files** — 37 of them new, for `lib/dev/trace.ts`, including the ones that
 matter most: `isTraceSinkEnabled` must return `false` for `VERCEL_ENV === "production"`, and the secret
 comparison must treat `undefined`, `""` and whitespace alike as absent, because an empty field in the
-Vercel UI is the realistic misconfiguration rather than a theoretical one. The 12 tests in
+Vercel UI is the realistic misconfiguration rather than a theoretical one. Six of those 37 exist because a
+reviewing session found that claim false when I made it: `traceSecretMatches(" ", " ")` returned **true**,
+so a whitespace-only `TRACE_SECRET` was a live secret and no test said otherwise. Both sides are trimmed
+now. The exposure was nil — you still had to know the value — but the diagnosability was not, and that is
+the real defect: with off, unconfigured and wrong-key deliberately collapsed into one identical 404, a
+trailing newline pasted into the dashboard field is indistinguishable from a disabled sink, so the owner
+would have had no way at all to tell a typo from a switched-off endpoint. The 12 tests in
 `proxy.test.ts` still pass, which is the cover for the `PUBLIC_PATHS` change — additive, one entry.
 `npm run build` succeeds and lists `ƒ /api/dev/trace` alongside `ƒ /api/match-events`.
 
@@ -3849,13 +3855,14 @@ thirteen worktrees and the three cheap gates are exactly the ones that hide it.
   `PUBLIC_PATHS` entry, covered by `proxy.test.ts`; CI runs the browser suite on its own `postgres:17`
   service with `E2E_WEB_SERVER` and `CI` both set, and that is where this gets its real run.
 - **Whether iOS Safari accepts a long bookmark address has not been observed**, and the answer now
-  matters much less than it did an hour ago. The install the README leads with is a roughly 420-character
+  matters much less than it did an hour ago. The install the README leads with is a **423-character**
   loader that sets `window.__fmTraceKey` and appends a `<script>` pointing at `GET /api/dev/trace`, so the
   probe arrives over the network and the bookmark stays short enough that the question is moot. The inline
-  form is kept as a fallback and is about **15 100 characters** — it grew rather than shrank, because the
-  secret and the key plumbing are now in it. Both figures move with the length of the secret, so the build
-  script prints the exact one; do not quote these from here. If that paste truncates it will look like it
-  worked, which is why
+  form is kept as a fallback and is **15 090 characters** — it grew rather than shrank, because the secret
+  and the key plumbing are now in it. **Both figures were measured with a 32-character key, and both move
+  with the length of the secret**, so the build script prints the exact one and that is what to quote. The
+  basis is given because a number without one is what let the previous figure in this paragraph go stale
+  unnoticed. If that paste truncates it will look like it worked, which is why
   the README says to scroll to the end of the field; and the repair is to use the loader.
 - **Nothing in this branch has run on the iPhone at all**, so the two tab-bar suspicions are exactly as
   open as they were this morning and no roadmap box moved to `[x]`.
@@ -3874,8 +3881,11 @@ his to do: infrastructure is not this session's to touch.
 
 **The loader puts the secret in a query string**, `?k=…` on the `GET`, because a bookmarklet cannot send
 a header for its own script tag. Query strings are the part of a URL that ends up in access logs, so that
-key should be treated as logged, rotated when the owner is done, and never reused for anything else. The
-`POST`s that follow use the `x-trace-secret` header instead.
+key should be treated as logged, rotated when the owner is done, and never reused for anything else. One
+consequence to expect rather than be alarmed by: the access log it lands in is **the same stream the owner
+is tailing to read his traces**, so he will watch his own key scroll past in `vercel logs` output. That is
+where it was always going to appear — not a leak, and not a reason for the next session reading this to go
+looking for one. The `POST`s that follow use the `x-trace-secret` header instead.
 
 **What it actually logs is wider than « tab coordinates ».** It forwards console output from five
 methods, `window.onerror` messages with stacks, unhandled rejections, the four tab labels it hit-tests,
@@ -3884,3 +3894,18 @@ console line or an error message can carry a real player's name into the Vercel 
 deliberate trade for being able to see anything at all from the phone, not an oversight, and it is
 bounded by the same 200-entry cap and the preview-only gate — but it is the reason the endpoint should go
 back to dead the moment the two tab-bar questions are answered.
+
+**A citation audit nobody asked for, which found three comments citing a decision that does not say what
+they claim.** Reconciling the decision entry meant reading every number it cites, bodies and not headings.
+Six of eight held. Two did not. « Decision 123 set the precedent of instrumentation that changes no
+production code » was loose — **PR #111** set it, 123 is only where it is written down, and 123 itself does
+ship production code; stated the right way round now. Worse, three comments in `lib/dev/trace.ts` and
+`app/api/dev/trace/route.ts` cited **decision 114** for the claim that some code cannot be unit-tested. 114
+says nothing of the kind: it is about the `COMMENT` event type, its 280 characters, and the four-tile action
+menu, and it never mentions Vitest. The claim itself is true and now cites what actually supports it —
+`vitest.config.ts` for the `include` list, decision 090 for « a claim no test can read », decision 096 for
+« untestable where it sat, because Vitest collects `lib/**` and nothing under `app/` ». The part worth
+recording is the failure mode, because **two sessions in a row mischaracterised 114, differently, without
+either one opening it** — one from a heading, one from the other's summary. It is the same error as asserting
+a security primitive's shape from memory of the intention rather than from the function, which happened in
+this same batch and was caught by the same reviewer. A citation is a claim; `grep` the entry.
