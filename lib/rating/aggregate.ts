@@ -93,10 +93,25 @@ export const RATING_SCORE_MAX = 10;
 export const RATING_SCORE_STEP = 0.5;
 
 /**
+ * Where every slider starts, and therefore the note an untouched one gives.
+ *
+ * Mid-scale, because a range input has no unset state: it has a value from the moment it renders, and
+ * it submits that value. That was weighed when the slider was chosen over the 0–10 pad and accepted —
+ * the mitigation is not a sentinel value, it is that **the screen says so out loud**
+ * (`RATING_SLIDERS_START_AT_FR`). A sentinel would mean a slider that looks like it says 5,0 and does
+ * not, which is worse than the honest version of the same problem.
+ */
+export const RATING_SCORE_DEFAULT = 5;
+
+/**
  * **Three notes before a figure is a figure** (rule 4): the floor under a match mean and under the
- * man of the match, deliberately the same number in both places. It is also `MIN_RATINGS` in
- * `lib/stats/aggregate.ts`, where it guards a season average — « three is the smallest number that
- * needs a second opinion to agree » holds at both scales.
+ * man of the match, deliberately the same number in both places.
+ *
+ * `MIN_RATED_MATCHES` in `lib/stats/aggregate.ts` is the same number for a different denominator —
+ * three *matches* with a mean before a season average exists, where this is three *notes* before one
+ * match has a mean. « Three is the smallest number that needs a second opinion to agree » is the
+ * reason at both scales, which is why they match; they are not the same threshold and neither imports
+ * the other.
  *
  * It matters most for a match the coach published with notes still owed: two teammates' opinions are
  * not a verdict, and « pas encore assez de notes » is the honest screen.

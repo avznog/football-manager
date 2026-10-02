@@ -15,7 +15,7 @@
 
 import { pluralize } from "@/lib/calendar/labels";
 
-import { formatAverage, RATING_SCORE_MAX } from "./aggregate";
+import { formatAverage, RATING_SCORE_DEFAULT, RATING_SCORE_MAX } from "./aggregate";
 
 /** One note's author, reduced to what naming him needs. A full `RatingReceived` is assignable. */
 export type NoteAuthor = {
@@ -67,4 +67,45 @@ export function ratingScoreFr(score: number | null): string {
  */
 export function ratingScoreValueTextFr(score: number): string {
   return `${formatAverage(score)} sur ${RATING_SCORE_MAX}`;
+}
+
+/**
+ * The sentence above the sliders, and **it is not optional**.
+ *
+ * Every slider starts at `RATING_SCORE_DEFAULT` and every slider is submitted, so an untouched one
+ * records 5,0 as an opinion rather than as a silence. That is a real cost of choosing a slider over
+ * the old 0–10 pad, it was accepted when the choice was made, and the agreed mitigation is this: the
+ * screen states the rule in the words below, above the list, before anybody touches anything.
+ *
+ * Here rather than in the component because Vitest collects `lib/**` and nothing under `app/`
+ * (decision 097) — a promise this load-bearing has to be pinnable by a test.
+ */
+export const RATING_SLIDERS_START_AT_FR =
+  `Tous les curseurs partent de ${formatAverage(RATING_SCORE_DEFAULT)}. ` +
+  "Si tu n’y touches pas, c’est la note que tu donnes.";
+
+/** « Une note envoyée ne change plus. » The `onConflictDoNothing` in `actions.ts`, said out loud. */
+export const RATING_IS_FINAL_FR = "Une note envoyée ne change plus.";
+
+/**
+ * What the screen says once the notes are in — and what it no longer says.
+ *
+ * Under decision 021 this line was « il en reste à mettre pour voir celles des autres »: the reader's
+ * own submissions bought him the right to read. Decision 137 deleted that trade, so the confirmation
+ * is about the team's calendar instead of about his debt — he waits for everybody, including the
+ * people he cannot do anything about.
+ *
+ * `unchanged > 0` with `saved === 0` is the retry path: a patchy connection resubmitting the same set
+ * must not read as a failure, and « déjà enregistrées » is the truth about it.
+ */
+export function ratingsSavedFr(saved: number, unchanged: number): string {
+  if (saved === 0) {
+    return unchanged > 0
+      ? "Ces notes étaient déjà enregistrées."
+      : "Rien de nouveau à enregistrer.";
+  }
+  return (
+    `${pluralize(saved, "note")} ${saved > 1 ? "enregistrées" : "enregistrée"}. ` +
+    "Les moyennes sortiront quand tout le monde aura noté."
+  );
 }

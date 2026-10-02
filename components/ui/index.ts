@@ -29,5 +29,6 @@ export {
 } from "./segmented-control";
 export { Select, type SelectProps } from "./select";
 export { Sheet, type SheetProps } from "./sheet";
+export { Slider, type SliderProps } from "./slider";
 export { Spinner, type SpinnerProps } from "./spinner";
 export { Textarea, type TextareaProps } from "./textarea";
