@@ -3955,3 +3955,129 @@ Worth separating, in that production result: the absent code and the unset `TRAC
 
 No decision entry. An observation that promotes a hedge is not a decision, and 136 was already taken by
 the other machine's trace sink; 137 is free.
+
+---
+
+## A note is the mean of what the others gave you
+
+**2026-10-02** · `feat/ratings-rebuild` · five commits, decision **137**
+
+The largest slice left in the repository, and most of it is a deletion. The owner's sentence: *a
+player's note for a match is the mean of the notes the others gave him, it appears once the notes are
+in, and the individual notes are the coach's alone.* That replaces the rule the whole rating feature
+was built on — decision 007's reciprocity gate, enforced season-wide by decision 021 — and the five
+commits are the order in which the tree stopped compiling and started again.
+
+**`ba3d260` and `216755e` — the table.** `score` is `numeric(3,1)` with two checks, a range and
+`ratings_score_half_step` (`(score * 2) = floor(score * 2)`): the step a slider implies is stated by
+the database rather than rounded silently by a `smallint`. `comment` is **dropped**, every self-rating
+is **deleted** — `ratings_no_self` cannot be added over the rows 007 required — and `db/seed.ts`
+stopped writing both in the same commit. `0007_chubby_silver_samurai.sql`, three irreversible
+statements out of five, each one deliberate and argued in the migration's own header. Production holds
+no ratings at all, which is the only reason this is cheap; a local or preview database loses the seed's
+fixtures.
+
+**`dd2cd91` — the question with no viewer in it.** `lib/rating/published.ts` replaces
+`ratingVisibility`: *are this match's means out?* Three clauses — every expected rater has submitted,
+or the coach published, or the window closed at the next kick-off. The expected raters are the men with
+`minutes > 0`, derived from the log and not from the sheet, which is also what makes « only a man who
+played is rated » a fact no constraint can see: it lives in `lib/rating/validation.ts` and in
+`submitRatings`, which is where a crafted form post is caught. `matches.ratings_published_at` is the
+one stored half, and it exists because the automatic backstop has a hole the size of a season's last
+match, which has no next kick-off — so without it the team that most wants its notes is the team whose
+notes wait for ever.
+
+**`55f0650` — one screen.** Eleven cards, a 0–10 pad and « Suivant » become one list of native
+`<input type="range">` and one submit. `components/ui/slider.tsx` is new and keeps the browser's own
+appearance, setting exactly one property (`accent-color`, as `accent-accent`): the usual Tailwind recipe
+of `appearance-none` plus two vendor pseudo-elements takes the theme colour with it and leaves a grey
+rail in dark mode, because `accent-color` only paints a control the browser is still drawing. Keeping
+the native thumb is also what gives the arrow keys a half-point step for free. `lib/rating/flow.ts` is
+**deleted** — it existed to decide what the forward button said, and there is no forward button —
+which supersedes decision 102 entirely. What a range cannot do is be unset, so every curseur starts at
+5,0 and every curseur is submitted; the screen says so above the list
+(`RATING_SLIDERS_START_AT_FR`), and there is deliberately no « passer sans noter », which would claim to
+do something the control cannot do.
+
+**`16ee9ff` — the two readers, and the split is in the data.** `getRatingResults` returns
+`published: false` *above* the select that would fetch any score, and a reader who is not the coach
+receives `count: null` and `received: []` for every player. So the `canSeeNotes` branches in
+`ratings-panel.tsx` are about layout and there is nothing in the RSC payload to find. A player reads
+« Karim · 7,5 »; the coach reads « Karim · 7,5 (5 notes) » and under it every note with its author.
+**The count is the coach's**, which was the one question left open and the owner answered it: on a
+player's own row a count is an invitation to work out who did not rate him, and in a squad of a dozen
+that arithmetic is easy and poisonous. Two new coach-only `can()` actions, `rating:readNotes` and
+`rating:publish` — a read in `can()` rather than an `isCoachOf` at the page, because a second way of
+asking the same question is how two answers drift apart.
+
+**`6741f59` — one season for everybody.** « D'après les matchs que tu as notés » is gone from
+`/stats`, from `/stats/equipe-type` and from the profile card, because there is only one set of numbers
+now. `PlayerRating.count` counts **matches with a published mean** instead of notes, so `MIN_RATINGS`
+is `MIN_RATED_MATCHES` and the screens say « sur 6 matchs notés »; it is the same number as
+`MIN_NOTES_FOR_MEAN = 3` for a different denominator, and neither constant imports the other. PR #105's
+shrinkage is better on this unit — within-player variance is now match-to-match variation rather than
+rater-to-rater disagreement, which is what a season average is about.
+
+**`d5e7179` — the browser suite was rewritten, not repaired.** Every rating selector the happy path
+used addressed something that no longer exists. It now walks the three states in one scenario: four of
+the **eight** men who played rate — the smallest number that leaves every rater exactly on the
+`MIN_NOTES_FOR_MEAN` floor — four never do, the means stay in, the coach is shown the four names and
+publishes without them, and the published screen is read by the coach and by a player in one pass.
+Half of that assertion is an absence, which is the only shape in which a leak of the kind 021 allowed
+can fail a test. Two things the tree taught the spec rather than the other way round: a complete submit
+**redirects** to the recap, so there is no « Tes notes sont envoyées » card to wait for; and a coach's
+row carries a nested list of chips naming the men who rated him, so `hasText` on a display name matched
+his own row *and* seven chips — the row is found by its identity `<div>` instead.
+
+**What was verified.** `npx tsc --noEmit` clean (filtered for the stale `.claude/worktrees/*/.next/types`
+that also make `npm run lint` useless — `npx eslint app components lib e2e` is the real command),
+`npm test` green at **1451 tests across 66 files**, `npm run test:e2e` green at 5.
+
+**What is not verified, and is the next session's first job if it is not this one's.** Both themes at
+390 px in both roles in one pass, and the end-to-end walk on a reset database as three users, including
+the crafted form post that proves a player cannot rate himself or a man with 0 minutes — the half no
+screen can demonstrate. Nothing below `npm run test:e2e` is evidence about a phone.
+
+**What was not done, and is not hiding.** Rating history and editing a note: `onConflictDoNothing`
+stays. Showing a player who gave him what: explicitly the coach's alone. And `D7`'s second half from
+the UX audit survives the rewrite in a new shape — nothing on the notation screen survives a navigation
+away, and the « 11 notes choisies, pas encore envoyées » warning the old flow printed went with the card
+counter it counted, so there is now no warning at all.
+
+**The hand walk, and the three things it found.** The entry above said the walk was the next session's
+first job; it was this one's, and the cost of having written the milestone up before doing it is three
+corrections rather than three fresh features. On a reset database, at 390 px, both themes, coach and
+player side by side: the J3 recap (means out), the J5 recap (published, one note each, no mean), the J7
+recap (« en attente » and the coach's publish button) and the J7 notation screen as Léo, who had not
+rated — the shots are in `audit/ratings/`.
+
+1. **`ratingDeadlineFr` still threatened a punishment the app had stopped carrying out.** It ended
+   « après, tu ne peux plus noter et **tu ne verras pas celles de l'équipe** »: decision 024's second
+   edge, which 137 reversed in the same breath as it wrote « the window closing publishes the means ».
+   Three unit assertions pinned that whole sentence and all three passed, because they had been updated
+   to match the code rather than the decision — the screenshot is what caught it. It now says « les
+   moyennes sortent sans tes notes », and one test asserts the old clause is *absent*.
+2. **`db/seed.ts` asserted a fixture it no longer held, and the fixture itself was wrong.** It printed
+   « notes : J7 complètes (HDM Julien 9,0) » while J7 has four raters of nine and an open window, so
+   nothing is out at all; three docblocks still described the 021 gate. The substantive half: **no match
+   showed a published mean for anybody.** J3's three raters looked like enough, but nobody rates himself,
+   so a rater is rated by the *other* raters only and each of the three sat at two notes — under
+   `MIN_NOTES_FOR_MEAN`. A fourth full rater puts the raters on 3 and everybody else on 4. J3 now
+   publishes nine real means with Léo and Julien sharing at 7,0, and each of the three states has exactly
+   one match: J3 out, J5 published but too thin, J7 awaited. Confirmed by querying the table after
+   `npm run db:reset`, not by reading the new prose.
+3. **The coach lost notes that existed.** `ratings-panel.tsx` returned « pas encore assez de notes »
+   whenever every mean was below the floor — for both readers. So on J5, with eight notes in the table,
+   the one person entitled to read them saw an empty state. The floor is about the figure, not about the
+   notes: the coach now gets his rows with « — » where the mean is withheld and « Aucune moyenne n'est
+   sortie » beside the count. The player's screen is untouched, because for him there genuinely is
+   nothing to show.
+
+**What this walk verified.** `npm test` 1451 across 66 files, `npm run test:e2e` 5, `npx eslint app
+components lib e2e db scripts` silent, `npm run typecheck` clean. The two screens that carry the whole
+decision were read in both roles in one pass, and the difference between them is exactly the count line
+and the author chips — which is the decision, on screen.
+
+**Still not verified.** The crafted form post. `lib/rating/validation.ts` and `submitRatings` refuse a
+note on yourself and on a 0-minute substitute, and unit tests cover both, but nobody has posted the
+fields directly to prove it is the server rather than the screen that refuses.

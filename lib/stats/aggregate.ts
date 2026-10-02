@@ -2,7 +2,7 @@
  * Season aggregation — pure, and the only place a season number is decided.
  *
  * Input: the per-match lines from `match-lines.ts` (cache or reduction, already resolved), the
- * match sheets, the trainings that were marked, and the ratings the viewer is allowed to see.
+ * match sheets, the trainings that were marked, and the notes of the matches whose means are out.
  * Output: one row per member plus the team's own tally. No database, no clock, no `Date.now()` —
  * the same season always aggregates to the same numbers, which is what makes them arguable.
  *
@@ -44,10 +44,17 @@
  * 8. **Members who have left keep their history.** They are included, flagged `hasLeft`, because a
  *    season table that silently loses a player who scored in September is wrong
  *    (`docs/DATA_MODEL.md`).
+ *
+ * 9. **A season of ratings is a run of per-match means, not a bag of notes** (decision 137). The
+ *    notes of one match collapse to one figure — the figure the whole team reads on that recap — and
+ *    the season average is the mean of those. A match with fewer than `MIN_NOTES_FOR_MEAN` notes
+ *    contributes nothing at all: it has no mean to contribute. See `PlayerRating`.
  */
 
 import type { SquadRole } from "@/db/schema";
 
+import { MIN_NOTES_FOR_MEAN } from "@/lib/rating/aggregate";
+import { meanOfNotes } from "@/lib/rating/published";
 import type { MatchStatLine } from "./match-lines";
 
 /* -------------------------------------------------------------------------- */
@@ -89,6 +96,13 @@ export type AttendanceMarkRow = {
   present: boolean;
 };
 
+/**
+ * One note, from one unnamed teammate, about one player, in one match.
+ *
+ * The rater is deliberately absent: this layer never needs to know who wrote what, and decision 137
+ * makes that the coach's business alone. `queries.ts` selects no `rater_member_id` here, and the only
+ * thing done with these rows is grouping them by match to take their mean.
+ */
 export type RatingRow = {
   matchId: string;
   ratedMemberId: string;
@@ -103,10 +117,14 @@ export type SeasonInput = {
   squad: readonly SquadAppearanceRow[];
   /** One row per judged player per session — trainings have no competition (decision 020). */
   attendance: readonly AttendanceMarkRow[];
-  /** Already filtered to what this viewer may see (decision 007). */
+  /**
+   * The notes of the matches whose means are **out** — and of no others. `lib/stats/ratings.ts`
+   * decides which those are and `queries.ts` selects nothing from the rest, so there is no filtering
+   * left to do here and no way for this module to leak a note it should not have had.
+   */
   ratings: readonly RatingRow[];
-  /** Matches whose ratings exist but are hidden from this viewer, so the UI can say why. */
-  hiddenRatingMatches?: number;
+  /** Matches holding notes that are still waiting on somebody, so the UI can say so. */
+  pendingRatingMatches?: number;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -123,22 +141,38 @@ export type PlayerAppearances = {
   goalkeeper: number;
 };
 
+/**
+ * A player's season, in ratings. **One mean per match, then the mean of those** — not the mean of
+ * every note ever written about him.
+ *
+ * That is decision 137's unit, and it changes what two of these three numbers mean. A match where
+ * eleven teammates rated him and a match where four did now count the same, which is right: the
+ * figure the whole team reads for a match is its mean, and a season is a run of those figures. The
+ * old unit let one well-attended Sunday outvote three thin ones.
+ */
 export type PlayerRating = {
-  /** 0–10, un-rounded. Null when nobody has rated them yet (rule 1). */
+  /** 0–10, un-rounded. Null when no match of his has a mean yet (rule 1). */
   average: number | null;
-  /** How many ratings the average is built on. */
+  /**
+   * How many **matches** the average is built on — not how many notes. A match whose mean rests on
+   * fewer than `MIN_NOTES_FOR_MEAN` notes is not counted at all: it has no mean to average.
+   */
   count: number;
   /**
-   * Population variance of the same scores — how much the team disagreed about this player, or how
-   * much he varied from one Sunday to the next. Exposed because an average alone cannot be ranked
-   * fairly: `lib/stats/best-seven.ts` shrinks a thin average towards the team's mean, and the
-   * strength of that shrinkage is a ratio of within-player spread to between-player spread. Without
-   * this field the ranking would have to re-read the ratings, and decision 021's gate would have to
-   * be trusted a second time in a second place.
+   * Population variance of the same per-match means — how much he varied from one Sunday to the next.
+   * Exposed because an average alone cannot be ranked fairly: `lib/stats/best-seven.ts` shrinks a thin
+   * average towards the team's mean, and the strength of that shrinkage is a ratio of within-player
+   * spread to between-player spread. Without this field the ranking would have to re-read the notes,
+   * and the publication rule would have to be trusted a second time in a second place.
    *
-   * Null below two scores (rule 1): one score has no spread, and `0` would claim perfect agreement
-   * where there is simply no second opinion. Genuinely `0` when every score is identical — that is
-   * a measurement, not a missing number.
+   * Under decision 137 this is **match-to-match variation**, where it used to be rater-to-rater
+   * disagreement. It is the better quantity for the shrinkage: form that swings is what makes an
+   * average over three matches a poor forecast, and two raters who disagree about one afternoon say
+   * nothing about the next one.
+   *
+   * Null below two matches (rule 1): one figure has no spread, and `0` would claim a metronome where
+   * there is simply no second Sunday. Genuinely `0` when every match's mean is identical — that is a
+   * measurement, not a missing number.
    */
   variance: number | null;
 };
@@ -218,7 +252,7 @@ export type LeaderboardEntry = {
   jerseyNumber: number | null;
   hasLeft: boolean;
   value: number;
-  /** Secondary figure, e.g. the number of ratings behind an average. */
+  /** Secondary figure, e.g. the number of rated matches behind an average. */
   count: number;
 };
 
@@ -228,23 +262,34 @@ export type SeasonStats = {
   players: PlayerSeasonStats[];
   topScorers: LeaderboardEntry[];
   topAssists: LeaderboardEntry[];
-  /** Best average received, over `MIN_RATINGS` ratings at least. */
+  /** Best average received, over `MIN_RATED_MATCHES` matches at least. */
   topRated: LeaderboardEntry[];
   /** Players who spent time in goal, best clean-sheet record first. */
   keepers: PlayerSeasonStats[];
   /** True when not one match, rating or marked session survives the filter. */
   isEmpty: boolean;
-  hiddenRatingMatches: number;
+  /**
+   * How many matches hold notes that are not out yet — identical for every reader (decision 137), and
+   * the reason a season average can be one or two matches short of the matches played. The screens
+   * say it so that a figure that moves on Thursday does not read as a bug.
+   */
+  pendingRatingMatches: number;
 };
 
 /** A form guide is five matches. Enough to see a run, short enough to fit a phone. */
 export const FORM_LENGTH = 5;
 
 /**
- * An average over one or two ratings is noise, and putting it at the top of the table would make
- * the leaderboard a lottery. Three is the smallest number that needs a second opinion to agree.
+ * An average over one or two **matches** is noise, and putting it at the top of the table would make
+ * the leaderboard a lottery. Three is the smallest number that needs a second Sunday to agree.
+ *
+ * It was three *notes* until decision 137, and the rename is the whole of the change: the unit of a
+ * season average is now one mean per match, so « sur 3 notes » and « sur 3 matchs » are different
+ * thresholds and a constant called `MIN_RATINGS` would have been read as the first while enforcing
+ * the second. The three-note floor still exists — it is `MIN_NOTES_FOR_MEAN`, and it guards the mean
+ * of a single match rather than of a season.
  */
-export const MIN_RATINGS = 3;
+export const MIN_RATED_MATCHES = 3;
 
 /** How many rows a leaderboard shows. */
 export const LEADERBOARD_SIZE = 5;
@@ -268,11 +313,10 @@ export function average(values: readonly number[]): number | null {
 /**
  * Mean squared deviation about the set's own mean — the **population** variance, dividing by `n`.
  *
- * `n` and not `n - 1`: these are not a sample of some larger pool of opinions about a player, they
- * are every opinion that exists and that this viewer may read (decision 021). Bessel's correction
- * estimates a population from a sample; there is no population beyond the scores themselves, so
- * correcting for one would inflate the spread of exactly the thin sets — two or three ratings — that
- * the shrinkage it feeds exists to distrust.
+ * `n` and not `n - 1`: these are not a sample of some larger pool of Sundays, they are every match
+ * this player has a mean for. Bessel's correction estimates a population from a sample; there is no
+ * population beyond the figures themselves, so correcting for one would inflate the spread of exactly
+ * the thin sets — two or three matches — that the shrinkage it feeds exists to distrust.
  *
  * Null under two values (rule 1): a single score has no spread to measure, and `0` there would read
  * as unanimity. Zero for identical scores, which is the real answer.
@@ -310,7 +354,8 @@ type Accumulator = {
   concededWhileGk: number;
   cleanMinutes: number;
   concededWhileOn: number;
-  ratings: number[];
+  /** matchId → the notes this player received in it. Collapsed to one mean per match at the end. */
+  notesByMatch: Map<string, number[]>;
   present: number;
   marked: number;
 };
@@ -333,7 +378,7 @@ function newAccumulator(member: StatsMember): Accumulator {
     concededWhileGk: 0,
     cleanMinutes: 0,
     concededWhileOn: 0,
-    ratings: [],
+    notesByMatch: new Map(),
     present: 0,
     marked: 0,
   };
@@ -406,7 +451,10 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
 
   for (const rating of input.ratings) {
     if (!matchIds.has(rating.matchId)) continue;
-    accumulatorFor(rating.ratedMemberId).ratings.push(rating.score);
+    const byMatch = accumulatorFor(rating.ratedMemberId).notesByMatch;
+    const notes = byMatch.get(rating.matchId);
+    if (notes) notes.push(rating.score);
+    else byMatch.set(rating.matchId, [rating.score]);
   }
 
   for (const mark of input.attendance) {
@@ -419,6 +467,18 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
 
   const players: PlayerSeasonStats[] = [...accumulators.values()]
     .map((acc): PlayerSeasonStats => {
+      /*
+       * One figure per match, in the order the matches were given, and only for the matches that have
+       * enough notes to have a mean at all. `meanOfNotes` is the same function the recap prints from
+       * — rounding to one decimal in exactly one place, so « 7,5 » on the recap and « 7,5 » in the
+       * season table are the same arithmetic and cannot drift apart.
+       */
+      const matchMeans = [...acc.notesByMatch.values()].flatMap((notes) => {
+        if (notes.length < MIN_NOTES_FOR_MEAN) return [];
+        const mean = meanOfNotes(notes);
+        return mean === null ? [] : [mean];
+      });
+
       const hasData =
         acc.appearances.selected > 0 ||
         acc.minutes > 0 ||
@@ -427,7 +487,9 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
         acc.ownGoals > 0 ||
         acc.fouls > 0 ||
         acc.penaltiesMissed > 0 ||
-        acc.ratings.length > 0 ||
+        // A note received is something to show even where there are too few for a mean: the row is
+        // how he finds out the match exists in the ratings at all.
+        acc.notesByMatch.size > 0 ||
         acc.marked > 0;
 
       return {
@@ -452,9 +514,9 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
         cleanMinutes: acc.cleanMinutes,
         concededWhileOn: acc.concededWhileOn,
         rating: {
-          average: average(acc.ratings),
-          count: acc.ratings.length,
-          variance: variance(acc.ratings),
+          average: average(matchMeans),
+          count: matchMeans.length,
+          variance: variance(matchMeans),
         },
         attendance: {
           present: acc.present,
@@ -539,9 +601,9 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     valueOf: (player) => player.rating.average ?? 0,
     tieBreak: (player) => player.rating.count,
     countOf: (player) => player.rating.count,
-    // Enough ratings to mean something — and an honest 0.0 still belongs in the ranking, which is
-    // why this is a predicate rather than "value > 0".
-    include: (player) => player.rating.count >= MIN_RATINGS,
+    // Enough rated matches to mean something — and an honest 0.0 still belongs in the ranking, which
+    // is why this is a predicate rather than "value > 0".
+    include: (player) => player.rating.count >= MIN_RATED_MATCHES,
   });
 
   const keepers = players
@@ -568,7 +630,7 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     topRated,
     keepers,
     isEmpty,
-    hiddenRatingMatches: input.hiddenRatingMatches ?? 0,
+    pendingRatingMatches: input.pendingRatingMatches ?? 0,
   };
 }
 

@@ -9,17 +9,21 @@
  * ## Why there are so many of them
  *
  * This screen prints a number that is *not* any player's own figure: the seven is ranked on a
- * shrunken value (`best-seven.ts`, rule 2), on posts nobody has ever been measured at, out of ratings
- * only this reader can see. Four of those are things the screen would otherwise imply away, and this
- * repository's definition of done singles out « a screen stating something untrue » as the defect
+ * shrunken value (`best-seven.ts`, rule 2), on posts nobody has ever been measured at, out of matches
+ * whose notes may not all be in. Three of those are things the screen would otherwise imply away, and
+ * this repository's definition of done singles out « a screen stating something untrue » as the defect
  * class no test catches. Hence one function per claim:
  *
  * 1. `DECLARED_POSTS_FR` — the posts are declarations, not measurements.
- * 2. `viewerRelativeRatingsFr` — a ratings seven is one reader's (decisions 007 and 021).
- * 3. `shrinkageSentenceFr` — what the shrinkage did, in the unit it measured (rule 3).
- * 4. `CLEAN_SHEET_READINGS_FR` — which of decision 011's two invincibilités is being read.
- * 5. `squadMeanStandInFr` — a disc whose number is the squad's average and not that man's (rule 2,
+ * 2. `shrinkageSentenceFr` — what the shrinkage did, in the unit it measured (rule 3).
+ * 3. `squadMeanStandInFr` — a disc whose number is the squad's average and not that man's (rule 2,
  *    and the part of decision 115 that was overstated).
+ * 4. `CLEAN_SHEET_READINGS_FR` — which of decision 011's two invincibilités is being read.
+ *
+ * There used to be a fifth, `viewerRelativeRatingsFr`: « ce sept est bâti d'après les matchs que tu as
+ * notés ». Decision 137 makes it false — every reader now reads the same seven — and the sentence that
+ * replaces it is about the team's calendar rather than the reader (`pendingRatingMatchesNoteFr` in
+ * `format.ts`).
  *
  * And none of them is a `title`: there is no hover on a phone (decision 072), so every one of these
  * is printed under the pitch.
@@ -67,9 +71,10 @@ export const DIRECTION_VALUES: Readonly<Record<BestSevenDirection, string>> = {
  * The criterion the screen opens on.
  *
  * Not `ratings`, deliberately, even though « l'équipe type » most obviously means the best-rated
- * seven: decision 021 makes a ratings average invisible to a reader who has not voted, so a player
- * who has never opened the notation flow would land on an empty screen and read it as a bug. Goals
- * per hour has a basis from the first final whistle, for everybody.
+ * seven: a mean needs every set of notes in, so for the first weeks of a season — and for the whole of
+ * one in a team that does not rate — the ratings seven is a pitch of seven squad means and reads as a
+ * bug. Goals per hour has a basis from the first final whistle. Decision 137 did not change this: it
+ * changed *why* the ratings basis can be missing, not that it can be.
  */
 export const DEFAULT_CRITERION: BestSevenCriterion = "goals";
 export const DEFAULT_DIRECTION: BestSevenDirection = "best";
@@ -313,7 +318,7 @@ export function formatCriterionValue(
 }
 
 /**
- * The raw figure with its denominator: « 9,0 sur 1 note », « 3 buts sur 240′ ».
+ * The raw figure with its denominator: « 9,0 sur 1 match noté », « 3 buts sur 240′ ».
  *
  * Null when the denominator is empty, and then `adjustedBesideRawFr` prints the shrunken value
  * alone: « 0,00/h sur 0′ » is arithmetic about nothing (rule 1 of `aggregate.ts`).
@@ -329,7 +334,7 @@ export function observedFigureFr(
     case "assists":
       return `${plural(observed.numerator, "passe décisive", "passes décisives")} sur ${formatMinutes(observed.denominator)}`;
     case "ratings":
-      return `${formatRating(observed.rate)} sur ${plural(observed.denominator, "note")}`;
+      return `${formatRating(observed.rate)} sur ${plural(observed.denominator, "match noté", "matchs notés")}`;
     case "cleanSheet":
       return `${formatMinutes(observed.numerator)} sur ${formatMinutes(observed.denominator)}`;
   }
@@ -462,23 +467,6 @@ export function outOfPositionNoteFr(count: number): string | null {
 /* Honesty sentence 2 — a ratings seven belongs to one reader                  */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Decision 021 applies decision 007's gate to season averages, so **two teammates read two
- * different sevens off the same season**, and neither is wrong. That is not a footnote on this
- * screen: it is what the heading « La meilleure équipe » would otherwise claim to be objective.
- *
- * Only the `ratings` criterion is gated — goals, assists and minutes are the event log, which
- * everybody sees — so this returns null for the other three rather than making the reader read a
- * caveat that does not apply to what is on screen.
- */
-export function viewerRelativeRatingsFr(criterion: BestSevenCriterion): string | null {
-  if (criterion !== "ratings") return null;
-  return (
-    "Ce sept est bâti d’après les matchs que tu as notés : un coéquipier qui a noté d’autres " +
-    "matchs que toi ne voit pas le même sept, et c’est normal."
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /* Honesty sentence 3 — what the shrinkage did, in the unit it measured        */
 /* -------------------------------------------------------------------------- */
@@ -505,8 +493,8 @@ function pluralFromPrinted(printed: string, singular: string, many = `${singular
 
 function priorStrengthFr(report: ShrinkageReport): string {
   switch (report.unit) {
-    case "ratings":
-      return plural(Math.round(report.priorStrength), "note");
+    case "ratedMatches":
+      return plural(Math.round(report.priorStrength), "match noté", "matchs notés");
     case "sixtyMinutes": {
       const printed = formatDecimal(report.priorStrength, 1);
       return `${printed} ${pluralFromPrinted(printed, "heure")} de jeu`;
@@ -517,7 +505,7 @@ function priorStrengthFr(report: ShrinkageReport): string {
 }
 
 /**
- * « Les notes sont ramenées vers la moyenne de l'équipe, à hauteur de 4 notes. »
+ * « Les notes sont ramenées vers la moyenne de l'équipe, à hauteur de 4 matchs notés. »
  *
  * The number is `shrinkage.priorStrength`, which rule 3 of `best-seven.ts` **measures** rather than
  * chooses — and when it could not be measured (`measured === null`), the sentence says that instead

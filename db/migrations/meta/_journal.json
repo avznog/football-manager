@@ -50,6 +50,13 @@
       "when": 1790848410589,
       "tag": "0006_seed_positions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790939693711,
+      "tag": "0007_chubby_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

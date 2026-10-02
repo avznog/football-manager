@@ -1,15 +1,23 @@
 /**
- * « Notation » — rate your teammates after the match (screen 7 of `docs/PLAN.md`).
+ * « Notation » — rate the teammates you played with (screen 7 of `docs/PLAN.md`).
  *
  * Who may be here, and what they see, is decided on the server:
  *
- * - only members on the **match sheet** as starter or substitute may rate (decision 007), and they
- *   rate everybody including themselves;
+ * - **only players who played may rate, and only they may be rated** — `minutes > 0` in the log, not
+ *   a role on the sheet (decision 137, superseding 007 on both counts). A named substitute who never
+ *   came on is told so rather than asked for opinions about a match he watched; a supporter was never
+ *   asked under 007 either (decision 039). Nobody rates himself, so the list is who played minus the
+ *   reader, and `getNotationView` arrives that way;
  * - the window closes at the **next kick-off**, after which the form is gone rather than merely
  *   disabled — an insert would be refused anyway (`lib/rating/actions.ts`). While it is open, the
  *   screen says when that is: `ratingDeadlineFr` (decision 079);
- * - this page **never shows anybody else's notes**, whatever the viewer's progress. Reading them is
- *   the recap's job, and `getRatingResults` gates that (see `lib/rating/queries.ts`).
+ * - this page **never shows anybody else's notes**, and under decision 137 it never will: a player
+ *   reads one settled mean per match in the recap, and the individual notes are the coach's alone.
+ *   `getRatingResults` is what gates that, and it is a different screen.
+ *
+ * What is deliberately *not* here any more: a count of how many notes the reader still owes, phrased
+ * as the price of reading the team's. That trade was decision 021 and it is gone — the means come out
+ * when everybody has rated, so his debt is to the team's calendar and not to his own access.
  *
  * `params` is a Promise in Next 16 and `PageProps<"/match/[id]/notation">` comes from `next typegen`
  * (`docs/NEXTJS16.md`). A match id from another team is a 404: every query is scoped by team.
@@ -29,7 +37,7 @@ import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import { getMatch } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
 import { ratingDeadlineFr } from "@/lib/rating/window";
-import { RatingFlow } from "./_components/rating-flow";
+import { RatingSheet } from "./_components/rating-sheet";
 
 export async function generateMetadata({ params }: PageProps<"/match/[id]/notation">) {
   const [{ team }, { id }] = await Promise.all([requireTeamContext(), params]);
@@ -47,12 +55,13 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
   });
   if (!view) notFound();
 
-  const { match, window, onSheet, sheetRole, targets, progress } = view;
+  const { match, window, played, sheetRole, blocked, targets, progress } = view;
   const kickoff = new Date(match.kickoffAt);
   const now = new Date();
 
-  // Invariant 4: the permission comes from `can()`, never from a role read on the spot.
-  const mayRate = onSheet && can(actor, "rating:submit", { teamId: team.id });
+  // Invariant 4: the permission comes from `can()`, never from a role read on the spot. `played` is
+  // the other half — `rating:submit` says « a member may rate », the log says « this one took part ».
+  const mayRate = played && blocked === null && can(actor, "rating:submit", { teamId: team.id });
   const deadline = ratingDeadlineFr(window.closesAtMs, now.getTime());
 
   return (
@@ -89,19 +98,26 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
             </ButtonLink>
           }
         />
-      ) : !mayRate ? (
-        /* A supporter *was* on the sheet — he simply rates nobody (decision 039). Telling him he
-           was not on it contradicts the sheet he can read two taps away. */
+      ) : blocked === "did-not-play" || blocked === "not-in-match" ? (
+        /*
+         * Two different people, two different sentences. A supporter or a substitute who stayed on
+         * the bench **was** on the sheet (decision 039), and telling him he was not contradicts the
+         * sheet he can read two taps away; `sheetRole` is what tells them apart. Neither is told
+         * about the deadline: a man who did not play is not waiting for a window.
+         */
         <EmptyState
           title={
             sheetRole === "supporter"
               ? "Tu étais supporter sur ce match"
-              : "Tu n’étais pas sur la feuille de match"
+              : sheetRole !== null
+                ? "Tu n’es pas entré en jeu"
+                : "Tu n’étais pas sur la feuille de match"
           }
           description={
-            sheetRole === "supporter"
-              ? "Les supporters ne notent pas — mais tu peux lire les notes de l’équipe dans le résumé."
-              : "Seuls les joueurs qui ont joué ou qui étaient sur le banc notent leurs coéquipiers."
+            sheetRole === null
+              ? "Seuls les joueurs qui ont joué notent leurs coéquipiers."
+              : "On note les joueurs sur ce qu’ils ont fait sur le terrain, donc seuls ceux qui ont " +
+                "joué donnent des notes — mais tu pourras lire les moyennes dans le résumé."
           }
           action={
             <ButtonLink href={`/match/${match.id}/recap`} variant="secondary">
@@ -109,14 +125,14 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
             </ButtonLink>
           }
         />
-      ) : progress.complete ? (
+      ) : progress.complete && progress.requiredCount > 0 ? (
         <Card title="Tes notes sont envoyées" as="h2">
           <div className="space-y-3">
             <p className="text-sm text-ink-muted">
-              Tu as noté {pluralize(progress.requiredCount, "joueur")} de la feuille de match. Les
-              notes de tout le monde sont maintenant visibles dans le résumé.
+              Tu as noté {pluralize(progress.requiredCount, "coéquipier")}. Les moyennes sortiront
+              dans le résumé quand tout le monde aura noté.
             </p>
-            <ButtonLink href={`/match/${match.id}/recap`}>Voir le résumé et les notes</ButtonLink>
+            <ButtonLink href={`/match/${match.id}/recap`}>Voir le résumé du match</ButtonLink>
           </div>
         </Card>
       ) : window.state === "closed" ? (
@@ -134,20 +150,35 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
           </div>
         </Card>
       ) : targets.length === 0 ? (
+        /* He played, and nobody else did — a match with one minute logged, or a log so thin that the
+           reader is the only name in it. Not an error, and not a form. */
         <EmptyState
-          title="Aucun joueur à noter"
-          description="La feuille de match de ce match est vide."
+          title="Personne d’autre à noter"
+          description="Le déroulé de ce match ne retient aucun autre joueur sur le terrain."
+        />
+      ) : !mayRate ? (
+        /* `rating:submit` said no to somebody the log says played: a member put in read-only by his
+           role rather than by this match. Rare, and still owed a reason. */
+        <EmptyState
+          title="Tu ne peux pas noter ce match"
+          description="Ton compte n’a pas le droit de donner des notes dans cette équipe."
+          action={
+            <ButtonLink href={`/match/${match.id}/recap`} variant="secondary">
+              Voir le résumé du match
+            </ButtonLink>
+          }
         />
       ) : (
         <>
           <p className="text-sm text-ink-muted">
-            Une note de 0 à 10 par coéquipier, toi compris. Un commentaire si tu veux. Ton nom est
-            visible par l’équipe.
+            Une note de 0 à 10 par demi-points, pour chaque joueur qui était sur le terrain avec toi.
+            L’équipe lira une moyenne par joueur, jamais ta note à toi — seul le coach voit les notes
+            une par une.
           </p>
           {/* The deadline the app enforces, said out loud (decision 079). Null when no next match is
               on the calendar: the window has no end yet, so there is nothing to announce. */}
           {deadline ? <p className="text-sm font-medium text-ink">{deadline}</p> : null}
-          <RatingFlow teamId={team.id} matchId={match.id} targets={targets} />
+          <RatingSheet teamId={team.id} matchId={match.id} targets={targets} />
         </>
       )}
     </div>

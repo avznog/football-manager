@@ -1,80 +1,125 @@
 import { describe, expect, it } from "vitest";
 
-import { noteAuthorFr, ratingCountNoteFr, ratingLegendFr } from "./labels";
-
-const author = (over: Partial<Parameters<typeof noteAuthorFr>[0]> = {}) =>
-  noteAuthorFr({ raterName: "Karim", isSelf: false, isViewer: false, ...over });
+import { RATING_SCORE_DEFAULT } from "./aggregate";
+import {
+  RATING_IS_FINAL_FR,
+  RATING_SLIDERS_START_AT_FR,
+  noteAuthorFr,
+  ratingCountNoteFr,
+  ratingScoreFr,
+  ratingScoreValueTextFr,
+  ratingsSavedFr,
+} from "./labels";
 
 describe("noteAuthorFr", () => {
-  it("says « toi » for the note the reader gave himself", () => {
-    // The defect: the recap said « 8 lui-même » to the man who had typed the 8.
-    expect(author({ isSelf: true, isViewer: true })).toBe("toi");
-  });
-
-  it("keeps « lui-même » for somebody else's self-note", () => {
-    expect(author({ isSelf: true })).toBe("lui-même");
-  });
-
   it("names the reader and marks him, for a note he gave a teammate", () => {
-    expect(author({ isViewer: true })).toBe("Karim (toi)");
+    // The coach plays too, so his own notes are in the list he is reading.
+    expect(noteAuthorFr({ raterName: "Karim", isViewer: true })).toBe("Karim (toi)");
   });
 
   it("just names anybody else", () => {
-    expect(author()).toBe("Karim");
+    expect(noteAuthorFr({ raterName: "Karim", isViewer: false })).toBe("Karim");
   });
 
   it("never names the reader in the third person", () => {
-    for (const isSelf of [true, false]) {
-      expect(author({ isSelf, isViewer: true })).toContain("toi");
-    }
+    // What this used to guard against was « lui-même » for a note the reader had typed. There are no
+    // self-notes left to get wrong, and « (toi) » is the whole of what remains.
+    expect(noteAuthorFr({ raterName: "Karim", isViewer: true })).toContain("toi");
   });
 });
 
 describe("ratingCountNoteFr", () => {
-  it("tutoies the reader about the note he gave himself", () => {
-    expect(ratingCountNoteFr({ count: 4, selfScore: 8, isViewer: true })).toBe(
-      "4 notes · tu t’es mis 8",
-    );
-  });
-
-  it("speaks of anybody else in the third person, as before", () => {
-    expect(ratingCountNoteFr({ count: 4, selfScore: 8, isViewer: false })).toBe(
-      "4 notes · il s’est mis 8",
-    );
-  });
-
-  it("says nothing about a self-score there is none of", () => {
-    expect(ratingCountNoteFr({ count: 4, selfScore: null, isViewer: true })).toBe("4 notes");
+  it("counts the notes a figure rests on", () => {
+    expect(ratingCountNoteFr(4)).toBe("4 notes");
   });
 
   it("counts one note in the singular", () => {
-    expect(ratingCountNoteFr({ count: 1, selfScore: null, isViewer: false })).toBe("1 note");
+    expect(ratingCountNoteFr(1)).toBe("1 note");
   });
 
   it("says a player is unrated rather than counting zero notes", () => {
-    expect(ratingCountNoteFr({ count: 0, selfScore: null, isViewer: false })).toBe(
-      "pas encore noté",
-    );
+    expect(ratingCountNoteFr(0)).toBe("pas encore noté");
   });
 
-  it("never tells the reader what « il » gave himself", () => {
-    expect(ratingCountNoteFr({ count: 4, selfScore: 8, isViewer: true })).not.toContain("il ");
+  it("says nothing about who gave what", () => {
+    // It is coach-facing, and even for him it is a count. The authors are a separate list; a count
+    // that named anybody would put one on a player's screen the day the component is reused.
+    expect(ratingCountNoteFr(4)).not.toMatch(/[A-Z]/);
   });
 });
 
-describe("ratingLegendFr", () => {
-  it("asks the reader for his own note in the second person", () => {
-    // Was « Sa note pour ce match (la tienne) » — a parenthesis patching the wrong pronoun.
-    expect(ratingLegendFr(true)).toBe("Ta note pour ce match");
+describe("ratingScoreFr", () => {
+  it("always shows the decimal, so 5 and 7,5 look like the same kind of figure", () => {
+    expect(ratingScoreFr(5)).toBe("5,0");
+    expect(ratingScoreFr(7.5)).toBe("7,5");
+    expect(ratingScoreFr(10)).toBe("10,0");
   });
 
-  it("keeps the third person for a teammate's card", () => {
-    expect(ratingLegendFr(false)).toBe("Sa note pour ce match");
+  it("shows a dash rather than a fake zero", () => {
+    expect(ratingScoreFr(null)).toBe("—");
+  });
+});
+
+describe("ratingScoreValueTextFr", () => {
+  it("spells the scale out, in French, for the screen reader", () => {
+    // `aria-valuetext` replaces the number entirely, so it has to carry « sur 10 » itself —
+    // otherwise a French voice reads « 7.5 » in English and the scale is left to be assumed.
+    expect(ratingScoreValueTextFr(7.5)).toBe("7,5 sur 10");
+    expect(ratingScoreValueTextFr(5)).toBe("5,0 sur 10");
+  });
+});
+
+describe("RATING_SLIDERS_START_AT_FR", () => {
+  it("names the figure an untouched slider gives, formatted as the screen shows it", () => {
+    // The promise the whole slider design rests on: a range has no unset state, so the reader is told
+    // what not touching it means. « 5,0 », not « 5 » — the same figure the row beside the name prints.
+    expect(RATING_SLIDERS_START_AT_FR).toContain(ratingScoreFr(RATING_SCORE_DEFAULT));
   });
 
-  it("never needs a parenthesis to say whose note it is", () => {
-    for (const isSelf of [true, false]) {
-      expect(ratingLegendFr(isSelf)).not.toContain("(");
+  it("says that not touching a slider is still giving a note", () => {
+    expect(RATING_SLIDERS_START_AT_FR).toContain("Si tu n’y touches pas");
+    expect(RATING_SLIDERS_START_AT_FR).toContain("la note que tu donnes");
+  });
+
+  it("tutoies (decision 074)", () => {
+    expect(RATING_SLIDERS_START_AT_FR).not.toMatch(/\bvous\b|\bvotre\b/i);
+  });
+});
+
+describe("RATING_IS_FINAL_FR", () => {
+  it("states that a sent note cannot be changed", () => {
+    // `onConflictDoNothing` in `actions.ts` is the rule; this is the reader finding out before he
+    // tries rather than after.
+    expect(RATING_IS_FINAL_FR).toMatch(/ne change plus/);
+  });
+});
+
+describe("ratingsSavedFr", () => {
+  it("counts what it wrote and says when the means come out", () => {
+    expect(ratingsSavedFr(6, 0)).toBe(
+      "6 notes enregistrées. Les moyennes sortiront quand tout le monde aura noté.",
+    );
+  });
+
+  it("agrees the participle with one note", () => {
+    expect(ratingsSavedFr(1, 0)).toContain("1 note enregistrée.");
+  });
+
+  it("reads a repeat submit as already saved rather than as a failure", () => {
+    // The retry path: a phone on a patchy connection resubmits the same set, writes nothing, and must
+    // not be told something went wrong.
+    expect(ratingsSavedFr(0, 6)).toBe("Ces notes étaient déjà enregistrées.");
+  });
+
+  it("says plainly when there was nothing to write at all", () => {
+    expect(ratingsSavedFr(0, 0)).toBe("Rien de nouveau à enregistrer.");
+  });
+
+  it("never promises the reader anybody else’s notes (decision 137)", () => {
+    // It used to end « il en reste à mettre pour voir celles des autres » — decision 021's trade,
+    // which no longer exists. Nobody buys access by submitting, and nobody ever reads a single note.
+    for (const sentence of [ratingsSavedFr(6, 0), ratingsSavedFr(1, 0), ratingsSavedFr(0, 6)]) {
+      expect(sentence).not.toMatch(/celles des autres|pour voir/);
     }
   });
 });

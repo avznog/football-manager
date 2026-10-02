@@ -7,32 +7,31 @@
 
 import { z } from "zod";
 
-import { RATING_SCORE_MAX, RATING_SCORE_MIN } from "./aggregate";
-
-/** Long enough for « énorme match, dommage pour le penalty », short enough to stay readable. */
-export const RATING_COMMENT_MAX = 240;
+import { RATING_SCORE_MAX, RATING_SCORE_MIN, RATING_SCORE_STEP } from "./aggregate";
 
 /**
- * A note is a **whole number from 0 to 10** (decision 007) — the same range as the `ratings.score`
- * check constraint, so a valid form can never produce a row the database refuses.
+ * A note runs from 0 to 10 **in half-points** (decision 137, keeping decision 007's range and adding
+ * the step). The same two bounds as the `ratings_score_range` check and the same step as
+ * `ratings_score_half_step`, so a form this schema accepts can never produce a row the database
+ * refuses — and, the direction that actually bites, a slider the screen renders can never produce a
+ * note this schema refuses.
  *
- * `coerce` because it arrives as a string from a radio input, and `int` before the bounds so "7.5"
- * is reported as "not a whole number" rather than as out of range. (A French "7,5" coerces to `NaN`
- * and is reported as "choisis une note", which is the right thing to say to someone who typed it.)
+ * `coerce` because it arrives as a string from an `<input type="range">`. The step is checked by
+ * arithmetic on a doubled value rather than with `multipleOf`: `0.5` is exact in binary floating
+ * point, so `7.5 * 2 === 15` holds with no tolerance needed, and the message can then say what is
+ * wrong rather than « nombre invalide ».
+ *
+ * A French « 7,5 » coerces to `NaN` and is reported as « choisis une note », which is the right thing
+ * to say to somebody who typed it — but nothing in the app sends it: a range input emits `7.5`.
  */
 export const ratingScoreSchema = z.coerce
   .number({ message: "Choisis une note de 0 à 10." })
-  .int("Une note est un nombre entier.")
   .min(RATING_SCORE_MIN, `Une note va de ${RATING_SCORE_MIN} à ${RATING_SCORE_MAX}.`)
-  .max(RATING_SCORE_MAX, `Une note va de ${RATING_SCORE_MIN} à ${RATING_SCORE_MAX}.`);
-
-/** An empty textarea means "no comment", which is a `null` column, not an empty string. */
-export const ratingCommentSchema = z
-  .string()
-  .trim()
-  .max(RATING_COMMENT_MAX, "Ce commentaire est trop long.")
-  .optional()
-  .transform((value) => (value && value.length > 0 ? value : null));
+  .max(RATING_SCORE_MAX, `Une note va de ${RATING_SCORE_MIN} à ${RATING_SCORE_MAX}.`)
+  .refine(
+    (score) => Number.isInteger(score / RATING_SCORE_STEP),
+    "Une note va par demi-points : 7 ou 7,5, pas 7,2.",
+  );
 
 /**
  * The identifiers only ever come from hidden fields the app itself rendered, so a failure here means
@@ -44,7 +43,6 @@ const identifierSchema = z.uuid("Ce formulaire est invalide, recharge la page.")
 export const ratingEntrySchema = z.object({
   ratedMemberId: identifierSchema,
   score: ratingScoreSchema,
-  comment: ratingCommentSchema,
 });
 
 export const submitRatingsSchema = z.object({
@@ -63,48 +61,34 @@ export type SubmitRatingsInput = z.infer<typeof submitRatingsSchema>;
 /**
  * Pulls the per-player fields out of one `FormData`.
  *
- * The whole sheet is submitted in a single POST — on a phone on the way home, twelve round trips is
- * twelve chances to lose the connection (same reasoning as `readAttendanceMarks` in
- * `lib/training/validation.ts`). Fields are named `score:<teamMemberId>` and
- * `comment:<teamMemberId>`.
+ * The whole set is submitted in a single POST — which decision 021 had to *ask* for, because the old
+ * card-at-a-time flow saved one note per round trip. Under decision 137 it is structural: the screen
+ * is one list with one button, so there is no half-submitted state to anchor on. Fields are named
+ * `score:<teamMemberId>`, and there is no longer a `comment:<teamMemberId>` — the free-text field and
+ * its column are gone.
  *
- * Two deliberate leniencies, because the form legitimately arrives half-filled:
+ * **A player with no field is skipped, not rejected.** Under the slider screen every target submits a
+ * value, so this leniency catches only the awkward paths: a disabled control, a member removed from
+ * the log while the page was open, a form rebuilt by hand. Rejecting the whole set because one field
+ * went missing would lose eleven notes the player did give.
  *
- * - **A player left blank is skipped, not rejected.** Rating is progressive: you save what you have
- *   and finish later. Only what is present is parsed, so an unanswered card costs nothing.
- * - **A comment with no note is dropped.** A comment qualifies a note; there is no row to hang it
- *   on without one, and the column is `not null`. The UI keeps the comment box disabled-looking
- *   until a note is picked, so this only catches the awkward paths.
- *
- * A malformed score (someone editing the DOM) *is* surfaced: it comes back as a parsed entry with
- * the raw value, and `submitRatingsSchema` rejects it with a French message rather than silently
- * ignoring a note the player believes he gave.
+ * A *malformed* score (somebody editing the DOM) **is** surfaced: it comes back as a parsed entry
+ * carrying the raw value, and `submitRatingsSchema` rejects it with a French message rather than
+ * silently ignoring a note the player believes he gave.
  */
 export function readRatingEntries(
   entries: Iterable<[string, FormDataEntryValue]>,
-): { ratedMemberId: string; score: unknown; comment: unknown }[] {
+): { ratedMemberId: string; score: unknown }[] {
   const scores = new Map<string, string>();
-  const comments = new Map<string, string>();
 
   for (const [key, value] of entries) {
     if (typeof value !== "string") continue;
+    if (!key.startsWith("score:")) continue;
 
-    if (key.startsWith("score:")) {
-      const memberId = key.slice("score:".length);
-      // A radio group with nothing selected submits nothing; an empty value means the same.
-      if (memberId.length > 0 && value.trim().length > 0) scores.set(memberId, value.trim());
-      continue;
-    }
-
-    if (key.startsWith("comment:")) {
-      const memberId = key.slice("comment:".length);
-      if (memberId.length > 0) comments.set(memberId, value);
-    }
+    const memberId = key.slice("score:".length);
+    // An empty value is a control that submitted nothing, not a note of zero.
+    if (memberId.length > 0 && value.trim().length > 0) scores.set(memberId, value.trim());
   }
 
-  return [...scores.entries()].map(([ratedMemberId, score]) => ({
-    ratedMemberId,
-    score,
-    comment: comments.get(ratedMemberId) ?? undefined,
-  }));
+  return [...scores.entries()].map(([ratedMemberId, score]) => ({ ratedMemberId, score }));
 }

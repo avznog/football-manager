@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { type RatingAuthorRow, type SquadRoleRow, ratingVisibility } from "./ratings";
+import {
+  type MatchPublicationRow,
+  type PlayedRow,
+  type RatingAuthorRow,
+  seasonRatingPublication,
+} from "./ratings";
 
 /* -------------------------------------------------------------------------- */
 /* Fixtures                                                                   */
@@ -9,150 +14,172 @@ import { type RatingAuthorRow, type SquadRoleRow, ratingVisibility } from "./rat
 const MATCHES = ["m1", "m2"];
 
 /**
- * Hugo and Karim played both matches. Gérard was a supporter at both. Chloé is a member who was
- * never on a sheet — she joined after the second match.
+ * Hugo and Karim played both matches; Yanis came on in m1 only. Gérard was on the sheet as a
+ * supporter at both and so appears nowhere here: decision 137 rates **minutes**, not selection, and
+ * a man with no minutes neither rates nor is rated.
  *
- * Two players on a sheet means a complete set is **two** notes: decision 007 has everyone rate
- * everyone including themselves. That is what makes the partial-set case below expressible.
+ * Three players in m1 means a complete set is **two** notes each — everyone who played, minus
+ * himself. Two in m2 means one note each. That is what makes the partial-set cases expressible.
  */
-const SQUAD: SquadRoleRow[] = [
-  { matchId: "m1", teamMemberId: "hugo", role: "starter" },
-  { matchId: "m1", teamMemberId: "karim", role: "substitute" },
-  { matchId: "m1", teamMemberId: "gerard", role: "supporter" },
-  { matchId: "m2", teamMemberId: "hugo", role: "starter" },
-  { matchId: "m2", teamMemberId: "karim", role: "starter" },
-  { matchId: "m2", teamMemberId: "gerard", role: "supporter" },
+const PLAYED: PlayedRow[] = [
+  { matchId: "m1", teamMemberId: "hugo", minutes: 58 },
+  { matchId: "m1", teamMemberId: "karim", minutes: 60 },
+  { matchId: "m1", teamMemberId: "yanis", minutes: 22 },
+  { matchId: "m1", teamMemberId: "gerard", minutes: 0 },
+  { matchId: "m2", teamMemberId: "hugo", minutes: 60 },
+  { matchId: "m2", teamMemberId: "karim", minutes: 60 },
 ];
 
-/**
- * Karim finished his set for m1 (Hugo and himself). Hugo started his and stopped after one note —
- * exactly the half-done set decision 023 keeps in the table. Nobody has rated m2.
- */
-const AUTHORS: RatingAuthorRow[] = [
-  { matchId: "m1", raterMemberId: "karim", ratedMemberId: "hugo" },
-  { matchId: "m1", raterMemberId: "karim", ratedMemberId: "karim" },
+/** Everybody who played m1 has finished his set. Nobody has rated m2 at all. */
+const COMPLETE_M1: RatingAuthorRow[] = [
   { matchId: "m1", raterMemberId: "hugo", ratedMemberId: "karim" },
+  { matchId: "m1", raterMemberId: "hugo", ratedMemberId: "yanis" },
+  { matchId: "m1", raterMemberId: "karim", ratedMemberId: "hugo" },
+  { matchId: "m1", raterMemberId: "karim", ratedMemberId: "yanis" },
+  { matchId: "m1", raterMemberId: "yanis", ratedMemberId: "hugo" },
+  { matchId: "m1", raterMemberId: "yanis", ratedMemberId: "karim" },
 ];
 
-const visibility = (viewerMemberId: string | null, authors = AUTHORS) =>
-  ratingVisibility({ matchIds: MATCHES, squad: SQUAD, authors, viewerMemberId });
+const OPEN: MatchPublicationRow[] = [
+  { matchId: "m1", publishedAtMs: null, windowClosed: false },
+  { matchId: "m2", publishedAtMs: null, windowClosed: false },
+];
+
+const split = (
+  authors: RatingAuthorRow[],
+  matches: MatchPublicationRow[] = OPEN,
+  played: PlayedRow[] = PLAYED,
+) => seasonRatingPublication({ matchIds: MATCHES, played, authors, matches });
 
 /* -------------------------------------------------------------------------- */
 
-describe("the decision 007 gate, read season-wide", () => {
-  it("opens a match to the player who finished his set", () => {
-    // Karim rated both rateable members of m1, so m1 is his to read. He was on the sheet for m2
-    // and has rated nobody there: gated. m2 holds no ratings at all, so there is nothing to warn
-    // him about — only a match that actually carries ratings is reported as hidden.
-    const seen = visibility("karim");
-    expect(seen.visibleMatchIds).toEqual(["m1"]);
-    expect(seen.hiddenMatchIds).toEqual([]);
+describe("seasonRatingPublication — every rater in", () => {
+  it("publishes a match whose every player has rated every other", () => {
+    // m2 holds no note at all, so it is in neither list: there is nothing to show and nothing a
+    // reader could sensibly be told to wait for.
+    const season = split(COMPLETE_M1);
+    expect(season.publishedMatchIds).toEqual(["m1"]);
+    expect(season.pendingMatchIds).toEqual([]);
   });
 
-  it("keeps a match hidden from a player who submitted only part of his set", () => {
-    // Hugo owes two notes for m1 and has written one. Decision 023 keeps that partial set in the
-    // table, so « a rating row exists » is *not* the rule: the set has to be complete. This is the
-    // leak the season aggregate would otherwise have — one average instead of thirteen notes.
-    const seen = visibility("hugo");
-    expect(seen.visibleMatchIds).toEqual([]);
-    expect(seen.hiddenMatchIds).toEqual(["m1"]);
+  it("keeps a match pending while one player owes one note", () => {
+    // Yanis has rated Hugo and stopped. His set is one short, so the whole match waits — the mean
+    // is « the notes the others gave him » and one of the others has not spoken.
+    const season = split(COMPLETE_M1.filter((row) => row.ratedMemberId !== "karim"));
+    expect(season.publishedMatchIds).toEqual([]);
+    expect(season.pendingMatchIds).toEqual(["m1"]);
   });
 
-  it("opens the match once the missing note lands", () => {
-    const seen = visibility("hugo", [
-      ...AUTHORS,
-      { matchId: "m1", raterMemberId: "hugo", ratedMemberId: "hugo" },
-    ]);
-    expect(seen.visibleMatchIds).toEqual(["m1"]);
-    expect(seen.hiddenMatchIds).toEqual([]);
+  it("does not count a self-note towards a complete set", () => {
+    // `ratings_no_self` makes this unwritable, but the predicate must not be the thing relying on
+    // that: a self-note is not one of the two notes Yanis owes.
+    const authors = COMPLETE_M1.filter(
+      (row) => !(row.raterMemberId === "yanis" && row.ratedMemberId === "karim"),
+    );
+    authors.push({ matchId: "m1", raterMemberId: "yanis", ratedMemberId: "yanis" });
+    const season = split(authors);
+    expect(season.pendingMatchIds).toEqual(["m1"]);
   });
 
-  it("reports a hidden match once it actually holds ratings", () => {
-    const seen = visibility("hugo", [
-      ...AUTHORS,
-      { matchId: "m2", raterMemberId: "karim", ratedMemberId: "hugo" },
-    ]);
-    expect(seen.visibleMatchIds).toEqual([]);
-    expect(seen.hiddenMatchIds).toEqual(["m1", "m2"]);
-  });
-
-  it("shows everything to a supporter, who has nothing to submit and nothing to anchor on", () => {
-    const seen = visibility("gerard");
-    expect(seen.visibleMatchIds).toEqual(MATCHES);
-    expect(seen.hiddenMatchIds).toEqual([]);
-  });
-
-  it("shows everything to a member who was never on a sheet", () => {
-    expect(visibility("chloe").visibleMatchIds).toEqual(MATCHES);
-  });
-
-  it("shows everything to a viewer who is not a member at all — a super admin", () => {
-    expect(visibility(null).visibleMatchIds).toEqual(MATCHES);
-  });
-
-  it("ignores a sheet row for a match outside the filter", () => {
-    const seen = ratingVisibility({
-      matchIds: ["m2"],
-      squad: SQUAD,
-      authors: AUTHORS,
-      viewerMemberId: "karim",
-    });
-    // m1 is out of the filter entirely, so Karim's completed set there neither opens it nor is
-    // reported as hidden; m2 carries no ratings, so it is silent too.
-    expect(seen.visibleMatchIds).toEqual([]);
-    expect(seen.hiddenMatchIds).toEqual([]);
-  });
-
-  it("preserves the order it was given, so the caller's ordering survives", () => {
-    const seen = ratingVisibility({
-      matchIds: ["m2", "m1"],
-      squad: SQUAD,
-      authors: [],
-      viewerMemberId: "gerard",
-    });
-    expect(seen.visibleMatchIds).toEqual(["m2", "m1"]);
-  });
-
-  it("does not let one viewer's completed set open the match for another", () => {
-    // The gate is per viewer, and the only rater it may ever look at is the viewer. Karim's two
-    // notes are in the fixture; they must do nothing for Hugo.
-    expect(visibility("hugo").visibleMatchIds).not.toContain("m1");
-    expect(visibility("karim").visibleMatchIds).toContain("m1");
+  it("ignores a note from somebody who did not play", () => {
+    // Gérard watched. A note from him is not part of anybody's set, and above all it does not make
+    // him an expected rater whose silence would hold the match back.
+    const authors = [
+      ...COMPLETE_M1,
+      { matchId: "m1", raterMemberId: "gerard", ratedMemberId: "hugo" },
+    ];
+    expect(split(authors).publishedMatchIds).toEqual(["m1"]);
   });
 });
 
-describe("how many hidden matches hold a note about one player", () => {
-  /**
-   * Hugo cannot read m1, which carries notes about Karim and about himself. Both of them are one
-   * match short; nobody else is short of anything, and « no key » has to mean zero rather than
-   * « the season's number », which is the defect this map exists to kill.
-   */
-  it("counts a hidden match once per player judged in it", () => {
-    expect(visibility("hugo").hiddenRatedCounts).toEqual({ karim: 1, hugo: 1 });
+describe("seasonRatingPublication — the coach's escape hatch", () => {
+  it("publishes a match the coach released, however much is owed", () => {
+    const matches: MatchPublicationRow[] = [
+      { matchId: "m1", publishedAtMs: 1_700_000_000_000, windowClosed: false },
+      { matchId: "m2", publishedAtMs: null, windowClosed: false },
+    ];
+    const season = split([COMPLETE_M1[0]], matches);
+    expect(season.publishedMatchIds).toEqual(["m1"]);
+    expect(season.pendingMatchIds).toEqual([]);
   });
 
-  /** Two notes about Karim in m1 are one match he is short of, not two. */
-  it("does not count a match twice for a player judged twice", () => {
-    const seen = visibility("hugo", [
-      ...AUTHORS,
-      { matchId: "m1", raterMemberId: "nico", ratedMemberId: "karim" },
-    ]);
-    expect(seen.hiddenRatedCounts.karim).toBe(1);
-  });
-
-  /** A player nobody judged in the hidden match is not short of it — his average never had it. */
-  it("leaves out a player the hidden match holds no note about", () => {
-    const seen = visibility("hugo", [
-      ...AUTHORS,
-      { matchId: "m2", raterMemberId: "karim", ratedMemberId: "nico" },
-    ]);
-    expect(seen.hiddenMatchIds).toEqual(["m1", "m2"]);
-    expect(seen.hiddenRatedCounts).toEqual({ karim: 1, hugo: 1, nico: 1 });
-    expect(seen.hiddenRatedCounts.gerard).toBeUndefined();
-  });
-
-  it("holds nothing back from a reader who has earned every match", () => {
-    expect(visibility("karim").hiddenRatedCounts).toEqual({});
+  it("does not invent notes for a match the coach released that nobody rated", () => {
+    // Publishing an unrated match publishes nothing: there is no mean to compute, so it belongs in
+    // neither list rather than in `publishedMatchIds` where a screen would look for figures.
+    const matches: MatchPublicationRow[] = [
+      { matchId: "m1", publishedAtMs: 1_700_000_000_000, windowClosed: false },
+      { matchId: "m2", publishedAtMs: null, windowClosed: false },
+    ];
+    const season = split([], matches);
+    expect(season.publishedMatchIds).toEqual([]);
+    expect(season.pendingMatchIds).toEqual([]);
   });
 });
 
+describe("seasonRatingPublication — the window closing", () => {
+  it("publishes what there is once the next match has kicked off", () => {
+    // This is the clause that reverses decision 024: a straggler no longer freezes a match for ever.
+    // Whether one note is enough to *print* is a different question, settled by `MIN_NOTES_FOR_MEAN`
+    // in the aggregate — this module only says the notes are out.
+    const matches: MatchPublicationRow[] = [
+      { matchId: "m1", publishedAtMs: null, windowClosed: true },
+      { matchId: "m2", publishedAtMs: null, windowClosed: false },
+    ];
+    const season = split([COMPLETE_M1[0]], matches);
+    expect(season.publishedMatchIds).toEqual(["m1"]);
+  });
+
+  it("leaves the last match of a season waiting on its players or its coach", () => {
+    // No next kick-off, so `windowClosed` is false for ever. The coach is the backstop, which is the
+    // whole reason `rating:publish` exists.
+    const season = split([COMPLETE_M1[0]]);
+    expect(season.pendingMatchIds).toEqual(["m1"]);
+  });
+});
+
+describe("seasonRatingPublication — the edges", () => {
+  it("returns two empty lists for no matches", () => {
+    expect(seasonRatingPublication({ matchIds: [], played: [], authors: [], matches: [] })).toEqual({
+      publishedMatchIds: [],
+      pendingMatchIds: [],
+    });
+  });
+
+  it("ignores rows belonging to a match outside the filter", () => {
+    // The competition filter narrows `matchIds`; the rows come back unfiltered, and a note from a
+    // cup match must not place that match in either list.
+    const season = seasonRatingPublication({
+      matchIds: ["m1"],
+      played: PLAYED,
+      authors: [...COMPLETE_M1, { matchId: "cup", raterMemberId: "hugo", ratedMemberId: "karim" }],
+      matches: OPEN,
+    });
+    expect(season.publishedMatchIds).toEqual(["m1"]);
+    expect(season.pendingMatchIds).toEqual([]);
+  });
+
+  it("preserves the order the matches were asked for", () => {
+    // The screens count these lists and some of them name the first entry, so the order has to be
+    // the caller's — most recent first, as `getSeasonStats` loads them — not insertion order here.
+    const matches: MatchPublicationRow[] = [
+      { matchId: "m1", publishedAtMs: null, windowClosed: true },
+      { matchId: "m2", publishedAtMs: null, windowClosed: true },
+    ];
+    const authors: RatingAuthorRow[] = [
+      { matchId: "m2", raterMemberId: "hugo", ratedMemberId: "karim" },
+      ...COMPLETE_M1,
+    ];
+    expect(
+      seasonRatingPublication({ matchIds: ["m2", "m1"], played: PLAYED, authors, matches }),
+    ).toEqual({ publishedMatchIds: ["m2", "m1"], pendingMatchIds: [] });
+  });
+
+  it("does not hold a match back when no minutes were ever logged", () => {
+    // A match whose log was never reduced has no expected raters, so nothing is owed and whatever
+    // notes it holds are out. It cannot be « en attente » for ever on account of a missing log —
+    // which is the failure mode worth pinning, since the notes themselves are real.
+    const season = split(COMPLETE_M1, OPEN, []);
+    expect(season.publishedMatchIds).toEqual(["m1"]);
+    expect(season.pendingMatchIds).toEqual([]);
+  });
+});

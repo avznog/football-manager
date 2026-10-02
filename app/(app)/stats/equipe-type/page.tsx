@@ -66,11 +66,10 @@ import {
   sevenQuestionKey,
   shrinkageSentenceFr,
   squadMeanStandInFr,
-  viewerRelativeRatingsFr,
   type BestSevenQuery,
 } from "@/lib/stats/best-seven-copy";
 import { toBestSevenSlots, toBestSevenSquad } from "@/lib/stats/best-seven-input";
-import { hiddenRatingMatchesNoteFr, matchCount } from "@/lib/stats/format";
+import { matchCount, pendingRatingMatchesNoteFr } from "@/lib/stats/format";
 import { getFormationUsage } from "@/lib/stats/formation-usage";
 import { getSeasonStats } from "@/lib/stats/queries";
 import { getSquad } from "@/lib/team/queries";
@@ -93,7 +92,7 @@ export default async function EquipeTypePage({
   const competitionId = parseCompetitionId(params[COMPETITION_PARAM], competitions);
 
   const [stats, usage, squad] = await Promise.all([
-    getSeasonStats(team.id, team.membershipId, { competitionId }),
+    getSeasonStats(team.id, { competitionId }),
     getFormationUsage(team.id, { competitionId }),
     // Declared posts come from the **current** squad, which is what `getSquad` returns; the reason a
     // departed player cannot be a candidate at all is argued in `best-seven-input.ts`.
@@ -300,9 +299,16 @@ function Body({
     // pitch means.
     declaredPostsFr(query.direction),
     outOfPositionNoteFr(result.outOfPositionCount),
-    // 2 — a ratings seven is one reader's. Only on `ratings`; the other three are the event log.
-    viewerRelativeRatingsFr(query.criterion),
-    query.criterion === "ratings" ? hiddenRatingMatchesNoteFr(stats.hiddenRatingMatches) : null,
+    /*
+     * 2 — what the ratings seven is still waiting for. Only on `ratings`; the other three criteria are
+     * the event log, which needs nobody to fill anything in.
+     *
+     * There used to be a sentence above this one saying the seven was *this reader's* — « d'après les
+     * matchs que tu as notés » — because under decision 021 it was: two teammates asking the same
+     * question of the same season got two different sevens. Decision 137 deleted that, so there is one
+     * seven and the only thing left to explain is the matches whose notes are not all in.
+     */
+    query.criterion === "ratings" ? pendingRatingMatchesNoteFr(stats.pendingRatingMatches) : null,
     // 3 — what the shrinkage did, with the measured prior strength or the admission that there is
     // none to print.
     shrinkageSentenceFr(query.criterion, result.shrinkage),

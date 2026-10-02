@@ -19,8 +19,8 @@ import {
   formatAttendance,
   formatMinutes,
   formatRating,
-  hiddenRatingsNoteFr,
   matchCount,
+  pendingRatingsNoteFr,
   plural,
 } from "@/lib/stats/format";
 import { getPlayerSeasonStats } from "@/lib/stats/queries";
@@ -29,15 +29,21 @@ import { Figure, FigureGrid, Note } from "../../stats/_components/parts";
 
 export async function PlayerStatsCard({
   teamId,
-  viewerMemberId,
   memberId,
+  isSelf,
 }: {
   teamId: string;
-  /** The reader's membership, so decision 007's rating gate applies to them and not to the page. */
-  viewerMemberId: string | null;
   memberId: string;
+  /**
+   * Whose profile this is, and the **only** thing left that depends on the reader: « Tes notes » or
+   * « Ses notes ». It used to be a `viewerMemberId` passed into the query, because under decision 021
+   * the figures themselves were the reader's — two people looking at the same profile saw two
+   * averages. Decision 137 makes every statistic the same for everybody, so what is left of the
+   * viewer is a pronoun.
+   */
+  isSelf: boolean;
 }) {
-  const { player, season } = await getPlayerSeasonStats(teamId, viewerMemberId, memberId);
+  const { player, season } = await getPlayerSeasonStats(teamId, memberId);
 
   if (!player || !player.hasData) {
     return (
@@ -54,11 +60,7 @@ export async function PlayerStatsCard({
   // The card header already prints « 7 matchs sur la feuille » in full width, so the roles line does
   // not repeat it. Same wording as `/stats`, from the same function.
   const roles = appearancesLineFr(appearances);
-  const hiddenNote = hiddenRatingsNoteFr(
-    season.hiddenRatingMatchesByMember[memberId] ?? 0,
-    rating.count,
-    viewerMemberId === memberId,
-  );
+  const pendingNote = pendingRatingsNoteFr(season.pendingRatingMatches, isSelf);
 
   return (
     <Card
@@ -78,7 +80,9 @@ export async function PlayerStatsCard({
         <Figure
           label="Note"
           value={rating.count > 0 ? formatRating(rating.average) : null}
-          hint={rating.count > 0 ? `sur ${plural(rating.count, "note")}` : undefined}
+          /* « sur 6 matchs notés », not « sur 6 notes » (decision 137): a season average is now the
+             mean of one figure per match, and the old wording would read as six opinions. */
+          hint={rating.count > 0 ? `sur ${plural(rating.count, "match noté", "matchs notés")}` : undefined}
         />
         <Figure
           label="Présence"
@@ -116,10 +120,11 @@ export async function PlayerStatsCard({
         </Note>
       ) : null}
 
-      {/* The season's hidden-match count belongs to the reader, not to this player: it used to be
-          printed under his average, matches that never held a note about him included — and over a
-          « — », where there was no average to exclude anything from. */}
-      {hiddenNote !== null ? <Note>{hiddenNote}</Note> : null}
+      {/* How many of the season's matches are still waiting for notes — a fact about the team's
+          calendar, identical on every profile. It used to be a per-reader count of matches *he* had
+          not rated, printed under this player's average and sometimes over a « — » where there was no
+          average for it to be excluded from. */}
+      {pendingNote !== null ? <Note>{pendingNote}</Note> : null}
     </Card>
   );
 }

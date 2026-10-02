@@ -11,7 +11,7 @@ contents change, and the version you remember from an hour ago may be stale.
 
 ## NOW
 
-**2026-10-01.** **This section is rewritten in place on every push; everything from `## Log` down is
+**2026-10-02.** **This section is rewritten in place on every push; everything from `## Log` down is
 appended to and never edited.** Those are the two halves of the protocol, and they are not
 interchangeable: this section says what is *true now*, the Log says what *happened*. So when you change
 a fact here you still leave a dated line in your own Log lane.
@@ -20,8 +20,8 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `429de41`. The newest tag, `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
-  now **22 commits behind**, so **preview is ahead of production** by all twenty-two and will stay ahead
+- **`main`** — at `171ae41`. The newest tag, `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
+  now **23 commits behind**, so **preview is ahead of production** by all twenty-three and will stay ahead
   until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
   **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
   other machine. Re-derive the two numbers rather than reading them: `git log -1 origin/main` and
@@ -49,8 +49,10 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **137**. The highest on `main` is **136** (the trace sink, the other
-  machine). **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
+- **Next free decision number** — **138**. The highest on `main` is **136** (the trace sink, the other
+  machine); **137 is taken** by the ratings rebuild and is on `feat/ratings-rebuild`, not yet merged, so a
+  session that greps `main` will be told 136 and must not write a second `## 137`.
+  **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
   believing**, and this line is why: it said 133 when 133 *and* 134 were already on `main` — the other
   machine's two placeholders, the ones this line itself called "coming on `feat/retro-one-action-list`,
   unclaimed", landed and were numbered without it being updated. A session that trusted the line would
@@ -81,17 +83,24 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   the whole demo season is **reported by a third session that logged in, and not independently checked
   from here**; treat it as a warning rather than as a fact, and assume preview is a shared instance with
   real-looking data in it rather than a scratch pad.
-- **Open pull requests** — **#114**, `perf/acknowledge-tab-taps` (the other machine: the tap
-  acknowledgement, branched off `646b830`, CI green, released for merge with decision **123** by its own
-  session) and **#115**, the rewrite of this section. Neither of the other machine's is mine to merge
-  until it says it is ready. **#117 merged** (`f13f27e`): both of the happy path's reloads were racing
-  the outbox flush, which is why a docs-only branch could fail the e2e job.
-- **In flight · the owner's machine** — nothing committed. Next is **PR 3, the ratings rebuild**, the
-  largest piece of work left in the repository, and nothing is ahead of it any more: the **database wipe
-  is closed without being done**, along with the super-admin password reset and the Neon `neondb_owner`
-  rotation, by the owner's decision (**132**). Do not re-propose any of the three. The facts behind them
-  are all still true and still rediscoverable, which is exactly why they were raised in every session
-  report for weeks — read 132 instead of raising them a fifth time.
+- **Open pull requests** — **none**. `gh pr list --state open` is empty; everything the two machines had
+  open is merged. **#137 was closed without merging**: it was a lone `1.0.0-beta.7` bump, and the owner
+  ships this release by hand, so `package.json` stays at **`1.0.0-beta.6`** and the bump belongs to
+  whichever pull request the owner decides earns it.
+- **In flight · the owner's machine** — **PR 3, the ratings rebuild**, on `feat/ratings-rebuild`, five
+  commits pushed and the branch green locally; the pull request is not opened yet. It is decision **137**:
+  a note is the mean of what the others gave you, the means come out once the notes are in, and the
+  individual notes are the coach's alone. It **supersedes 021 and 024 entirely, 102 entirely, 007 on three
+  of its four clauses**, and renames `MIN_RATINGS` to `MIN_RATED_MATCHES` because the unit changed from
+  notes to matches. Migration **`0007_chubby_silver_samurai.sql`** is in it and three of its statements are
+  irreversible on purpose (`score` → `numeric(3,1)`, `comment` dropped, every self-rating deleted), so a
+  session on the other machine with a local database should expect `db:migrate` to take its seeded ratings
+  with it. **What is still owed before it is opened**: both themes at 390 px in both roles in one pass, and
+  the walk on a reset database as three users including the crafted form post for the two refusals. Ahead
+  of it there is nothing: the **database wipe is closed without being done**, along with the super-admin
+  password reset and the Neon `neondb_owner` rotation, by the owner's decision (**132**). Do not re-propose
+  any of the three. The facts behind them are all still true and still rediscoverable, which is exactly why
+  they were raised in every session report for weeks — read 132 instead of raising them a fifth time.
 - **In flight · the other machine** — **the owner's fourth batch of iPhone remarks**, four areas, planned
   in `docs/PLAN.md`'s new `## Amendments` and `docs/ROADMAP.md`'s « The fourth batch from the owner's
   iPhone ». Open and waiting on the gatekeeper: **#114** (tap acknowledgement, released for merge),
@@ -102,16 +111,14 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   « `<Suspense>` on `/stats` » one is **withdrawn and must not be re-opened** — it removes the no-JS path
   that decisions 100 and 116 built, see #114 — and the auth prefix joins are untouched and still a
   tidiness item.
-- **Open for review, not mine to merge · PR #134** — `feat/iphone-trace-sink`, a diagnostic sink so the owner's
-  iPhone 16 can be watched live against preview. In these files and no others: `lib/dev/trace.ts` (+ test),
-  `app/api/dev/trace/route.ts`, `proxy.ts` (one `PUBLIC_PATHS` line), `scripts/iphone-trace/*`. No schema
-  change, no migration, no infrastructure, and **nothing in the client bundle** — the capture is a
-  bookmarklet, which is what keeps decision 127 and `audit:screens` true. Left open for the gatekeeper,
-  per rule 1. **It stays dead after merging until the owner sets `TRACE_SECRET` in Vercel's preview
-  environment**, which is his by rule 3 — so `404` from `/api/dev/trace` is the correct answer, not a
-  regression to chase. The files I am staying out of are the ones
-  **`feat/a-dock-of-players-and-buttons`** holds in the main checkout: that branch is two commits ahead of
-  `origin/main` and **unpushed**, so `git fetch` does not reveal it. One of those commits edits this file.
+- **The trace sink is merged and still dead, which is correct.** PR #134 is on `main` (`dcb4f0e`):
+  `lib/dev/trace.ts`, `app/api/dev/trace/route.ts`, one `PUBLIC_PATHS` line in `proxy.ts`,
+  `scripts/iphone-trace/*`. No migration, no infrastructure and **nothing in the client bundle** — the
+  capture is a bookmarklet, which is what keeps decision 127 and `audit:screens` true. **It stays dead
+  until the owner sets `TRACE_SECRET` in Vercel's preview environment**, which is his by rule 3, so `404`
+  from `/api/dev/trace` is the right answer and not a regression to chase. It has still never been run on
+  an iPhone: `docs/ROADMAP.md`'s « The instrument for the questions only the phone can answer » is
+  deliberately all unchecked boxes.
 
 **Who writes which line — because two machines rewriting one block is exactly the conflict the two Log
 lanes were invented to avoid.** The gatekeeper machine, the owner's, owns every line above except the
@@ -855,6 +862,24 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   before it, #132: `git rev-parse` on an annotated tag returns the tag object, which this file had been
   "corrected" into believing. Shipped nothing to production — `package.json` still reads `1.0.0-beta.6`
   and **no tag was cut**; `main` is now 20 commits ahead of the one that was.
+
+- **2026-10-02 · the owner's machine · `feat/ratings-rebuild`** — PR 3 of the plan, and **decision 137**: a
+  note is the mean of what the others gave you, the means come out once the notes are in, and the
+  individual notes are the coach's alone. Five commits, pushed as they were made. It supersedes **021 and
+  024 entirely, 102 entirely, and 007 on three of its four clauses**, which is why the diff is 51 files for
+  one sentence of product: `ratingVisibility` and the whole viewer-relative statistics tree are deleted,
+  `lib/rating/flow.ts` with them, and `/stats`, the profile and « l'équipe type » print one set of numbers
+  for every reader. `MIN_RATINGS` is `MIN_RATED_MATCHES` because the unit changed from notes to matches.
+  Migration **`0007_chubby_silver_samurai.sql`**, three of its statements irreversible on purpose — `score`
+  → `numeric(3,1)` with a half-step check, `comment` dropped, every self-rating deleted — so another
+  machine's local database loses its seeded ratings on `db:migrate`, and `db/seed.ts` stopped writing both
+  in the same commit. Two things the tree taught the browser suite rather than the other way round: a
+  complete submit **redirects** to the recap, and a coach's row carries author chips, so `hasText` on a
+  display name matched his own row and seven chips. **Nothing is shipped**: `package.json` is still
+  `1.0.0-beta.6`, #137 — a lone bump — was closed on the owner's instruction because he ships this one by
+  hand, and the pull request for this branch is not opened yet. What it is waiting on is the half no suite
+  can give: both themes at 390 px in both roles in one pass, and the walk on a reset database as three
+  users, including the crafted form post for « not yourself » and « not a man with 0 minutes ».
 
 ### From the other machine
 

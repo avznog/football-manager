@@ -13,7 +13,8 @@ import {
   formatRecord,
   formatSigned,
   formEntryLabelFr,
-  hiddenRatingsNoteFr,
+  pendingRatingMatchesNoteFr,
+  pendingRatingsNoteFr,
   matchCount,
   plural,
   resultLabelOf,
@@ -188,37 +189,42 @@ describe("ATTENDANCE_NOT_FILTERED_FR", () => {
   });
 });
 
-describe("hiddenRatingsNoteFr", () => {
-  /** Nothing held back: the dash beside it means what it says, and a note would invent a reason. */
-  it("says nothing when the reader has earned every match", () => {
-    expect(hiddenRatingsNoteFr(0, 4, false)).toBeNull();
+describe("pendingRatingMatchesNoteFr", () => {
+  /** Nothing waiting: the averages are complete, and a note would invent a reason for a figure. */
+  it("says nothing when every match's notes are in", () => {
+    expect(pendingRatingMatchesNoteFr(0)).toBeNull();
   });
 
   /**
-   * Ali's own profile: every note he has received sits in a match he has not rated, so the card shows
-   * « — ». The old sentence announced two matches « exclus de cette moyenne » under no moyenne at all.
+   * The same sentence for every reader — the whole of decision 137 in this file. It must not reproach
+   * anybody and must not depend on what the reader has written: the old wording did both.
    */
-  it("explains a missing average rather than excluding matches from it", () => {
-    const note = hiddenRatingsNoteFr(2, 0, true);
+  it("names the matches and says the means arrive together", () => {
+    const note = pendingRatingMatchesNoteFr(2);
     expect(note).toBe(
-      "Tes notes sur 2 matchs restent cachées tant que tu n’as pas noté tes coéquipiers : " +
-        "c’est pourquoi il n’y a pas de moyenne.",
+      "2 matchs ne sont pas comptés ici : toutes les notes ne sont pas encore rentrées. " +
+        "Les moyennes arriveront d’un coup.",
     );
-    expect(note).not.toContain("exclus de cette moyenne");
+    expect(note).not.toContain("tu n’as pas");
+    expect(note).not.toContain("débloquent");
   });
 
-  /** Somebody else's profile, same gate, same reason — it is always the reader who has not voted. */
-  it("says « ses notes » on another player's profile", () => {
-    expect(hiddenRatingsNoteFr(1, 0, false)).toContain("Ses notes sur 1 match");
-    expect(hiddenRatingsNoteFr(1, 0, true)).toContain("Tes notes sur 1 match");
+  it("agrees with one match", () => {
+    expect(pendingRatingMatchesNoteFr(1)).toContain("1 match n’est pas compté ici");
+  });
+});
+
+describe("pendingRatingsNoteFr", () => {
+  it("says nothing when none of his matches is waiting", () => {
+    expect(pendingRatingsNoteFr(0, true)).toBeNull();
   });
 
-  /** With something visible, the average is real and the sentence says what it covers. */
-  it("bounds an average that exists instead of denying it", () => {
-    expect(hiddenRatingsNoteFr(1, 4, false)).toBe(
-      "Ses notes sur 1 match restent cachées tant que tu n’as pas noté tes coéquipiers. " +
-        "La moyenne ne porte que sur les matchs que tu as notés.",
+  /** Second person on one's own profile, third on somebody else's — as everywhere else (074). */
+  it("says « tes notes » or « ses notes », and blames nobody", () => {
+    expect(pendingRatingsNoteFr(2, true)).toBe(
+      "Tes notes sur 2 matchs ne sont pas encore sorties : elles arrivent quand tout le monde a noté.",
     );
+    expect(pendingRatingsNoteFr(1, false)).toContain("Ses notes sur 1 match");
   });
 });
 

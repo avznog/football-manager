@@ -1,62 +1,79 @@
 import { describe, expect, it } from "vitest";
 
-import type { SquadRole } from "@/db/schema";
 import {
-  isOnRateableSheet,
-  isRateableRole,
+  hasPlayed,
   playedLabelFr,
-  rateableMemberIds,
-  ratingCardPositionFr,
+  playedMemberIds,
   ratingProgress,
-  ratingVisibility,
-  type SheetEntry,
+  ratingTargetsFor,
+  type PlayedEntry,
 } from "./progress";
 
-function sheet(...entries: [string, SquadRole][]): SheetEntry[] {
-  return entries.map(([teamMemberId, role]) => ({ teamMemberId, role }));
+function played(...entries: [string, number][]): PlayedEntry[] {
+  return entries.map(([teamMemberId, minutes]) => ({ teamMemberId, minutes }));
 }
 
-const SHEET = sheet(
-  ["hugo", "starter"],
-  ["karim", "starter"],
-  ["momo", "substitute"],
-  ["pierre", "supporter"],
-);
+/** Momo was named a substitute and never came on; Pierre watched from the touchline. */
+const PLAYED = played(["hugo", 60], ["karim", 58], ["momo", 0]);
 
-describe("isRateableRole", () => {
-  it("is true for the players who were on the pitch or the bench", () => {
-    expect(isRateableRole("starter")).toBe(true);
-    expect(isRateableRole("substitute")).toBe(true);
+describe("playedMemberIds", () => {
+  it("keeps everybody with a minute on the clock, and is sorted", () => {
+    expect(playedMemberIds(PLAYED)).toEqual(["hugo", "karim"]);
   });
 
-  it("is false for a supporter, and for nothing at all", () => {
-    expect(isRateableRole("supporter")).toBe(false);
-    expect(isRateableRole(null)).toBe(false);
-    expect(isRateableRole(undefined)).toBe(false);
-  });
-});
-
-describe("rateableMemberIds", () => {
-  it("keeps starters and substitutes, drops supporters, and is sorted", () => {
-    expect(rateableMemberIds(SHEET)).toEqual(["hugo", "karim", "momo"]);
+  it("drops the named substitute who never came on", () => {
+    // The sheet said he was there; the log says he did not play. Decision 137 reads the log, which
+    // is the whole difference between it and decision 007.
+    expect(playedMemberIds(PLAYED)).not.toContain("momo");
   });
 
-  it("is empty for a sheet with nobody who played", () => {
-    expect(rateableMemberIds(sheet(["pierre", "supporter"]))).toEqual([]);
+  it("keeps a one-minute cameo: it is a performance, however short", () => {
+    expect(playedMemberIds(played(["ali", 1]))).toEqual(["ali"]);
+  });
+
+  it("is empty for a match nobody recorded", () => {
+    expect(playedMemberIds([])).toEqual([]);
   });
 });
 
-describe("isOnRateableSheet", () => {
-  it("lets a starter and a substitute rate", () => {
-    expect(isOnRateableSheet(SHEET, "hugo")).toBe(true);
-    expect(isOnRateableSheet(SHEET, "momo")).toBe(true);
+describe("hasPlayed", () => {
+  it("is true for the men who were on the pitch", () => {
+    expect(hasPlayed(PLAYED, "hugo")).toBe(true);
+    expect(hasPlayed(PLAYED, "karim")).toBe(true);
   });
 
-  it("refuses a supporter, a stranger, and a viewer with no membership", () => {
-    // A coach who did not play is not on the sheet as a player: decision 007.
-    expect(isOnRateableSheet(SHEET, "pierre")).toBe(false);
-    expect(isOnRateableSheet(SHEET, "someone-else")).toBe(false);
-    expect(isOnRateableSheet(SHEET, null)).toBe(false);
+  it("refuses the unused substitute, a stranger, and a viewer with no membership", () => {
+    expect(hasPlayed(PLAYED, "momo")).toBe(false);
+    expect(hasPlayed(PLAYED, "pierre")).toBe(false);
+    expect(hasPlayed(PLAYED, null)).toBe(false);
+    expect(hasPlayed(PLAYED, undefined)).toBe(false);
+  });
+});
+
+describe("ratingTargetsFor", () => {
+  it("is everybody who played, minus himself", () => {
+    expect(ratingTargetsFor(PLAYED, "hugo")).toEqual(["karim"]);
+  });
+
+  it("never includes the rater, which is what the recap's figure means", () => {
+    // « la moyenne des notes que les autres lui ont mises » — his own note has no place in it, and
+    // `ratings_no_self` says the same thing in the database.
+    for (const id of playedMemberIds(PLAYED)) {
+      expect(ratingTargetsFor(PLAYED, id)).not.toContain(id);
+    }
+  });
+
+  it("asks nothing of somebody who did not play", () => {
+    // A supporter opening the notation URL by hand is a reader, not an error.
+    expect(ratingTargetsFor(PLAYED, "momo")).toEqual([]);
+    expect(ratingTargetsFor(PLAYED, "pierre")).toEqual([]);
+    expect(ratingTargetsFor(PLAYED, null)).toEqual([]);
+  });
+
+  it("asks nothing of the only man who played", () => {
+    // Degenerate, but it is the shape of a match whose log holds one player: there is nobody else
+    // to rate, so his set is empty and therefore complete.
+    expect(ratingTargetsFor(played(["hugo", 60]), "hugo")).toEqual([]);
   });
 });
 
@@ -80,15 +97,16 @@ describe("ratingProgress", () => {
     expect(progress.missingIds).toEqual(["hugo", "momo"]);
   });
 
-  it("is complete only when every required note is in, self-rating included", () => {
-    // "momo" is the rater's own id here: the set is not complete until he has rated himself.
+  it("is complete only when every required note is in", () => {
     expect(ratingProgress({ requiredIds, submittedIds: ["hugo", "karim"] }).complete).toBe(false);
     expect(
       ratingProgress({ requiredIds, submittedIds: ["hugo", "karim", "momo"] }).complete,
     ).toBe(true);
   });
 
-  it("ignores a submitted note for somebody no longer on the sheet", () => {
+  it("ignores a submitted note for somebody who is no longer required", () => {
+    // A retro amendment can take a man's minutes to zero after his team-mates have rated him. The
+    // note stays in the table; it is neither a missing one nor one that completes the set.
     const progress = ratingProgress({
       requiredIds: ["hugo", "karim"],
       submittedIds: ["hugo", "karim", "ghost"],
@@ -107,61 +125,19 @@ describe("ratingProgress", () => {
   });
 });
 
-describe("ratingVisibility", () => {
-  it("hides everything from a rater who has not finished", () => {
-    expect(ratingVisibility({ mayRate: true, progress: { complete: false } })).toEqual({
-      visible: false,
-      reason: "incomplete",
-    });
-  });
-
-  it("opens the results once the rater has submitted his full set", () => {
-    expect(ratingVisibility({ mayRate: true, progress: { complete: true } })).toEqual({
-      visible: true,
-      reason: "complete",
-    });
-  });
-
-  it("shows the results to somebody who was never a rater", () => {
-    // The coach who did not play, a supporter, an admin: no set to submit, nothing to anchor on.
-    expect(ratingVisibility({ mayRate: false, progress: { complete: false } })).toEqual({
-      visible: true,
-      reason: "not-a-rater",
-    });
-  });
-});
-
 describe("playedLabelFr", () => {
   it("says what the log says, not what the sheet planned", () => {
     expect(playedLabelFr(42)).toBe("42’");
-    // The bug: a named substitute who spent the hour on the bench was labelled « entré en jeu »,
-    // because the badge was read off his sheet role rather than off his minutes.
-    expect(playedLabelFr(0)).toBe("non entré");
   });
 
-  it("claims nothing about a match nobody recorded", () => {
-    // No log means no minutes, and « non entré » would be the same invention as a « 0 – 0 » for a
-    // match whose events do not exist (decision 013).
+  it("says nothing about a man with no minutes, because he is not on the screen", () => {
+    // « non entré » had a reader under decision 007, where the unused substitute was rated anyway.
+    // Decision 137 does not put him in the list, so the label has nobody left to describe.
+    expect(playedLabelFr(0)).toBeNull();
     expect(playedLabelFr(null)).toBeNull();
   });
 
-  it("does not round a cameo up to a minute, and does not round it away either", () => {
-    // The reducer hands over whole minutes; a 40-second appearance arrives here as 0 and reads
-    // « non entré », which is the same rule the season stats use (`lib/stats/aggregate.ts` rule 3).
+  it("does not round a cameo away", () => {
     expect(playedLabelFr(1)).toBe("1’");
-  });
-});
-
-describe("ratingCardPositionFr", () => {
-  it("says what the figure counts, so it cannot be read as a score or a tally of raters", () => {
-    // « 3 / 11 » under a name, next to « n° 8 », read as a fact about the player — and on this
-    // screen most plausibly as "three of eleven have rated him", which decision 007 hides.
-    expect(ratingCardPositionFr(2, 11)).toBe("joueur 3 sur 11");
-    expect(ratingCardPositionFr(0, 11)).toBe("joueur 1 sur 11");
-  });
-
-  it("stays quiet when there is only one card", () => {
-    expect(ratingCardPositionFr(0, 1)).toBeNull();
-    expect(ratingCardPositionFr(0, 0)).toBeNull();
   });
 });

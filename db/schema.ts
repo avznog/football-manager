@@ -15,6 +15,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   smallint,
@@ -316,6 +317,21 @@ export const matches = pgTable(
     /** Who drives game mode; defaults to the coach who starts it (decision 004). */
     operatorUserId: uuid().references(() => users.id, { onDelete: "set null" }),
     entryMode: entryMode().notNull().default("live"),
+    /**
+     * When the coach released this match's rating means, or null if he has not (decision 137).
+     *
+     * It is the **escape hatch, not the normal path**: a match publishes itself once every player
+     * who was on the pitch has submitted his set, and that is what happens when the squad does what
+     * it is asked. This column is for the straggler who never will — and for the last match of a
+     * season, where the other automatic clause cannot help, because it fires at the next kick-off
+     * and there is no next kick-off (`lib/rating/window.ts` returns a null `closesAtMs`, which reads
+     * as « open for ever »).
+     *
+     * A timestamp rather than a boolean, because « published » is an event with a time and the recap
+     * will want to say when. Nullable and set once; nothing un-publishes a mean, since a figure the
+     * squad has already read cannot be recalled.
+     */
+    ratingsPublishedAt: timestamp({ withTimezone: true }),
     createdBy: uuid().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
@@ -564,9 +580,28 @@ export const injuries = pgTable(
 /* -------------------------------------------------------------------------- */
 
 /**
- * Self-rating is allowed, and authorship is visible to everyone (decision 007).
- * A rater may not read anyone else's ratings until they have submitted their own full set —
- * enforced in the query layer, not here.
+ * One note, from one player about another, for one match.
+ *
+ * **A row here is the coach's to read, nobody else's** (decision 137, superseding 007 on three
+ * points). What a player sees is the *mean* of the notes he was given, once the match's notes are
+ * published; who gave which note, and how many there are, never leaves the coach's screen. Decision
+ * 007's reciprocity gate — you read a match's notes once you have written yours — is gone with it
+ * (decision 021, superseded entirely): nobody reads an individual note at all, so there is nothing
+ * left to anchor on.
+ *
+ * Two shapes of this table carry that, and neither is enforceable here:
+ *
+ * - **nobody rates himself**, and only a player with minutes rates or is rated. A `check` cannot say
+ *   that — it is a fact about `match_events`, which this table cannot see — so it lives in
+ *   `lib/rating/` and in the Server Action, and `raterMemberId <> ratedMemberId` is the one half that
+ *   *is* local and so is checked here;
+ * - **the mean is only published when it is a verdict.** `matches.ratingsPublishedAt` and the
+ *   three-note floor in `lib/stats/aggregate.ts` decide that.
+ *
+ * `score` is `numeric(3,1)` because the slider steps by half a point, and the step is checked rather
+ * than implied: a `smallint` column with a `0.5` slider in front of it is a rounding bug waiting for
+ * the first person to look at the data. There is no `comment` column — decision 137 dropped it with
+ * the free-text field it fed.
  */
 export const ratings = pgTable(
   "ratings",
@@ -581,14 +616,15 @@ export const ratings = pgTable(
     ratedMemberId: uuid()
       .notNull()
       .references(() => teamMembers.id, { onDelete: "cascade" }),
-    score: smallint().notNull(),
-    comment: text(),
+    score: numeric({ precision: 3, scale: 1, mode: "number" }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     unique("ratings_unique").on(t.matchId, t.raterMemberId, t.ratedMemberId),
     index("ratings_match_idx").on(t.matchId),
     check("ratings_score_range", sql`${t.score} between 0 and 10`),
+    check("ratings_score_half_step", sql`(${t.score} * 2) = floor(${t.score} * 2)`),
+    check("ratings_no_self", sql`${t.raterMemberId} <> ${t.ratedMemberId}`),
   ],
 );
 

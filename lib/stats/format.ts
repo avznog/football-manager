@@ -184,55 +184,46 @@ export function adjustedBesideRawFr(adjusted: string, raw: string | null): strin
 }
 
 /**
- * Why a card of averages is short of matches: the reader's own unrated matches, season-wide.
+ * Why a card of averages is short of matches: some matches' notes are not all in yet.
  *
- * Decision 021 applies decision 007's gate to every average, so two teammates read two different
- * numbers off the same season. `/stats`'s « Meilleures notes » card has stated this since decision
- * 021; `/stats/equipe-type` needs the same sentence about a seven built on the same averages, and a
- * second wording of one rule is how two screens come to disagree about it. So the sentence moved
- * here verbatim rather than being retyped — this is a *team-level* count, which is why it is not
- * `hiddenRatingsNoteFr`: that one is about one player's own notes and says « Ses notes ».
+ * **One sentence, the same for every reader** — which is the whole of decision 137 in this file. There
+ * used to be two functions here and both were in the second person about the reader's own doing:
+ * « tu étais sur la feuille et tu n'as pas encore noté tes coéquipiers. Tes notes débloquent les
+ * leurs. » Under the reciprocity gate that was true and necessary; under decision 137 nobody's average
+ * depends on what he has written, so the sentence states a fact about the team's calendar instead and
+ * reproaches nobody.
  *
- * Null when nothing is held back, in which case there is nothing to explain.
+ * It is used by `/stats`'s « Meilleures notes » card and by `/stats/equipe-type`, whose seven is built
+ * on the same averages. One wording in one place, because a second wording of one rule is how two
+ * screens come to disagree about it.
+ *
+ * Null when nothing is waiting, in which case there is nothing to explain.
  */
-export function hiddenRatingMatchesNoteFr(hiddenMatches: number): string | null {
-  if (hiddenMatches <= 0) return null;
+export function pendingRatingMatchesNoteFr(pendingMatches: number): string | null {
+  if (pendingMatches <= 0) return null;
   return (
-    `${matchCount(hiddenMatches)} ${hiddenMatches > 1 ? "sont exclus" : "est exclu"} de ces ` +
-    "moyennes : tu étais sur la feuille et tu n’as pas encore noté tes coéquipiers. Tes notes " +
-    "débloquent les leurs."
+    `${matchCount(pendingMatches)} ${pendingMatches > 1 ? "ne sont pas comptés" : "n’est pas compté"} ` +
+    "ici : toutes les notes ne sont pas encore rentrées. Les moyennes arriveront d’un coup."
   );
 }
 
 /**
- * Why a player's average is short, or missing altogether.
+ * Why a player's average is missing on his own profile card.
  *
- * The profile card used to print the **season's** hidden-match count under **one player's** average:
- * « 2 matchs sont exclus de cette moyenne ». Two things were wrong with it. The count is a fact about
- * the reader's own unrated matches, so it included matches that never held a note about this player
- * and were therefore never in his average. And it said « cette moyenne » over a « — », on a profile
- * where every note received is hidden — announcing the exclusion of two matches from an average that
- * was not there.
+ * Narrower than it looks: a mean exists for a match as soon as three teammates have rated him, so the
+ * only thing left to explain is a player whose matches are **all** still waiting, or who has been
+ * rated by one or two people in each of them. « Pas assez de notes » is the honest reading of both and
+ * the screen says it with the dash; this sentence adds the *when*.
  *
- * So the sentence takes both numbers — how many hidden matches hold a note about *this* player, and
- * how many notes the reader can actually see — and whose profile it is, because « tes notes » on one's
- * own page is the whole point of the gate. Null when there is nothing held back, in which case the
- * dash means what it says: nobody has rated him.
- *
- * The reason is always the reader's own doing — decision 007's gate, applied season-long by decision
- * 021 — which is why it is second person, on one's own profile and on somebody else's alike.
+ * Third person or second depending on whose profile it is, as everywhere else — but no longer about
+ * anything the reader did or failed to do. Null when he has an average: the figure explains itself.
  */
-export function hiddenRatingsNoteFr(
-  hiddenMatches: number,
-  visibleNotes: number,
-  isSelf: boolean,
-): string | null {
-  if (hiddenMatches <= 0) return null;
+export function pendingRatingsNoteFr(pendingMatches: number, isSelf: boolean): string | null {
+  if (pendingMatches <= 0) return null;
 
   const whose = isSelf ? "Tes notes" : "Ses notes";
-  const held = `${whose} sur ${matchCount(hiddenMatches)} restent cachées tant que tu n’as pas noté tes coéquipiers`;
-
-  return visibleNotes === 0
-    ? `${held} : c’est pourquoi il n’y a pas de moyenne.`
-    : `${held}. La moyenne ne porte que sur les matchs que tu as notés.`;
+  return (
+    `${whose} sur ${matchCount(pendingMatches)} ne sont pas encore sorties : ` +
+    "elles arrivent quand tout le monde a noté."
+  );
 }

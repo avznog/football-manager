@@ -5,8 +5,10 @@
  *   the coach picks the squad and builds a composition plus a planned change at the 30th minute →
  *   starts game mode → logs a goal with an assist, a goal conceded, a missed penalty from behind
  *   « Autre… », two free-text comments, and applies the planned change →
- *   final whistle → score and minutes played are right → a player submits his ratings →
- *   the recap shows the man of the match.
+ *   final whistle → score and minutes played are right → four of the eight men who played rate their
+ *   teammates → the coach releases the means without the four who never did →
+ *   the recap shows one mean per player, the man of the match, and the notes themselves to the coach
+ *   alone.
  *
  * ## What it is here to catch
  *
@@ -21,7 +23,11 @@
  * 4. that the planned change was applied **only after confirmation** (invariant 3): while the
  *    prompt is on screen the pitch still shows the man who is about to come off, and the substitute
  *    is nowhere on it;
- * 5. the man of the match on the recap;
+ * 5. the man of the match on the recap, and **the two readers of a rated match** (decision 137): a
+ *    player reads one mean per player and nothing else, the coach reads the same means with their
+ *    note counts and every individual note with its author. Half of that assertion is the absence of
+ *    something, so it is made twice on the same screen rather than once — the only way a leak of the
+ *    kind decision 021 once allowed shows up in a test;
  * 6. **the shape of the ACTION menu** (decision 114): four tiles and an « Autre… », with « Faute »
  *    offered nowhere. `FOUL` deliberately stays in the vocabulary, so nothing else in the repo can
  *    tell « no longer offered » from « still there, one tap further » — only the count of 0 below;
@@ -40,9 +46,16 @@
  *
  * ## Two deliberate departures from the sentence in `docs/PLAN.md`
  *
- * - **Two raters, not one.** `MOTM_MIN_RATINGS` is 2 (decision 025): after a single player's notes,
- *   the recap *correctly* refuses to crown anybody. The spec asserts that refusal first — it is the
- *   decision working — then has a second player rate, and only then asserts the man of the match.
+ * - **Four raters and four stragglers, not one rater.** Under decision 137 a match's means come out
+ *   when *every* man who played has rated, so a scenario with a single rater asserts nothing but the
+ *   waiting state. Eight played here — the starting seven plus the substitute — and each of them owes
+ *   a note to the other seven. Four rate (9 to the striker, 5 to everybody else), which is deliberately
+ *   the smallest number that works: a rater is rated by the three others, which is exactly the
+ *   `MIN_NOTES_FOR_MEAN` floor, and the four who never rate still owe their series for ever. So the
+ *   spec walks all three states in order — nothing is out while anybody owes, the coach is offered
+ *   the four names and publishes without them, and only then is there a man of the match. The
+ *   stragglers are the point rather than an oversight: they are the case `publishRatings` exists for,
+ *   and the season's last match has no next kick-off to close its window for it.
  * - **The starting composition is confirmed in game mode before kick-off.** A composition is never
  *   applied automatically (invariant 3), so without that confirmation nobody is on the pitch and
  *   nobody accrues a minute. The prompt is answered, not bypassed.
@@ -140,6 +153,18 @@ const STARTERS: readonly (readonly [FixturePlayerKey, string])[] = [
   ["cm2", "milieu central"],
   ["st", "attaquant"],
 ];
+
+/**
+ * Who ends this match with a minute to his name — and therefore who rates, who is rated, and who the
+ * means wait for (decision 137).
+ *
+ * The starting seven plus the substitute who comes on at the 30th: eight of the eight, because the
+ * only man on the sheet who never plays would be a ninth and the fixture has none. Derived from
+ * `STARTERS` rather than typed out again, so a change to the composition cannot leave the rating
+ * arithmetic quietly wrong. It is the **log's** list and not the sheet's, which is the whole of the
+ * rule — a named substitute who stays on the bench rates nobody and is rated by nobody.
+ */
+const PLAYED: readonly FixturePlayerKey[] = [...STARTERS.map(([key]) => key), "sub"];
 
 test("le parcours complet : match, composition, mode match, notation, résumé", async ({ page }) => {
   const fixture = provisionFixture();
@@ -632,15 +657,40 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   // Back to a clock that agrees with the server's, now that the match is over.
   await page.clock.setFixedTime(Date.now());
 
-  await test.step("the striker rates the squad; one rater is not enough to crown anybody", async () => {
+  await test.step("the striker rates everybody who played, on one screen, with sliders", async () => {
     await logout(page);
     await login(page, striker.username, fixture.password);
     await page.goto(matchUrl);
 
     await page.getByRole("link", { name: "Noter mes coéquipiers" }).click();
-    await rateEveryone(page, fixture, striker);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Noter mes coéquipiers" }),
+    ).toBeVisible();
 
-    await page.getByRole("button", { name: "Terminer et voir le résumé" }).click();
+    // The two sentences the design owes the reader before he starts. The first is what choosing a
+    // slider costs: a range has no unset state, so every thumb is submitted and an untouched one is
+    // an opinion of 5,0 (decision 137). The second is `onConflictDoNothing`, said out loud.
+    await expect(page.getByText("Tous les curseurs partent de 5,0")).toBeVisible();
+    await expect(page.getByText("Une note envoyée ne change plus.")).toBeVisible();
+
+    /*
+     * A real `<input type="range">`, which is why `components/ui/slider.tsx` keeps the browser's own
+     * appearance: the arrow keys move it by the half-point the scale is written in, and a styled
+     * `appearance-none` rail would have had to re-implement that. Asserted before the notes are
+     * filled in, and overwritten by the loop below.
+     */
+    const nudged = sliderOf(page, gk);
+    await nudged.press("ArrowRight");
+    await expect(nudged).toHaveAttribute("aria-valuetext", "5,5 sur 10");
+
+    await rateEveryone(page, fixture, striker, striker);
+    await page.getByRole("button", { name: "Envoyer mes notes" }).click();
+
+    /*
+     * One POST for the whole set — decision 021's atomic submit, now structural rather than a rule to
+     * remember — and a redirect to the recap, because a finished set may be the thing that publishes
+     * the match's means and there is something new there for him either way (`actions.ts`).
+     */
     await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap$`));
 
     // Scoped to the scoreboard, because the equaliser's « 1 – 1 » is *also* on the timeline three
@@ -650,8 +700,11 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(finalScore).toContainText("1 – 1");
     await expect(finalScore).toContainText("Match nul");
 
-    // Decision 025: one teammate's opinion does not make a man of the match.
-    await expect(page.getByText("Pas encore assez de notes")).toBeVisible();
+    // Nothing is out, and nothing is owed to *him* any more: under decision 137 rating buys the
+    // rater no access at all, so the card he reads after finishing is the same card everybody else
+    // reads. The man of the match does not exist yet either — its card is gated on publication.
+    await expect(page.getByText("Les moyennes ne sont pas encore sorties")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Homme du match" })).toHaveCount(0);
 
     await assertMinutes(page, [
       [gk, 60],
@@ -664,21 +717,95 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(minutesRow(page, cm1.displayName).getByRole("cell").nth(2)).toHaveText("1");
   });
 
-  await test.step("a second rater completes the vote and the recap crowns the striker", async () => {
-    await logout(page);
-    await login(page, gk.username, fixture.password);
-    await page.goto(matchUrl);
+  await test.step("three more rate, and the means stay in while anybody still owes", async () => {
+    for (const rater of [gk, cm1, cm2]) {
+      await logout(page);
+      await login(page, rater.username, fixture.password);
+      await page.goto(`${matchUrl}/notation`);
 
-    await page.getByRole("link", { name: "Noter mes coéquipiers" }).click();
-    await rateEveryone(page, fixture, striker);
-    await page.getByRole("button", { name: "Terminer et voir le résumé" }).click();
+      await rateEveryone(page, fixture, rater, striker);
+      await page.getByRole("button", { name: "Envoyer mes notes" }).click();
+      await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap$`));
+    }
+
+    /*
+     * Still `cm2`, on the recap his own submit sent him to, and he has done everything he can: four of
+     * the eight have rated, every player holds at least the three notes `MIN_NOTES_FOR_MEAN` asks for,
+     * and the means are *still* in. A player is told how many series are missing and never whose — the
+     * names would turn a wait into a list of people to blame, and he can do nothing about it either
+     * way. He is offered no way to publish.
+     */
+    const ratings = ratingsCard(page);
+    await expect(ratings).toContainText("Les moyennes ne sont pas encore sorties");
+    await expect(ratings).toContainText("Elles sortiront d’un coup quand tout le monde aura noté.");
+    await expect(ratings).not.toContainText(sub.displayName);
+    await expect(
+      ratings.getByRole("button", { name: "Sortir les moyennes maintenant" }),
+    ).toHaveCount(0);
+  });
+
+  await test.step("the coach publishes without the four who never rated, and the striker is crowned", async () => {
+    await logout(page);
+    await login(page, coach.username, fixture.password);
+    await page.goto(`${matchUrl}/recap`);
+
+    const pending = ratingsCard(page);
+    // The coach, and only the coach, gets the names: he is the one who can go and ask, and the
+    // alternative is a button that gives up on four people without saying who they are.
+    await expect(pending).toContainText("4 joueurs sur 8 n’ont pas fini");
+    await expect(pending).toContainText(sub.displayName);
+    // What the tap costs, before the tap: a note cannot be added once the means are out.
+    await expect(pending).toContainText(
+      "Les moyennes seront calculées sans les 4 séries qui manquent, et elles ne bougeront plus.",
+    );
+
+    await pending.getByRole("button", { name: "Sortir les moyennes maintenant" }).click();
 
     const motm = page
       .locator("section")
       .filter({ has: page.getByRole("heading", { name: "Homme du match" }) })
       .last();
     await expect(motm).toContainText(striker.displayName);
-    await expect(motm).toContainText("9,0 de moyenne sur 2 notes");
+    await expect(motm).toContainText("9,0 de moyenne");
+    // It used to read « 9,0 de moyenne sur 2 notes ». How many people rated a player is the coach's
+    // figure and this card is read by everybody, so the count is gone (decision 137) — even here,
+    // where the reader *is* the coach.
+    await expect(motm).not.toContainText("note");
+
+    const published = ratingsCard(page);
+    // The state of the collection, which is a sentence only he gets: 4 raters × 7 teammates.
+    await expect(published).toContainText("28 notes sur 8 joueurs à noter.");
+
+    const row = ratingRow(page, striker);
+    await expect(row).toContainText("9,0");
+    await expect(row).toContainText("3 notes");
+    // The only place in the app where an individual note appears, and the only reader who ever sees
+    // one: three chips, each a figure and the name of the man who gave it.
+    for (const author of [gk, cm1, cm2]) {
+      await expect(row).toContainText(author.displayName);
+    }
+  });
+
+  await test.step("a player reads the means, and never a note nor a count", async () => {
+    await logout(page);
+    await login(page, gk.username, fixture.password);
+    await page.goto(`${matchUrl}/recap`);
+
+    const ratings = ratingsCard(page);
+    await expect(ratings).toContainText("La moyenne des notes des coéquipiers");
+    // Not his: the coach's denominator is `raterTotal`, which is 0 for everybody else.
+    await expect(ratings).not.toContainText("à noter.");
+
+    const row = ratingRow(page, striker);
+    await expect(row).toContainText("9,0");
+    /*
+     * The half of decision 137 that is an absence, and the one a leak would show up in. It is not
+     * CSS: `getRatingResults` returns `count: null` and `received: []` to anybody who is not the
+     * coach, so there is no number in the RSC payload for a crafted request to find either. `cm1`
+     * rated the striker and does not appear on his row; the count under his name is gone.
+     */
+    await expect(row).not.toContainText("notes");
+    await expect(row).not.toContainText(cm1.displayName);
   });
 
   await test.step("a coach-only screen is a French dead end for a player, with a way out", async () => {
@@ -1000,58 +1127,75 @@ function timelineLine(page: Page, text: string): Locator {
 }
 
 /**
- * Gives every player on the sheet a note, in the order the flow presents them: 9 to the man of the
- * match, 5 to everybody else. The card on screen is read rather than assumed, so the loop cannot
- * silently rate the same player eight times.
+ * One slider for every teammate who played, dragged in one pass: 9 to the man of the match, 5 to
+ * everybody else. Does not submit — the caller taps « Envoyer mes notes », because what happens after
+ * that tap differs between the first rater and the last.
  *
- * Two taps per teammate, not one: selecting a note no longer advances (decision 102). Tapping the
- * number and asserting it is checked *before* tapping « Suivant » is the regression this suite owes
- * the owner's report — the old flow replaced the card so fast that no state existed in which the
- * chosen number was visibly chosen.
+ * It asserts the shape of the list before touching it, and that is half of decision 137: the rater is
+ * **not** on it (nobody rates himself), and it is exactly as long as the number of other men with a
+ * minute in the log — a substitute who stayed on the bench is not a card to skip past, he is absent.
+ * The old helper walked an eleven-button pad one card at a time behind a « Suivant »; none of that
+ * exists any more.
+ *
+ * `fill` on a range input sets the value and fires `input`, which is how the figure beside the name
+ * follows it. The arrow keys are exercised once, by the caller, where a reader would notice them.
  */
-async function rateEveryone(page: Page, fixture: Fixture, best: FixturePlayer): Promise<void> {
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Noter mes coéquipiers" }),
-  ).toBeVisible();
+async function rateEveryone(
+  page: Page,
+  fixture: Fixture,
+  rater: FixturePlayer,
+  best: FixturePlayer,
+): Promise<void> {
+  const targets = PLAYED.filter((key) => key !== rater.key).map((key) => playerOf(fixture, key));
 
-  const cards = page.locator("form > ul > li:not([hidden])");
-  // Pagination starts at hydration: one card at a time is the sign the client has taken over.
-  await expect(cards).toHaveCount(1);
+  const rows = page.locator("form > ul > li");
+  await expect(rows).toHaveCount(targets.length);
+  await expect(page.locator("form > ul")).not.toContainText(rater.displayName);
 
-  const rated = new Set<string>();
-  for (let step = 0; step < fixture.players.length; step += 1) {
-    const card = cards.first();
-    const name = (await card.getByRole("heading", { level: 2 }).innerText()).trim();
-    const player = fixture.players.find((candidate) => candidate.displayName === name);
-    if (!player) throw new Error(`Carte de notation inattendue : « ${name} ».`);
-    if (rated.has(player.membershipId)) {
-      throw new Error(`« ${name} » est proposé deux fois à la notation.`);
-    }
-    rated.add(player.membershipId);
+  for (const target of targets) {
+    const note = target.membershipId === best.membershipId ? 9 : 5;
+    const slider = sliderOf(page, target);
 
-    const note = player.membershipId === best.membershipId ? 9 : 5;
-    await segment(card, `score:${player.membershipId}-${note}`).click();
-
-    // Still on the same teammate, with the note visibly his: the card did not move under the thumb.
-    await expect(card.getByRole("heading", { level: 2 })).toHaveText(name);
-    // An attribute selector, not `#id`: these ids contain a `:`, which a CSS id selector would read
-    // as the start of a pseudo-class.
-    await expect(card.locator(`input[id="score:${player.membershipId}-${note}"]`)).toBeChecked();
-    await expect(card.getByText(`Note choisie : ${note} / 10`)).toBeVisible();
-
-    const isLast = step === fixture.players.length - 1;
-    if (isLast) {
-      // Nothing to press on: the last card offers no forward button, only the submit below.
-      await expect(page.getByRole("button", { name: "Suivant" })).toHaveCount(0);
-    } else {
-      await page.getByRole("button", { name: "Suivant", exact: true }).click();
-    }
+    await slider.fill(`${note}`);
+    // What a screen reader says, which is the whole reason `aria-valuetext` is set: « 9 sur 10 » in
+    // English digits would be read as « nine point zero » by a French voice (`labels.ts`).
+    await expect(slider).toHaveAttribute("aria-valuetext", `${note},0 sur 10`);
+    // And what everybody else reads: the figure beside the name, one decimal, on the right row.
+    await expect(rows.filter({ hasText: target.displayName })).toContainText(`${note},0`);
   }
+}
 
-  await expect(
-    page.getByText(`${fixture.players.length} / ${fixture.players.length} notés`),
-  ).toBeVisible();
-  await expect(page.getByText("Prêt à envoyer")).toBeVisible();
+/** A teammate's slider, found by the line above it — which is its label, and its accessible name. */
+function sliderOf(page: Page, player: FixturePlayer): Locator {
+  return page.getByRole("slider", { name: player.displayName });
+}
+
+/**
+ * « Les notes » on the recap: the card whose contents are the whole of decision 137's split. Scoped,
+ * because most of what is asserted about it is an absence — a name that must not appear there appears
+ * three times elsewhere on the same page, in the minutes table and the timeline.
+ */
+function ratingsCard(page: Page): Locator {
+  return page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { level: 2, name: "Les notes", exact: true }) });
+}
+
+/**
+ * One player's row inside « Les notes » — his mean, and, for the coach, his notes and their authors.
+ *
+ * Two scopings, and both are needed because of the chips. `:scope > li` on the first list, because the
+ * chips are a nested list and a plain `ul > li` would return them as rows. And the name is looked for
+ * in the row's identity `<div>` rather than in the row's text, because a chip names *the man who gave
+ * the note*: « Zacharie Nadal » appears on his own row once and on seven other rows as an author, so
+ * `hasText` on the row matched all eight. The chips are the `<li>`'s other child and are in no `<div>`.
+ */
+function ratingRow(page: Page, player: FixturePlayer): Locator {
+  return ratingsCard(page)
+    .locator("ul")
+    .first()
+    .locator(":scope > li")
+    .filter({ has: page.locator("div", { hasText: player.displayName }) });
 }
 
 /* -------------------------------------------------------------------------- */
