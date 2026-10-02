@@ -167,9 +167,10 @@ function daysUntilNextSunday(): number {
  * Offset of a past match day: `pastSunday(0)` is the most recent Sunday **strictly** in the past.
  *
  * Anchoring on the last Sunday rather than on "today minus n" matters: a played match whose
- * kick-off is a few hours in the future would be a nonsense the whole app would have to tolerate,
- * and the rating window (`lib/rating/window.ts`) reads the *next* kick-off, so the newest played
- * match has to sit before today and the next fixture after it.
+ * kick-off is a few hours in the future would be a nonsense the whole app would have to tolerate, so
+ * the newest played match has to sit before today and the next fixture after it. The rating rules no
+ * longer read the calendar at all (decision 139 deleted the window), so this is now about the
+ * calendar screens alone rather than about the notes.
  */
 function pastSunday(weeksAgo: number): number {
   const today = new Date().getDay();
@@ -243,8 +244,9 @@ async function seedDemo(): Promise<void> {
     .returning({ id: users.id });
 
   // The super admin runs this team as a non-playing coach: that is the account you log into.
-  // He is on no match sheet, so he never rates and is never rated — and he is the viewer who reads
-  // the individual notes and their authors, which under decision 137 nobody else ever does.
+  // He is on no match sheet, so he is never *rated* — and under decision 139 he may rate anyway, which
+  // is why he counts in the coach's « n membres sur 14 ». He is also the viewer who reads the
+  // individual notes and their authors, which nobody else ever does.
   await db
     .insert(teamMembers)
     .values({
@@ -503,8 +505,8 @@ async function seedDemo(): Promise<void> {
    * - **Rayan scored** here and has **left the club** since (`team_members.left_at`). A season
    *   table that loses a September scorer in January is wrong, so he must still appear — flagged as
    *   departed — in the scorers, the minutes and the player list.
-   * - **Brice is a supporter**, the one sheet role that may neither rate nor be rated
-   *   (decisions 007 / 020 / 022): 1 selection, 1 « supporter », 0 appearance, no rating card.
+   * - **Brice is a supporter**: 1 selection, 1 « supporter », 0 appearance, and nobody's to rate. He
+   *   may rate, though — that half of decisions 007 / 020 / 022 is superseded by 139.
    * - **Léo comes off and comes back on** (38′ of football in two spells) and **Ali comes on and
    *   goes off again** — rolling substitutions, so minutes and clean minutes are not a single
    *   interval for anybody.
@@ -519,12 +521,11 @@ async function seedDemo(): Promise<void> {
    *   pitch when we conceded, and his second spell starts clean** (reducer rule 3), so his
    *   `conceded_while_on` is 0; Ali 24′ of 30′ with `conceded_while_on` 1.
    * - Hugo: 60′ in goal, 44′ gk-clean, conceded 1 → no clean sheet.
-   * - No ratings at all for this match, and nobody has published it: the recap says « pas encore
-   *   assez de notes » and `/stats` counts it among the matches still **awaiting notes**, for every
-   *   reader alike. Nothing here is hidden *from* anybody — there is nothing to hide (decision 137).
-   *   And since decision 138 its age buys it nothing: **this five-week-old match is still rateable**,
-   *   which is the case to open `/match/<id>/notation` on to see the new rule, because the old one
-   *   had locked it weeks ago.
+   * - No ratings at all for this match, and the coach has not shown it: the recap says the means are
+   *   not out and `/stats` counts it among the matches still **awaiting notes**, for every reader
+   *   alike. Nothing here is hidden *from* anybody — there is nothing to hide. And its age buys it
+   *   nothing either way: **this five-week-old match is still rateable** (decision 139), so
+   *   `/match/<id>/notation` opens on an empty slate five weeks after the final whistle.
    */
   await seedPlayedMatch({
     ...common,
@@ -578,12 +579,12 @@ async function seedDemo(): Promise<void> {
 
   /**
    * J3 — **coupe, à l'extérieur, DÉFAITE 1-3.** The only defeat of the season, and **the match whose
-   * means are out** (decision 137): the coach released them the following Sunday evening without
-   * waiting for the one man who never finished, and every player has the three notes
-   * `MIN_NOTES_FOR_MEAN` asks for. It is the fixture to look at to see the feature working.
+   * means are out**: the coach showed them the following Sunday evening without waiting for the one man
+   * who never finished, and every player has the three notes `MIN_NOTES_FOR_MEAN` asks for. It is the
+   * fixture to look at to see the feature working.
    *
-   * It holds a `ratings_published_at`, which it did not have to before decision 138: the next
-   * kick-off used to publish it on its own. Now nothing does, so the fixture states the act.
+   * It holds a `ratings_published_at` because under decision 139 that is the only way a mean is ever
+   * visible — nothing publishes itself, and the figures here say so by the fixture stating the act.
    *
    * Expected — score **1-3**, conceded at 8′, 26′ and 49′:
    * - Julien 1 but (21′), Léo 1 passe, Karim 1 faute.
@@ -662,13 +663,15 @@ async function seedDemo(): Promise<void> {
         { username: "julien", delta: 1 },
         { username: "samir", delta: -1 },
         { username: "leo", delta: 0 },
-        // A partial set. It hides nothing from anybody now (decision 021 is gone); it is how a
-        // fixture holds a match **published without everybody**, which here is the coach's doing and
-        // nothing else (decision 138 left him as the only way). He is the last rater of the two men he
-        // did rate, so he absorbs their spread and his own delta never applies.
+        // A partial set. It hides nothing from anybody (decision 021 is gone); it is how a fixture
+        // holds a match **shown without everybody**, which under decision 139 is the ordinary case
+        // rather than the exception, since the coach decides and nothing waits for a full house. He is
+        // the last rater of the two men he did rate, so he absorbs their spread and his own delta
+        // never applies.
         { username: "karim", delta: 0, only: ["hugo", "samir"] },
       ],
-      // The Sunday evening after, the coach stopped waiting for Karim. This is what shut the window.
+      // The Sunday evening after, the coach stopped waiting for Karim and showed the means. It shut
+      // nothing: Karim can still finish his set, and the figures would move.
       publishedAt: at(pastSunday(3), 20, 30),
     },
   });
@@ -738,13 +741,15 @@ async function seedDemo(): Promise<void> {
    * - Minutes: Samir/Thomas/Nico/Léo/Karim 60′, Hugo 30′, Mehdi 30′, Julien 50′, Momo 10′,
    *   Yanis/Ali 0′ — sum 420′.
    * - Julien 1 but (12′), Karim 1 but (40′) + 2 passes (12′, 57′), Momo 1 but (57′), Léo 1 passe.
-   * - Ratings: **Mehdi alone** submitted, and his set is complete. The coach published it the
+   * - Ratings: **Mehdi alone** submitted, and his set is complete. The coach showed the means the
    *   following Sunday evening rather than wait for the other ten — and every player still has exactly
    *   **one** note, Mehdi himself none at all, since nobody rates himself. One note is below
    *   `MIN_NOTES_FOR_MEAN`, so this is the
    *   fixture for « pas encore assez de notes »: no mean, no man of the match (decision 025), and the
    *   same sentence for every reader — Mehdi, who rated, and Karim and Hugo, who did not, see
-   *   identical screens (decision 137 killed the gate that used to tell them apart).
+   *   identical screens (decision 137 killed the gate that used to tell them apart). It is also the
+   *   fixture where the coach's « Masquer les moyennes » has something to undo: a match he showed too
+   *   early (decision 139).
    */
   await seedPlayedMatch({
     ...common,
@@ -844,14 +849,15 @@ async function seedDemo(): Promise<void> {
 
   /**
    * J7 — **championnat, à l'extérieur, victoire 2-0**, the most recent match and the only
-   * **clean sheet** of the season. It is also the match **whose means are not out** (decision 137):
-   * four of the nine men who played have rated and the coach has not published, so every reader —
-   * coach included — is told the notes are « en attente », and the coach's « Sortir les moyennes
-   * maintenant » is the only way to the figures below.
+   * **clean sheet** of the season. It is also the match **whose means the coach has not shown**
+   * (decision 139): four members have sent their notes and `ratings_published_at` is null, so every
+   * reader — coach included — is told the means are not out, and the coach's « Sortir les moyennes »
+   * is the only thing in the application that can change that.
    *
-   * Its rating window is open because nothing has published it — not because it is the most recent
-   * match. Under decision 138 that is no longer a privilege of the latest fixture: J2 and J6, played
-   * weeks ago and never published, are rateable too, and `/match/<id>/notation` works on all three.
+   * It is the fixture to open the new rule on, in both directions: show the means and the figures
+   * below appear for the whole team, hide them again and they all go back behind the query's early
+   * return. Nothing about its *age* matters any more — **every played match of this season is
+   * rateable**, J1 to J7, because decision 139 deleted the window entirely.
    *
    * Expected — score **2-0**:
    * - Julien 1 but (9′), Ali 1 but (52′), Karim 1 passe, Léo 1 passe, Nico 1 faute,
@@ -861,14 +867,19 @@ async function seedDemo(): Promise<void> {
    * - Nothing conceded, so **clean minutes = minutes** for everybody, and Hugo has 60′ gk-clean →
    *   his **second** clean sheet of the season.
    * - Ratings: Karim, Hugo, Julien and Samir each submitted a complete set of the **nine** men who
-   *   played — Yanis and Fabien were named and never came on, so they are neither raters nor rated
-   *   (decision 137). Every average is exactly its base, so once the coach publishes:
+   *   played. Yanis and Fabien were named and never came on, so they are not *rated* (decision 137's
+   *   `minutes > 0`, which survives) — but under 139 they may rate, and so may Brice, and so may a
+   *   member who was not on the sheet at all. The coach's tally counts **members**, not players, for
+   *   that reason: « 4 membres sur 14 » — the thirteen players still in the squad plus the non-playing
+   *   super admin, Rayan having left. Looked at on a phone, that denominator is the surprise of the
+   *   new rule: ten names follow it, and all ten are entitled to rate.
+   *   Every average is exactly its base, so the moment the coach shows them:
    *   Julien 9,0 · Karim 8,0 · Hugo 8,0 · Ali 8,0 · Léo 7,0 · Samir 7,0 · Thomas 7,0 ·
    *   Nico 6,0 · Momo 6,0 — over **3** notes for the four raters, who are not rated by themselves,
    *   and **4** for the five others. Man of the match: **Julien, 9,0**. Until then, nothing.
-   * - **Brice is a supporter**: he may not rate, may not be rated, and appears in no rating card.
-   *   He reads exactly what everybody else reads, which is now the whole of the question
-   *   (decision 137 removed the gate that made « may he read this? » depend on who he was).
+   * - **Brice is a supporter**: he may not be rated and appears in nobody's list, but **he may rate**
+   *   (decision 139, superseding 007/020/022 on this half) — he watched the same hour from the
+   *   touchline. `/match/<id>/notation` as Brice is the case to check the new rule on.
    */
   await seedPlayedMatch({
     ...common,
@@ -1083,12 +1094,12 @@ type Push = (
 type RatingsFixture = {
   bases: Record<string, number>;
   /**
-   * When the coach released this match's means — `matches.ratings_published_at`.
+   * When the coach showed this match's means — `matches.ratings_published_at`.
    *
-   * Needed since decision 138, and this is the one place the fixture had to change for it. Rating a
-   * played match stays open until its means are out, and the **only** two things that bring them out
-   * are the squad finishing and this timestamp; the next kick-off used to be a third, which is how J3
-   * and J5 used to be published without anybody pressing anything. They now say so by holding a date.
+   * Under decision 139 it is the **only** thing that makes a mean visible: no fixture is published by
+   * its raters finishing, and none by the calendar moving on. So a fixture that wants to show figures
+   * has to carry a date here, and one that wants the « pas encore sorties » state simply omits it —
+   * which is J7, the newest match, four full sets in and still hidden.
    */
   publishedAt?: Date;
   raters: ReadonlyArray<{
@@ -1096,8 +1107,8 @@ type RatingsFixture = {
     delta: number;
     /**
      * A deliberately **partial** set: only these teammates were rated. It no longer hides anything
-     * from anybody (decision 021 is gone) — it is how a fixture holds a match whose notes are *not
-     * all in*, which is the state the new publication rule turns on.
+     * from anybody (decision 021 is gone), and it no longer holds publication back either (139) — it
+     * is how a fixture holds a mean that will still move when the rest of the set arrives.
      */
     only?: readonly string[];
   }>;

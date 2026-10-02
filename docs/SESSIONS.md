@@ -4140,3 +4140,55 @@ instead of a clock.
 
 **Still not verified**, carried a second time: the crafted form post proving the *server* refuses a
 self-note and a note on a 0-minute substitute.
+
+## The coach decides when the means are out, and everybody rates
+
+**2026-10-02** · `feat/coach-reveals-the-means` · five commits, decision **139**
+
+The owner corrected the product, not the code: *everyone can note, even the supporters. The notes are
+available only when the coach says so (he can put them visible or not, by match). If the coach does not
+say so, no one can see no notes (except the one one has noted). If the coach enables the notes for a match
+to be seen, every one can see everyone's mean for the match.* Four clarifications settled the rest: any
+member may rate, only the men who played are rated (137's `minutes > 0` survives), the switch goes **both
+ways**, and a member who never rated may still rate after the means are out.
+
+**What this gives up, and it was said before the work started.** Decisions 021, 137 and 138 all existed
+for one guarantee — nobody reads a mean before writing his own notes — and that guarantee is now gone
+entirely. A man can read the squad's figures, then send notes that move them. The owner chose it anyway,
+and the screens say so out loud rather than hiding it (`ratingInvitationFr`): « Les moyennes de ce match
+sont sorties, et tu peux quand même noter : tes notes compteront dedans. »
+
+**The rating window stopped being a concept.** `lib/rating/window.ts` and its test are deleted,
+`ratingUrgencyFr` with them, and `lib/rating/published.ts` is one predicate over one column:
+`meansAreVisible(publishedAtMs)`. The rater→rated graph has left the publication question altogether —
+`ratingsPublication`, `RatingsPublication*` and `owingRaterIds` are gone, and nothing counts who still
+owes anything in order to decide what may be read. `publishRatings` and `hideRatings` share
+`coachsMatch(formData)` and `setPublishedAt(matchId, teamId, at)`, so the only asymmetry between showing
+and hiding is the instant written. One permission answers both, `rating:publish`.
+
+**The honest denominator is what found the one real defect.** The coach's tally counts *members* now, not
+players with minutes, and computing the e2e figure (9 = 8 players + the non-playing coach) surfaced that
+`rating:submit` was in `SELF_ACTIONS` in `lib/auth/can.ts`, which requires `isPlayer`. So the server
+refused the non-playing coach the very thing the tally was counting him as entitled to — a figure that
+lies, in a feature whose whole subject is figures. It has its own branch now, above the `isPlayer` test,
+with two tests: he may rate the match he did not play, and he still may not target anybody but himself.
+
+**The 390 px pass, both themes, coach and supporter, in one pass.** Eighteen shots on the reset demo
+season, on J7, driving the switch in both directions with a throwaway probe: no sideways scroll, nothing
+clipped, no new tap target under 44 px, and hiding returns the recap to exactly the pre-publication state.
+It found two things no test would have. The hide helper read « L’équipe ne verra plus que les siennes »,
+where « les siennes » grammatically belongs to the team and the fact belongs to each reader — it is
+« Chacun ne verra plus que ses propres notes » now. And the J7 fixture docblock promised « 4 membres sur
+11 » while the screen says **14**: thirteen players still in the squad plus the non-playing super admin,
+Rayan having left. The seed comment that called that admin a member who « never rates » was false under
+this decision too, and both are corrected. Ten silent names follow that denominator on a 390 px screen,
+which is long and is right: all ten are entitled to rate.
+
+**Gates.** `npm run typecheck` clean, `npm test` 1436 across 65 files, `npx eslint app components lib e2e
+db scripts` silent, `npm run test:e2e` 5 passed, `npm run db:reset` clean. No migration:
+`matches.ratings_published_at` was already a nullable `timestamptz`, and nothing about it changed except
+that it may now be set back to null.
+
+**Still not verified**, carried a third time: the crafted form post proving the *server* refuses a
+self-note and a note on a 0-minute substitute. **Nothing is shipped** — `package.json` is still
+`1.0.0-beta.6` and the `beta.7` bump and tag are the owner's.

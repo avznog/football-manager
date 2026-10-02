@@ -501,11 +501,17 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 ## M6 — Ratings & recap
 
 > **Decision 137 rebuilt this milestone, and the `[x]` boxes above the rebuild record September, not
-> today.** A note is now the mean of what the others gave you, it comes out once the notes are in, and
-> the individual notes are the coach's alone. The four lines that follow this note — the card-at-a-time
-> flow, the reciprocity gate, the optional comment, the two-tap pad of decision 102 — all describe
-> something that has been deleted. They are kept because a reader of `git log` will meet them, and the
-> block at the end of this section is what is true.
+> today.** A note is now the mean of what the others gave you, and the individual notes are the coach's
+> alone. The four lines that follow this note — the card-at-a-time flow, the reciprocity gate, the optional
+> comment, the two-tap pad of decision 102 — all describe something that has been deleted. They are kept
+> because a reader of `git log` will meet them, and the block at the end of this section is what is true.
+>
+> **Then decision 139 replaced the rules around it, a day later.** *Every member* rates, supporter and
+> non-playing coach included; a mean is visible when **the coach says so, per match**, and hidden again
+> when he says so; **nothing ever closes**. So the items below that talk about a rating window, about
+> means coming out « quand tout le monde aura noté », or about a publish button that is a deadline, are
+> history too — including the decision-138 block, which 139 supersedes entirely. The last block of this
+> section is the current rule.
 
 - [x] Rating flow: one teammate per card, 0–10, optional comment
 - [x] Results hidden until you have submitted your own
@@ -526,8 +532,8 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       27 septembre à 10:30 ». `closesAtMs` had been computed since M6 and read by nobody, so three
       screens promised « tu verras les notes des autres quand tu auras fini » without mentioning that
       finishing has a closing time — and `progress.ts` makes missing it permanent (decision 079). **That
-      sentence no longer exists**: decision 138 removed the date it named, and `ratingUrgencyFr` names the
-      two events that end the rating instead
+      sentence no longer exists**: decision 138 removed the date it named, and 139 removed the deadline
+      itself. What is printed now is who decides — `ratingInvitationFr`
 - [x] …and the recap's rating list calls the reader « toi » wherever he appears in it. He appears
       twice — as the author of the notes he gave and as the subject of his own row — and only the
       first had a rule, so his own row said « il s'est mis 8 » and « lui-même » three rows under
@@ -577,7 +583,9 @@ it stands.
       backstop has a hole the size of a season's last match — no next kick-off, so the team that most
       wants its notes would be the team whose notes wait for ever. The coach reads who is missing before
       he is offered the button — « 4 joueurs sur 8 n'ont pas fini », naming them
-      (`ratings-panel.tsx`, `publish-ratings-form.tsx`)
+      (`ratings-panel.tsx`, `publish-ratings-form.tsx`). **Decision 139 superseded all of this**: there is
+      no derived clause left, the button is the only door, the file is now
+      `ratings-visibility-form.tsx`, and the fraction counts members
 - [x] **`MIN_NOTES_FOR_MEAN = 3`**: a match published with one note is not a verdict, so below three
       notes a player has no mean. Decision 025's two, raised
 - [x] **The raw notes are the coach's, enforced by not selecting them.** `getRatingResults` returns
@@ -665,6 +673,46 @@ it stands.
       else: the publish form said « elles ne bougeront plus » and stopped, which was the whole consequence
       when the calendar would have closed the window anyway and is half of it now. It reads « …et plus
       personne ne pourra noter ce match », in both the singular and the plural branch
+- [x] **The coach decides when a match's means are out, and he can take them back** (decision 139, the
+      owner's correction of 137 and 138: « everyone can note, even the supporters; the notes are available
+      only when the coach says so, per match; if he does not say so, no one can see no notes »).
+      `matches.ratings_published_at` is the whole rule — null hidden, timestamp visible, nothing derives
+      it — and `rating:publish` writes it both ways (`publishRatings` / `hideRatings`, one permission, one
+      shared helper, so a coach who may show can always undo it). No migration: the column was already a
+      nullable `timestamptz`
+- [x] **Any member rates; only those who played are rated.** `rating:submit` is the one self-scoped action
+      in `can()` that does not require `isPlayer`, because a non-playing coach is a member with the best
+      view of the hour — and because the coach's own tally counts active members, so a denominator the
+      permission refuses would be a figure that lies. The `minutes > 0` rule for who may be *rated* is
+      decision 137's and survives untouched
+- [x] **The rating window stops existing as a concept.** `lib/rating/window.ts` and its tests deleted,
+      with `ratingWindow`, `getRatingWindow`, `publicationOf`, `ratingsPublication`, `owingRaterIds`,
+      `NotationBlockedReason` and `ratingUrgencyFr`. `lib/rating/published.ts` is one predicate over one
+      column, `meansAreVisible`. Publication had a derived clause under 137 — « every expected set is in » —
+      and deleting it takes the rater→rated graph out of the publication question: `lib/stats/queries.ts`
+      drops `getRatingAuthors`, `lib/stats/ratings.ts` drops its nested maps, `getNotationView` loses a
+      round trip, and the season's score query starts before the logs are replayed
+- [x] **The anti-anchoring guarantee is gone, deliberately.** Decisions 021, 137 and 138 all existed for
+      « nobody writes his notes after reading the team's ». A player can now read a published mean and
+      then rate the man it belongs to, a mean the squad has read can vanish, and no mean is ever final.
+      The owner was told all three in those words and chose the switch anyway — he wants the figures under
+      his own hand, per match, more than he wants anchoring-proof arithmetic among twelve people who see
+      each other every Sunday
+- [x] **« silent » replaces « owing », over the members rather than the players.** `RaterTally` is
+      « 4 membres sur 9 » with the coach counted, because the form posts a whole set at once and « has not
+      finished » collapses to « has sent nothing ». Members who have left are on neither side of the
+      fraction
+- [x] **Six sentences the screens had to stop saying**, every one true last week: « seuls les joueurs qui
+      ont joué donnent des notes », « La notation est fermée », « les moyennes sortiront quand tout le
+      monde aura noté » (three places), « elles ne bougeront plus, et plus personne ne pourra noter ce
+      match », « ceux qui étaient sur le terrain avec toi ». `ratingInvitationFr(meansVisible)` replaces
+      the deadline with who decides, and says out loud that a late note moves a figure the squad has read.
+      A reader who did not play is told **why he is asked anyway** in his own case — supporter,
+      named-but-never-on, not-on-the-sheet, three sentences, because the three EmptyStates this replaces
+      told them apart
+- [x] **One guard that looks cosmetic and is not.** The match page's rating card dropped `notation.played`
+      and gained `progress.requiredCount > 0`: an empty set is *vacuously* complete, so without it a match
+      nobody played would congratulate every reader on having noted everybody
 - [ ] **The crafted form post is still not tried by hand.** `lib/rating/validation.ts` and
       `submitRatings` refuse a note on yourself and a note on a 0-minute substitute, and unit tests cover
       both, but nobody has posted the form fields directly to prove the server and not the screen is what

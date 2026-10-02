@@ -58,8 +58,6 @@ import {
 } from "./match-lines";
 import {
   type MatchPublicationRow,
-  type PlayedRow,
-  type RatingAuthorRow,
   type VisibleRatingRow,
   seasonRatingPublication,
 } from "./ratings";
@@ -249,21 +247,21 @@ async function getEventsFor(matchIds: readonly string[]): Promise<MatchEventReco
 }
 
 /**
- * Who rated whom, **without the scores** — everything `ratings.ts` needs to work out which matches
- * have every expected set in. Deliberately selects no `score` column: an unpublished match's scores
- * should not leave the database at all, rather than be fetched and then filtered out in JavaScript,
- * where a later refactor could quietly forget the filter.
+ * Which of these matches hold at least one note — **ids only, no score and no author**.
+ *
+ * All `ratings.ts` needs beyond the published column, and asking for no more than that is deliberate:
+ * an unpublished match's scores should not leave the database at all, rather than be fetched and then
+ * filtered out in JavaScript, where a later refactor could quietly forget the filter. It used to select
+ * the whole rater→rated graph, because publication depended on every expected set being in; decision
+ * 139 made it the coach's column, so the graph is no longer anybody's business up here.
  */
-async function getRatingAuthors(matchIds: readonly string[]): Promise<RatingAuthorRow[]> {
+async function getRatedMatchIds(matchIds: readonly string[]): Promise<string[]> {
   if (matchIds.length === 0) return [];
-  return db
-    .select({
-      matchId: ratings.matchId,
-      raterMemberId: ratings.raterMemberId,
-      ratedMemberId: ratings.ratedMemberId,
-    })
+  const rows = await db
+    .selectDistinct({ matchId: ratings.matchId })
     .from(ratings)
     .where(inArray(ratings.matchId, [...matchIds]));
+  return rows.map((row) => row.matchId);
 }
 
 /** The scores themselves, for the matches whose means are out — and for no others. */
@@ -352,12 +350,34 @@ export const getSeasonStats = cache(
 
     const matchIds = matchRows.map((match) => match.id);
 
-    const [scores, cached, squad, ratingAuthors] = await Promise.all([
+    const [scores, cached, squad, ratedMatchIds] = await Promise.all([
       getMatchScores(matchIds),
       getCachedStatRows(matchIds),
       getSquadRows(matchIds),
-      getRatingAuthors(matchIds),
+      getRatedMatchIds(matchIds),
     ]);
+
+    /*
+     * Publication is decided here, before a single score is read, and it needs nothing but rows: the
+     * coach's column and whether a match holds notes at all (decision 139). It used to sit below
+     * `resolveMatchStatLines`, because it needed every player's minutes to work out whether every
+     * expected set was in — so the second round trip could not start until the whole log had been
+     * reduced. Now it starts immediately, and the scores load while the logs are being replayed.
+     */
+    const publication = seasonRatingPublication({
+      matchIds,
+      ratedMatchIds,
+      matches: matchRows.map(
+        (match): MatchPublicationRow => ({
+          matchId: match.id,
+          publishedAtMs: match.ratingsPublishedAtMs,
+        }),
+      ),
+    });
+
+    // A second round trip, on purpose: publication is decided first, and only then are any scores
+    // read. A hidden match's notes never reach this process.
+    const visibleRatings = getVisibleRatingScores(publication.publishedMatchIds);
 
     // « sur N séances pointées » — counted here rather than in a second `count(distinct)` round
     // trip, since every mark is already in hand (decision 020).
@@ -402,32 +422,7 @@ export const getSeasonStats = cache(
 
     const { lines, reducedMatchIds } = resolveMatchStatLines({ matchIds, cached, logs });
 
-    /*
-     * Minutes are what decides who was expected to rate and who could be rated (decision 137), and
-     * they come from the lines just resolved — the cache when M4 froze the match, the log otherwise.
-     * So this has to sit after `resolveMatchStatLines` and cannot join the parallel batch above.
-     */
-    const played: PlayedRow[] = lines.map((line) => ({
-      matchId: line.matchId,
-      teamMemberId: line.teamMemberId,
-      minutes: line.minutes,
-    }));
-
-    const publication = seasonRatingPublication({
-      matchIds,
-      played,
-      authors: ratingAuthors,
-      matches: matchRows.map(
-        (match): MatchPublicationRow => ({
-          matchId: match.id,
-          publishedAtMs: match.ratingsPublishedAtMs,
-        }),
-      ),
-    });
-
-    // A second round trip, on purpose: publication is decided first, and only then are any scores
-    // read. An unpublished match's notes never reach this process.
-    const visibleRatingRows = await getVisibleRatingScores(publication.publishedMatchIds);
+    const visibleRatingRows = await visibleRatings;
 
     const statsMatches: StatsMatch[] = matchRows.map((match) => ({
       id: match.id,

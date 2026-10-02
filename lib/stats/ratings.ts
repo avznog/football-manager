@@ -1,16 +1,25 @@
 /**
- * Which matches' rating means are out — the season-long reading of decision 137.
+ * Which matches' rating means are out — the season-long reading of decision 139.
  *
  * This module used to answer « which matches may *this viewer* read », because decision 021 extended
  * decision 007's reciprocity gate across the whole statistics tree: publishing a season average to
  * somebody who had not rated a match would have been reading its notes, just with one number instead
- * of thirteen. Decision 137 removes the premise. Nobody reads an individual note but the coach, a
+ * of thirteen. Decision 137 removed the premise. Nobody reads an individual note but the coach, a
  * match's means are out or they are not, and **every reader therefore gets the same statistics**.
  *
  * What survives is the shape: this is still the one place that decides, for many matches at once,
  * which of them a mean may be computed from. What is gone is `viewerMemberId` — and with it
  * `hiddenRatedCounts`, which existed so a profile card could explain to one reader why *his* average
  * was short of two matches. No reader's average is short of anything any more.
+ *
+ * ## What decision 139 took out of it
+ *
+ * Until decision 139 this function also had to work out, per match, whether **every expected rater had
+ * submitted** — which meant it needed the minutes of every player of every match (`PlayedRow`) and the
+ * whole rater→rated graph (`RatingAuthorRow`), rebuilt into two nested maps, to answer a question about
+ * a boolean. Publication is now one column the coach writes, so all of that is gone and the loop reads
+ * one row per match. The only thing still asked of the notes is whether a match holds **any**, and that
+ * is a set of match ids.
  *
  * **The rule itself lives in `lib/rating/published.ts`** and this module does not restate it; it
  * applies it per match. Two implementations of « published » would drift the day one of them was
@@ -21,19 +30,7 @@
  * average never reads as a bug.
  */
 
-import { playedMemberIds, ratingTargetsFor, type PlayedEntry } from "@/lib/rating/progress";
-import { ratingsPublication } from "@/lib/rating/published";
-
-/**
- * Who rated whom, in which match — **without the scores**. This is all the predicate needs, and
- * asking for no more than it needs is what lets `queries.ts` leave an unpublished match's scores in
- * the database.
- */
-export type RatingAuthorRow = {
-  matchId: string;
-  raterMemberId: string;
-  ratedMemberId: string;
-};
+import { meansAreVisible } from "@/lib/rating/published";
 
 /** A score from a match whose means are out. */
 export type VisibleRatingRow = {
@@ -42,98 +39,57 @@ export type VisibleRatingRow = {
   score: number;
 };
 
-/** Minutes played, per match — who was expected to rate, and who could be rated. */
-export type PlayedRow = {
-  matchId: string;
-  teamMemberId: string;
-  minutes: number;
-};
-
 /**
- * The one per-match fact the predicate needs beyond the notes themselves.
+ * The one per-match fact the predicate needs beyond « does this match hold notes ».
  *
  * It used to carry a second — `windowClosed`, whether a later match had kicked off — and this module
  * had to be handed it because deriving it needs the calendar and a clock, and this module has neither.
- * Decision 138 deleted the clause, so the row is down to the column: a season's means are out for the
- * matches whose sets are all in, plus the ones the coach released.
+ * Decision 138 deleted the clause, and decision 139 deleted the other derived one, so the row is the
+ * column and nothing else: a season's means are out for the matches the coach has released.
  */
 export type MatchPublicationRow = {
   matchId: string;
-  /** `matches.ratings_published_at` in epoch ms, or null — the coach's escape hatch. */
+  /** `matches.ratings_published_at` in epoch ms, or null — null is hidden, and hiding writes null. */
   publishedAtMs: number | null;
 };
 
 export type SeasonRatingPublication = {
   /** Match ids whose means may be computed and shown. To everybody, identically. */
   publishedMatchIds: string[];
-  /** Matches that hold notes and are still waiting on somebody. */
+  /** Matches that hold notes and whose means the coach has not released. */
   pendingMatchIds: string[];
 };
 
 /**
- * Split a season's matches into the ones whose means are out and the ones still waiting.
+ * Split a season's matches into the ones whose means are out and the ones still hidden.
  *
  * A match that holds no note at all is in **neither** list: it is not published (there is nothing to
- * publish) and telling a reader that a match nobody rated is « en attente de notes » would be a
- * weekly reproach for a friendly in October nobody intends to rate. `pendingMatchIds` is what the
- * screens count, so it carries only the matches a reader could reasonably be waiting for.
+ * publish) and telling a reader that a match nobody rated is « en attente » would be a weekly reproach
+ * for a friendly in October nobody intends to rate. `pendingMatchIds` is what the screens count, so it
+ * carries only the matches a reader could reasonably be waiting for.
+ *
+ * Note what « pending » now means, because the word survived a change of subject: it used to be « still
+ * waiting on a teammate's notes » and it is now « the coach has not shown these yet ». The screens that
+ * count it had to be reworded for that, and the set is the same size either way.
  */
 export function seasonRatingPublication(input: {
   /** The matches under consideration — already filtered by competition. */
   matchIds: readonly string[];
-  played: readonly PlayedRow[];
-  /** Who rated whom, scores excluded. */
-  authors: readonly RatingAuthorRow[];
+  /** Which of them hold at least one note. Ids only; no score and no author leaves the database. */
+  ratedMatchIds: readonly string[];
   matches: readonly MatchPublicationRow[];
 }): SeasonRatingPublication {
-  const wanted = new Set(input.matchIds);
-
-  const playedBy = new Map<string, PlayedEntry[]>();
-  for (const row of input.played) {
-    if (!wanted.has(row.matchId)) continue;
-    const entry: PlayedEntry = { teamMemberId: row.teamMemberId, minutes: row.minutes };
-    const list = playedBy.get(row.matchId);
-    if (list) list.push(entry);
-    else playedBy.set(row.matchId, [entry]);
-  }
-
-  const hasRatings = new Set<string>();
-  /** matchId → rater → whom he has rated. */
-  const submittedIn = new Map<string, Map<string, Set<string>>>();
-  for (const author of input.authors) {
-    if (!wanted.has(author.matchId)) continue;
-    hasRatings.add(author.matchId);
-    const byRater = submittedIn.get(author.matchId) ?? new Map<string, Set<string>>();
-    const rated = byRater.get(author.raterMemberId) ?? new Set<string>();
-    rated.add(author.ratedMemberId);
-    byRater.set(author.raterMemberId, rated);
-    submittedIn.set(author.matchId, byRater);
-  }
-
+  const hasRatings = new Set(input.ratedMatchIds);
   const publicationOf = new Map(input.matches.map((row) => [row.matchId, row]));
 
   const publishedMatchIds: string[] = [];
   const pendingMatchIds: string[] = [];
 
   for (const matchId of input.matchIds) {
-    const played = playedBy.get(matchId) ?? [];
-    const expectedRaterIds = playedMemberIds(played);
-    const byRater = submittedIn.get(matchId);
-
-    const completeRaterIds = expectedRaterIds.filter((raterId) =>
-      ratingTargetsFor(played, raterId).every((target) => byRater?.get(raterId)?.has(target)),
-    );
-
-    const row = publicationOf.get(matchId);
-    const { published } = ratingsPublication({
-      expectedRaterIds,
-      completeRaterIds,
-      publishedAtMs: row?.publishedAtMs ?? null,
-    });
-
     // Nothing to show and nothing to wait for: a match nobody rated belongs in neither list.
     if (!hasRatings.has(matchId)) continue;
-    if (published) publishedMatchIds.push(matchId);
+    const row = publicationOf.get(matchId);
+    if (meansAreVisible(row?.publishedAtMs ?? null)) publishedMatchIds.push(matchId);
     else pendingMatchIds.push(matchId);
   }
 

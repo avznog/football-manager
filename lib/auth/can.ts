@@ -62,9 +62,16 @@ export type Action =
    */
   | "rating:readNotes"
   /**
-   * Release a match's means with notes still owed — the escape hatch for the straggler who never
-   * will. A coach action, not a self-scoped one: `rating:submit` is self-scoped and therefore false
-   * for a coach who did not play, and he is exactly the person who has to be able to do this.
+   * **Show a match's means to the team, or hide them again.** One permission over one column, both
+   * ways (decision 139): `publishRatings` writes the instant, `hideRatings` writes null back, and
+   * splitting them into two actions would let a coach who may show end up unable to undo it.
+   *
+   * It used to be the escape hatch for the straggler who never rated, because the squad finishing
+   * published a match by itself. Nothing publishes anything by itself now — this is the only door, and
+   * the coach decides per match.
+   *
+   * A coach action, not a self-scoped one: `rating:submit` is every member's, and deciding what the
+   * whole team reads is not something a member does for himself.
    */
   | "rating:publish"
   // Self-scoped
@@ -77,6 +84,20 @@ export type Action =
    */
   | "profile:editShirtName"
   | "injury:declare"
+  /**
+   * Give notes for a match. **Any member of the team** (decision 139) — a supporter on the touchline
+   * watched the same hour the players did, and a member who was not on the sheet at all may rate too.
+   *
+   * Self-scoped, so a coach cannot rate on somebody's behalf — but, unlike every other self-scoped
+   * action, **not conditional on `isPlayer`**. « Any member » is what was asked for, and a non-playing
+   * coach is a member with the best view of the hour; it is also what makes the coach's own tally
+   * honest, since its denominator is the active members and a denominator nobody can reach is a figure
+   * that lies. This is why the action is handled on its own in `can()` rather than through
+   * `SELF_ACTIONS`.
+   *
+   * Who may be *rated* is a different question, answered from the log in `lib/rating/progress.ts`
+   * (`minutes > 0`, decision 137), and no permission can see it.
+   */
   | "rating:submit"
   // Read
   | "team:read";
@@ -130,7 +151,6 @@ const SELF_ACTIONS = new Set<Action>([
   "profile:editPositions",
   "profile:editShirtName",
   "injury:declare",
-  "rating:submit",
 ]);
 
 export function can(actor: Actor, action: Action, context: Context): boolean {
@@ -153,6 +173,16 @@ export function can(actor: Actor, action: Action, context: Context): boolean {
   // Running game mode may be delegated to a non-coach for a single match (decision 004).
   if (action === "match:operate" && context.match?.operatorUserId === actor.userId) {
     return true;
+  }
+
+  /*
+   * Self-scoped, like the block below, but for **every** member rather than every player: a non-playing
+   * coach and a supporter both get to rate (decision 139). It is above the `isPlayer` test rather than
+   * inside it because that test is what would turn « any member » back into « any player ».
+   */
+  if (action === "rating:submit") {
+    const target = context.targetMemberId ?? membership.membershipId;
+    return target === membership.membershipId;
   }
 
   if (SELF_ACTIONS.has(action)) {

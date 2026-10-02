@@ -6,6 +6,7 @@ import {
   RATING_SLIDERS_START_AT_FR,
   noteAuthorFr,
   ratingCountNoteFr,
+  ratingInvitationFr,
   ratingScoreFr,
   ratingScoreValueTextFr,
   ratingsSavedFr,
@@ -95,9 +96,11 @@ describe("RATING_IS_FINAL_FR", () => {
 });
 
 describe("ratingsSavedFr", () => {
-  it("counts what it wrote and says when the means come out", () => {
+  it("counts what it wrote and says who decides when the means come out", () => {
+    // It used to promise « quand tout le monde aura noté », which published a match behind the coach's
+    // back and is no longer how it works (decision 139): nothing comes out until he taps the button.
     expect(ratingsSavedFr(6, 0)).toBe(
-      "6 notes enregistrées. Les moyennes sortiront quand tout le monde aura noté.",
+      "6 notes enregistrées. C’est le coach qui décide quand les moyennes sortent.",
     );
   });
 
@@ -120,6 +123,39 @@ describe("ratingsSavedFr", () => {
     // which no longer exists. Nobody buys access by submitting, and nobody ever reads a single note.
     for (const sentence of [ratingsSavedFr(6, 0), ratingsSavedFr(1, 0), ratingsSavedFr(0, 6)]) {
       expect(sentence).not.toMatch(/celles des autres|pour voir/);
+    }
+  });
+});
+
+describe("ratingInvitationFr", () => {
+  it("promises no deadline while the means are hidden, because there is none", () => {
+    // What replaced `ratingUrgencyFr`, deleted with `lib/rating/window.ts`. Nothing closes the notation
+    // any more (decision 139), so the sentence names the only thing a member can be told: who decides.
+    const line = ratingInvitationFr(false);
+    expect(line).toContain("ce match reste ouvert");
+    expect(line).toContain("C’est le coach qui décide quand les moyennes sortent.");
+  });
+
+  it("still invites him once the means are out, and says they are", () => {
+    // The trade decision 139 accepted out loud: he may note after reading the team's figures, and his
+    // notes will move one the squad has already seen. The sentence does not hide either half.
+    const line = ratingInvitationFr(true);
+    expect(line).toContain("sont sorties");
+    expect(line).toContain("tes notes compteront dedans");
+  });
+
+  it("never claims a note will stop counting", () => {
+    // The old sentence ended « et tes notes ne compteront plus », which was the window closing. There
+    // is no window, so that promise would now be a lie in both states.
+    for (const line of [ratingInvitationFr(false), ratingInvitationFr(true)]) {
+      expect(line).not.toMatch(/ne compteront plus|fermée|dernier délai/);
+    }
+  });
+
+  it("tutoies (decision 074)", () => {
+    for (const line of [ratingInvitationFr(false), ratingInvitationFr(true)]) {
+      expect(line).toMatch(/\btu\b|\btes\b/i);
+      expect(line).not.toMatch(/\bvous\b|\bvotre\b/i);
     }
   });
 });

@@ -6,15 +6,20 @@ import "server-only";
  * Two jobs, and the first one is a security boundary:
  *
  * 1. **Publication and the coach's privilege are enforced here, not in the UI.** Decision 137 has two
- *    rules to keep, and both are kept by *not selecting* rather than by not rendering: an unpublished
- *    match's scores are never read at all, and a reader who is not the coach never receives an
- *    individual note or the count behind a mean — `getRatingResults` decides both **before** it
- *    issues the select. There is nothing for a crafted request, a React DevTools inspection or a
- *    leaked RSC payload to reveal, because the numbers never leave Postgres.
+ *    rules to keep, and both are kept by *not selecting* rather than by not rendering: a match whose
+ *    means the coach has not shown never has its scores read at all, and a reader who is not the coach
+ *    never receives an individual note or the count behind a mean — `getRatingResults` decides both
+ *    **before** it issues the select. There is nothing for a crafted request, a React DevTools
+ *    inspection or a leaked RSC payload to reveal, because the numbers never leave Postgres.
  *
  *    This replaces decision 007's per-viewer gate, which asked whether *this reader* had earned the
  *    notes. The question has no viewer in it any more; what has a viewer in it is whether he is the
  *    coach, and that is one `can()` answer passed in rather than a rule restated here.
+ *
+ *    Decision 139 made the first of the two a question about one column the coach writes, and made it
+ *    **reversible**: hiding a match again is the same early return doing the same job, so a figure the
+ *    squad read last week simply stops being selected. Nothing is cached per match that would survive
+ *    that, which is the whole reason the switch can go both ways at all.
  *
  * 2. **The recap's data loading.** The recap is derived, so it needs the event log, the
  *    compositions, the slot catalogue and the squad, then `reduceMatch` (invariant 2: the reducer is
@@ -67,13 +72,8 @@ import {
   type PlayedEntry,
   type RatingProgress,
 } from "./progress";
-import {
-  ratingsPublication,
-  type RatingsPublication,
-  type RatingsPublicationReason,
-} from "./published";
+import { meansAreVisible } from "./published";
 import { buildRecap, type MatchRecap, type RecapMember } from "./recap";
-import { ratingWindow, type RatingWindow } from "./window";
 
 /* -------------------------------------------------------------------------- */
 /* Small reads                                                                */
@@ -136,64 +136,18 @@ export async function getTeamDirectory(teamId: string): Promise<DirectoryMember[
 }
 
 /**
- * The rating window of a match, with `now` taken once so a page renders one consistent answer.
+ * Are this match's means out? One column, parsed once.
  *
- * Decision 138 made the window depend on **publication** rather than on the calendar, which is why
- * this now costs two reads: whether the means are out is a question about who played and who has
- * rated, not about the next fixture. The previous version read one column from one row
- * (`getNextKickoffAfter`, deleted with the rule), and the two callers that have those rows in hand
- * already — `getNotationView` and `getRatingResults` — do not go through here for exactly that
- * reason. This entry point is for the callers that hold a match and nothing else.
+ * This used to be `publicationOf`, which took the match, every player's minutes and the whole
+ * rater→rated graph, because publication had a derived clause: every expected set in. Decision 139
+ * deleted it, so there is nothing to derive and nothing for two call sites to spell differently —
+ * which is what the old helper existed to prevent. `getRatingWindow` went the same way, with the
+ * module behind it: nothing closes the notation any more, so a « window » had one state.
  */
-export async function getRatingWindow(match: MatchRow, nowMs = Date.now()): Promise<RatingWindow> {
-  const [state, pairs] = await Promise.all([
-    loadMatchState(match, nowMs),
-    getRatingPairs(match.id),
-  ]);
-  return ratingWindow({
-    finished: match.status === "finished",
-    published: publicationOf(match, playedFrom(state), pairs).publication.published,
-  });
-}
-
-/**
- * Is this match's mean out, from the three facts that decide it — plus who has rated whom, which the
- * caller invariably wants next.
- *
- * Factored out because the window and the results now ask the same question, and asking it twice with
- * two spellings of « a complete set » is how the two would come to disagree — the screen saying the
- * notes are closed over a panel that is still waiting for them.
- */
-function publicationOf(
-  match: { ratingsPublishedAt: string | null },
-  played: readonly PlayedEntry[],
-  pairs: readonly { raterMemberId: string; ratedMemberId: string }[],
-): {
-  publication: RatingsPublication;
-  expectedRaterIds: string[];
-  /** rater → whom he has rated, which is what « il te reste 3 notes » is counted from. */
-  submittedBy: Map<string, Set<string>>;
-} {
-  const expectedRaterIds = playedMemberIds(played);
-
-  // One rater's set is complete when he has a note on every other player who played.
-  const submittedBy = new Map<string, Set<string>>();
-  for (const pair of pairs) {
-    const set = submittedBy.get(pair.raterMemberId) ?? new Set<string>();
-    set.add(pair.ratedMemberId);
-    submittedBy.set(pair.raterMemberId, set);
-  }
-  const completeRaterIds = expectedRaterIds.filter((raterId) =>
-    ratingTargetsFor(played, raterId).every((target) => submittedBy.get(raterId)?.has(target)),
+function meansOut(match: { ratingsPublishedAt: string | null }): boolean {
+  return meansAreVisible(
+    match.ratingsPublishedAt === null ? null : Date.parse(match.ratingsPublishedAt),
   );
-
-  const publication = ratingsPublication({
-    expectedRaterIds,
-    completeRaterIds,
-    publishedAtMs: match.ratingsPublishedAt === null ? null : Date.parse(match.ratingsPublishedAt),
-  });
-
-  return { publication, expectedRaterIds, submittedBy };
 }
 
 /** The rows one rater has already written for one match. Nobody else's scores are selected. */
@@ -208,20 +162,20 @@ async function getMyRatings(matchId: string, raterMemberId: string) {
 }
 
 /**
- * Who rated whom, **with no scores**: the pairs, and only the pairs.
+ * Who has sent notes for this match — **ids only, no score and no victim**.
  *
- * This is how « has every set come in » is answered for a reader who is not entitled to a single
- * note. Selecting the pairs and not the figures is the point — a count of rows per rater is all the
- * publication predicate needs, and anything more would be a leak dressed as a convenience.
+ * Read for the coach alone, and only to tell him how many people have spoken before he decides to show
+ * the means. It used to be `getRatingPairs`, the whole rater→rated graph, because publication depended
+ * on every expected set being in; decision 139 made publication his column, so nobody needs the graph
+ * and this is a `selectDistinct` of one column. Who rated *whom* is still in the table and still the
+ * coach's to read — but only once the means are out, down in `getRatingResults`.
  */
-async function getRatingPairs(matchId: string) {
-  return db
-    .select({
-      raterMemberId: ratings.raterMemberId,
-      ratedMemberId: ratings.ratedMemberId,
-    })
+async function getRaterIds(matchId: string): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ raterMemberId: ratings.raterMemberId })
     .from(ratings)
     .where(eq(ratings.matchId, matchId));
+  return rows.map((row) => row.raterMemberId);
 }
 
 /**
@@ -268,29 +222,30 @@ export type RatingTarget = {
   myScore: number | null;
 };
 
-/** Why the viewer is not being asked for notes. `null` when he is. */
-export type NotationBlockedReason =
-  /** He played, and the window is shut or not open yet. */
-  | "window"
-  /** He was named but never came on, so he has no opinion to be collected. */
-  | "did-not-play"
-  /** He was not in this match at all: a supporter, a non-playing coach, somebody looking in. */
-  | "not-in-match";
-
 export type NotationView = {
   match: MatchRow;
-  window: RatingWindow;
-  /** He played, so he rates — `minutes > 0` in the log, not a role on the sheet. */
-  played: boolean;
   /**
-   * How the viewer was listed on the sheet, or null if he was not on it at all. `played` answers
-   * « is he asked »; this answers « why not », and they are different questions: a supporter was on
-   * the sheet and rates nobody (decision 039), so telling him he was not on it is a lie.
+   * The match has been played, so there is something to rate. `status === "finished"`.
+   *
+   * The only thing left of the rating window (decision 139): nothing shuts afterwards, so « pas encore
+   * joué » is the one state in which a member is turned away, and it is not about him.
    */
+  finished: boolean;
+  /**
+   * The means are out. **Not a lock** — he may still rate (decision 139) — but the screen has to say
+   * it, because his notes will move a figure the squad has already read and he is about to write them
+   * having read it.
+   */
+  meansVisible: boolean;
+  /**
+   * He played, which no longer decides whether he is asked (decision 139: everybody is) and still
+   * decides two things: he is in the list of rated men, so his own list is one name shorter, and the
+   * screen greets a man who was on the pitch differently from one who watched.
+   */
+  played: boolean;
+  /** How he was listed, or null if he was not on the sheet at all. Supporters rate too now. */
   sheetRole: SquadRole | null;
-  /** Why he is being shown a read-only screen, or null when he is being asked for notes. */
-  blocked: NotationBlockedReason | null;
-  /** Everybody he owes a note: who played, minus himself. Starters first, then by shirt. */
+  /** Everybody he may note: who played, minus himself. Starters first, then by shirt. */
   targets: RatingTarget[];
   progress: RatingProgress;
 };
@@ -314,15 +269,14 @@ export async function getNotationView(input: {
   if (!match) return null;
 
   const nowMs = input.nowMs ?? Date.now();
-  const [sheet, directory, state, pairs] = await Promise.all([
+  const [sheet, directory, state] = await Promise.all([
     getMatchSheet(match.id),
     getTeamDirectory(match.teamId),
     loadMatchState(match, nowMs),
-    getRatingPairs(match.id),
   ]);
 
   /*
-   * Minutes come from the log or from nowhere, and they are the whole of who rates whom now.
+   * Minutes come from the log or from nowhere, and they are the whole of who is rated now.
    * `state.started` is false when no `KICKOFF` was ever recorded — a match nobody opened game mode
    * for and nobody backfilled — and reading every player as 0’ would not mean « nobody came on » but
    * « we do not know » (decision 013). A retro entry writes a `KICKOFF` per period
@@ -331,21 +285,15 @@ export async function getNotationView(input: {
   const played = playedFrom(state);
   const minutesOf = new Map(played.map((entry) => [entry.teamMemberId, entry.minutes]));
 
-  /*
-   * The window now depends on whether the means are out (decision 138), so it is derived here from the
-   * pairs rather than fetched: this screen has to read who has rated whom anyway to tell the viewer
-   * what he still owes, and a second round trip for the same answer could come back different.
-   */
-  const window = ratingWindow({
-    finished: match.status === "finished",
-    published: publicationOf(match, played, pairs).publication.published,
-  });
-
   const viewerPlayed = hasPlayed(played, input.membershipId);
   const requiredIds = ratingTargetsFor(played, input.membershipId);
 
-  const mine =
-    viewerPlayed && input.membershipId ? await getMyRatings(match.id, input.membershipId) : [];
+  /*
+   * His own notes, and nobody else's — gated on his having a membership and nothing more. It used to
+   * require `viewerPlayed` too, which meant a supporter was shown an empty form; decision 139 asks him
+   * for notes, so he has a set and may already have sent part of it.
+   */
+  const mine = input.membershipId ? await getMyRatings(match.id, input.membershipId) : [];
   const myScoreOf = new Map(mine.map((row) => [row.ratedMemberId, row.score]));
 
   const byMembership = new Map(directory.map((member) => [member.membershipId, member]));
@@ -367,32 +315,16 @@ export async function getNotationView(input: {
 
   return {
     match,
-    window,
+    finished: match.status === "finished",
+    meansVisible: meansOut(match),
     played: viewerPlayed,
     sheetRole: input.membershipId ? roleOf.get(input.membershipId) ?? null : null,
-    blocked: blockedReason({ viewerPlayed, onSheet: roleOf.has(input.membershipId ?? ""), window }),
     targets,
     progress: ratingProgress({
       requiredIds,
       submittedIds: mine.map((row) => row.ratedMemberId),
     }),
   };
-}
-
-/**
- * Why the screen is read-only, in the order the reader needs told.
- *
- * « Tu n'as pas joué ce match » comes before « les notes sont fermées », because a man who never came
- * on is not waiting for a window to open — telling him about a deadline would have him come back.
- */
-function blockedReason(input: {
-  viewerPlayed: boolean;
-  onSheet: boolean;
-  window: RatingWindow;
-}): NotationBlockedReason | null {
-  if (!input.viewerPlayed) return input.onSheet ? "did-not-play" : "not-in-match";
-  if (!input.window.isOpen) return "window";
-  return null;
 }
 
 /**
@@ -457,24 +389,42 @@ export type ManOfTheMatchView = {
   tied: boolean;
 };
 
-/** What the coach is told about who has not finished. Empty for every other reader. */
-export type OwingRater = {
+/** One member who has sent no note at all for this match. Coach only. */
+export type SilentMember = {
   memberId: string;
   displayName: string;
 };
 
+/**
+ * How many people have spoken, and who has not — **the coach's alone**, and the one thing he has to go
+ * on when he decides whether the means are worth showing yet.
+ *
+ * It replaces `owing` / `raterTotal`, whose denominator was « the players with minutes » because they
+ * were the people publication waited for. Nothing waits for anybody now, and anybody in the team may
+ * rate (decision 139), so the denominator is **the active members** — the coach included, since he
+ * rates too — and « who has not finished his set » collapses to « who has sent nothing », because the
+ * form posts a whole set at once.
+ */
+export type RaterTally = {
+  /** Active members who have sent at least one note. */
+  raterCount: number;
+  /** Active members: everybody entitled to rate. */
+  memberTotal: number;
+  /** The ones who have sent nothing, by name, in the directory's order. */
+  silent: SilentMember[];
+};
+
 type RatingResultsCommon = {
-  reason: RatingsPublicationReason;
   /** The viewer's own set — what the duty card and the « il te reste 3 notes » line read. */
   progress: RatingProgress;
   /** `can(actor, "rating:readNotes", …)`: he reads the individual notes and the counts. */
   canSeeNotes: boolean;
-  /** Who still owes at least one note, by name — **coach only**. */
-  owing: OwingRater[];
-  /** Everybody expected to rate, so « 5 sur 7 ont noté » can be said — **coach only**, else 0. */
-  raterTotal: number;
-  /** He may release the means now: `rating:publish`, not yet published, notes still owed. */
+  /** Who has rated and who has not — **coach only**, null for every other reader. */
+  tally: RaterTally | null;
+  /** The means are hidden and he may show them: `rating:publish`. */
   canPublish: boolean;
+  /** The means are out and he may hide them again — the same permission, the other way. */
+  canHide: boolean;
 };
 
 export type RatingResultsView =
@@ -487,7 +437,6 @@ export type RatingResultsView =
     })
   | (RatingResultsCommon & {
       published: false;
-      reason: "pending";
     });
 
 /**
@@ -495,9 +444,11 @@ export type RatingResultsView =
  *
  * Two boundaries, both enforced by what is *selected*:
  *
- * - **unpublished means nothing is read.** The `select` that would fetch the scores is below the
- *   early return, so an unpublished match's figures never leave Postgres — for anybody, the coach
- *   included. He has a button to publish them, which is a different thing from reading them early;
+ * - **hidden means nothing is read.** The `select` that would fetch the scores is below the early
+ *   return, so a hidden match's figures never leave Postgres — for anybody, the coach included. He has
+ *   a button to show them, which is a different thing from reading them early. Under decision 139 that
+ *   button is the *only* thing that opens this, and it goes both ways: hiding a match again puts every
+ *   figure back behind this same early return;
  * - **not the coach means no note and no count.** The scores are fetched (they are needed for the
  *   means) but `received` stays empty and `count` stays null for every other reader, so there is no
  *   RSC payload to inspect and no field to un-hide in DevTools.
@@ -513,23 +464,27 @@ export async function getRatingResults(input: {
   canSubmit: boolean;
   /** `can(actor, "rating:readNotes", …)` — the coach. */
   canSeeNotes: boolean;
-  /** `can(actor, "rating:publish", …)` — the coach. */
+  /** `can(actor, "rating:publish", …)` — the coach, who shows the means and may hide them again. */
   canPublish: boolean;
   nowMs?: number;
 }): Promise<RatingResultsView | null> {
   const match = await getMatch(input.teamId, input.matchId);
   if (!match) return null;
 
+  const published = meansOut(match);
   const nowMs = input.nowMs ?? Date.now();
-  const [sheet, directory, state, pairs] = await Promise.all([
+  const [sheet, directory, state, mine, raterIds] = await Promise.all([
     getMatchSheet(match.id),
     getTeamDirectory(match.teamId),
     loadMatchState(match, nowMs),
-    getRatingPairs(match.id),
+    // His own notes, for his own progress line. Reading them is not reading anybody else's.
+    input.membershipId ? getMyRatings(match.id, input.membershipId) : [],
+    // Who has spoken, for the tally — and only for the one reader entitled to it.
+    input.canSeeNotes ? getRaterIds(match.id) : [],
   ]);
 
   const played = playedFrom(state);
-  const { publication, expectedRaterIds, submittedBy } = publicationOf(match, played, pairs);
+  const ratedIds = playedMemberIds(played);
 
   const byMembership = new Map(directory.map((member) => [member.membershipId, member]));
   const nameOf = (memberId: string) =>
@@ -538,25 +493,22 @@ export async function getRatingResults(input: {
 
   const progress = ratingProgress({
     requiredIds: input.canSubmit ? ratingTargetsFor(played, input.membershipId) : [],
-    submittedIds: input.membershipId ? [...(submittedBy.get(input.membershipId) ?? [])] : [],
+    submittedIds: mine.map((row) => row.ratedMemberId),
   });
 
   const common: RatingResultsCommon = {
-    reason: publication.reason,
     progress,
     canSeeNotes: input.canSeeNotes,
-    owing: input.canSeeNotes
-      ? publication.owingRaterIds.map((memberId) => ({ memberId, displayName: nameOf(memberId) }))
-      : [],
-    raterTotal: input.canSeeNotes ? expectedRaterIds.length : 0,
-    // Nothing to publish once it is published, and nothing to release when nobody owes anything.
-    canPublish:
-      input.canPublish && match.ratingsPublishedAt === null && publication.owingRaterIds.length > 0,
+    tally: input.canSeeNotes ? tallyOf(directory, raterIds) : null,
+    // The switch, and which way it points. `rating:publish` answers both: it is one permission over one
+    // column, and splitting it in two would let the two drift (`lib/auth/can.ts`).
+    canPublish: input.canPublish && !published,
+    canHide: input.canPublish && published,
   };
 
-  if (!publication.published) {
+  if (!published) {
     // Hard stop. Nothing below this line runs, so nothing below this line can leak.
-    return { ...common, published: false, reason: "pending" };
+    return { ...common, published: false };
   }
 
   const rows = await db
@@ -568,7 +520,7 @@ export async function getRatingResults(input: {
     .from(ratings)
     .where(eq(ratings.matchId, match.id));
 
-  const aggregate = aggregateRatings(rows as RatingRecord[], { members: expectedRaterIds });
+  const aggregate = aggregateRatings(rows as RatingRecord[], { members: ratedIds });
 
   const receivedByMember = new Map<string, RatingReceived[]>();
   if (input.canSeeNotes) {
@@ -607,6 +559,28 @@ export async function getRatingResults(input: {
     players,
     manOfTheMatch: toManOfTheMatchView(manOfTheMatch(aggregate), nameOf, byMembership),
     ratingCount: input.canSeeNotes ? aggregate.ratingCount : 0,
+  };
+}
+
+/**
+ * Who has sent notes, out of everybody who could, and who has not.
+ *
+ * **Active members only**, on both sides of the fraction: a member who has left is not going to rate,
+ * so counting him would give the coach a denominator that can never be reached, and naming him would
+ * ask him to. His notes, if he sent any before leaving, are still in the mean — this is a tally of
+ * people to chase, not of notes received, and `ratingCount` is the other one.
+ */
+function tallyOf(directory: readonly DirectoryMember[], raterIds: readonly string[]): RaterTally {
+  const rated = new Set(raterIds);
+  const active = directory.filter((member) => !member.hasLeft);
+  const silent = active.filter((member) => !rated.has(member.membershipId));
+  return {
+    raterCount: active.length - silent.length,
+    memberTotal: active.length,
+    silent: silent.map((member) => ({
+      memberId: member.membershipId,
+      displayName: member.displayName,
+    })),
   };
 }
 

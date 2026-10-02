@@ -130,18 +130,30 @@ describe("can — coaches", () => {
     expect(can(coach, "team:create", { teamId: TEAM })).toBe(false);
   });
 
-  it("reads the individual notes, and may release a match's means", () => {
-    // Decision 137: the raw notes are the coach's alone, and he is the escape hatch for a straggler
-    // who never rates. Both have to work for a coach who did not play himself — which is why they
-    // are coach actions and not self-scoped ones like `rating:submit` two tests down.
+  it("reads the individual notes, and shows or hides a match's means", () => {
+    // Decision 137: the raw notes are the coach's alone. And since 139 the switch is his alone too, in
+    // both directions — one permission over one column, so a coach who may show can always undo it.
+    // Both have to work for a coach who did not play himself, which is why they are coach actions.
     expect(can(coach, "rating:readNotes", { teamId: TEAM })).toBe(true);
     expect(can(coach, "rating:publish", { teamId: TEAM })).toBe(true);
   });
 
+  it("rates the match although he did not play it", () => {
+    /*
+     * The one self-scoped action a non-playing coach gets, and the exception is deliberate: decision
+     * 139 says **any member** may give notes, and he is a member with the best view of the hour. It is
+     * also what keeps the coach's own tally honest — its denominator is the active members, and a
+     * denominator including somebody the permission refuses is a figure that lies.
+     */
+    expect(can(coach, "rating:submit", { teamId: TEAM })).toBe(true);
+    // Still self-scoped: being able to rate is not being able to rate *for* somebody.
+    expect(can(coach, "rating:submit", { teamId: TEAM, targetMemberId: "m-player" })).toBe(false);
+  });
+
   it("who does not play has nothing to declare for themselves", () => {
-    // A non-playing coach has no availability or position preferences of their own.
+    // A non-playing coach has no availability or position preferences of their own. `rating:submit` is
+    // the one exception and has its own test above.
     expect(can(coach, "availability:declare", { teamId: TEAM })).toBe(false);
-    expect(can(coach, "rating:submit", { teamId: TEAM })).toBe(false);
     expect(can(coach, "profile:editPositions", { teamId: TEAM })).toBe(false);
     // Not a maillot, so not a flocage. He still reaches a player's through `member:update`.
     expect(can(coach, "profile:editShirtName", { teamId: TEAM })).toBe(false);

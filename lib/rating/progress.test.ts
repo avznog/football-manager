@@ -36,6 +36,7 @@ describe("playedMemberIds", () => {
   });
 });
 
+/** No longer a gate on rating (decision 139) — only on being rated, and on what the screen says. */
 describe("hasPlayed", () => {
   it("is true for the men who were on the pitch", () => {
     expect(hasPlayed(PLAYED, "hugo")).toBe(true);
@@ -63,17 +64,31 @@ describe("ratingTargetsFor", () => {
     }
   });
 
-  it("asks nothing of somebody who did not play", () => {
-    // A supporter opening the notation URL by hand is a reader, not an error.
-    expect(ratingTargetsFor(PLAYED, "momo")).toEqual([]);
-    expect(ratingTargetsFor(PLAYED, "pierre")).toEqual([]);
-    expect(ratingTargetsFor(PLAYED, null)).toEqual([]);
+  it("asks the whole list of somebody who did not play", () => {
+    // Decision 139: the unused substitute, the supporter on the touchline, and a member who was not
+    // even on the sheet all rate the men who played. Nobody is subtracted, because none of them is in
+    // the rated set to subtract.
+    expect(ratingTargetsFor(PLAYED, "momo")).toEqual(["hugo", "karim"]);
+    expect(ratingTargetsFor(PLAYED, "pierre")).toEqual(["hugo", "karim"]);
+  });
+
+  it("asks the whole list of a viewer with no membership at all", () => {
+    // A null id cannot equal anybody's, so nothing is filtered out. The query layer is what refuses
+    // him an insert; this function describes the match, not the reader's right to act on it.
+    expect(ratingTargetsFor(PLAYED, null)).toEqual(["hugo", "karim"]);
   });
 
   it("asks nothing of the only man who played", () => {
     // Degenerate, but it is the shape of a match whose log holds one player: there is nobody else
     // to rate, so his set is empty and therefore complete.
     expect(ratingTargetsFor(played(["hugo", 60]), "hugo")).toEqual([]);
+  });
+
+  it("is empty for a match nobody played, whoever is asking", () => {
+    // The one meaning an empty list has left (decision 139): no log, so no rated set. A supporter
+    // used to produce the same empty list for a different reason, which is exactly what made it
+    // ambiguous.
+    expect(ratingTargetsFor([], "pierre")).toEqual([]);
   });
 });
 

@@ -106,6 +106,38 @@ export function ratingsSavedFr(saved: number, unchanged: number): string {
   }
   return (
     `${pluralize(saved, "note")} ${saved > 1 ? "enregistrées" : "enregistrée"}. ` +
-    "Les moyennes sortiront quand tout le monde aura noté."
+    "C’est le coach qui décide quand les moyennes sortent."
+  );
+}
+
+/**
+ * The line that invites a member to note a match he has not finished — what used to be
+ * `ratingUrgencyFr` in `lib/rating/window.ts`, which is deleted along with the window (decision 139).
+ *
+ * There is no urgency left to express, and that is the honest version of it: **nothing closes the
+ * notation**, so the old sentence's promise that « tes notes ne compteront plus » is simply false. What
+ * remains to say is who decides — the coach, per match — because that is the only thing a member
+ * waiting for a figure can usefully know, and he cannot act on it.
+ *
+ * Two states, and the second is the uncomfortable one. Once the means are out a member may **still**
+ * note (decision 139, asked for and chosen with the cost stated), so his notes will move a figure the
+ * squad has already read, and he writes them having read it. The anti-anchoring guarantee decisions
+ * 021, 137 and 138 were built around is gone, and the sentence does not pretend otherwise: it says the
+ * means are out and that his notes will count anyway, rather than inviting him in as though nothing had
+ * been published.
+ *
+ * Only for a viewer whose set is unfinished — it is about notes he has still to give, which is nothing
+ * to say to somebody who has already rated everybody.
+ */
+export function ratingInvitationFr(meansVisible: boolean): string {
+  if (meansVisible) {
+    return (
+      "Les moyennes de ce match sont sorties, et tu peux quand même noter : " +
+      "tes notes compteront dedans."
+    );
+  }
+  return (
+    "Tu peux noter quand tu veux, ce match reste ouvert. " +
+    "C’est le coach qui décide quand les moyennes sortent."
   );
 }

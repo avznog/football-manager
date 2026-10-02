@@ -224,7 +224,9 @@ match is amended. **Never** written incrementally — that would let it drift fr
 `id`, `match_id`, `rater_member_id`, `rated_member_id`, `score` (`numeric(3,1)`, 0–10 in
 half-points), `created_at`. Unique `(match_id, rater_member_id, rated_member_id)`.
 
-Rewritten by decision 137, which supersedes 007 on three of its clauses and 021 and 024 entirely.
+Rewritten by decision 137, which supersedes 007 on three of its clauses and 024 entirely; decision **139**
+then replaced the rules around it — who may write a row, and what makes one readable — while leaving the
+table itself untouched. 021 is gone with it.
 `comment` was **dropped** and the self-ratings decision 007 required were **deleted**
 (`0007_chubby_silver_samurai.sql`) — see the migration's own header for why each of those is
 irreversible on purpose.
@@ -235,25 +237,34 @@ Invariants:
   by the database rather than implied by it, because a `smallint` behind a half-point control rounds
   silently
 - **nobody rates himself** — `ratings_no_self`, `rater_member_id <> rated_member_id`
-- **both members must have played**: `minutes > 0` in the log, not a role on the sheet. That is a fact
-  about `match_events` and no constraint here can see it, so it lives in `lib/rating/validation.ts`
-  and in `submitRatings`, which is where a crafted form post is caught
-- inserts are refused once the match's means are out, and not before that — a played match is rateable
-  however old it is (decision 138, which deleted the next-kick-off deadline)
-- **nothing is read until the match's means are published**, and what a non-coach may read is one mean
-  per player. Never a raw score, never an author. `lib/rating/published.ts` owns the question and
+- **the rated member must have played**: `minutes > 0` in the log, not a role on the sheet. The **rater**
+  needs nothing of the sort — any member of the team may rate, supporter and non-playing coach included
+  (decision 139, superseding 137 on this half). Both are facts about `match_events` and the membership
+  rather than about this table, so they live in `lib/rating/validation.ts` and in `submitRatings`, which
+  is where a crafted form post is caught
+- **inserts are never refused for being late.** A played match is rateable for ever, and the means being
+  out changes nothing: a note that arrives afterwards moves a figure the squad has read (decision 139,
+  which deleted the rating window). The only timing rule is that the match is `finished`
+- **nothing is read until the coach has shown the match's means**, and what a non-coach may read is one
+  mean per player. Never a raw score, never an author. `lib/rating/published.ts` owns the question and
   `getRatingResults` enforces it by not selecting
 
 ### `matches.ratings_published_at`
-Nullable `timestamptz` on `matches`, written by `publishRatings` (`rating:publish`, coach-only).
+Nullable `timestamptz` on `matches`, written by `publishRatings` and `hideRatings` (`rating:publish`,
+coach-only, one permission both ways).
 
-The coach's escape hatch, and the only stored half of « are this match's means out? ». There is exactly
-one other clause and it is derived: every expected rater has submitted. There used to be a third — the
-window closing at the next kick-off — and decision 138 deleted it, because it never fired for a season's
-last match, which has no next kick-off, and fired for everybody else on a date that had nothing to do
-with their notes. So this column carries a second, heavier job: **it is also the rating deadline**.
-Nobody can rate a match once it is set, nothing else closes the rating, and because a published mean is
-never unpublished the window never reopens. Idempotent: a second publish does not move the instant.
+**The whole of « are this match's means out? »** — null is hidden, a timestamp is visible, and nothing
+derives, schedules or infers it (decision 139). It had two other clauses in its short life: « every
+expected rater has submitted » (137) and « the window closed at the next kick-off » (007, deleted by 138).
+Both are gone, so the rater→rated graph has left the publication question entirely and
+`lib/rating/published.ts` is one predicate over this column.
+
+Three things it is **not**, each of which the docs asserted at some point: not an escape hatch (nothing
+else publishes, so it is the only door), not a deadline (nothing closes the notation), and not write-once
+— **it can be set back to null**, which is how the coach hides a match again. The cost was stated and
+accepted: a mean the squad has read can vanish, and there is no record of what was visible when.
+Publishing is idempotent, so two taps do not move the instant; hiding and showing again does move it,
+which is right — that is a new decision, not a repeat of the old one.
 
 ## Derived, never stored
 
