@@ -167,9 +167,13 @@ split rests on.
 
 One piece of dashboard state the design does still depend on: **`dev.7orteils.bgonzva.fr` is pinned to
 the git branch `main`**, so the CLI preview deployment only takes that domain if it carries `main` as
-its git-branch metadata — which is why `deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` itself. That
-is expected to work and **has not been observed yet**; the first `main` push after this merges is the
-test, and `docs/DEPLOY.md` §4 has the fallback.
+its git-branch metadata — which is why `deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` itself. **The
+domain is observed to take a CLI preview deployment; that the variable is what wins it is inferred.**
+`vercel inspect https://dev.7orteils.bgonzva.fr` prints a `target preview` deployment holding the alias,
+which is the first claim; the second would need a preview deploy carrying a different ref to fail to take
+the domain, and that experiment points the owner's only review surface at the wrong commit, so nobody
+runs it. Keep setting the variable, do not promote the reason, and see `docs/DEPLOY.md` §4 for the
+fallback and for how to re-check without reading the log for an alias line it never prints.
 
 **Versions are the `version` field in `package.json`, and a tag is the act that ships.** Bump the number
 in the pull request that earns it; then, when the owner decides to ship, the annotated tag is cut **by
