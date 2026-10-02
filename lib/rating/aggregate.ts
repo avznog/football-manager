@@ -16,11 +16,12 @@
  * Each is a judgement call, written down because a number nobody can explain is worse than a
  * number that is merely debatable. Each is pinned by a test in `aggregate.test.ts`.
  *
- * 1. **Self-ratings count.** Decision 007 lets a player rate himself, so his own note is one note
- *    among the others. Excluding it would make the count depend on who happened to be rating, and
- *    silently discarding a row the app asked the player to write is worse than the small bias of
- *    keeping it. `selfScore` exposes it separately so the UI can show « il s'est mis 8 » — the
- *    wording itself lives in `labels.ts`, because it is « tu t'es mis 8 » on the reader's own row.
+ * 1. **There are no self-ratings to count.** Decision 007 required a player to rate himself and this
+ *    module used to expose that note separately as `selfScore`, so the UI could print « il s'est mis
+ *    8 ». Decision 137 drops it: a player's figure is the mean of the notes *the others* gave him,
+ *    `ratings_no_self` says so in the database, and a row where rater and rated are the same member
+ *    is now dropped here as well — not because it would bias the mean, but because it cannot exist,
+ *    and a module that silently averaged one in would hide the day something wrote one.
  *
  * 2. **Averages are compared exactly, not as displayed.** `24/3` and `16/2` are the same average
  *    and tie; `22/3` and `7.3` do not, even though both print « 7,3 ». Comparison is integer
@@ -30,9 +31,11 @@
  * 3. **A tie is reported as a tie.** `manOfTheMatch` returns *every* player on the top average.
  *    Two names on the recap is the honest answer; picking one by alphabet would invent a winner.
  *
- * 4. **Two ratings minimum to be man of the match.** One mate handing out a 10 must not outrank an
- *    8.4 agreed by nine. When nobody reaches the minimum the function returns `null` and the recap
- *    says so — a man of the match voted by one person is not a distinction.
+ * 4. **Three notes minimum to be man of the match, and to print a mean at all.** One mate handing out
+ *    a 10 must not outrank an 8.4 agreed by nine. The floor was two (decision 025); decision 137
+ *    raises it to three and makes it the same floor the match mean uses, because the two cannot
+ *    sensibly disagree — a figure too thin to show a player is too thin to crown him. When nobody
+ *    reaches it the function returns `null` and the recap says « pas encore assez de notes ».
  *
  * 5. **A player with no rating is not last, he is unrated.** His `average` is `null`, he sorts
  *    after everybody who has one, and he is never eligible for a distinction.
@@ -42,9 +45,8 @@
 export type RatingRecord = {
   raterMemberId: string;
   ratedMemberId: string;
-  /** Whole number, 0–10 (decision 007). Out-of-range rows are ignored — see `aggregateRatings`. */
+  /** 0–10 in half-points (decision 137). Rows off the step are ignored — see `aggregateRatings`. */
   score: number;
-  comment?: string | null;
   /** Present when the records span several matches, as they do for a season aggregate. */
   matchId?: string | null;
 };
@@ -52,7 +54,7 @@ export type RatingRecord = {
 /** Everything the ratings say about one rated player. */
 export type PlayerRatingAggregate = {
   memberId: string;
-  /** How many teammates rated him, his own note included (rule 1). */
+  /** How many teammates rated him. Never includes a note of his own (rule 1). */
   count: number;
   /** Sum of the scores. Kept so averages can be compared and merged without rounding (rule 2). */
   sum: number;
@@ -62,8 +64,6 @@ export type PlayerRatingAggregate = {
   averageLabel: string;
   best: number | null;
   worst: number | null;
-  /** The note he gave himself, if he rated himself. */
-  selfScore: number | null;
 };
 
 export type RatingAggregate = {
@@ -89,12 +89,32 @@ export type AggregateOptions = {
 export const RATING_SCORE_MIN = 0;
 export const RATING_SCORE_MAX = 10;
 
-/** Two notes minimum to be man of the match (rule 4). */
-export const MOTM_MIN_RATINGS = 2;
+/** Half-points (decision 137). The slider's `step`, and `ratings_score_half_step` in the database. */
+export const RATING_SCORE_STEP = 0.5;
 
-/** A score the database could not hold is not a score: the check constraint says 0..10, integer. */
+/**
+ * **Three notes before a figure is a figure** (rule 4): the floor under a match mean and under the
+ * man of the match, deliberately the same number in both places. It is also `MIN_RATINGS` in
+ * `lib/stats/aggregate.ts`, where it guards a season average — « three is the smallest number that
+ * needs a second opinion to agree » holds at both scales.
+ *
+ * It matters most for a match the coach published with notes still owed: two teammates' opinions are
+ * not a verdict, and « pas encore assez de notes » is the honest screen.
+ */
+export const MIN_NOTES_FOR_MEAN = 3;
+
+/**
+ * A score the database could not hold is not a score: `ratings_score_range` says 0..10 and
+ * `ratings_score_half_step` says the step is a half.
+ *
+ * The step is checked by `score * 2` being whole rather than with a modulo on `0.5`, because `0.5` is
+ * exact in binary floating point and so the doubling is exact too — no tolerance, and the same
+ * expression the check constraint uses.
+ */
 export function isValidScore(score: number): boolean {
-  return Number.isInteger(score) && score >= RATING_SCORE_MIN && score <= RATING_SCORE_MAX;
+  if (!Number.isFinite(score)) return false;
+  if (score < RATING_SCORE_MIN || score > RATING_SCORE_MAX) return false;
+  return Number.isInteger(score * 2);
 }
 
 type Acc = {
@@ -103,7 +123,6 @@ type Acc = {
   sum: number;
   best: number | null;
   worst: number | null;
-  selfScore: number | null;
 };
 
 /**
@@ -111,8 +130,9 @@ type Acc = {
  *
  * Works for one match or for a whole season: nothing here looks at `matchId`, so the same call
  * gives the recap its per-match averages and the stats screen its per-season ones. Rows whose
- * score is not a whole 0–10 are dropped rather than trusted — the column has a check constraint,
- * but a fixture or a future import path might not.
+ * score is off the scale or off the half-step are dropped rather than trusted, and so is a row where
+ * a member rated himself — the column has check constraints, but a fixture or a future import path
+ * might not, and under decision 137 a self-note is not a row the mean can reinterpret.
  */
 export function aggregateRatings(
   records: readonly RatingRecord[],
@@ -132,7 +152,6 @@ export function aggregateRatings(
       sum: 0,
       best: null,
       worst: null,
-      selfScore: null,
     };
     accumulators.set(memberId, created);
     return created;
@@ -142,12 +161,13 @@ export function aggregateRatings(
 
   for (const record of records) {
     if (!isValidScore(record.score)) continue;
+    // Nobody rates himself (rule 1). The member still gets an accumulator — he is rated by others.
+    if (record.raterMemberId === record.ratedMemberId) continue;
     const acc = accFor(record.ratedMemberId);
     acc.count += 1;
     acc.sum += record.score;
     acc.best = acc.best === null ? record.score : Math.max(acc.best, record.score);
     acc.worst = acc.worst === null ? record.score : Math.min(acc.worst, record.score);
-    if (record.raterMemberId === record.ratedMemberId) acc.selfScore = record.score;
     raters.add(record.raterMemberId);
     ratingCount += 1;
     total += record.score;
@@ -174,7 +194,6 @@ function toAggregate(acc: Acc): PlayerRatingAggregate {
     averageLabel: formatAverage(average),
     best: acc.best,
     worst: acc.worst,
-    selfScore: acc.selfScore,
   };
 }
 
@@ -247,7 +266,7 @@ export function manOfTheMatch(
   aggregate: RatingAggregate,
   options: { minRatings?: number } = {},
 ): ManOfTheMatch | null {
-  const minRatings = options.minRatings ?? MOTM_MIN_RATINGS;
+  const minRatings = options.minRatings ?? MIN_NOTES_FOR_MEAN;
   const eligible = rankByAverage(aggregate, { minRatings });
   const best = eligible[0];
   if (!best || best.average === null) return null;

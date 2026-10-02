@@ -7,13 +7,14 @@ import {
   formatAverageOutOfTen,
   isValidScore,
   manOfTheMatch,
+  MIN_NOTES_FOR_MEAN,
   rankByAverage,
   type RatingRecord,
 } from "./aggregate";
 
 /** A rating row, in the order it reads out loud: "karim rated hugo 8". */
-function rate(rater: string, rated: string, score: number, comment?: string): RatingRecord {
-  return { raterMemberId: rater, ratedMemberId: rated, score, comment: comment ?? null };
+function rate(rater: string, rated: string, score: number): RatingRecord {
+  return { raterMemberId: rater, ratedMemberId: rated, score };
 }
 
 describe("aggregateRatings", () => {
@@ -31,19 +32,29 @@ describe("aggregateRatings", () => {
     expect(aggregate.raterIds).toEqual(["julien", "karim", "samir"]);
   });
 
-  it("counts a self-rating like any other note, and exposes it separately", () => {
-    // Decision 007: a player rates everyone including himself.
+  it("drops a self-note instead of averaging it in", () => {
+    // Decision 007 required one and this module used to expose it as `selfScore`; decision 137 and
+    // `ratings_no_self` make it a row that cannot exist. A legacy or hand-written one is ignored, so
+    // the mean stays « what the others gave him » whatever is in the table.
     const aggregate = aggregateRatings([rate("hugo", "hugo", 9), rate("karim", "hugo", 5)]);
 
     const hugo = aggregate.byMember.get("hugo");
-    expect(hugo?.count).toBe(2);
-    expect(hugo?.average).toBe(7);
-    expect(hugo?.selfScore).toBe(9);
+    expect(hugo?.count).toBe(1);
+    expect(hugo?.average).toBe(5);
+    expect(aggregate.ratingCount).toBe(1);
+    // Rating only himself does not make him a participant either.
+    expect(aggregate.raterIds).toEqual(["karim"]);
   });
 
-  it("leaves selfScore null when the player did not rate himself", () => {
-    const aggregate = aggregateRatings([rate("karim", "hugo", 5)]);
-    expect(aggregate.byMember.get("hugo")?.selfScore).toBeNull();
+  it("averages the half-points the slider can produce", () => {
+    const aggregate = aggregateRatings([
+      rate("karim", "hugo", 7.5),
+      rate("samir", "hugo", 8),
+      rate("julien", "hugo", 6.5),
+    ]);
+
+    expect(aggregate.byMember.get("hugo")).toMatchObject({ count: 3, sum: 22, average: 22 / 3 });
+    expect(aggregate.byMember.get("hugo")?.averageLabel).toBe("7,3");
   });
 
   it("keeps a player rated by a single teammate, with a count of one", () => {
@@ -77,7 +88,8 @@ describe("aggregateRatings", () => {
     const aggregate = aggregateRatings([
       rate("karim", "hugo", 11),
       rate("samir", "hugo", -1),
-      rate("julien", "hugo", 7.5),
+      // Off the half-step: no slider produces it and `ratings_score_half_step` refuses it.
+      rate("julien", "hugo", 7.25),
       rate("leo", "hugo", 7),
     ]);
 
@@ -173,8 +185,10 @@ describe("manOfTheMatch", () => {
     const aggregate = aggregateRatings([
       rate("karim", "hugo", 9),
       rate("samir", "hugo", 8),
+      rate("julien", "hugo", 8.5),
       rate("karim", "leo", 6),
       rate("samir", "leo", 7),
+      rate("julien", "leo", 6.5),
     ]);
 
     const motm = manOfTheMatch(aggregate);
@@ -185,15 +199,18 @@ describe("manOfTheMatch", () => {
 
   it("returns every player on a tied average", () => {
     const aggregate = aggregateRatings([
-      // thomas: 16/2 = 8.
+      // thomas: 24/3 = 8.
       rate("karim", "thomas", 8),
       rate("samir", "thomas", 8),
-      // nico: 24/3 = 8. Same average from different fractions.
+      rate("julien", "thomas", 8),
+      // nico: 32/4 = 8. Same average from a different fraction.
       rate("karim", "nico", 9),
       rate("samir", "nico", 8),
       rate("julien", "nico", 7),
-      rate("karim", "leo", 5),
-      rate("samir", "leo", 5),
+      rate("leo", "nico", 8),
+      rate("karim", "pierre", 5),
+      rate("samir", "pierre", 5),
+      rate("julien", "pierre", 5),
     ]);
 
     const motm = manOfTheMatch(aggregate);
@@ -203,20 +220,27 @@ describe("manOfTheMatch", () => {
     expect(motm?.average).toBe(8);
   });
 
-  it("refuses to crown a player only one teammate rated", () => {
+  it("refuses to crown a player two teammates rated, with three notes on the board", () => {
     const aggregate = aggregateRatings([
       rate("karim", "momo", 10),
+      rate("samir", "momo", 10),
       rate("karim", "hugo", 8),
       rate("samir", "hugo", 8),
+      rate("julien", "hugo", 8),
     ]);
 
-    // momo has the best average but a single note; the title goes to the agreed 8.
+    // momo has the best average on two notes — which is what decision 025 allowed and decision 137
+    // does not. The title goes to the 8 three people agreed on.
     const motm = manOfTheMatch(aggregate);
     expect(motm?.members.map((player) => player.memberId)).toEqual(["hugo"]);
   });
 
   it("returns null when nobody has enough notes", () => {
-    const aggregate = aggregateRatings([rate("karim", "momo", 10), rate("karim", "hugo", 9)]);
+    const aggregate = aggregateRatings([
+      rate("karim", "momo", 10),
+      rate("samir", "momo", 10),
+      rate("karim", "hugo", 9),
+    ]);
     expect(manOfTheMatch(aggregate)).toBeNull();
   });
 
@@ -252,12 +276,36 @@ describe("formatAverage", () => {
 });
 
 describe("isValidScore", () => {
-  it("accepts whole numbers from 0 to 10 and nothing else", () => {
+  it("accepts 0 to 10 in half-points", () => {
     expect(isValidScore(0)).toBe(true);
+    expect(isValidScore(0.5)).toBe(true);
+    expect(isValidScore(7.5)).toBe(true);
     expect(isValidScore(10)).toBe(true);
+  });
+
+  it("refuses what no slider can produce and the column would not hold", () => {
     expect(isValidScore(-1)).toBe(false);
+    expect(isValidScore(-0.5)).toBe(false);
     expect(isValidScore(11)).toBe(false);
-    expect(isValidScore(7.5)).toBe(false);
+    expect(isValidScore(10.5)).toBe(false);
+    expect(isValidScore(7.25)).toBe(false);
+    expect(isValidScore(7.0001)).toBe(false);
     expect(isValidScore(Number.NaN)).toBe(false);
+    expect(isValidScore(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+});
+
+describe("MIN_NOTES_FOR_MEAN", () => {
+  it("is the same floor the man of the match uses, because they cannot disagree", () => {
+    // A figure too thin to show a player is too thin to crown him. `manOfTheMatch` takes its default
+    // from this constant; this test is what stops the two drifting apart again.
+    expect(MIN_NOTES_FOR_MEAN).toBe(3);
+    const aggregate = aggregateRatings([
+      rate("karim", "hugo", 8),
+      rate("samir", "hugo", 8),
+      rate("julien", "hugo", 8),
+    ]);
+    expect(manOfTheMatch(aggregate)?.members[0]?.memberId).toBe("hugo");
+    expect(manOfTheMatch(aggregate, { minRatings: MIN_NOTES_FOR_MEAN + 1 })).toBeNull();
   });
 });
