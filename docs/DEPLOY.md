@@ -185,6 +185,13 @@ the proof there is that `dev.7orteils.bgonzva.fr/connexion` and that deployment'
 byte-identical bodies while production's differs. **Re-check by comparing bodies or by `vercel inspect`,
 never by reading the log for an alias line that is not printed.**
 
+The sharpest instance is the `main` push for #134 (run 36979080977, all four jobs green):
+`dpl_F4obsfm3r4Qkb55m31Zqf12YEvTq`, `target preview`, holding the alias, with `created` **53 seconds**
+before the `inspect`. That short interval is the part worth keeping — it ties the alias to *that run's*
+`deploy-preview` rather than to some earlier deployment that happened to still hold the domain, which no
+single `inspect` of a long-settled deployment can do. When checking this again, read `created` as well as
+`target`.
+
 What is *not* observed is that `VERCEL_GIT_COMMIT_REF: main` is what wins the alias. Everything above is
 equally consistent with the pin being irrelevant and the domain going to the latest preview deployment
 whatever branch it claims. The discriminator would be a CLI preview deploy carrying a *different* ref and
@@ -208,6 +215,28 @@ below, and `"regions": ["lhr1"]` so the functions run in the same city as the da
 111). It is read from the repository rather than the dashboard, which is why the CI build honours it too.
 The build command is the default `npm run build`, and it deliberately does not migrate: decision 078 says
 why.
+
+### Whether a `proxy.ts` change reached a deployment: ask two paths, not one
+
+A route added to `PUBLIC_PATHS` in `proxy.ts` can be confirmed from outside with no secret and no
+account, which is not obvious when the route itself is built to look absent. The trick is that the
+answer only means something **as a pair**, against a control path that is deliberately *not* public:
+
+```bash
+curl -si https://dev.7orteils.bgonzva.fr/api/dev/trace       | head -1   # 404
+curl -si https://dev.7orteils.bgonzva.fr/api/dev/nope-control | head -1   # 307 → /connexion?suivant=…
+```
+
+The control path 307s to `/connexion`, which is the proxy refusing an unauthenticated request. The real
+path does not — so it was let through, reached its handler, and the `404` is that handler's own gate
+answering rather than Next failing to route. **Neither response says anything alone**: the 404 is
+indistinguishable from an absent route, and the 307 is what every path gets. It is the difference between
+them that locates the `PUBLIC_PATHS` entry in the deployed code.
+
+The same pair run against production returns `307` for *both*, which is how production is known to carry
+no trace route at all — no tag has been cut since it was added. Worth noting which of those is a gate and
+which is a circumstance: the absent code and the unset `TRACE_SECRET` are circumstances a tag would
+change, and `isTraceSinkEnabled` refusing `VERCEL_ENV === "production"` is the gate. Only count the gate.
 
 ### The Git integration deploys nothing
 
