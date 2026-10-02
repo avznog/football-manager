@@ -5047,3 +5047,87 @@ before — a match nobody played publishes vacuously, and the screen must still 
 au coup de sifflet final » rather than « c'est fermé ». And the demo season now carries the case the old
 seed could not: J3 and J5 are published and closed, while **J2, J6 and J7 are rateable whatever their
 age** — J2 is five weeks old and is the match to open `/notation` on to see this decision working.
+
+## 139 — The coach decides when a match's means are out, everybody rates, and nothing ever closes
+
+**2026-10-02** · accepted · **supersedes decision 138 entirely**, and decision 021 entirely ·
+**supersedes decision 137** on who may rate and on what publishes a match · supersedes the halves of
+decisions 007 / 020 / 022 that said a supporter may not rate · keeps 137's `minutes > 0` rule for who may
+be **rated**, and its « the raw notes are the coach's alone »
+
+The owner read the rules decisions 137 and 138 had built and said they were wrong, in one paragraph:
+**everyone can note, even the supporters; the notes are available only when the coach says so, per match;
+if he does not say so, nobody sees any mean except his own; if he does, everybody sees everybody's mean
+for that match.** Four follow-up answers settled the rest: any member may rate (not only those on the
+sheet), only those who played get a mean, the switch **goes both ways**, and a man who never rated may
+still rate after the means are out.
+
+**The rule, in four lines.**
+
+1. **Who may rate: any member of the team.** A supporter on the touchline watched the same hour. A named
+   substitute who never came on watched it too. A member who was not on the sheet at all may rate. So may
+   the non-playing coach — which is why `rating:submit` is the one self-scoped action in `can()` that does
+   not require `isPlayer`.
+2. **Who may be rated: only those who played**, `minutes > 0` in the reduced log. That is decision 137's
+   rule and it survives untouched. Nobody rates himself.
+3. **Visibility is one column and one hand.** `matches.ratings_published_at` null means hidden, a
+   timestamp means visible, and **the coach's tap is the only thing that writes either**. Nothing derives
+   it, nothing schedules it, the calendar does not touch it.
+4. **Nothing closes.** A played match is rateable for ever. The means being out does not stop a note, and
+   a note arriving afterwards moves a figure the squad has read.
+
+**What this gives up, said plainly, because it was said before it was chosen.** Decisions 021, 137 and
+138 all existed for one property: *nobody writes his notes after reading the team's.* **That guarantee is
+gone, in full.** A player can now read a published mean and then rate the man it belongs to. The owner was
+told this in those words and chose it anyway, and the trade is legible: he wants the figures under his own
+control, per match, more than he wants anchoring-proof arithmetic in a team of twelve who see each other
+every Sunday. Two smaller costs come with it. **A mean the squad has read can vanish**, because hiding is
+reversible and there is no record of what was visible when — a player who screenshotted his 4,2 keeps it.
+And a mean is never final, so « 7,5 » on a recap is « 7,5 so far ».
+
+**The rating window stops existing as a concept**, which is the largest deletion in this slice.
+`lib/rating/window.ts` and its tests are gone, `ratingWindow` / `NotationBlockedReason` /
+`getRatingWindow` / `publicationOf` / `ratingsPublication` / `owingRaterIds` with them, and
+`lib/rating/published.ts` is one predicate over one nullable column: `meansAreVisible(publishedAtMs)`.
+Publication had a derived clause under 137 — « every expected set is in » — and deleting it removes the
+rater→rated graph from the publication question entirely: `lib/stats/queries.ts` drops
+`getRatingAuthors`, `lib/stats/ratings.ts` drops its nested maps, `getNotationView` loses a round trip,
+and the season's score query can start before the logs are replayed.
+
+**The two refusals the server no longer makes.** `submitRatings` had four rules and has three: « la
+notation est fermée : les moyennes sont sorties » went with the window, and « seuls les joueurs qui ont
+joué peuvent noter » went with rule 1. What stayed is the one that matters against a crafted post — the
+set of legal targets is re-derived from the log, so self-notes and notes on a 0-minute substitute are
+still dropped rather than trusted, and `ratings_no_self` says the same thing in Postgres.
+
+**`rating:publish` is one permission, both ways.** `publishRatings` writes the instant, `hideRatings`
+writes null back, and they share their checks in one helper. Splitting them into two actions would let a
+coach who may show end up unable to undo it, which on a per-match switch somebody will need within a
+week. Publishing stays idempotent — two taps on a slow connection must not move the moment the notes came
+out — while hiding and showing again *does* move it, which is right: that is a new decision, not a repeat
+of the old one.
+
+**The coach's « who has spoken » changes denominator, not shape.** `owing` / `raterTotal` counted the
+players with minutes, because they were who publication waited for. Nothing waits for anybody, and any
+member may rate, so `RaterTally` counts the **active members** — « 4 membres sur 9 », the coach included —
+and `silent` replaces `owing`, because the form posts a whole set at once and « has not finished »
+collapses to « has sent nothing ». Members who have left are on neither side of the fraction: a
+denominator that can never be reached is a figure that lies.
+
+**What the screens had to stop saying**, all of it true last week and false now: « seuls les joueurs qui
+ont joué donnent des notes » (an EmptyState, deleted), « La notation est fermée » (deleted), « les
+moyennes sortiront quand tout le monde aura noté » (three places), « elles ne bougeront plus, et plus
+personne ne pourra noter ce match » (the publish form's whole justification under 138), and « ceux qui
+étaient sur le terrain avec toi » (the reader may not have been on it). What replaces the deadline is
+`ratingInvitationFr(meansVisible)`, which states who decides and, when the figures are already out, that
+his notes will still move one the squad has read — decision 079's rule applied to a limit that has
+stopped existing. A reader who did not play is also told **why he is asked anyway**, in his own case:
+supporter, named-but-never-on, and not-on-the-sheet are three sentences, because the three EmptyStates
+this replaces told them apart and losing that would read as a bug.
+
+**One guard that looks cosmetic and is not.** The match page's rating card dropped `notation.played` and
+gained `progress.requiredCount > 0`. An empty set is *vacuously* complete, so without it a match nobody
+played would congratulate every reader on having noted everybody; `played` used to rule that out as a
+side effect.
+
+**No migration.** `ratings_published_at` was already a nullable `timestamptz`, so hiding is `set null`.
