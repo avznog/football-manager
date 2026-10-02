@@ -7,8 +7,10 @@
  * yet reads « pas encore de données » rather than `0`.
  *
  * Read-only, so no new permission: any member of the team may read it (`team:read`, decision 002),
- * and the layout guard has already refused anyone with no team. The one thing that differs between
- * two readers is the ratings, which decision 007 gates per match — see `lib/stats/ratings.ts`.
+ * and the layout guard has already refused anyone with no team. **Nothing on it differs between two
+ * readers.** That used to be false — decision 021 gated the ratings per viewer, so two teammates saw
+ * two « meilleures notes » and neither could tell which was the team's. Decision 137 publishes a
+ * match's means to everybody at once or to nobody, so there is one answer and this page prints it.
  */
 
 import Link from "next/link";
@@ -17,7 +19,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { competitionLabelOf, statsFilterOptions } from "@/lib/competition/options";
 import { getTeamCompetitions } from "@/lib/competition/queries";
-import { MIN_RATINGS, isPlayerSortKey, sortPlayers } from "@/lib/stats/aggregate";
+import { MIN_RATED_MATCHES, isPlayerSortKey, sortPlayers } from "@/lib/stats/aggregate";
 import {
   DEFAULT_CRITERION,
   DEFAULT_DIRECTION,
@@ -25,8 +27,8 @@ import {
 } from "@/lib/stats/best-seven-copy";
 import {
   formatRating,
-  hiddenRatingMatchesNoteFr,
   matchCount,
+  pendingRatingMatchesNoteFr,
   plural,
 } from "@/lib/stats/format";
 import { getSeasonStats } from "@/lib/stats/queries";
@@ -72,9 +74,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
     sort: isPlayerSortKey(sortValue) ? sortValue : DEFAULT_SORT,
   };
 
-  const stats = await getSeasonStats(team.id, team.membershipId, {
-    competitionId: query.competitionId,
-  });
+  const stats = await getSeasonStats(team.id, { competitionId: query.competitionId });
 
   // The coach's own word for it, lowercased into the sentence — « Saison en cours, championnat D3 ».
   const filterLabel = competitionLabelOf(competitions, query.competitionId);
@@ -202,20 +202,24 @@ function SeasonCards({
         />
         <Leaderboard
           title="Meilleures notes"
-          description={`Moyenne reçue, à partir de ${plural(MIN_RATINGS, "note")}`}
+          /* « à partir de 3 matchs notés », not « 3 notes » (decision 137). A season average is the
+             mean of one settled figure per match now, so the threshold counts matches — and the old
+             wording was the more forgiving of the two, which is the direction that misleads. */
+          description={`Moyenne reçue, à partir de ${plural(MIN_RATED_MATCHES, "match noté", "matchs notés")}`}
           entries={stats.topRated}
           valueLabel={(entry) => formatRating(entry.value)}
-          countLabel={(entry) => plural(entry.count, "note")}
+          countLabel={(entry) => plural(entry.count, "match noté", "matchs notés")}
           emptyMessage={
-            // A masked average and a missing average are two different facts, and saying « personne
-            // n’a été noté » to somebody who simply has not voted yet would be a lie.
-            stats.hiddenRatingMatches > 0
-              ? "Aucune moyenne à afficher pour l’instant."
-              : `Personne n’a encore reçu ${plural(MIN_RATINGS, "note")} : une moyenne sur une ou deux notes ne veut rien dire, donc le classement attend.`
+            // A ranking waiting on the notes to come in and a ranking nobody qualifies for are two
+            // different facts, and saying « personne n’a assez de matchs » while three matches are
+            // still being rated would be the wrong one.
+            stats.pendingRatingMatches > 0
+              ? "Aucune moyenne à afficher pour l’instant : des matchs attendent encore leurs notes."
+              : `Personne n’a encore ${plural(MIN_RATED_MATCHES, "match noté", "matchs notés")} : une moyenne sur un ou deux matchs ne veut rien dire, donc le classement attend.`
           }
           // Shared with `/stats/equipe-type`, which builds a seven out of these same averages and
-          // owes the reader the same sentence about them (decision 021). Same words, one source.
-          note={hiddenRatingMatchesNoteFr(stats.hiddenRatingMatches) ?? undefined}
+          // owes the reader the same sentence about them. Same words, one source.
+          note={pendingRatingMatchesNoteFr(stats.pendingRatingMatches) ?? undefined}
         />
       </div>
 
@@ -223,7 +227,7 @@ function SeasonCards({
         players={sortPlayers(stats.players, query.sort)}
         query={query}
         markedSessions={stats.markedSessions}
-        hiddenRatingMatches={stats.hiddenRatingMatches}
+        pendingRatingMatches={stats.pendingRatingMatches}
       />
 
       <div className="space-y-4">

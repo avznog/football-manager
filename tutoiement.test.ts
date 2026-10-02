@@ -128,10 +128,11 @@ const ALLOWED_PRONOUN_SPELLINGS = /rendez-vous/giu;
  *   the rest of this list needs. It is the commonest politeness form in French interface copy —
  *   « Veuillez patienter », « Veuillez réessayer » — and the tree has never contained it, which is the
  *   reason to add it before it appears rather than after.
- * - **`notez` is kept**, despite « noter » being a domain verb here: the ratings screen already writes
- *   the imperative as « Note tes coéquipiers » (`recap/_components/ratings-panel.tsx`), so the `tu` form
- *   is the one in use and the `vous` form is free to be a breach. The nouns are different words and
- *   whole-word matching does not touch them — « Note », « notes », « aucune note » all stay silent.
+ * - **`notez` is kept**, despite « noter » being a domain verb here: the ratings screens already write
+ *   the imperative as « Noter mes coéquipiers » and « Note tes coéquipiers »
+ *   (`match/[id]/notation/page.tsx`, `recap/_components/ratings-panel.tsx`), so the `tu` form is the one
+ *   in use and the `vous` form is free to be a breach. The nouns are different words and whole-word
+ *   matching does not touch them — « Note », « notes », « aucune note » all stay silent.
  *
  * `vous confirmez` and the other indicative readings need no thought: the pronoun in front of them is
  * already a breach of the first rule.

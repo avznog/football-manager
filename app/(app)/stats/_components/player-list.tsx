@@ -20,7 +20,7 @@ import {
   formatAttendance,
   formatMinutes,
   formatRating,
-  matchCount,
+  pendingRatingMatchesNoteFr,
   plural,
 } from "@/lib/stats/format";
 
@@ -31,13 +31,16 @@ export function PlayerList({
   players,
   query,
   markedSessions,
-  hiddenRatingMatches,
+  pendingRatingMatches,
 }: {
   players: readonly PlayerSeasonStats[];
   query: StatsQuery;
   markedSessions: number;
-  /** Matches whose ratings decision 007 keeps from this reader, so a dash is not read as "none". */
-  hiddenRatingMatches: number;
+  /**
+   * Matches whose means are not out yet, so a dash is not read as « nobody rated him ». It used to be
+   * a count of matches *this reader* had not rated — the same number for everybody now (decision 137).
+   */
+  pendingRatingMatches: number;
 }) {
   /**
    * Every figure on a row is inside the competition filter except the attendance, which cannot be:
@@ -81,12 +84,11 @@ export function PlayerList({
           Un joueur non pointé n’est pas un absent.
           {filtered ? ` ${ATTENDANCE_NOT_FILTERED_FR}` : ""}
         </Note>
-        {hiddenRatingMatches > 0 ? (
-          // Without this, a masked average is indistinguishable from an average nobody has given.
-          <Note>
-            Les notes de {matchCount(hiddenRatingMatches)} ne sont pas comptées ici : tu étais sur
-            la feuille et tu n’as pas encore noté tes coéquipiers.
-          </Note>
+        {pendingRatingMatches > 0 ? (
+          // Without this, a figure short of matches is indistinguishable from an average nobody has
+          // given. One sentence from one place, so this table and « Meilleures notes » above it
+          // cannot come to disagree about a rule that belongs to neither of them.
+          <Note>{pendingRatingMatchesNoteFr(pendingRatingMatches)}</Note>
         ) : null}
       </div>
     </Card>

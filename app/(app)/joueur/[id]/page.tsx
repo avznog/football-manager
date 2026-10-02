@@ -219,11 +219,7 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
       )}
 
       {profile.isPlayer ? (
-        <PlayerStatsCard
-          teamId={team.id}
-          viewerMemberId={team.membershipId}
-          memberId={profile.membershipId}
-        />
+        <PlayerStatsCard teamId={team.id} memberId={profile.membershipId} isSelf={isSelf} />
       ) : null}
 
       {canRemove && !isSelf && !profile.isLastCoach ? (
