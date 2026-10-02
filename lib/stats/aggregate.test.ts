@@ -4,7 +4,7 @@ import type { MatchStatLine } from "./match-lines";
 import {
   FORM_LENGTH,
   LEADERBOARD_SIZE,
-  MIN_RATINGS,
+  MIN_RATED_MATCHES,
   type PlayerSeasonStats,
   type SeasonInput,
   type StatsMatch,
@@ -329,22 +329,32 @@ describe("attendance with unmarked sessions", () => {
 
 describe("ratings", () => {
   const members = [member("julien", "Julien"), member("karim", "Karim")];
-  const matches = [match("m1"), match("m2", { kickoffAt: "2026-09-13T08:30:00.000Z" })];
+  const matches = [
+    match("m1"),
+    match("m2", { kickoffAt: "2026-09-13T08:30:00.000Z" }),
+    match("m3", { kickoffAt: "2026-09-20T08:30:00.000Z" }),
+  ];
 
-  it("averages over matches without rounding, and counts what it averaged", () => {
+  /** `MIN_NOTES_FOR_MEAN` notes of the same value — the cheapest way to give a match a known mean. */
+  const notes = (matchId: string, ratedMemberId: string, ...scores: number[]) =>
+    scores.map((score) => ({ matchId, ratedMemberId, score }));
+
+  it("averages one mean per match, un-rounded, and counts the matches", () => {
+    // Decision 137's unit. Three matches, three means — 8, 6 and 7 — so the season average is 7 over
+    // nine notes that are never averaged together: m1's four notes do not outweigh m2's three.
     const stats = season({
       members,
       matches,
       ratings: [
-        { matchId: "m1", ratedMemberId: "julien", score: 7 },
-        { matchId: "m1", ratedMemberId: "julien", score: 8 },
-        { matchId: "m2", ratedMemberId: "julien", score: 6 },
+        ...notes("m1", "julien", 7, 8, 8, 9),
+        ...notes("m2", "julien", 6, 6, 6),
+        ...notes("m3", "julien", 7, 7, 7),
       ],
     });
     expect(playerNamed(stats.players, "julien").rating).toEqual({
       average: 7,
       count: 3,
-      // Mean 7; deviations 0, +1, -1 → 2 / 3.
+      // Mean 7; deviations +1, −1, 0 → 2 / 3. Match-to-match variation, not rater disagreement.
       variance: 2 / 3,
     });
     expect(playerNamed(stats.players, "karim").rating).toEqual({
@@ -354,28 +364,46 @@ describe("ratings", () => {
     });
   });
 
-  it("ignores a rating attached to a match outside the filter", () => {
+  it("ignores a note attached to a match outside the filter", () => {
     const stats = season({
       members,
       matches: [match("m1")],
-      ratings: [{ matchId: "m2", ratedMemberId: "julien", score: 9 }],
+      ratings: notes("m2", "julien", 9, 9, 9),
     });
     expect(playerNamed(stats.players, "julien").rating.count).toBe(0);
   });
 
-  it("measures the spread over the ratings the viewer may see, and no others", () => {
-    // `queries.ts` never reads a score from a gated match (decision 021), so a hidden rating simply
-    // is not in this input. What must not happen is the *matches* filter leaking into the spread:
-    // m2's 2 is dropped here, and a variance that still counted it would be 8 rather than 0.
+  it("gives no mean at all to a match two people rated", () => {
+    // The floor is `MIN_NOTES_FOR_MEAN`, and it is the same number that refuses to crown a man of the
+    // match (`lib/rating/aggregate.ts`): a figure too thin to show is too thin to average. m2 has two
+    // notes, so it contributes nothing — not a mean of 2, which would halve his season.
     const stats = season({
       members,
-      matches: [match("m1")],
+      matches,
+      ratings: [...notes("m1", "julien", 8, 8, 8), ...notes("m2", "julien", 2, 2)],
+    });
+    expect(playerNamed(stats.players, "julien").rating).toEqual({
+      average: 8,
+      count: 1,
+      variance: null,
+    });
+    // He still has a row: a note received is something to show, even where there are too few of them.
+    expect(playerNamed(stats.players, "julien").hasData).toBe(true);
+  });
+
+  it("measures the spread over the matches in the filter, and no others", () => {
+    // `queries.ts` never reads a score from an unpublished match (decision 137), so an unpublished
+    // one simply is not in this input. What must not happen is the *matches* filter leaking into the
+    // spread: m2's 2s are dropped here, and a variance that still counted them would be 9, not 0.
+    const stats = season({
+      members,
+      matches: [match("m1"), match("m2", { kickoffAt: "2026-09-13T08:30:00.000Z" })],
       ratings: [
-        { matchId: "m1", ratedMemberId: "julien", score: 8 },
-        { matchId: "m1", ratedMemberId: "julien", score: 8 },
-        { matchId: "m2", ratedMemberId: "julien", score: 2 },
+        ...notes("m1", "julien", 8, 8, 8),
+        ...notes("m2", "julien", 8, 8, 8),
+        ...notes("m3", "julien", 2, 2, 2),
       ],
-      hiddenRatingMatches: 1,
+      pendingRatingMatches: 1,
     });
 
     expect(playerNamed(stats.players, "julien").rating).toEqual({
@@ -385,16 +413,16 @@ describe("ratings", () => {
     });
   });
 
-  it(`keeps a thin average out of the leaderboard but not out of the table (${MIN_RATINGS} minimum)`, () => {
+  it(`keeps a thin average out of the leaderboard but not out of the table (${MIN_RATED_MATCHES} matches minimum)`, () => {
     const stats = season({
       members,
       matches,
       ratings: [
-        // Karim: one glowing rating. Real, shown on his row, not a ranking.
-        { matchId: "m1", ratedMemberId: "karim", score: 10 },
-        { matchId: "m1", ratedMemberId: "julien", score: 6 },
-        { matchId: "m1", ratedMemberId: "julien", score: 6 },
-        { matchId: "m2", ratedMemberId: "julien", score: 6 },
+        // Karim: one glowing match. Real, shown on his row, not a ranking.
+        ...notes("m1", "karim", 10, 10, 10),
+        ...notes("m1", "julien", 6, 6, 6),
+        ...notes("m2", "julien", 6, 6, 6),
+        ...notes("m3", "julien", 6, 6, 6),
       ],
     });
 
@@ -412,18 +440,18 @@ describe("ratings", () => {
       members,
       matches,
       ratings: [
-        { matchId: "m1", ratedMemberId: "julien", score: 0 },
-        { matchId: "m1", ratedMemberId: "julien", score: 0 },
-        { matchId: "m2", ratedMemberId: "julien", score: 0 },
+        ...notes("m1", "julien", 0, 0, 0),
+        ...notes("m2", "julien", 0, 0, 0),
+        ...notes("m3", "julien", 0, 0, 0),
       ],
     });
     expect(stats.topRated).toHaveLength(1);
     expect(stats.topRated[0]).toMatchObject({ teamMemberId: "julien", value: 0, count: 3 });
   });
 
-  it("passes the count of matches whose ratings are hidden from the viewer", () => {
-    expect(season({ hiddenRatingMatches: 2 }).hiddenRatingMatches).toBe(2);
-    expect(season().hiddenRatingMatches).toBe(0);
+  it("passes the count of matches still waiting on their notes", () => {
+    expect(season({ pendingRatingMatches: 2 }).pendingRatingMatches).toBe(2);
+    expect(season().pendingRatingMatches).toBe(0);
   });
 });
 
@@ -646,7 +674,12 @@ describe("sorting the table", () => {
       line("m1", "b", { minutes: 30, goals: 4 }),
       line("m1", "c", { minutes: 45, goals: 1 }),
     ],
-    ratings: [{ matchId: "m1", ratedMemberId: "b", score: 8 }],
+    // Three notes, because one does not make a mean any more (decision 137).
+    ratings: [
+      { matchId: "m1", ratedMemberId: "b", score: 8 },
+      { matchId: "m1", ratedMemberId: "b", score: 8 },
+      { matchId: "m1", ratedMemberId: "b", score: 8 },
+    ],
     attendance: [{ teamMemberId: "c", present: true }],
   });
 

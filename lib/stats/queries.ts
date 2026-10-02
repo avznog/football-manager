@@ -7,7 +7,7 @@ import "server-only";
  * Drizzle row with a live `Date` on it ever crosses the RSC boundary (`CLAUDE.md`).
  *
  * This module **fetches**; it decides nothing. The rules live in the pure modules next to it:
- * `match-lines.ts` (cache or reduction), `ratings.ts` (who may see a rating), `aggregate.ts` (every
+ * `match-lines.ts` (cache or reduction), `ratings.ts` (whose means are out), `aggregate.ts` (every
  * season number). That separation is what lets the interesting cases be tested from hand-written
  * fixtures instead of from a database.
  *
@@ -20,7 +20,7 @@ import "server-only";
  * M4 freezes a match at the final whistle, a season aggregate replays nothing at all.
  */
 
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { db } from "@/db/client";
@@ -56,7 +56,13 @@ import {
   matchesNeedingReduction,
   resolveMatchStatLines,
 } from "./match-lines";
-import { type RatingAuthorRow, type VisibleRatingRow, ratingVisibility } from "./ratings";
+import {
+  type MatchPublicationRow,
+  type PlayedRow,
+  type RatingAuthorRow,
+  type VisibleRatingRow,
+  seasonRatingPublication,
+} from "./ratings";
 
 /* -------------------------------------------------------------------------- */
 /* The filter                                                                 */
@@ -123,6 +129,8 @@ async function getFinishedMatches(
     competitionLabel: string;
     periodsCount: number;
     periodMinutes: number;
+    /** When the coach released this match's means, in epoch ms, or null (decision 137). */
+    ratingsPublishedAtMs: number | null;
   }>;
   liveCount: number;
 }> {
@@ -139,6 +147,7 @@ async function getFinishedMatches(
       competitionLabel: competitions.labelFr,
       periodsCount: matches.periodsCount,
       periodMinutes: matches.periodMinutes,
+      ratingsPublishedAt: matches.ratingsPublishedAt,
     })
     .from(matches)
     .innerJoin(competitions, eq(competitions.id, matches.competitionId))
@@ -151,9 +160,35 @@ async function getFinishedMatches(
     .where(and(eq(matches.teamId, teamId), eq(matches.status, "live"), competitionPredicate));
 
   return {
-    rows: rows.map((row) => ({ ...row, kickoffAt: row.kickoffAt.toISOString() })),
+    rows: rows.map(({ ratingsPublishedAt, ...row }) => ({
+      ...row,
+      kickoffAt: row.kickoffAt.toISOString(),
+      ratingsPublishedAtMs: ratingsPublishedAt?.getTime() ?? null,
+    })),
     liveCount: Number(live[0]?.count ?? 0),
   };
+}
+
+/**
+ * The team's most recent kick-off that has already happened, in epoch ms, or null.
+ *
+ * One row, and it answers « has the rating window shut » for **every** match at once: a window closes
+ * at the next kick-off (`lib/rating/window.ts`), so it is shut for exactly the matches that kicked
+ * off *before* this instant. The alternative — `getNextKickoffAfter` per match, as the single-match
+ * screens do — is one round trip per finished match of the season.
+ *
+ * Deliberately **not** filtered by competition, and deliberately not restricted to finished matches:
+ * the window is the calendar's, not the filter's. A cup tie on Wednesday closes the league match of
+ * the Sunday before, and a match abandoned without a final whistle still kicked off.
+ */
+async function getLatestStartedKickoffMs(teamId: string, nowMs: number): Promise<number | null> {
+  const rows = await db
+    .select({ kickoffAt: sql<Date | null>`max(${matches.kickoffAt})` })
+    .from(matches)
+    .where(and(eq(matches.teamId, teamId), lte(matches.kickoffAt, new Date(nowMs))));
+
+  const latest = rows[0]?.kickoffAt ?? null;
+  return latest === null ? null : new Date(latest).getTime();
 }
 
 /** The match sheets: the source of truth for titulaire / remplaçant / supporter. */
@@ -236,8 +271,8 @@ async function getEventsFor(matchIds: readonly string[]): Promise<MatchEventReco
 }
 
 /**
- * Who rated whom, **without the scores** — everything the gate in `ratings.ts` needs to decide what
- * this viewer has earned. Deliberately selects no `score` column: a score the viewer may not read
+ * Who rated whom, **without the scores** — everything `ratings.ts` needs to work out which matches
+ * have every expected set in. Deliberately selects no `score` column: an unpublished match's scores
  * should not leave the database at all, rather than be fetched and then filtered out in JavaScript,
  * where a later refactor could quietly forget the filter.
  */
@@ -253,11 +288,11 @@ async function getRatingAuthors(matchIds: readonly string[]): Promise<RatingAuth
     .where(inArray(ratings.matchId, [...matchIds]));
 }
 
-/** The scores themselves, for the matches the gate has opened — and for no others. */
+/** The scores themselves, for the matches whose means are out — and for no others. */
 async function getVisibleRatingScores(
-  visibleMatchIds: readonly string[],
+  publishedMatchIds: readonly string[],
 ): Promise<VisibleRatingRow[]> {
-  if (visibleMatchIds.length === 0) return [];
+  if (publishedMatchIds.length === 0) return [];
   return db
     .select({
       matchId: ratings.matchId,
@@ -265,7 +300,7 @@ async function getVisibleRatingScores(
       score: ratings.score,
     })
     .from(ratings)
-    .where(inArray(ratings.matchId, [...visibleMatchIds]));
+    .where(inArray(ratings.matchId, [...publishedMatchIds]));
 }
 
 /**
@@ -302,11 +337,6 @@ export type SeasonStatsResult = SeasonStats & {
   /** Sessions with at least one player judged — the denominator's denominator. */
   markedSessions: number;
   /**
-   * Per member, how many of those hidden matches hold a note about *them* — which is the only number
-   * a single player's average may be explained with (`ratings.ts`).
-   */
-  hiddenRatingMatchesByMember: Record<string, number>;
-  /**
    * Matches whose numbers had to be replayed from the log because the cache had no row for them.
    * Zero once M4 freezes every final whistle; useful while it does not.
    */
@@ -314,10 +344,14 @@ export type SeasonStatsResult = SeasonStats & {
 };
 
 /**
- * Everything `/stats` shows, for one team, through one viewer's eyes.
+ * Everything `/stats` shows, for one team. **The same numbers for every reader.**
  *
- * `viewerMemberId` only affects the ratings: the aggregate is otherwise the same for everybody, and
- * the gate is decision 007's, applied match by match (`ratings.ts`).
+ * It used to take a `viewerMemberId`, because decision 021 made a season average a view of what the
+ * reader had earned: he saw the matches he had rated and a count of the ones he had not. Decision 137
+ * removes the premise — nobody reads an individual note but the coach, so a mean is either out or it
+ * is not — and with it the parameter, the per-member hidden counts, and the three screens that had to
+ * say « d'après les matchs que tu as notés ». A number two teammates can compare is worth more than
+ * one each of them had to earn.
  *
  * `cache()`d so a page that renders the team card, the tables and a per-player card costs a single
  * pass — and so `generateMetadata` is free.
@@ -325,14 +359,16 @@ export type SeasonStatsResult = SeasonStats & {
 export const getSeasonStats = cache(
   async (
     teamId: string,
-    viewerMemberId: string | null,
     filter: StatsFilter = { competitionId: null },
+    nowMs: number = Date.now(),
   ): Promise<SeasonStatsResult> => {
-    const [{ rows: matchRows, liveCount }, members, attendance] = await Promise.all([
-      getFinishedMatches(teamId, filter),
-      getStatsMembers(teamId),
-      getAttendanceMarks(teamId),
-    ]);
+    const [{ rows: matchRows, liveCount }, members, attendance, latestStartedKickoffMs] =
+      await Promise.all([
+        getFinishedMatches(teamId, filter),
+        getStatsMembers(teamId),
+        getAttendanceMarks(teamId),
+        getLatestStartedKickoffMs(teamId, nowMs),
+      ]);
 
     const matchIds = matchRows.map((match) => match.id);
 
@@ -386,14 +422,36 @@ export const getSeasonStats = cache(
 
     const { lines, reducedMatchIds } = resolveMatchStatLines({ matchIds, cached, logs });
 
-    const visibility = ratingVisibility({
+    /*
+     * Minutes are what decides who was expected to rate and who could be rated (decision 137), and
+     * they come from the lines just resolved — the cache when M4 froze the match, the log otherwise.
+     * So this has to sit after `resolveMatchStatLines` and cannot join the parallel batch above.
+     */
+    const played: PlayedRow[] = lines.map((line) => ({
+      matchId: line.matchId,
+      teamMemberId: line.teamMemberId,
+      minutes: line.minutes,
+    }));
+
+    const publication = seasonRatingPublication({
       matchIds,
-      squad,
+      played,
       authors: ratingAuthors,
-      viewerMemberId,
+      matches: matchRows.map(
+        (match): MatchPublicationRow => ({
+          matchId: match.id,
+          publishedAtMs: match.ratingsPublishedAtMs,
+          // Shut for every match that kicked off before the last one to have started.
+          windowClosed:
+            latestStartedKickoffMs !== null &&
+            new Date(match.kickoffAt).getTime() < latestStartedKickoffMs,
+        }),
+      ),
     });
-    // A second round trip, on purpose: the gate decides first, and only then are any scores read.
-    const visibleRatingRows = await getVisibleRatingScores(visibility.visibleMatchIds);
+
+    // A second round trip, on purpose: publication is decided first, and only then are any scores
+    // read. An unpublished match's notes never reach this process.
+    const visibleRatingRows = await getVisibleRatingScores(publication.publishedMatchIds);
 
     const statsMatches: StatsMatch[] = matchRows.map((match) => ({
       id: match.id,
@@ -413,7 +471,7 @@ export const getSeasonStats = cache(
       squad,
       attendance,
       ratings: visibleRatingRows,
-      hiddenRatingMatches: visibility.hiddenMatchIds.length,
+      pendingRatingMatches: publication.pendingMatchIds.length,
     });
 
     return {
@@ -422,7 +480,6 @@ export const getSeasonStats = cache(
       matchesConsidered: matchRows.length,
       liveMatches: liveCount,
       markedSessions,
-      hiddenRatingMatchesByMember: visibility.hiddenRatedCounts,
       reducedFromLog: reducedMatchIds.length,
     };
   },
@@ -437,11 +494,10 @@ export const getSeasonStats = cache(
  */
 export async function getPlayerSeasonStats(
   teamId: string,
-  viewerMemberId: string | null,
   teamMemberId: string,
   filter: StatsFilter = { competitionId: null },
 ): Promise<{ player: SeasonStats["players"][number] | null; season: SeasonStatsResult }> {
-  const season = await getSeasonStats(teamId, viewerMemberId, filter);
+  const season = await getSeasonStats(teamId, filter);
   return {
     player: season.players.find((row) => row.teamMemberId === teamMemberId) ?? null,
     season,

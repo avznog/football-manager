@@ -98,7 +98,7 @@ describe("shrinkage", () => {
     player({ ratingAverage: 6.1, ratingCount: 9, ratingVariance: 1 }),
   ];
 
-  it("ranks a single 9,0 below a twelve-rating 7,4", () => {
+  it("ranks a one-match 9,0 below a twelve-match 7,4", () => {
     const flash = player({ displayName: "Éclair", ratingAverage: 9, ratingCount: 1 });
     const steady = player({
       displayName: "Régulier",
@@ -114,10 +114,10 @@ describe("shrinkage", () => {
     expect(adjustedOf("Éclair")).toBeLessThan(figure(adjustedOf("Régulier")));
     // And the raw figure is still there to print next to it (decision 072).
     const flashCell = evaluation.cells[candidates.indexOf(flash)][0];
-    expect(flashCell.observed).toMatchObject({ rate: 9, denominator: 1, denominatorUnit: "ratings" });
+    expect(flashCell.observed).toMatchObject({ rate: 9, denominator: 1, denominatorUnit: "ratedMatches" });
   });
 
-  it("does not gate: one rating is still a candidate, it is merely disbelieved", () => {
+  it("does not gate: one rated match is still a candidate, it is merely disbelieved", () => {
     const flash = player({ displayName: "Éclair", ratingAverage: 10, ratingCount: 1 });
     const result = bestSeven({
       criterion: "ratings",
@@ -125,7 +125,7 @@ describe("shrinkage", () => {
       slots: [slot("s", "AT")],
       candidates: [flash, ...ordinary()],
     });
-    // `/stats` would drop him outright for being under MIN_RATINGS. Here he is ranked — and still
+    // `/stats` would drop him outright for being under MIN_RATED_MATCHES. Here he is ranked — and still
     // wins the slot, because a 10 shrunk towards 6 is above 6 — but he is ranked on a figure that
     // says how little is known, which is an answer rather than a refusal to answer.
     expect(pickedName(result, "s")).toBe("Éclair");
@@ -243,7 +243,7 @@ describe("the measured prior strength", () => {
     player({ ratingAverage: average, ratingCount: count, ratingVariance: variance });
 
   it("measures a value inside the clamp from a squad that has a real spread", () => {
-    // Four players, within-player variance 1.0, means 5/6/6/7 over eight ratings each.
+    // Four players, within-player variance 1.0, means 5/6/6/7 over eight rated matches each.
     // Observed spread of the means is 0.5, of which 1.0/8 = 0.125 is sampling noise, so the real
     // between-player spread is 0.375 and m = 1.0 / 0.375 = 2.666…
     const report = fitShrinkage([rated(5), rated(6), rated(6), rated(7)], "ratings", "allPitch");
@@ -253,7 +253,7 @@ describe("the measured prior strength", () => {
     expect(report.betweenPlayerVariance).toBeCloseTo(0.375, 10);
     expect(report.measured).toBeCloseTo(1 / 0.375, 6);
     expect(report.priorStrength).toBeCloseTo(1 / 0.375, 6);
-    expect(report.unit).toBe("ratings");
+    expect(report.unit).toBe("ratedMatches");
   });
 
   it("is maximally sceptical about a uniform squad and trusting of a squad with gulfs", () => {
@@ -305,9 +305,9 @@ describe("the measured prior strength", () => {
   });
 
   it("prints no figure at all on a selection where nobody has a rating to show (rule 1b)", () => {
-    // Decision 021 can hide every rating in a competition from a reader who has not voted, which is
-    // how this used to reach a real screen: seven discs, « 0,0 » each, on a 0–10 scale, under a team
-    // figure that correctly said « — ».
+    // A competition whose matches are all still waiting on their notes has no mean anywhere, which is
+    // how this reached a real screen: seven discs, « 0,0 » each, on a 0–10 scale, under a team figure
+    // that correctly said « — ». Decision 137 changed the cause and not the case.
     const result = bestSeven({
       criterion: "ratings",
       direction: "best",
@@ -401,7 +401,7 @@ describe("the measured prior strength", () => {
       slots: [slot("s", "AT")],
       candidates: [rated(5), rated(6), rated(6), rated(7)],
     });
-    expect(result.shrinkage.unit).toBe("ratings");
+    expect(result.shrinkage.unit).toBe("ratedMatches");
     expect(result.shrinkage.priorStrength).toBeCloseTo(1 / 0.375, 6);
     expect(result.shrinkage.clamp).toEqual(PRIOR_STRENGTH_CLAMP.ratings);
   });
@@ -1039,7 +1039,7 @@ describe("the output a screen can be honest with", () => {
     // « 7,0 » and « 9,0 sur 1 note », both on screen, neither on hover.
     expect(pick?.observed.rate).toBe(9);
     expect(pick?.observed.denominator).toBe(1);
-    expect(pick?.observed.denominatorUnit).toBe("ratings");
+    expect(pick?.observed.denominatorUnit).toBe("ratedMatches");
     expect(pick?.adjusted).toBeLessThan(9);
     expect(pick?.adjusted).toBeGreaterThan(6);
   });

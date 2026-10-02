@@ -20,7 +20,7 @@
  *
  * 1b. **A figure the models cannot produce is `null`, never `0`.** Everything below divides by a squad
  *    mean, and there are real selections where no squad mean exists at all — a competition filter
- *    where nobody the reader can see has a rating, a `cleanSheet` seven on matches run in game mode
+ *    whose matches are all still waiting on their notes, a `cleanSheet` seven on matches run in game mode
  *    without a confirmed composition, so that not one minute was ever attributed to the goal. In those
  *    cases the adjusted figure is `null` (rule 1 of `aggregate.ts`: « a number nobody has yet is
  *    `null`, never `0` »), and `aggregateSeven` refuses to total a partial seven. A `0` here is not a
@@ -28,7 +28,7 @@
  *    printed on seven discs at once.
  *
  * 2. **A thin figure is shrunk towards the squad, never gated.** `/stats` protects its rating
- *    leaderboard with a hard threshold (`MIN_RATINGS = 3`), which is the right answer for a table
+ *    leaderboard with a hard threshold (`MIN_RATED_MATCHES = 3`), which is the right answer for a table
  *    whose rows are independent. It is the wrong answer here: the owner asked for the figures to be
  *    weighted by how much a player has played, and explicitly refused a threshold, because a
  *    threshold makes a player appear and vanish as a Sunday passes. So every figure is an
@@ -58,8 +58,8 @@
  *    clamped, because a three-match season measures a between-player variance of almost nothing and
  *    would otherwise produce an absurd number; the clamps are justified one by one at
  *    `PRIOR_STRENGTH_CLAMP`. And it is **returned**, so the screen can write « les notes sont ramenées
- *    vers la moyenne de l'équipe, à hauteur de 4 notes ». A number the screen cannot explain is a
- *    number the screen must not use.
+ *    vers la moyenne de l'équipe, à hauteur de 4 matchs notés ». A number the screen cannot explain
+ *    is a number the screen must not use.
  *
  * 4. **For the goalkeeper's slot, `cleanSheet` scores the keeper's own pair.** Decision 011 kept two
  *    clean-sheet figures because « minutes d'invincibilité » was ambiguous and the owner wanted both:
@@ -143,10 +143,14 @@ export type BestSevenCandidate = {
   ratingAverage: number | null;
   ratingCount: number;
   /**
-   * Population variance of the same scores. Null below two ratings — one score has no spread, and a
-   * `0` there would claim perfect agreement where there is simply no second opinion. This is the
-   * within-player noise of rule 3's numerator; `PlayerRating.variance` in `aggregate.ts` exists to
-   * supply it, so this file never re-reads a rating and never re-derives decision 021's gate.
+   * Population variance of the same per-match means. Null below two rated matches — one figure has no
+   * spread, and a `0` there would claim a metronome where there is simply no second Sunday. This is
+   * the within-player noise of rule 3's numerator; `PlayerRating.variance` in `aggregate.ts` exists to
+   * supply it, so this file never re-reads a note and never re-derives the publication rule.
+   *
+   * Decision 137 changed what it measures without changing its role: match-to-match variation, where
+   * it used to be rater-to-rater disagreement. The better quantity of the two for shrinking a thin
+   * average — form that swings is what makes three matches a poor forecast of the fourth.
    */
   ratingVariance: number | null;
   /** What he declared, `player_positions` flattened. A missing code means "not wanted". */
@@ -180,11 +184,11 @@ export const BEST_SEVEN_AGGREGATION: Readonly<Record<BestSevenCriterion, "sum" |
 
 /** The unit `n` and `m` are counted in, so the screen can write the noun after the number. */
 export const BEST_SEVEN_EXPOSURE_UNIT: Readonly<
-  Record<BestSevenCriterion, "ratings" | "sixtyMinutes" | "minutes">
+  Record<BestSevenCriterion, "ratedMatches" | "sixtyMinutes" | "minutes">
 > = {
   goals: "sixtyMinutes",
   assists: "sixtyMinutes",
-  ratings: "ratings",
+  ratings: "ratedMatches",
   cleanSheet: "minutes",
 };
 
@@ -193,10 +197,13 @@ export const BEST_SEVEN_EXPOSURE_UNIT: Readonly<
  * these six numbers is a claim about the smallest and the largest amount of scepticism that is ever
  * reasonable, and a measurement outside them says more about a short season than about the squad.
  *
- * - **ratings, `[2, 10]`.** The floor is two ratings: below that the shrinkage would be weaker than
- *   `/stats`'s own `MIN_RATINGS = 3` gate is strict, and a single 9,0 would top the seven — the thing
- *   rule 2 exists to prevent. The ceiling is ten, roughly a full season of cards for one player: past
- *   that every average collapses onto the team's and the card stops saying anything.
+ * - **ratings, `[2, 10]`, in rated matches.** The unit changed with decision 137 — a season's input is
+ *   one mean per match, not one note per teammate — and the two bounds happen to survive it, for
+ *   reasons that have to be re-argued in the new unit rather than inherited. The floor is two matches:
+ *   below that the shrinkage would be weaker than `/stats`'s own `MIN_RATED_MATCHES = 3` gate is
+ *   strict, and one 9,0 afternoon would top the seven, which is the thing rule 2 exists to prevent.
+ *   The ceiling is ten matches, most of an amateur season: past that every average collapses onto the
+ *   team's and the card stops saying anything.
  * - **goals and assists, `[1, 6]`**, in 60-minute blocks — so between one match and six. A floor of
  *   one match means a hat-trick in a cameo is halved before it is believed; a ceiling of six matches
  *   is most of an amateur season, and more would bury a genuine goalscorer.
@@ -252,18 +259,19 @@ const MINUTES_PER_RATE_UNIT = 60;
 
 /**
  * What actually happened, alongside what the ranking believes. Both travel to the screen because
- * decision 072 leaves nothing on hover: « 7,0 » and « 9,0 sur 1 note » are printed side by side, so
+ * decision 072 leaves nothing on hover: « 7,0 » and « 9,0 sur 1 match noté » are printed side by side,
+ * so
  * the shrinkage is visible rather than a silent correction.
  */
 export type ObservedFigure = {
   /** The raw rate — goals per 60, the average mark, the share of minutes. Null when nothing yet. */
   rate: number | null;
-  /** Its numerator in natural units: goals, assists, clean minutes, or the sum of the ratings. */
+  /** Its numerator in natural units: goals, assists, clean minutes, or the sum of the match means. */
   numerator: number;
-  /** Its denominator, the figure the screen says out loud: minutes, or a number of ratings. */
+  /** Its denominator, the figure the screen says out loud: minutes, or a number of rated matches. */
   denominator: number;
-  /** What that denominator counts, so the screen can write « sur 1 note » or « sur 240 minutes ». */
-  denominatorUnit: "minutes" | "ratings";
+  /** What that denominator counts: « sur 1 match noté », or « sur 240 minutes ». */
+  denominatorUnit: "minutes" | "ratedMatches";
   /** The same denominator in the shrinkage's unit — 60-minute blocks for goals and assists. */
   exposure: number;
 };
@@ -279,7 +287,7 @@ export type ShrinkageReport = {
    * squad has any exposure at all, in which case the criterion cannot rank anyone.
    */
   squadMean: number | null;
-  /** `m`, after clamping. The number the sentence « à hauteur de 4 notes » prints. */
+  /** `m`, after clamping. The number the sentence « à hauteur de 4 matchs notés » prints. */
   priorStrength: number;
   /** What it measured before the clamp, or null when the squad was too thin to measure it. */
   measured: number | null;
@@ -304,7 +312,7 @@ export type ShrinkageReport = {
   /** The bounds it was clamped into — `PRIOR_STRENGTH_CLAMP` for this criterion. */
   clamp: readonly [number, number];
   /** The unit `priorStrength` is counted in. */
-  unit: "ratings" | "sixtyMinutes" | "minutes";
+  unit: "ratedMatches" | "sixtyMinutes" | "minutes";
   /** The two moments behind `measured`, for a debug screen and for the tests. */
   withinPlayerVariance: number | null;
   betweenPlayerVariance: number | null;
@@ -426,16 +434,16 @@ export function hasOwnExposure(observed: ObservedFigure): boolean {
 
 /** One player's raw contribution to a model, in the criterion's own units. */
 type Sample = {
-  /** Exposure: ratings, 60-minute blocks, or minutes. */
+  /** Exposure: rated matches, 60-minute blocks, or minutes. */
   exposure: number;
-  /** Numerator in natural units: goals, clean minutes, the sum of the ratings. */
+  /** Numerator in natural units: goals, clean minutes, the sum of the match means. */
   numerator: number;
   /** `numerator / exposure`, or null with no exposure. */
   rate: number | null;
   /** The denominator the screen prints, and what it counts. */
   denominator: number;
-  denominatorUnit: "minutes" | "ratings";
-  /** Within-player variance of this player's own scores, when the criterion measures it directly. */
+  denominatorUnit: "minutes" | "ratedMatches";
+  /** Within-player variance of this player's own figures, when the criterion measures it directly. */
   withinVariance: number | null;
 };
 
@@ -453,7 +461,7 @@ function sampleOf(
         numerator: (rate ?? 0) * count,
         rate,
         denominator: count,
-        denominatorUnit: "ratings",
+        denominatorUnit: "ratedMatches",
         withinVariance: count >= 2 ? candidate.ratingVariance : null,
       };
     }
@@ -495,7 +503,7 @@ function clamp(value: number, [low, high]: readonly [number, number]): number {
  *
  * | criterion       | model          | exposure `n`    | `m`                       |
  * |-----------------|----------------|-----------------|---------------------------|
- * | ratings         | Normal–Normal  | ratings         | σ²within / τ²             |
+ * | ratings         | Normal–Normal  | rated matches   | σ²within / τ²             |
  * | goals, assists  | Gamma–Poisson  | 60-min blocks   | μ / τ²                    |
  * | cleanSheet      | Beta–Binomial  | minutes         | μ(1−μ) / τ² − 1           |
  *
@@ -505,7 +513,7 @@ function clamp(value: number, [low, high]: readonly [number, number]): number {
  * at all, and the reason a squad where everyone is genuinely alike measures τ² ≈ 0 and comes out
  * maximally sceptical instead of dividing by nothing.
  *
- * Everything is weighted by exposure, so a man with eleven ratings counts eleven times in the
+ * Everything is weighted by exposure, so a man with eleven rated matches counts eleven times in the
  * measurement of the spread he is part of; a man with none weighs nothing and cannot move it.
  */
 export function fitShrinkage(
@@ -565,13 +573,13 @@ export function fitShrinkage(
   switch (criterion) {
     case "ratings": {
       // Measured, not modelled: the input carries each player's own variance. Pooled over everyone
-      // who has at least two ratings — one rating has no spread, and calling it 0 would claim the
-      // team agrees perfectly about a man exactly one person has judged.
+      // with at least two rated matches — one match has no spread, and calling it 0 would claim a
+      // metronome out of a man who has played once.
       const withSpread = samples.filter((sample) => sample.withinVariance !== null);
       const spreadExposure = withSpread.reduce((total, sample) => total + sample.exposure, 0);
-      // Ratings exist, but not one player has the two decision 021's variance needs: the within-player
-      // noise is unknown, so the ratio cannot be formed. Its own cause, not `noSpread` — the écarts
-      // between these players may be wide, and it is the other moment that is missing.
+      // Means exist, but not one player has the two matches a variance needs: the within-player noise
+      // is unknown, so the ratio cannot be formed. Its own cause, not `noSpread` — the écarts between
+      // these players may be wide, and it is the other moment that is missing.
       if (spreadExposure <= 0) return report(squadMean, null, null, null, "noRepeat");
       withinVariance =
         withSpread.reduce(

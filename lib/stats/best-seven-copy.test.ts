@@ -52,7 +52,6 @@ import {
   shrinkageSentenceFr,
   squadMeanStandInFr,
   swapAnnouncementFr,
-  viewerRelativeRatingsFr,
   type BestSevenQuery,
 } from "./best-seven-copy";
 
@@ -62,7 +61,7 @@ const report = (overrides: Partial<ShrinkageReport> = {}): ShrinkageReport => ({
   measured: 4,
   unmeasurable: null,
   clamp: [2, 10],
-  unit: "ratings",
+  unit: "ratedMatches",
   withinPlayerVariance: 1,
   betweenPlayerVariance: 0.25,
   source: "allPitch",
@@ -73,7 +72,7 @@ const observed = (overrides: Partial<ObservedFigure> = {}): ObservedFigure => ({
   rate: 9,
   numerator: 9,
   denominator: 1,
-  denominatorUnit: "ratings",
+  denominatorUnit: "ratedMatches",
   exposure: 1,
   ...overrides,
 });
@@ -361,7 +360,8 @@ describe("printing a figure", () => {
   });
 
   it("carries the denominator beside the raw figure", () => {
-    expect(observedFigureFr("ratings", observed())).toBe("9,0 sur 1 note");
+    expect(observedFigureFr("ratings", observed())).toBe("9,0 sur 1 match noté");
+    expect(observedFigureFr("ratings", observed({ denominator: 4 }))).toBe("9,0 sur 4 matchs notés");
     expect(
       observedFigureFr("goals", {
         rate: 0.75,
@@ -382,7 +382,7 @@ describe("printing a figure", () => {
     ).toBe("120′ sur 240′");
   });
 
-  it("says nothing rather than « sur 0 note » when the denominator is empty", () => {
+  it("says nothing rather than « sur 0 match noté » when the denominator is empty", () => {
     expect(observedFigureFr("ratings", observed({ rate: null, numerator: 0, denominator: 0 }))).toBeNull();
     expect(observedFigureFr("ratings", observed({ denominator: 0 }))).toBeNull();
   });
@@ -439,7 +439,7 @@ describe("the heading", () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* The four honesty sentences                                                 */
+/* The honesty sentences                                                      */
 /* -------------------------------------------------------------------------- */
 
 describe("honesty 1 — the posts are declarations", () => {
@@ -464,23 +464,12 @@ describe("honesty 1 — the posts are declarations", () => {
   });
 });
 
-describe("honesty 2 — a ratings seven belongs to one reader", () => {
-  it("uses the prescribed wording, on the ratings criterion only", () => {
-    const note = viewerRelativeRatingsFr("ratings");
-    expect(note).toContain("d’après les matchs que tu as notés");
-    expect(note).toContain("ne voit pas le même sept");
-
-    // Goals, assists and minutes are the event log: everybody sees the same ones, so a caveat here
-    // would be a caveat about something that is not happening.
-    expect(viewerRelativeRatingsFr("goals")).toBeNull();
-    expect(viewerRelativeRatingsFr("assists")).toBeNull();
-    expect(viewerRelativeRatingsFr("cleanSheet")).toBeNull();
-  });
-});
-
-describe("honesty 3 — what the shrinkage did", () => {
+describe("honesty 2 — what the shrinkage did", () => {
   it("quotes the measured prior strength in its own unit", () => {
-    expect(shrinkageSentenceFr("ratings", report())).toContain("à hauteur de 4 notes");
+    expect(shrinkageSentenceFr("ratings", report())).toContain("à hauteur de 4 matchs notés");
+    expect(
+      shrinkageSentenceFr("ratings", report({ priorStrength: 1, measured: 1 })),
+    ).toContain("à hauteur de 1 match noté");
     expect(
       shrinkageSentenceFr("goals", report({ unit: "sixtyMinutes", priorStrength: 3, measured: 3 })),
     ).toContain("à hauteur de 3,0 heures de jeu");
@@ -603,7 +592,7 @@ describe("honesty 3 — what the shrinkage did", () => {
   });
 });
 
-describe("honesty 3b — a disc showing the squad's figure, not the man's", () => {
+describe("honesty 3 — a disc showing the squad's figure, not the man's", () => {
   it("says nothing when every man on the pitch has a figure of his own", () => {
     expect(squadMeanStandInFr(0)).toBeNull();
     expect(squadMeanStandInFr(-1)).toBeNull();
@@ -716,7 +705,6 @@ describe("the tutoiement (decision 074)", () => {
       declaredPostsFr("best"),
       declaredPostsFr("worst"),
       CLEAN_SHEET_READINGS_FR,
-      viewerRelativeRatingsFr("ratings"),
       shrinkageSentenceFr("ratings", report()),
       shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "noData" })),
       shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "onePlayer" })),
