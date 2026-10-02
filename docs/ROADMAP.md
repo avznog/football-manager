@@ -1509,3 +1509,53 @@ number with the pull request — it is the `iad1` → `lhr1` region pin, not #11
       deciding is whether the suite should refuse a server it did not start, or at least print which one
       it attached to. Not started: CI is unaffected (`E2E_WEB_SERVER` and `CI` both set), so this costs
       only local sessions, which is also why it will keep happening until something checks
+
+## The instrument for the questions only the phone can answer — 2026-10-01
+
+Three of the open items in this file say, in different words, « neither can be settled from a Linux
+session ». There is now a way to ask the device directly: a capture bookmarklet the owner taps into the
+preview deployment, and `POST /api/dev/trace`, which prints what it sends to the server console so a
+session reads it live with `vercel logs`. It is decision 136 (« The owner's iPhone gets a trace sink,
+and it ships nothing »); `scripts/iphone-trace/README.md` is the operating instructions.
+
+**Nothing in this section is `[x]`, and the asymmetry is deliberate.** The tool exists; no finding has
+been confirmed with it; it has not itself been run on the device. The rule the rest of this file keeps —
+nothing is written up as fixed until it has been seen on the owner's phone — binds the instrument as much
+as the defects, so the only thing that can promote any box below is a reading from the iPhone 16.
+
+- [~] **The trace sink is built and has never been run on an iPhone.** `scripts/iphone-trace/capture.js`
+      → `build-bookmarklet.mjs` → a `javascript:` URL in the gitignored `audit/`;
+      `app/api/dev/trace/route.ts` behind `isTraceSinkEnabled` (`lib/dev/trace.ts`, 19 unit tests), which
+      reads `VERCEL_ENV` and answers **404 on production**, indistinguishable from an absent route. The
+      four steps are build · install the bookmark · tap it on the screen in question · read
+      `vercel logs`. Two things to know before relying on it: the minified URL is **14 359 characters**
+      and whether iOS Safari accepts a bookmark address that long **has not been observed** — a truncated
+      paste is the failure that looks like success — and on preview the route is public and
+      unauthenticated by design, so anyone who knows the path can write bounded noise into the log stream
+      (schema-validated, capped at 200 entries). Nothing of it is in the app's bundle, which is what keeps
+      decision 127's reasoning about the absent error digest true
+- [ ] **The two tab-bar suspicions above** — « Two device-only suspicions, written down rather than acted
+      on », under « A tap on the bottom tab bar is acknowledged » — are the first target, and the trace
+      implements that item's own prescribed method rather than a new one: `elementFromPoint` at the centre
+      of each of the four tabs (Calendrier · Équipe · Stats · Moi), once on install while Safari's bottom
+      toolbar is still expanded, and again after a scroll that collapses it. Three readings tell the
+      suspicions apart — the tab's own name (tappable where it is painted), a stranger's name (geometry
+      and hit regions disagree), and `(rien)` for a null hit, which is the `overflow-x: hidden` shape.
+      Each pass carries `scrollY`, `innerHeight` and the visual viewport's height and `offsetTop`, which
+      is how a collapsed toolbar is told from an expanded one after the fact. **Still unsettled**: this
+      line adds an instrument and no evidence
+- [ ] **The crash on saving preferred positions is fixed, and it is the argument for the sink.** Its
+      cause — `positions` holding none of the rows its foreign key points at — was found by reading, over
+      hours, from a machine where the bug could not happen, because the only thing the phone produced was
+      « ça plante ». `updatePlayerPositions` now logs the Postgres `code` server-side, so the *next* one
+      of these is in the log stream; what the trace adds is the browser half the server never sees. Open
+      here only as a method note: the next crash reported from the phone starts with a trace, not with a
+      re-read of the action
+- [ ] **The audit's viewport is `390 × 844` and the owner's phone is `393 × 852` at DPR 3** — the item
+      under « The audit tooling itself ». The trace's device block records the user agent, DPR, `screen`,
+      `innerWidth`/`innerHeight`, the visual viewport, the theme as `<html>` actually carries it, whether
+      it is running installed to the home screen, and the **resolved** `env(safe-area-inset-bottom)` in
+      px. That is the first time those numbers will have come from the device rather than from a
+      `deviceScaleFactor` we set ourselves, and it is what the `w-[390px]` assumptions and the
+      `--tabbar-h` / safe-area work have to be checked against. The audit script taking its viewport from
+      one list of devices is still the fix; this only supplies the measurements it should be built on

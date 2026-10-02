@@ -97,6 +97,16 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   « `<Suspense>` on `/stats` » one is **withdrawn and must not be re-opened** — it removes the no-JS path
   that decisions 100 and 116 built, see #114 — and the auth prefix joins are untouched and still a
   tidiness item.
+- **Open for review, not mine to merge · PR #134** — `feat/iphone-trace-sink`, a diagnostic sink so the owner's
+  iPhone 16 can be watched live against preview. In these files and no others: `lib/dev/trace.ts` (+ test),
+  `app/api/dev/trace/route.ts`, `proxy.ts` (one `PUBLIC_PATHS` line), `scripts/iphone-trace/*`. No schema
+  change, no migration, no infrastructure, and **nothing in the client bundle** — the capture is a
+  bookmarklet, which is what keeps decision 127 and `audit:screens` true. Left open for the gatekeeper,
+  per rule 1. **It stays dead after merging until the owner sets `TRACE_SECRET` in Vercel's preview
+  environment**, which is his by rule 3 — so `404` from `/api/dev/trace` is the correct answer, not a
+  regression to chase. The files I am staying out of are the ones
+  **`feat/a-dock-of-players-and-buttons`** holds in the main checkout: that branch is two commits ahead of
+  `origin/main` and **unpushed**, so `git fetch` does not reveal it. One of those commits edits this file.
 
 **Who writes which line — because two machines rewriting one block is exactly the conflict the two Log
 lanes were invented to avoid.** The gatekeeper machine, the owner's, owns every line above except the
@@ -1231,3 +1241,86 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   formation templates, so an unseeded table shows up as « the composition editor offers no formations at
   all ». If that is what he sees, it is the FK.
   **Next: the preferred-positions slice, then the retro match entry.**
+
+### From the iphone-analyser worktree
+
+A third lane, opened for the same mechanical reason the first two were split: two sessions appending to
+one tail conflict on that tail. If this worktree is folded back into another machine's lane later,
+nothing here needs rewriting — it is dated history either way.
+
+- **2026-10-01 18:10 · iphone-analyser worktree** — **`feat/iphone-trace-sink` is open as PR #134 and is
+  not mine to merge.** Six commits, HEAD `8191499`, rebased onto `1bcd754` and verified an ancestor of
+  `origin/main`. Gates: typecheck and lint clean, **1446 tests across 66 files** (32 new), `npm run build`
+  compiling with `ƒ /api/dev/trace` in the route list. `npm run test:e2e` was **not** run, and the honest
+  reason is the server rather than the database — `reuseExistingServer: !process.env.CI`, and ports 3000
+  and 3451 belong to other sessions here, so a green run would be a green run against someone else's code.
+  **Three things the next session needs from this and should not have to read the PR to find.**
+  First: a **fresh worktree's `node_modules` is an empty directory**, and Node resolution walks *up* to the
+  main checkout's, so `typecheck`, `lint` and `vitest` all pass from a worktree that has nothing installed.
+  Turbopack refuses to, by design, which is why `npm run build` is the only one of the four that catches it.
+  `npm ci` inside the worktree is the fix. In a repository worked from thirteen worktrees this is the
+  cheapest hour anyone will save all week.
+  Second: **the sink is dead until the owner sets `TRACE_SECRET` in Vercel's *preview* environment**, which
+  is his by rule 3 and deliberately not done here. Unset, empty and whitespace-only all mean dead; off,
+  unconfigured and wrong-key all answer one `404` with no distinguishing body; `VERCEL_ENV === "production"`
+  means dead unconditionally. `Trace KO` on the phone with no `TRACE_SECRET` set is the designed behaviour
+  of an unconfigured sink, not a bug to debug.
+  Third: `lib/dev/capture-source.ts` is **generated and committed**, because `scripts/` is not in Vercel's
+  serverless bundle — reading `capture.js` from disk works locally and 500s in preview. So **editing
+  `scripts/iphone-trace/capture.js` without re-running `build-bookmarklet.mjs` changes nothing in preview.**
+  The drift test is a backstop, not a gate; making it a gate means wiring the generator into `npm run build`,
+  and `package.json` is the owner's, so it is proposed in #134 rather than done.
+  `c301a50` in this branch rewrites the pinned-domain note below as a command plus the limit of its
+  evidence rather than as a claim — the alias is observed, the mechanism is still inferred. The two-piece
+  `COORDINATION.md` / `docs/DEPLOY.md` promotion once this lands belongs to
+  `preview-production-deploy-split-status`, which has been told so directly.
+
+- **2026-10-01 17:37 · iphone-analyser worktree · `feat/iphone-trace-sink`** — Building a diagnostic
+  sink so the owner's iPhone 16 can be watched live against preview. **Files I am in, so nobody else
+  takes them:** `lib/dev/trace.ts` (+ test), `app/api/dev/trace/route.ts`, `proxy.ts` (one line added to
+  `PUBLIC_PATHS`), `scripts/iphone-trace/*`. **No database, no table, no migration** — the sink writes
+  JSON lines to the server console and I read them with `vercel logs`, which is what lets it skip both a
+  new `Action` member for `can()` and the preview/production migration asymmetry of decision 119. The
+  capture code is a **bookmarklet**, not production code, so decision 127's « the absence of a digest is
+  itself a diagnosis » stays true and `audit:screens` (decision 059) sees no new console output. First
+  target is the two unsettled tab-bar suspicions at `docs/ROADMAP.md:935`, by the `elementFromPoint`
+  method that section already prescribes. **I deliberately did not touch** `app/error.tsx`,
+  `app/(app)/error.tsx`, `components/errors/error-screen.tsx`, `app/globals.css` or `game-mode.tsx`.
+  Per rule 1 I will **not** merge my own branch — it will be left open for the gatekeeper. Per rule 3 I
+  touched no infrastructure: the gate reads `VERCEL_ENV`, which Vercel populates by itself, so there is no
+  new variable for the owner to set.
+- **2026-10-01 18:05 · iphone-analyser worktree** — Two corrections to what I wrote an hour ago, both
+  because I had read `origin` and not the machine. I named
+  `fix/error-screen-offers-a-reload` and `fix/action-bar-bottom-padding` as the unmerged branches holding
+  the five files I was avoiding; **both have since merged** (#118 and #123). The branch actually in flight
+  is **`feat/a-dock-of-players-and-buttons`**, checked out in the *main* checkout, two commits ahead of
+  `origin/main` and **never pushed** — so no `git fetch`, and nothing in this file, could have revealed it.
+  One of its two commits edits this file. The general lesson, and the reason this is written down rather
+  than quietly fixed: **on a machine running several sessions, `git worktree list` and `ListAgents` are
+  evidence and `origin` is not.** Second correction: I said `main` was at `1efe7de`; `origin/main` had
+  already moved to `bd938e9`, and local `main` — checked out in `ux-analyser` — is **twelve commits
+  behind** it, which is a live trap for anyone who branches from it, as I did.
+- **2026-10-01 17:37 · iphone-analyser worktree** — **The pinned preview domain is observed, not inferred.**
+  `## NOW` and `docs/DEPLOY.md` §4 both still hedge it as « expected, not seen ». The command, so that any
+  session can re-execute it rather than believe this line — which is the whole lesson of decision 119's
+  first draft:
+
+  ```
+  $ vercel inspect https://dev.7orteils.bgonzva.fr
+  > Fetched deployment "football-manager-d7fbs01br-avznog-team.vercel.app" in avznog-team
+    id       dpl_6PrsBKkc9hUv23Q7qYcWHFf65ZD2
+    name     football-manager
+    target   preview
+    status   ● Ready
+    url      https://football-manager-d7fbs01br-avznog-team.vercel.app
+    created  Thu Oct 01 2026 16:55:32 GMT+0200
+    Aliases
+      ╶ https://dev.7orteils.bgonzva.fr
+  ```
+
+  `target preview` plus that alias is the claim: **the branch-pinned domain does take a CLI preview
+  deployment.** This is weaker evidence than it looks for one thing and stronger for another — it does
+  **not** show that `VERCEL_GIT_COMMIT_REF: main` is what won the alias, only that a preview-target
+  deployment holds it; but it is direct rather than inferred from byte-identical bodies. I am not the
+  gatekeeper, so per rule 1 I have left both hedged lines alone; the session on `preview-production-deploy-split-status`
+  asked for this record and will promote them.

@@ -4734,3 +4734,118 @@ between two of them. This is where decision 097 is narrowed rather than contradi
 sentence that is true of only some states of the screen belongs in a pure function a test can walk. It
 says nothing about the sentence having to be *drawn*, and the version of this screen that printed all of
 them was the one that proved a true sentence can still be the wrong 20 px.
+## 136 — The owner's iPhone gets a trace sink, and it ships nothing
+
+**2026-10-01** · accepted · **amends decision 127** · follows the precedent PR #111 set, recorded in
+decision 123 · supersedes nothing
+
+*(Numbering: 136 was taken rather than left as `## NNN`, which coordination rule 2 would otherwise
+require, because the session holding `docs/DECISIONS.md` said so directly — nothing else was in flight
+on this file and a session holding it should name its own number. Derived, not assumed:
+`grep -c '^## ' docs/DECISIONS.md` on `1bcd754` gives 135, whose last entry is 135. The `## NOW` line
+claiming 123 was stale by thirteen.)*
+
+Three of the four device-only questions this repository is carrying cannot be answered from a Linux
+session, and all three are the same shape: the evidence is on a phone that is not the machine running
+the session, and iOS Safari has no console a session can read. The two tab-bar suspicions are told
+apart by what `document.elementFromPoint` returns at the centre of each tab — that is the roadmap's own
+prescription, not a new idea here. The positions crash was a `23503` reaching an error boundary with
+nothing written down anywhere a session could read. And the audit walks 390 × 844 while the owner's
+phone is 393 × 852 at DPR 3, which is a claim about the device nobody has ever measured on the device.
+So: the owner taps a capture into the page, it POSTs a batch, and a session watches it come out of
+`vercel logs`.
+
+*(Amended the same day, before any of it had run on the device: the route was closed behind a shared
+secret in `TRACE_SECRET`, and the paragraphs below describe that tightened design rather than the
+unauthenticated one this entry was first written against. Recorded rather than smoothed over, because
+for one afternoon the record and the code disagreed and a reader deserves to know why.)*
+
+**Nothing is stored, and that is the load-bearing choice rather than a shortcut.** A `traces` table
+would need a new `Action` member in `lib/auth/can.ts` to satisfy invariant 4, and its migration would
+reach preview on merge and production on the next tag by decision 119 — so a *preview-only* table is
+not expressible at all, and the thing a diagnostic most needs to be is deletable. Decisions 115 and 122
+are the standing bias against a new table and this follows them. The route therefore `console.log`s one
+`[iphone-trace] <single-line JSON>` per entry and the reader is `vercel logs … | grep '[iphone-trace]'`.
+The cost, stated rather than buried: **there is no durability.** A trace lives as long as the log stream
+and no longer, so a finding worth keeping has to be copied into `docs/` by hand, by the session that read
+it. Deleting `app/api/dev/trace/`, the two files in `lib/dev/`, `scripts/iphone-trace/` and one line of
+`proxy.ts` deletes the feature, and that is the property being bought.
+
+**The capture is a bookmarklet, not production code, and that is what keeps decision 127 true.**
+`scripts/iphone-trace/capture.js` is built by `build-bookmarklet.mjs` into a `javascript:` URL in the
+gitignored `audit/`, and — since the amendment — its text is also committed as `lib/dev/capture-source.ts`
+so that `GET /api/dev/trace` can serve it to the phone instead of the owner pasting 15 KB into a bookmark
+field. That constant sits in **this one route's server bundle and in no client bundle**: no component
+imports it, it changes no rendered screen, and nothing of it runs unless the owner fetches it with the
+secret in hand and the browser injects it into a tab he opened himself. This is the amendment: decision 127 reasoned that the **absence** of a
+Next error digest means the throw happened in the browser, and a shipped client-side error sink would
+have made that sentence false the day it merged — every browser throw would have left a server-side
+trace and the digest's absence would have stopped meaning anything. It still means what 127 says it
+means, because nothing of the sink is ever in a *client* bundle. For the same reason decision 059's `audit:screens`
+console gate still sees nothing new on any of the 23 walked screens: the capture wraps the five
+`console` methods and always calls through to the original, but it is not there during an audit run.
+**PR #111** set this precedent — instrumentation that deliberately changed no production code — and
+decision 123 is where that is written down; this is the second use of it. Stated that way round on
+purpose: 123 itself does ship production code, so « decision 123 set the precedent » was loose, and the
+fact being leaned on is PR #111's.
+
+**The gate reads `VERCEL_ENV`, which Vercel populates by itself.** `isTraceSinkEnabled`
+(`lib/dev/trace.ts`) is `false` for `production`, `true` for `preview` and `development`, and falls
+back to `NODE_ENV` off Vercel. `VERCEL_ENV` appeared nowhere in the repository before this, and it
+needs no dashboard change of its own: Vercel populates it on every deployment. **The secret, however,
+is a new environment variable, and setting it is the owner's act and not a session's.** `TRACE_SECRET`
+is Preview-only — it is now set there, and deliberately not on Production — so coordination rule 3,
+infrastructure is the owner's, is *observed* here rather than avoided: a session wrote the code that
+reads the variable and named it in the handover, the owner went to the Vercel dashboard and set it, and
+until he had, the endpoint was dead. `isTraceSinkEnabled` is a pure function taking the environment as
+an argument and never reading `process.env`, and the route reads the environment **inside** the handler, so the production case is a
+unit test rather than a claim and a build does not depend on the environment being populated (decision
+075). Disabled answers **404 and not 403**: on production the endpoint must be indistinguishable from
+one that was never deployed, and a 403 would confirm it is there.
+
+**The route is listed in `proxy.ts`'s `PUBLIC_PATHS`, and public here means authenticated by a shared
+secret rather than by a session.** It is in `PUBLIC_PATHS` because the middleware 307s any
+extension-less path carrying no session cookie, which would otherwise swallow exactly the captures
+worth having most — the ones from `/connexion` and `/rejoindre`, and the one taken after an error
+killed the session. What stands in for the session cookie is `TRACE_SECRET`, compared with
+`crypto.timingSafeEqual` behind a byte-length guard, **both sides trimmed before they are compared** so
+that a value pasted into the dashboard with a trailing newline is not a symptom the owner has no way to
+diagnose. Off, unconfigured and wrong-key all answer **one identical 404 with no distinguishing body**,
+so the route is indistinguishable from one that was never deployed; and an unset, empty or
+whitespace-only secret means **dead, not open** — it fails closed, because a forgotten variable turning
+a diagnostic endpoint into an anonymous write channel is the failure nobody notices until it is being
+used. It calls no `can()` because it performs no mutation: it writes no row, reads no row and never
+touches a database client, so there is nothing for `can()` to authorise, and invariant 4 is about
+mutations. **The residual risk, named rather than argued away: the install path puts the key in a query
+string.** A bookmarklet cannot set a header on the `<script>` tag it injects, so the loader fetches the
+probe as `GET /api/dev/trace?k=…`; query strings are the part of a URL that reaches access logs, so that
+key should be treated as logged, rotated once the diagnosis is done, and reused for nothing else. One
+consequence to expect rather than be alarmed by: the access log it lands in is **the same stream the
+owner is tailing to read his traces**, so he will watch his own key scroll past in `vercel logs` output
+— that is where it was always going to appear, not a leak. The POSTs that follow carry the secret in the
+`x-trace-secret` header instead.
+
+**The overlay sits above the tab bar, not across it, and excludes itself from its own results.** The
+panel is French, tutoies, and carries « Test » and « Envoyer » because there is no console under a thumb
+and no devtools to open. It is positioned clear of the bar and of the home indicator, it is transparent
+to taps except on its two buttons, and the hit test skips it — a probe that covers what it measures
+reports its own presence as the defect, which is the `/equipe` theme-drift mistake in another costume.
+If `(overlay du traceur — à ignorer)` ever appears in a reading, that line is the tool's fault and not
+the app's.
+
+**Two things are not verified, and nothing downstream may assume them.** First, the install is a
+loader — **423 characters, measured with a 32-character secret** — that sets `window.__fmTraceKey` and
+appends a `<script>` pointing at `GET /api/dev/trace?k=…`, and the all-inline form is kept only as a
+fallback, at **15 090 characters with that same 32-character secret**. Both figures move with the length
+of the secret, so `build-bookmarklet.mjs` prints the exact ones on every build and neither should be
+quoted from here. Whether iOS Safari accepts a bookmark address as long as the **fallback**'s **has not
+been observed** — Safari refuses a `javascript:` URL typed into the address bar at all, so a bookmark is
+the only install path, and a silently truncated paste is the one failure that looks like success.
+Killing that risk is precisely what the loader was built for, which is why the README leads with it and
+says to scroll to the end of the field and check. If the fallback turns out not to fit, the repair is
+the loader — and failing that a shorter capture, not a cleverer minifier: the one in
+`build-bookmarklet.mjs` strips comments and indentation and nothing else, on purpose, because a clever minifier is a bug in a tool whose whole job is to be
+believed. Second, **the two tab-bar suspicions remain open.** This entry builds the instrument the
+roadmap asked for and settles neither suspicion; the roadmap's own rule — nothing is written up as fixed
+until it has been seen on the device — applies to the instrument too, which has itself never been run on
+the device.

@@ -3783,3 +3783,129 @@ now says so, because a port number is not a fact about a machine.
 **Looked at, at 390 px, in both themes**, which on this screen is the whole point: the dock is the five
 discs plus the two buttons, and the turf grows by about 44 px — enough that the attacker's poste is on
 screen with the pitch at rest, where before it was under the banner.
+## A trace sink for the owner's iPhone, which ships nothing to the owner's iPhone
+
+**2026-10-01** · `feat/iphone-trace-sink`
+
+Three open items in `docs/ROADMAP.md` say the same thing in different words: it cannot be settled from
+here. The two tab-bar suspicions, the geometry of an iPhone 16 against an audit that walks 390 × 844, and
+— until its cause was found by reading — the crash on saving preferred positions. The common factor is
+not difficulty; it is that the evidence is on a phone which is not the machine running the session, and
+iOS Safari offers no console a session can read. This branch builds the instrument and settles none of
+them.
+
+**What it is.** A **bookmarklet**, plus a thin endpoint. `scripts/iphone-trace/capture.js` (624 lines) is
+built by `scripts/iphone-trace/build-bookmarklet.mjs` into a `javascript:` URL written to the already
+gitignored `audit/`. It hooks `window.onerror` and `unhandledrejection`, wraps the five `console` methods
+while always calling through to the original, records a device block (user agent, DPR, `screen`,
+`innerWidth`/`innerHeight`, the visual viewport, the theme as `<html>` carries it, standalone, and the
+**resolved** `env(safe-area-inset-bottom)`), and runs the tab-bar hit test the roadmap prescribed:
+`document.elementFromPoint` at the centre of each of Calendrier · Équipe · Stats · Moi, with the rect, the
+element found, and `scrollY` / `innerHeight` / the visual viewport's height and `offsetTop` recorded per
+pass, so a collapsed Safari toolbar can be told from an expanded one afterwards. A small French overlay
+gives it « Test » and « Envoyer », because there is no console under a thumb; it sits **above** the bar
+rather than across it and excludes itself from its own hit-test results. `lib/dev/trace.ts` is the pure
+half — the gate, the French `TRACE_ERRORS`, the Zod contract, `formatTraceLines` —
+and `app/api/dev/trace/route.ts` prints one `[iphone-trace] <single-line JSON>` per entry. One line in
+`proxy.ts`'s `PUBLIC_PATHS`. **No table and no migration**, which is decision 136's first paragraph and
+not an omission: a preview-only table is not expressible under decision 119, and the cost is that a
+trace lives exactly as long as the log stream.
+
+**How it is used, in four steps.** `node scripts/iphone-trace/build-bookmarklet.mjs`; install the printed
+URL as the *address* of a Safari bookmark on the phone — Safari strips the `javascript:` scheme from
+anything typed into the address bar, so a bookmark is the only way in; open
+`https://dev.7orteils.bgonzva.fr`, go to the screen in question and tap the bookmark; read
+`vercel logs dev.7orteils.bgonzva.fr --project football-manager`. The full version, including the Safari
+menu names in French and what each hit-test reading means, is `scripts/iphone-trace/README.md`.
+
+**What was verified.** `npm run typecheck` clean, `npm run lint` clean, `npm test` green at
+**1451 unit tests across 66 files** — 37 of them new, for `lib/dev/trace.ts`, including the ones that
+matter most: `isTraceSinkEnabled` must return `false` for `VERCEL_ENV === "production"`, and the secret
+comparison must treat `undefined`, `""` and whitespace alike as absent, because an empty field in the
+Vercel UI is the realistic misconfiguration rather than a theoretical one. Six of those 37 exist because a
+reviewing session found that claim false when I made it: `traceSecretMatches(" ", " ")` returned **true**,
+so a whitespace-only `TRACE_SECRET` was a live secret and no test said otherwise. Both sides are trimmed
+now. The exposure was nil — you still had to know the value — but the diagnosability was not, and that is
+the real defect: with off, unconfigured and wrong-key deliberately collapsed into one identical 404, a
+trailing newline pasted into the dashboard field is indistinguishable from a disabled sink, so the owner
+would have had no way at all to tell a typo from a switched-off endpoint. The 12 tests in
+`proxy.test.ts` still pass, which is the cover for the `PUBLIC_PATHS` change — additive, one entry.
+`npm run build` succeeds and lists `ƒ /api/dev/trace` alongside `ƒ /api/match-events`.
+
+**An operational trap found while getting that build to run, which will cost the next session an hour
+if it is not written down.** `npm run build` first failed here with « Could not find the Next.js package
+(next/package.json) », resolved from the worktree root. The cause is that **a fresh worktree's
+`node_modules` is an empty directory**, and Node's resolution walks *up* the tree to the main checkout's
+`node_modules` — so `typecheck`, `lint` and `vitest` all pass from a worktree that has no dependencies
+installed, silently using another checkout's. Turbopack refuses to, by design: « files outside of the
+workspace root are not compiled ». So a green `npm test` in a worktree does **not** imply the worktree is
+installed, and the fix is `npm ci` inside it. Worth knowing because this repository is worked from
+thirteen worktrees and the three cheap gates are exactly the ones that hide it.
+
+**What was not verified, and will not be papered over.** Three things.
+
+- **`npm run test:e2e` was not run**, deliberately, and the honest reason is the dev server rather than
+  the database. `e2e/fixtures/seed.ts` creates a run-scoped team and prunes the previous run's, and
+  decision 044 keeps it off the demo season, so two sessions running it concurrently is survivable by
+  design. What is not survivable is a server this session did not start: `playwright.config.ts` has
+  `reuseExistingServer: !process.env.CI`, ports 3000 and 3451 belong to other sessions on this machine,
+  and reusing one has **already** produced a green run against another checkout's code — the item under
+  « The tooling this batch broke its nose on » is exactly that. A pass under those conditions is not
+  evidence, so none was claimed. The change this branch makes to anything the suite walks is one additive
+  `PUBLIC_PATHS` entry, covered by `proxy.test.ts`; CI runs the browser suite on its own `postgres:17`
+  service with `E2E_WEB_SERVER` and `CI` both set, and that is where this gets its real run.
+- **Whether iOS Safari accepts a long bookmark address has not been observed**, and the answer now
+  matters much less than it did an hour ago. The install the README leads with is a **423-character**
+  loader that sets `window.__fmTraceKey` and appends a `<script>` pointing at `GET /api/dev/trace`, so the
+  probe arrives over the network and the bookmark stays short enough that the question is moot. The inline
+  form is kept as a fallback and is **15 090 characters** — it grew rather than shrank, because the secret
+  and the key plumbing are now in it. **Both figures were measured with a 32-character key, and both move
+  with the length of the secret**, so the build script prints the exact one and that is what to quote. The
+  basis is given because a number without one is what let the previous figure in this paragraph go stale
+  unnoticed. If that paste truncates it will look like it worked, which is why
+  the README says to scroll to the end of the field; and the repair is to use the loader.
+- **Nothing in this branch has run on the iPhone at all**, so the two tab-bar suspicions are exactly as
+  open as they were this morning and no roadmap box moved to `[x]`.
+
+**What the owner should be told rather than find.** Three things, in the order they bite.
+
+**The route is in `PUBLIC_PATHS`, and public is not open.** It has to be: the middleware 307s any
+extension-less path without a session cookie, which would swallow the captures worth having most —
+`/connexion`, `/rejoindre`, and anything taken after an error killed the session. What stands in for the
+session is a shared secret in `TRACE_SECRET`, compared with `crypto.timingSafeEqual` behind a
+byte-length guard, and **unset, empty or whitespace all mean a dead endpoint**. Off, unconfigured and
+wrong-key are one answer — `404`, with no body distinguishing them — so the route is indistinguishable
+from one that was never deployed, which is also exactly what production gets.
+**So nothing works until the owner sets `TRACE_SECRET` in Vercel's preview environment**, and that is
+his to do: infrastructure is not this session's to touch.
+
+**The loader puts the secret in a query string**, `?k=…` on the `GET`, because a bookmarklet cannot send
+a header for its own script tag. Query strings are the part of a URL that ends up in access logs, so that
+key should be treated as logged, rotated when the owner is done, and never reused for anything else. One
+consequence to expect rather than be alarmed by: the access log it lands in is **the same stream the owner
+is tailing to read his traces**, so he will watch his own key scroll past in `vercel logs` output. That is
+where it was always going to appear — not a leak, and not a reason for the next session reading this to go
+looking for one. The `POST`s that follow use the `x-trace-secret` header instead.
+
+**What it actually logs is wider than « tab coordinates ».** It forwards console output from five
+methods, `window.onerror` messages with stacks, unhandled rejections, the four tab labels it hit-tests,
+and a label the owner types into the overlay. On a preview whose database holds real-looking data, a
+console line or an error message can carry a real player's name into the Vercel log stream. That is a
+deliberate trade for being able to see anything at all from the phone, not an oversight, and it is
+bounded by the same 200-entry cap and the preview-only gate — but it is the reason the endpoint should go
+back to dead the moment the two tab-bar questions are answered.
+
+**A citation audit nobody asked for, which found three comments citing a decision that does not say what
+they claim.** Reconciling the decision entry meant reading every number it cites, bodies and not headings.
+Six of eight held. Two did not. « Decision 123 set the precedent of instrumentation that changes no
+production code » was loose — **PR #111** set it, 123 is only where it is written down, and 123 itself does
+ship production code; stated the right way round now. Worse, three comments in `lib/dev/trace.ts` and
+`app/api/dev/trace/route.ts` cited **decision 114** for the claim that some code cannot be unit-tested. 114
+says nothing of the kind: it is about the `COMMENT` event type, its 280 characters, and the four-tile action
+menu, and it never mentions Vitest. The claim itself is true and now cites what actually supports it —
+`vitest.config.ts` for the `include` list, decision 090 for « a claim no test can read », decision 096 for
+« untestable where it sat, because Vitest collects `lib/**` and nothing under `app/` ». The part worth
+recording is the failure mode, because **two sessions in a row mischaracterised 114, differently, without
+either one opening it** — one from a heading, one from the other's summary. It is the same error as asserting
+a security primitive's shape from memory of the intention rather than from the function, which happened in
+this same batch and was caught by the same reviewer. A citation is a claim; `grep` the entry.
