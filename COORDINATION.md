@@ -20,9 +20,9 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `1cd7974`, the squash of **#142**, a one-line `## NOW` correction. The newest tag,
+- **`main`** — at `7be9919`, the squash of **#143, the coach's switch**. The newest tag,
   `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
-  now **28 commits behind**, so **preview is ahead of production** by all twenty-eight and will stay ahead
+  now **29 commits behind**, so **preview is ahead of production** by all twenty-nine and will stay ahead
   until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
   **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
   other machine. Re-derive the two numbers rather than reading them: `git log -1 origin/main` and
@@ -50,9 +50,7 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **140**. The highest written is **139**, the coach's switch, on
-  `feat/coach-reveals-the-means` and not yet merged — so if that branch is still open when you read this,
-  **139 is taken and 140 is yours**.
+- **Next free decision number** — **140**. The highest on `main` is **139**, the coach's switch.
   **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
   believing**, and this line is why: it said 133 when 133 *and* 134 were already on `main` — the other
   machine's two placeholders, the ones this line itself called "coming on `feat/retro-one-action-list`,
@@ -84,8 +82,8 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   the whole demo season is **reported by a third session that logged in, and not independently checked
   from here**; treat it as a warning rather than as a fact, and assume preview is a shared instance with
   real-looking data in it rather than a scratch pad.
-- **The rating rules are now one sentence, and decision 139 is the one to read** — on
-  `feat/coach-reveals-the-means`, superseding **138 entirely, 021 entirely, and 137 on who may rate**.
+- **The rating rules are now one sentence, and decision 139 is the one to read** — merged as **#143**
+  (`7be9919`), superseding **138 entirely, 021 entirely, and 137 on who may rate**.
   **Every member of the team may rate, supporter and non-playing coach included; only the men who played
   are rated; and `matches.ratings_published_at` is the whole of « are the means out », settable back to
   null.** So **nothing ever closes the notation** — there is no window, `lib/rating/window.ts` and
@@ -96,9 +94,8 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   own tally counts him as entitled to. No migration. `npm run db:reset` on the other machine: J7 is the
   fixture that exercises the switch in both directions, and `/match/<J7>/notation` **as Brice, a
   supporter**, is the one screen that shows the new rule by itself.
-- **Open pull requests** — **the coach's switch**, `feat/coach-reveals-the-means`, decision 139, from the
-  owner's machine. Everything else the two machines had open is merged; `gh pr list --state open` is the
-  only answer worth believing. **#137 was closed without merging**: it was a lone `1.0.0-beta.7` bump, and the owner
+- **Open pull requests** — **none**; everything both machines had open is merged. `gh pr list --state
+  open` is the only answer worth believing. **#137 was closed without merging**: it was a lone `1.0.0-beta.7` bump, and the owner
   ships this release by hand, so `package.json` stays at **`1.0.0-beta.6`** and the bump belongs to
   whichever pull request the owner decides earns it.
 - **The ratings rebuild is merged** — **#138**, decision **137**, squashed to `b9a2974`. A note is the
@@ -116,8 +113,8 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   Neon `neondb_owner` rotation, by the owner's decision (**132**). Do not re-propose any of the three. The
   facts behind them are all still true and still rediscoverable, which is exactly why they were raised in
   every session report for weeks — read 132 instead of raising them a fifth time.
-- **In flight · the owner's machine** — **`feat/coach-reveals-the-means`**, decision 139, pushed and up
-  for review. Nothing else; apart from that branch the checkout is clean and level with `origin`. It briefly was not: `.claude/worktrees/ux-analyser` held the `main` branch, two worktrees
+- **In flight · the owner's machine** — **nothing.** The checkout is on `main`, clean, level with
+  `origin`. It briefly was not: `.claude/worktrees/ux-analyser` held the `main` branch, two worktrees
   cannot hold one branch, and `gh pr merge --delete-branch` therefore failed its *local* half after the
   merge had already succeeded on GitHub — a half-done command that reports only the failure. The worktree
   is detached at the same commit now and `main` is back in the primary checkout. **If `gh pr merge` ever
