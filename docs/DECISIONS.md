@@ -4849,3 +4849,137 @@ believed. Second, **the two tab-bar suspicions remain open.** This entry builds 
 roadmap asked for and settles neither suspicion; the roadmap's own rule — nothing is written up as fixed
 until it has been seen on the device — applies to the instrument too, which has itself never been run on
 the device.
+
+---
+
+## 137 — A note is the mean of what the others gave you, and the notes themselves are the coach's
+
+**2026-10-02** · accepted · **supersedes decision 021 and decision 024 entirely**, decision 007 on
+three of its four clauses, decision 102 entirely, and the thresholds and count in decision 025 ·
+amends decision 023's last paragraph and decision 079's second half · leaves decision 039 standing and
+strengthens it
+
+One sentence, and it is the owner's: **a player's note for a match is the mean of the notes the others
+gave him, it appears once the notes are in, and the individual notes are the coach's alone.**
+
+Everything below follows from that, and most of it is a deletion.
+
+**What decision 007 keeps.** The 0–10 scale, now with half-points. That is all. Its other three
+clauses go: a player no longer rates himself, only a player with `minutes > 0` may rate or be rated,
+and the author of a note is visible to the coach and to nobody else. The reasoning that made them right
+in September was that a rating is a conversation the squad has out loud; the owner has decided it is a
+measurement the squad reads and the coach interprets, which is a different thing and wants a different
+screen.
+
+**Why decision 021 goes entirely, and why nothing of value is lost.** 021 enforced 007's reciprocity
+gate season-wide: a viewer who could have rated a match and did not saw nothing from it in any average,
+anywhere. It existed for one property — you must not read other people's notes before writing yours —
+and the new rule has that property *more* strongly and for free: **nobody** reads any note until the
+whole match is in, and no player ever reads an individual note at all. What 021 cost was a statistics
+tree in which every figure depended on who was looking. `ratingVisibility`, `visibleMatchIds`,
+`hiddenMatchIds`, `hiddenRatedCounts`, `getVisibleRatingScores`'s second round trip and the
+« d'après les matchs que tu as notés » on three screens are all gone, and `/stats`, a player's profile
+and « l'équipe type » now print one set of numbers that is the same for every reader. That is the
+largest simplification in the repository since the stats cache, and it was bought by a product
+decision rather than by a refactor.
+
+**Why decision 024 goes with it.** 024 was the gate's two edges — « no set to fill means no gate »
+and « never filling it means never seeing » — and a gate that no longer exists has no edges. The second
+edge is the one worth naming as it leaves: `lib/rating/progress.ts` used to document, deliberately,
+that *a player who never rates never sees that match's ratings, for ever*, and that the window closing
+does not release them. That was defensible as an anti-free-riding rule and it was also a door shutting
+on somebody for a week of silence. It is reversed: the means come out when the last expected rater
+submits, **or** when the coach publishes, **or** when the window closes at the next kick-off. A man who
+never rated reads the same figure as everybody else, and the thing he loses by not rating is his say.
+
+**Why decision 102 goes.** 102 made choosing a note and advancing two gestures, because the pad
+replaced the card in the same frame as the tap and no state existed in which the reader's answer was
+visible. It was right about the pad. There is no pad: the screen is one list of native
+`<input type="range">`, one per teammate, and one submit. There is nothing to advance to, so
+« Suivant » and « Passer sans noter » are gone and `lib/rating/flow.ts` — which existed to decide what
+that button said, and which decision 097 put in `lib/` so its sentences could be tested — is **deleted**
+rather than kept for a screen with no forward button. What 102 was protecting is kept by a different
+mechanism: the figure beside each name is the slider's own value, printed at 1.125 rem next to the man
+it is about, and it cannot be out of date because it is the only piece of React state on the screen.
+
+**What a slider costs, stated rather than discovered.** A range input has no unset state. Every slider
+starts at 5,0 and every slider is submitted, so an untouched one records 5,0 as an opinion and not as a
+silence. The owner was told this when the choice was made and accepted it; the mitigation is that the
+screen says so, above the list, in `RATING_SLIDERS_START_AT_FR`: « Tous les curseurs partent de 5,0. Si
+tu n'y touches pas, c'est la note que tu donnes. » There is deliberately **no** « passer sans noter »
+button — it would claim to do something the control cannot do. And `components/ui/slider.tsx` keeps the
+browser's native appearance, setting exactly one property (`accent-color`, via `accent-accent`): the
+usual Tailwind recipe of `appearance-none` plus two vendor pseudo-elements takes the theme colour with
+it and leaves a grey rail in dark mode, because `accent-color` only paints a control the browser is
+still drawing. Keeping the native thumb is also what gives the arrow keys their half-point step for
+free, which the happy path now asserts.
+
+**The three clauses that publish a match, and the floor that still refuses.** `lib/rating/published.ts`
+owns the question, and it has no viewer in it: *is this match's mean out?* The expected raters are the
+players with `minutes > 0` — derived from the log, no column — and each owes a note to each of the
+others. A new nullable `matches.ratings_published_at` is the coach's escape hatch, written by
+`publishRatings` behind the new `rating:publish`; it exists because the automatic backstop has a hole
+the size of a season's last match, which has no next kick-off to close its window, so the team that
+most wants its notes would be the team whose notes wait for ever. Idempotent, so two taps on a slow
+connection do not move the moment the notes came out. And `MIN_NOTES_FOR_MEAN = 3` guards the figure
+itself: a match published with one note is not a verdict, so below three notes on a player he has no
+mean. That number is **decision 025's two, raised to three**, and 025's « the list shows each player's
+rating count alongside their average » is now coach-only — on a player's own row a count is an
+invitation to work out who did not rate him, and in a squad of a dozen that arithmetic is easy and
+poisonous. The man-of-the-match card therefore reads « 9,0 de moyenne » and no longer « sur 7 notes »,
+even when the reader is the coach, because that card is read by everybody.
+
+**Security by not selecting, not by not rendering.** `getRatingResults` returns `published: false`
+*above* the select that would fetch any score, so an unpublished match's figures never leave Postgres
+for anybody — the coach included. A reader who is not the coach receives `count: null` and
+`received: []` for every player. So the `canSeeNotes` branches in `ratings-panel.tsx` are about layout,
+and there is nothing in the RSC payload for a crafted request or an open DevTools to find. Two new
+`can()` actions carry it, both coach-only: `rating:readNotes` (the notes, their authors, and the count a
+mean rests on) and `rating:publish`. `rating:readNotes` is a *read* in `can()` rather than an `isCoachOf`
+at the page because a second way of asking the same question is how two answers drift apart.
+
+**The migration is `0007_chubby_silver_samurai.sql`, and three of its five statements are
+irreversible.** `score` becomes `numeric(3,1)` with a `ratings_score_half_step` check — widening loses
+nothing and `7` survives as `7.0`, while the way back would round a half-point silently. `comment` is
+**dropped**: the free-text field is gone from the screen and a column nobody writes reads as a feature
+that exists. Every **self-rating is deleted**, because `ratings_no_self` cannot be added over rows that
+007 required, and because a mean « of the notes the others gave him » has no place for his own. Nothing
+of anybody's is lost on production, which holds no ratings at all; a local or preview database loses the
+seed's fixtures, and `db/seed.ts` stopped writing both in the same commit. `ratings_no_self` is only the
+half of the rule the table can see — « only a man with minutes is rated » is a fact about `match_events`
+and lives in `lib/rating/` and in the Server Action, which is where a crafted form post is caught.
+
+**What is amended rather than superseded.** Decision 023's « a rating is final » stands and is said out
+loud on the screen (`RATING_IS_FINAL_FR`); what goes is its last paragraph, where a complete set was
+what unlocked the results. A partial set is still legal in the action and the screen still shows an
+already-sent note as a locked figure, but 021's « M6 must submit a player's whole set atomically » is
+now structural rather than a rule to remember: the screen is one form with one submit. Decision 079's
+deadline sentence stands — the app still states when the window shuts — but its second half, the
+paragraph about a door closing for ever on a player who ran out of time, describes a rule that no longer
+exists. Decision 095 keeps `noteAuthorFr` and « toi » winning over « lui-même », minus the self-note it
+was half written about. Decision 039 — a supporter is on the sheet, rates nobody, and may read the
+results — is untouched and is now the ordinary case rather than the exception: *everybody* reads the
+results.
+
+**One unit is renamed because it changed meaning.** `PlayerRating.count` keeps its name and counts
+**matches with a published mean** instead of notes; `lib/stats/aggregate.ts`'s `MIN_RATINGS` is now
+`MIN_RATED_MATCHES` for the same reason, and the screens say « sur 6 matchs notés » where they said
+« sur 6 notes ». The two constants are the same number — three — for two different denominators, and
+neither imports the other. The shrinkage PR #105 landed is *better* on this unit: the within-player
+variance is now match-to-match variation rather than rater-to-rater disagreement, which is what a
+season average is supposed to be about.
+
+**The browser suite was rewritten rather than repaired.** Every selector the happy path used for the
+ratings — `score:<membershipId>-<note>`, « Suivant », the `form > ul > li:not([hidden])` pagination,
+« N / N notés », « Terminer et voir le résumé » — addressed something that no longer exists. It now
+walks all three states of a published match: four of the eight men who played rate (the smallest number
+that leaves every rater on exactly the `MIN_NOTES_FOR_MEAN` floor), the means stay in while four still
+owe, the coach is shown their four names and publishes without them, and the same screen is then read
+by the coach and by a player in one pass — « 28 notes sur 8 joueurs à noter », a count and the author
+chips for him, « 9,0 » and nothing else for the player. Half of that assertion is an absence, which is
+the only shape in which a leak of the kind 021 allowed can fail a test.
+
+**What was *not* done, and is not hiding.** Rating history and editing a note: `onConflictDoNothing`
+stays. Showing a player who gave him what: explicitly the coach's alone. And the number this entry
+does not settle — whether 5,0 as a default produces a squad of average players — is a question for the
+owner after a real Sunday, not for a session.

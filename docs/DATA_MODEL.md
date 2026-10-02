@@ -221,14 +221,36 @@ match is amended. **Never** written incrementally — that would let it drift fr
 ## Ratings
 
 ### `ratings`
-`id`, `match_id`, `rater_member_id`, `rated_member_id`, `score` (0–10 integer), `comment`,
-`created_at`. Unique `(match_id, rater_member_id, rated_member_id)`.
+`id`, `match_id`, `rater_member_id`, `rated_member_id`, `score` (`numeric(3,1)`, 0–10 in
+half-points), `created_at`. Unique `(match_id, rater_member_id, rated_member_id)`.
+
+Rewritten by decision 137, which supersedes 007 on three of its clauses and 021 and 024 entirely.
+`comment` was **dropped** and the self-ratings decision 007 required were **deleted**
+(`0007_chubby_silver_samurai.sql`) — see the migration's own header for why each of those is
+irreversible on purpose.
 
 Invariants:
-- both members must be in `match_squad` for that match with role `starter` or `substitute`
-- self-rating is allowed (`rater = rated`) — decision 007
-- a rater may not read any rating for a match until they have submitted their own full set
+- `score` is between 0 and 10 **and lands on a half-point**: two checks, `ratings_score_range` and
+  `ratings_score_half_step` (`(score * 2) = floor(score * 2)`). The step the slider implies is stated
+  by the database rather than implied by it, because a `smallint` behind a half-point control rounds
+  silently
+- **nobody rates himself** — `ratings_no_self`, `rater_member_id <> rated_member_id`
+- **both members must have played**: `minutes > 0` in the log, not a role on the sheet. That is a fact
+  about `match_events` and no constraint here can see it, so it lives in `lib/rating/validation.ts`
+  and in `submitRatings`, which is where a crafted form post is caught
 - inserts are refused once the next match for that team has kicked off
+- **nothing is read until the match's means are published**, and what a non-coach may read is one mean
+  per player. Never a raw score, never an author. `lib/rating/published.ts` owns the question and
+  `getRatingResults` enforces it by not selecting
+
+### `matches.ratings_published_at`
+Nullable `timestamptz` on `matches`, written by `publishRatings` (`rating:publish`, coach-only).
+
+The coach's escape hatch, and the only stored half of « are this match's means out? ». The other two
+clauses are derived: every expected rater has submitted, or the window has closed at the next
+kick-off. It exists because the last match of a season has no next kick-off, so without it the team
+that most wants its notes is the team whose notes could wait for ever (decision 137). Idempotent: a
+second publish does not move the instant.
 
 ## Derived, never stored
 

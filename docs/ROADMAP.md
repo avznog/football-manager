@@ -499,6 +499,14 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       test asserts the whole line (decision 106)
 
 ## M6 — Ratings & recap
+
+> **Decision 137 rebuilt this milestone, and the `[x]` boxes above the rebuild record September, not
+> today.** A note is now the mean of what the others gave you, it comes out once the notes are in, and
+> the individual notes are the coach's alone. The four lines that follow this note — the card-at-a-time
+> flow, the reciprocity gate, the optional comment, the two-tap pad of decision 102 — all describe
+> something that has been deleted. They are kept because a reader of `git log` will meet them, and the
+> block at the end of this section is what is true.
+
 - [x] Rating flow: one teammate per card, 0–10, optional comment
 - [x] Results hidden until you have submitted your own
 - [x] Window closes at the next kick-off
@@ -535,6 +543,76 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       selection is now a fill, a ring, a bolder digit and « Note choisie : 8 / 10 » in an
       `aria-live` region; the forward button says « Passer sans noter » on a card with no score, and
       the last card has none at all (decision 102)
+
+**The rebuild — decision 137, `feat/ratings-rebuild`.** Everything below this line is the milestone as
+it stands.
+
+- [x] **A note is the mean of what the others gave you.** One screen, every teammate who played listed
+      once, a native `<input type="range">` each at `min=0 max=10 step=0.5`, one submit — all the notes
+      or none, which is what the old flow could not do per card. `components/ui/slider.tsx` keeps the
+      browser's own appearance and sets exactly one property (`accent-color`, as `accent-accent`): the
+      Tailwind recipe of `appearance-none` plus two vendor pseudo-elements takes the theme colour with
+      it and leaves a grey rail in dark mode. Keeping the native thumb is also what gives the arrow keys
+      a half-point step for free, which the happy path asserts. `app/(app)/match/[id]/notation/
+      _components/rating-sheet.tsx` replaces `rating-flow.tsx`, and `lib/rating/flow.ts` is deleted:
+      there is no forward button left for it to label
+- [x] **The screen says what a slider costs, because a range has no unset state.** Every curseur starts
+      at 5,0 and every curseur is submitted, so an untouched one records 5,0 as an opinion rather than a
+      silence. `RATING_SLIDERS_START_AT_FR` says so above the list — « Tous les curseurs partent de 5,0.
+      Si tu n'y touches pas, c'est la note que tu donnes. » — and there is deliberately no « passer sans
+      noter », which would claim to do something the control cannot do
+- [x] **Nobody rates himself, and nobody rates a man who did not play.** `minutes > 0` in the log, not a
+      role on the sheet: `ratings_no_self` is the half of the rule the table can see, and the minutes
+      half lives in `lib/rating/validation.ts` and in `submitRatings`, which is where a crafted form post
+      is caught rather than at the screen. The `comment` column and its `Textarea` are gone
+- [x] **Published, or « en attente » — one question with no viewer in it.** `lib/rating/published.ts`:
+      the means are out when every expected rater has submitted, **or** the coach has published, **or**
+      the window has closed at the next kick-off. `matches.ratings_published_at` is the coach's escape
+      hatch (`publishRatings`, `rating:publish`, idempotent), and it exists because the automatic
+      backstop has a hole the size of a season's last match — no next kick-off, so the team that most
+      wants its notes would be the team whose notes wait for ever. The coach reads who is missing before
+      he is offered the button — « 4 joueurs sur 8 n'ont pas fini », naming them
+      (`ratings-panel.tsx`, `publish-ratings-form.tsx`)
+- [x] **`MIN_NOTES_FOR_MEAN = 3`**: a match published with one note is not a verdict, so below three
+      notes a player has no mean. Decision 025's two, raised
+- [x] **The raw notes are the coach's, enforced by not selecting them.** `getRatingResults` returns
+      `published: false` *above* the select that would fetch any score, and a non-coach receives
+      `count: null` and `received: []` for every player — so an unpublished match's figures never leave
+      Postgres, and the `canSeeNotes` branches in `ratings-panel.tsx` are about layout, not about
+      secrecy. Two new coach-only `can()` actions carry it: `rating:readNotes` and `rating:publish`
+- [x] **The count is the coach's too.** On a player's own row a count is an invitation to work out who
+      did not rate him, and in a squad of a dozen that arithmetic is easy and poisonous. So the
+      man-of-the-match card reads « 9,0 de moyenne » and no longer « sur 7 notes », even for the coach,
+      because that card is read by everybody
+- [x] **Every reader now sees the same season.** `ratingVisibility`, `visibleMatchIds`,
+      `hiddenMatchIds`, `hiddenRatedCounts`, `getVisibleRatingScores`'s second round trip and the
+      « d'après les matchs que tu as notés » on three screens are deleted; `/stats`, a player's profile
+      and « l'équipe type » print one set of numbers. The largest simplification in the repository since
+      the stats cache, and bought by a product decision rather than by a refactor (decision 021 goes
+      entirely)
+- [x] **`PlayerRating.count` counts matches, not notes.** `MIN_RATINGS` is now `MIN_RATED_MATCHES` and
+      the screens say « sur 6 matchs notés ». Same number, two denominators, neither constant importing
+      the other. PR #105's shrinkage is better on this unit: the within-player variance is now
+      match-to-match variation rather than rater-to-rater disagreement
+- [x] **The migration is `0007_chubby_silver_samurai.sql`, and three of its statements are
+      irreversible** on purpose: `score` → `numeric(3,1)` with `ratings_score_half_step`, `comment`
+      dropped, every self-rating deleted (`ratings_no_self` cannot be added over the rows decision 007
+      required). Production holds no ratings at all; a local or preview database loses the seed's
+      fixtures, and `db/seed.ts` stopped writing both in the same commit
+- [x] **The browser suite was rewritten, not repaired** — every rating selector it used addressed
+      something that no longer exists. It now walks all three states in one pass: four of the eight men
+      who played rate (the smallest number that leaves every rater exactly on the floor), the means stay
+      in while four still owe, the coach is shown their four names and publishes without them, and the
+      published screen is then read by the coach and by a player — « 28 notes sur 8 joueurs à noter »
+      and the author chips for him, « 9,0 » and nothing else for the player. Half of that assertion is
+      an absence, which is the only shape in which a leak of the kind 021 allowed can fail a test
+- [ ] **Not yet walked by hand.** Both themes at 390 px in both roles in one pass, and the end-to-end
+      walk on a reset database as three users — including crafted form data proving a player cannot rate
+      himself or anybody with 0 minutes, which is the half no screen can demonstrate. The suite is green
+      and nothing below `npm run test:e2e` is evidence about the phone
+- [ ] **Whether 5,0 as a default produces a squad of average players** is a question for the owner after
+      a real Sunday, and not one a session can answer. If it does, the answer is not a « passer sans
+      noter » button — it is a different control
 
 ## M7 — Retro-entry & amendments
 - [x] "Saisie rétroactive" screen synthesising a full event log from a filled-in sheet
@@ -758,36 +836,37 @@ the reachable-turf finding below an **under**-statement on device rather than an
       a derived score; the `live` flag computed at `:41` only picks the border colour. The same class
       of defect as « 0 – 0 » for an unrecorded match, and the fix belongs next to it in
       `event-parts.tsx:86`: a live score is a running score, never a verdict
-- [ ] The recap contradicts itself about who came on. In « Les notes », Yanis and Fabien carry « entré
-      en jeu »; in « Temps de jeu » a few hundred pixels below, the same two men are « non entré ·
-      0 min ». `app/(app)/match/[id]/recap/_components/ratings-panel.tsx:91` deduces it from
-      `squadRole === "substitute"` — from what the coach *planned*. This is the exact bug whose fix
-      `lib/rating/progress.ts:144-159` documents at length: the notation flow was corrected and the
-      recap is the copy that was missed. The log answers this question, not the sheet
+- [x] The recap contradicts itself about who came on. In « Les notes », Yanis and Fabien carried « entré
+      en jeu »; in « Temps de jeu » a few hundred pixels below, the same two men were « non entré ·
+      0 min ». The badge still reads `squadRole === "substitute"`, and it is now true: decision 137 put
+      only the men with `minutes > 0` in that list, so a named substitute who stayed on the bench is not
+      in it to be mis-described. Fixed by the list's membership rule rather than by the line this item
+      pointed at — worth saying, because the line is still there and still reads the sheet
 - [ ] « Ce match a été saisi après coup, sans composition : les temps de jeu viennent de la saisie »
       is shown for a match nothing has been entered for — the same screen still offers « Saisir le
       match », which only renders when `score === null`. `lib/composition/plan.ts:437` branches on
       `match.entryMode === "retro"` alone and never on whether a log exists, so it describes a record
       the app does not hold. `app/(app)/match/[id]/saisie/page.tsx:76-81` refuses to make that claim;
       this sentence should be held to the same standard
-- [ ] `/stats` shows two members of one team two different « Meilleures notes » podiums under
+- [x] `/stats` shows two members of one team two different « Meilleures notes » podiums under
       identical copy — coach: Julien 9,0 · Ali 8,0 · Hugo 8,0; Ali: Karim 7,0 · Samir 7,0 · Hugo 6,0,
       and the counts diverge too (Nico « 6,0 sur 4 notes » against « 5,5 sur 2 notes »). Decision 007's
-      reciprocity gating is *why*, and it is right, but the card is titled as an absolute leaderboard
-      — « Moyenne reçue, à partir de 3 notes » — and the note at `app/(app)/stats/page.tsx:182` only
-      mentions the two excluded matches. Two team-mates will argue about who is best rated. The label
-      has to become viewer-relative: « d'après les matchs que tu as notés »
+      reciprocity gating was *why*, and the fix this item prescribed — label the card « d'après les
+      matchs que tu as notés » — was overtaken: decision 137 deleted the gate, so the podium is the
+      same for every reader and needs no viewer-relative label. The card now reads « Moyenne reçue, à
+      partir de 3 matchs notés », which is an absolute leaderboard and is now true
 - [ ] The rank column invents an order among ties: #2 Ali 8,0, #3 Hugo 8,0, #4 Karim 8,0, and #4
       Rayan 1 but above #5 Ali 1 but. `app/(app)/stats/_components/leaderboard.tsx:50` prints
       `{index + 1}`; a competition rank repeats on equal values
-- [ ] A rating for a man who never came on: Fabien reads MATCHS 0 · MINUTES 0′ · NOTE 5,0 « sur 4
-      notes » on the coach's `/stats` (« 3 fois remplaçant »). Either the notation screen should not
-      offer a 0-minute substitute, or the average is suppressed at zero minutes — the same argument
-      `playedLabelFr` already settled for « non entré »
+- [x] A rating for a man who never came on: Fabien read MATCHS 0 · MINUTES 0′ · NOTE 5,0 « sur 4
+      notes » on the coach's `/stats` (« 3 fois remplaçant »). This item offered two fixes and decision
+      137 took the first: the notation screen does not offer a 0-minute substitute, and the Server Action
+      refuses one even if the form is crafted. A man with no minutes now has no note to average
 - [ ] « Présence aux entraînements » has no minimum denominator, so Rayan — who has left the club —
       tops it at 1/1 · 100 %, above ten players on 1/2. `app/(app)/stats/_components/attendance.tsx:31`
       sorts on the rate and uses `marked` only as a tie-break, while « Meilleures notes » enforces
-      `MIN_RATINGS = 3` for precisely this reason
+      `MIN_RATED_MATCHES = 3` for precisely this reason (`MIN_RATINGS` when this was written; renamed by
+      decision 137, which changed its denominator from notes to matches and not its argument)
 - [ ] Three already-archived competitions are advised to « Archive-la plutôt », beside a control that
       only offers « Réactiver ». `lib/competition/labels.ts:56-72` never receives
       `competition.archived`, so the advice clause is unconditional
@@ -1110,9 +1189,17 @@ Ordered by harm, which is not the order they are cheapest to fix.
       `D6` (the scorer field is created 487 px below the button), `D18`, `D22`, `D34`, `D41`, `D52`
 - [ ] **Slice 5 — one rule for when availability is open.** `D9`, `D10`, `D11`, `D37` are four faces of
       decision 121 meeting `isPast`: « finished » and « played » are different facts
-- [ ] **Slice 6 — ratings.** `D7` (both controls below the fold, progress lost on navigation), `D13` (the
-      recap says « entré en jeu » for men who never came on, and `playedLabelFr` already fixes it on
-      `/notation`), `D21`
+- [~] **Slice 6 — ratings**, mostly overtaken by decision 137 rather than worked through. `D13` is gone:
+      only men with `minutes > 0` are in the list the badge describes. `D21` is gone: the unpublished
+      panel is headlined « Les moyennes ne sont pas encore sorties » and no longer hardcodes
+      « Note tes coéquipiers pour voir les notes » over a sentence contradicting it. `D7`'s first half is
+      gone with the pad — eleven cards, « Précédent » / « Passer sans noter » / « Enregistrer » 253 px
+      below the fold, tap + scroll + tap eleven times — because there is one screen, one slider each and
+      one submit. **`D7`'s second half still stands:** nothing survives a navigation away, and it is now
+      one form's worth of sliders rather than a card counter — and the « 11 notes choisies, pas encore
+      envoyées » warning the old flow at least printed went with the card counter, so there is now no
+      warning at all. Same family as `D4`, and the outbox game mode has is still the answer nobody has
+      written here
 - [ ] **Slice 7 — the way in.** `D16` (the invite link is never built), `D17`, `D30`, `D31`, `A6`, `A7`
 - [ ] **Slice 8 — roster and profiles.** `D8` (a coach can demote himself out of the app with one tap),
       `D29`, `D32`, `D33`, `D35`, `D36`, `D43`, `D44`, `D45`
