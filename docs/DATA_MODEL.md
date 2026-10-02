@@ -238,7 +238,8 @@ Invariants:
 - **both members must have played**: `minutes > 0` in the log, not a role on the sheet. That is a fact
   about `match_events` and no constraint here can see it, so it lives in `lib/rating/validation.ts`
   and in `submitRatings`, which is where a crafted form post is caught
-- inserts are refused once the next match for that team has kicked off
+- inserts are refused once the match's means are out, and not before that — a played match is rateable
+  however old it is (decision 138, which deleted the next-kick-off deadline)
 - **nothing is read until the match's means are published**, and what a non-coach may read is one mean
   per player. Never a raw score, never an author. `lib/rating/published.ts` owns the question and
   `getRatingResults` enforces it by not selecting
@@ -246,11 +247,13 @@ Invariants:
 ### `matches.ratings_published_at`
 Nullable `timestamptz` on `matches`, written by `publishRatings` (`rating:publish`, coach-only).
 
-The coach's escape hatch, and the only stored half of « are this match's means out? ». The other two
-clauses are derived: every expected rater has submitted, or the window has closed at the next
-kick-off. It exists because the last match of a season has no next kick-off, so without it the team
-that most wants its notes is the team whose notes could wait for ever (decision 137). Idempotent: a
-second publish does not move the instant.
+The coach's escape hatch, and the only stored half of « are this match's means out? ». There is exactly
+one other clause and it is derived: every expected rater has submitted. There used to be a third — the
+window closing at the next kick-off — and decision 138 deleted it, because it never fired for a season's
+last match, which has no next kick-off, and fired for everybody else on a date that had nothing to do
+with their notes. So this column carries a second, heavier job: **it is also the rating deadline**.
+Nobody can rate a match once it is set, nothing else closes the rating, and because a published mean is
+never unpublished the window never reopens. Idempotent: a second publish does not move the instant.
 
 ## Derived, never stored
 

@@ -322,14 +322,19 @@ export const matches = pgTable(
      *
      * It is the **escape hatch, not the normal path**: a match publishes itself once every player
      * who was on the pitch has submitted his set, and that is what happens when the squad does what
-     * it is asked. This column is for the straggler who never will — and for the last match of a
-     * season, where the other automatic clause cannot help, because it fires at the next kick-off
-     * and there is no next kick-off (`lib/rating/window.ts` returns a null `closesAtMs`, which reads
-     * as « open for ever »).
+     * it is asked. This column is for the straggler who never will.
+     *
+     * Since decision 138 it carries a second job, and it is the heavier of the two: **it is also the
+     * rating deadline.** Rating a played match stays open for as long as its means are not out, with
+     * no calendar clause at all, so filling this in is what ends it (`lib/rating/window.ts`). There
+     * used to be a third publication clause — the next kick-off — and it never fired for the last
+     * match of a season, which had no next kick-off; this column was its only backstop and is now the
+     * whole of it.
      *
      * A timestamp rather than a boolean, because « published » is an event with a time and the recap
      * will want to say when. Nullable and set once; nothing un-publishes a mean, since a figure the
-     * squad has already read cannot be recalled.
+     * squad has already read cannot be recalled — and since 138 that also means the window never
+     * reopens.
      */
     ratingsPublishedAt: timestamp({ withTimezone: true }),
     createdBy: uuid().references(() => users.id, { onDelete: "set null" }),

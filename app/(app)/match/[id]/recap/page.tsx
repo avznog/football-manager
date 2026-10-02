@@ -29,8 +29,8 @@ import { entryModeBadgeFr, venueSideLabel } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import type { MatchRow } from "@/lib/match/queries";
 import { MIN_NOTES_FOR_MEAN } from "@/lib/rating/aggregate";
-import { getMatchRecap, getRatingResults, getRatingWindow } from "@/lib/rating/queries";
-import { ratingDeadlineFr } from "@/lib/rating/window";
+import { getMatchRecap, getRatingResults } from "@/lib/rating/queries";
+import { ratingUrgencyFr } from "@/lib/rating/window";
 import { ManOfTheMatchCard } from "./_components/man-of-the-match";
 import { MinutesTable } from "./_components/minutes-table";
 import { RatingsPanel } from "./_components/ratings-panel";
@@ -53,7 +53,6 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
   // thing this page used it for was `isOnRateableSheet`, which is gone with the rule.
   const { match, recap } = view;
   const kickoff = new Date(match.kickoffAt);
-  const now = new Date();
 
   // A match nobody has played has nothing to recap.
   if (match.status === "scheduled") {
@@ -104,17 +103,14 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
    * play, while `rating:readNotes` and `rating:publish` are his and his alone (decision 137).
    */
   const canSubmit = can(actor, "rating:submit", { teamId: team.id });
-  const [results, window] = await Promise.all([
-    getRatingResults({
-      teamId: team.id,
-      matchId: match.id,
-      membershipId: team.membershipId,
-      canSubmit,
-      canSeeNotes: can(actor, "rating:readNotes", { teamId: team.id }),
-      canPublish: can(actor, "rating:publish", { teamId: team.id }),
-    }),
-    getRatingWindow(match),
-  ]);
+  const results = await getRatingResults({
+    teamId: team.id,
+    matchId: match.id,
+    membershipId: team.membershipId,
+    canSubmit,
+    canSeeNotes: can(actor, "rating:readNotes", { teamId: team.id }),
+    canPublish: can(actor, "rating:publish", { teamId: team.id }),
+  });
 
   /*
    * Whether he is *asked* for notes is the log's answer, not the sheet's (decision 137): a named
@@ -122,9 +118,18 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
    * built from `ratingTargetsFor`, which is empty for anybody who did not play — so the sheet is no
    * longer read here at all.
    */
+  /*
+   * And whether the window is still open needs no query of its own any more: under decision 138 it is
+   * shut exactly when the means are out, which `results` has already answered. `getRatingWindow` would
+   * re-read the log and the pairs to arrive at the same boolean, and a second answer is a second
+   * chance to contradict the panel underneath.
+   */
   const canStillRate =
-    canSubmit && window.isOpen && results !== null && results.progress.requiredCount > 0;
-  const deadline = ratingDeadlineFr(window.closesAtMs, now.getTime());
+    canSubmit &&
+    match.status === "finished" &&
+    results !== null &&
+    !results.published &&
+    results.progress.requiredCount > 0;
 
   return (
     <div className="space-y-6">
@@ -158,7 +163,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
       {/* The prompt of screen 6: the recap asks for the notes, it does not wait to be found. It no
           longer promises anything in return — « tu verras les notes de tout le monde dès que tu auras
           fini » was decision 021's trade, and under 137 his own notes unlock nothing for him
-          (`ratings-panel.tsx`). What is left is the deadline, which is the honest reason to do it now. */}
+          (`ratings-panel.tsx`). What is left is that the means come out without him. */}
       {canStillRate && results !== null && !results.progress.complete ? (
         <Card title="À toi de noter" as="h2" className="border-accent/40 bg-accent/10">
           <div className="space-y-3">
@@ -166,8 +171,8 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
               Une note pour chaque joueur qui était sur le terrain avec toi. L’équipe lira une
               moyenne par joueur, jamais ta note à toi.
             </p>
-            {/* The window has a closing time and this card never said it (decision 079). */}
-            {deadline ? <p className="text-sm font-medium text-ink">{deadline}</p> : null}
+            {/* What closes the window, which this card never said (decision 079). */}
+            <p className="text-sm font-medium text-ink">{ratingUrgencyFr()}</p>
             <ButtonLink href={`/match/${match.id}/notation`}>
               {results.progress.submittedCount > 0 ? "Finir mes notes" : "Noter mes coéquipiers"}
             </ButtonLink>

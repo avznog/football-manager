@@ -754,9 +754,12 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     // alternative is a button that gives up on four people without saying who they are.
     await expect(pending).toContainText("4 joueurs sur 8 n’ont pas fini");
     await expect(pending).toContainText(sub.displayName);
-    // What the tap costs, before the tap: a note cannot be added once the means are out.
+    // What the tap costs, before the tap, and both halves of it: the figures stop moving *and* the
+    // notation closes. Under decision 138 this button is the only thing that closes it — nothing else
+    // does any more — so a coach who is not told that is being asked to end something unknowingly.
     await expect(pending).toContainText(
-      "Les moyennes seront calculées sans les 4 séries qui manquent, et elles ne bougeront plus.",
+      "Les moyennes seront calculées sans les 4 séries qui manquent, elles ne bougeront plus, et " +
+        "plus personne ne pourra noter ce match.",
     );
 
     await pending.getByRole("button", { name: "Sortir les moyennes maintenant" }).click();
@@ -808,8 +811,32 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(row).not.toContainText(cm1.displayName);
   });
 
+  await test.step("and the four who never rated have missed it, because the means are out", async () => {
+    /*
+     * Decision 138's other half, and the only one a test can state: the window is shut now, and the
+     * tap two steps up is what shut it. Before that tap `sub` could still have rated this match —
+     * however long ago it was played, which is the request this decision answers — and the suite
+     * walked past that state without looking at it.
+     */
+    await logout(page);
+    await login(page, sub.username, fixture.password);
+    await page.goto(`${matchUrl}/notation`);
+
+    await expect(page.getByRole("heading", { name: "La notation est fermée" })).toBeVisible();
+    // Why it is shut, and what it cost him — he never sent one, and the screen says so rather than
+    // printing « Tu en avais mis 0 sur 7 ».
+    await expect(
+      page.getByText("Les moyennes de ce match sont sorties, donc les notes ne bougent plus."),
+    ).toBeVisible();
+    await expect(page.getByText("Tu n’en avais mis aucune.")).toBeVisible();
+    // No sliders, and not merely a hidden form: there is nothing to submit on this screen.
+    await expect(page.locator("input[type=range]")).toHaveCount(0);
+    // And the sentence that invited him is gone with the window it described.
+    await expect(page.getByText("Tu peux encore noter")).toHaveCount(0);
+  });
+
   await test.step("a coach-only screen is a French dead end for a player, with a way out", async () => {
-    // Still the goalkeeper, so still a player: `match:amend` is coach-only, and the retro-entry
+    // Still the substitute, so still a player: `match:amend` is coach-only, and the retro-entry
     // screen answers `notFound()` rather than 403 precisely so that it does not confirm the match
     // exists. What a player must therefore see is a 404 — in French, inside the shell.
     await page.goto(`${matchUrl}/saisie`);

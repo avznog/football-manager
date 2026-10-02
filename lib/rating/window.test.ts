@@ -1,118 +1,76 @@
 import { describe, expect, it } from "vitest";
 
-import { ratingDeadlineFr, ratingWindow } from "./window";
-
-const NOW = Date.UTC(2026, 8, 22, 18, 0, 0);
-const HOUR = 3_600_000;
+import { ratingUrgencyFr, ratingWindow } from "./window";
 
 describe("ratingWindow", () => {
-  it("is open once the match is finished and no next match has started", () => {
-    expect(
-      ratingWindow({ finished: true, nextKickoffAtMs: NOW + 48 * HOUR, nowMs: NOW }),
-    ).toMatchObject({ state: "open", isOpen: true, closesAtMs: NOW + 48 * HOUR });
-  });
-
-  it("is open with no next match on the calendar at all", () => {
-    expect(ratingWindow({ finished: true, nextKickoffAtMs: null, nowMs: NOW })).toMatchObject({
+  it("is open once the match is finished and the means are not out", () => {
+    expect(ratingWindow({ finished: true, published: false })).toMatchObject({
       state: "open",
       isOpen: true,
-      closesAtMs: null,
     });
   });
 
-  it("closes at the next kick-off", () => {
-    expect(ratingWindow({ finished: true, nextKickoffAtMs: NOW - 1, nowMs: NOW })).toMatchObject({
+  /**
+   * The whole of decision 138, and the request behind it: a match played five weeks ago whose notes
+   * nobody finished is still rateable. The calendar is not an input any more — there is no
+   * `nextKickoffAtMs`, and no clock — so « however old » is true by construction rather than by a
+   * case that has to be remembered.
+   */
+  it("is open for a match however long ago it was played, as long as nothing is published", () => {
+    expect(ratingWindow({ finished: true, published: false }).isOpen).toBe(true);
+  });
+
+  /**
+   * And the guarantee that stops it being open for ever: a reader who could rate a published match
+   * would be writing his notes after reading the team's, which is the anchoring decision 021 existed
+   * to prevent and the one property decision 137 kept.
+   */
+  it("closes the moment the means are out", () => {
+    expect(ratingWindow({ finished: true, published: true })).toMatchObject({
       state: "closed",
       isOpen: false,
     });
   });
 
-  it("treats the kick-off instant itself as closed", () => {
-    // Strict at the boundary, so the state cannot flip with millisecond jitter.
-    expect(ratingWindow({ finished: true, nextKickoffAtMs: NOW, nowMs: NOW }).state).toBe("closed");
-  });
-
-  it("stays open a minute before the next kick-off", () => {
-    expect(
-      ratingWindow({ finished: true, nextKickoffAtMs: NOW + 60_000, nowMs: NOW }).isOpen,
-    ).toBe(true);
-  });
-
-  it("is not open before the final whistle, whatever the calendar says", () => {
-    expect(
-      ratingWindow({ finished: false, nextKickoffAtMs: NOW + 48 * HOUR, nowMs: NOW }),
-    ).toMatchObject({ state: "not-yet", isOpen: false });
-    expect(ratingWindow({ finished: false, nextKickoffAtMs: null, nowMs: NOW }).isOpen).toBe(false);
-  });
-
-  it("an unfinished match whose successor has kicked off is still 'not-yet', never 'open'", () => {
-    // A match left in `live` by mistake: it must not become rateable just because time passed.
-    expect(ratingWindow({ finished: false, nextKickoffAtMs: NOW - HOUR, nowMs: NOW }).state).toBe(
-      "not-yet",
-    );
+  it("is not open before the final whistle, published or not", () => {
+    expect(ratingWindow({ finished: false, published: false })).toMatchObject({
+      state: "not-yet",
+      isOpen: false,
+    });
+    /*
+     * A match nobody played and nobody finished: `ratingsPublication` publishes it vacuously, so
+     * `published` arrives true. « Not yet » still wins — a match that has not been played is not a
+     * match whose rating is over, and the screen's two sentences are different.
+     */
+    expect(ratingWindow({ finished: false, published: true }).state).toBe("not-yet");
   });
 });
 
-describe("ratingDeadlineFr", () => {
+describe("ratingUrgencyFr", () => {
   /**
-   * The whole point: `closesAtMs` existed from the first day and no screen read it, so the app
-   * enforced a deadline it never named. NOW is 20:00 in Paris on 22 September 2026, so a window
-   * shutting 48 hours later shuts on the Thursday evening.
+   * There is no date left to assert, which is the point: the old sentence named the next kick-off, and
+   * for the last match of a season it named nothing at all and printed nothing. This one is true for
+   * every played match, so it is unconditional on the three screens that show it.
    */
-  it("names the instant the window shuts", () => {
-    expect(ratingDeadlineFr(NOW + 48 * HOUR, NOW)).toBe(
-      "À finir avant le coup d’envoi du match suivant, jeudi 24/09/2026 à 20:00 : après, tu ne " +
-        "peux plus noter et les moyennes sortent sans tes notes.",
-    );
+  it("names the two things that end the rating, and no date", () => {
+    const sentence = ratingUrgencyFr();
+    expect(sentence).toContain("tout le monde aura noté");
+    expect(sentence).toContain("le coach");
+    expect(sentence).not.toContain("coup d’envoi");
   });
 
   /**
-   * Both halves of what missing it costs, and the second half is the one decision 137 rewrote: the
-   * window closing used to hide the match's notes from a man who had not rated, for ever, and now it
-   * publishes the means. So what he loses is his say and not his sight, and the sentence must not
-   * contain the old threat — a promise the app would no longer keep.
+   * It must not threaten the punishment decision 137 removed. The window closing *publishes* the
+   * means, so « tu ne verras pas celles de l'équipe » would be a threat the app no longer carries
+   * out — and three unit assertions once pinned that sentence while it was wrong, which is why it is
+   * asserted negatively here rather than trusted to a reading.
    */
-  it("says what is lost after, not only when", () => {
-    const sentence = ratingDeadlineFr(NOW + 48 * HOUR, NOW);
-    expect(sentence).toContain("tu ne peux plus noter");
-    expect(sentence).toContain("les moyennes sortent sans tes notes");
-    expect(sentence).not.toContain("tu ne verras pas");
+  it("does not threaten to hide the team's means from him", () => {
+    expect(ratingUrgencyFr()).not.toContain("tu ne verras pas");
   });
 
-  /**
-   * A deadline the reader can place against tonight, not a date he has to count days from — and
-   * the digits alongside it, so the sentence stays true in a screenshot read the next morning.
-   */
-  it("uses the relative day when the next match is tomorrow, with the date behind it", () => {
-    expect(ratingDeadlineFr(NOW + 24 * HOUR, NOW)).toBe(
-      "À finir avant le coup d’envoi du match suivant, demain, 23/09/2026 à 20:00 : après, tu ne " +
-        "peux plus noter et les moyennes sortent sans tes notes.",
-    );
-  });
-
-  /**
-   * No fixture after this one: the window genuinely has no end, so there is nothing to warn about.
-   * Inventing « pas de date limite » would be a claim that stops being true the moment the coach
-   * adds a match.
-   */
-  it("says nothing when no next match is scheduled", () => {
-    expect(ratingDeadlineFr(null, NOW)).toBeNull();
-  });
-
-  /**
-   * Printing a deadline that has already gone by is exactly the defect this function exists to
-   * remove. The closed screens say so in their own words.
-   */
-  it("says nothing once the deadline has passed", () => {
-    expect(ratingDeadlineFr(NOW - HOUR, NOW)).toBeNull();
-    expect(ratingDeadlineFr(NOW, NOW)).toBeNull();
-  });
-
-  /** The same boundary as `ratingWindow`: open a minute before, so the two never disagree. */
-  it("still warns a minute before the kick-off, while the window is open", () => {
-    expect(ratingWindow({ finished: true, nextKickoffAtMs: NOW + 60_000, nowMs: NOW }).isOpen).toBe(
-      true,
-    );
-    expect(ratingDeadlineFr(NOW + 60_000, NOW)).not.toBeNull();
+  /** What he actually loses is his say, and the sentence has to carry it. */
+  it("says his notes stop counting, which is the loss", () => {
+    expect(ratingUrgencyFr()).toContain("tes notes ne compteront plus");
   });
 });

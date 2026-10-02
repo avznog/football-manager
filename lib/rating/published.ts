@@ -12,19 +12,20 @@
  * note for a reader who is not the coach, and no mean at all for an unpublished match — because the
  * rule being right in a module proves nothing about a screen that bypasses it (decision 097).
  *
- * ## Three clauses, and the one that cannot be relied on
+ * ## Two clauses, and why there is no third
  *
  * 1. **every set is in** — everybody who played has rated everybody else who played. This is the
  *    normal path and the only one that needs nobody to act;
  * 2. **the coach published** — `matches.ratingsPublishedAt`, the escape hatch for the straggler who
- *    never will;
- * 3. **the rating window closed** — the next kick-off has come, so the notes can no longer change.
+ *    never will.
  *
- * Clause 3 is the one to be careful about, and it is weaker than it looks: `ratingWindow` reports
- * `closesAtMs: null` when the calendar holds no later match, which reads as « open for ever ». So
- * the **last match of a season never closes its own window** — the one match a team most wants its
- * notes for. Clause 3 cannot be the backstop; clause 2 is, which is why the publish action exists
- * and why the recap offers it to the coach rather than hiding it in an admin screen.
+ * There used to be a third — « the rating window closed », the next kick-off having come. Decision 138
+ * removed it, and the argument was already written here: it was weaker than it looked, because
+ * `ratingWindow` reported `closesAtMs: null` when the calendar held no later match, so the **last
+ * match of a season never closed its own window** — the one match a team most wants its notes for.
+ * Clause 2 was the real backstop. Removing the clause also turns the dependency the other way round:
+ * `ratingWindow` now asks *this* module whether the means are out, because publishing is what shuts
+ * rating, and a module cannot be both above and below another one.
  *
  * ## What this reverses, on purpose
  *
@@ -35,17 +36,18 @@
  * never have seen, for a mean that says nothing about him as a rater — so decision 137 takes the
  * other side. The nudge survives in a smaller form: nothing is published while the squad still owes
  * notes, so the team waits on its stragglers rather than the stragglers losing something.
+ *
+ * Decision 138 goes one step further and removes the deadline itself: a man who has not rated a match
+ * whose means are not out can still rate it, however long ago it was played. So publishing is no
+ * longer only what releases the means — it is also what ends the rating, and this predicate is the
+ * one place that decides both.
  */
-
-import type { RatingWindowState } from "./window";
 
 export type RatingsPublicationReason =
   /** Everybody who played has rated everybody else. The normal path. */
   | "every-set-in"
   /** The coach released them, with notes still owed. */
   | "coach-published"
-  /** The next match has kicked off, so nothing can change any more. */
-  | "window-closed"
   /** Notes are still owed, and nobody has overridden that. */
   | "pending";
 
@@ -67,15 +69,14 @@ export type RatingsPublicationInput = {
   completeRaterIds: readonly string[];
   /** `matches.ratingsPublishedAt` as epoch ms, or null if the coach has not published. */
   publishedAtMs: number | null;
-  windowState: RatingWindowState;
 };
 
 /**
  * The published predicate.
  *
- * When more than one clause holds, the reason reported is the one that explains the most: the squad
- * finishing its notes is a better thing to tell a reader than a deadline passing, even when both are
- * true. Order is « every set in », then the coach, then the window.
+ * When both clauses hold, the reason reported is the one that explains the most: the squad finishing
+ * its notes is a better thing to tell a reader than the coach having pressed a button, and it is also
+ * the one that leaves nobody out. Order is « every set in », then the coach.
  *
  * **A match nobody played publishes vacuously** — there is no set outstanding, so there is nothing
  * to wait for. That is not the same as having a mean to show: a match nobody recorded (decision 013)
@@ -94,9 +95,6 @@ export function ratingsPublication(input: RatingsPublicationInput): RatingsPubli
   }
   if (input.publishedAtMs !== null) {
     return { published: true, reason: "coach-published", owingRaterIds };
-  }
-  if (input.windowState === "closed") {
-    return { published: true, reason: "window-closed", owingRaterIds };
   }
   return { published: false, reason: "pending", owingRaterIds };
 }

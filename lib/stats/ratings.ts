@@ -49,20 +49,18 @@ export type PlayedRow = {
   minutes: number;
 };
 
-/** The two per-match facts the predicate needs beyond the notes themselves. */
+/**
+ * The one per-match fact the predicate needs beyond the notes themselves.
+ *
+ * It used to carry a second — `windowClosed`, whether a later match had kicked off — and this module
+ * had to be handed it because deriving it needs the calendar and a clock, and this module has neither.
+ * Decision 138 deleted the clause, so the row is down to the column: a season's means are out for the
+ * matches whose sets are all in, plus the ones the coach released.
+ */
 export type MatchPublicationRow = {
   matchId: string;
   /** `matches.ratings_published_at` in epoch ms, or null — the coach's escape hatch. */
   publishedAtMs: number | null;
-  /**
-   * The rating window has shut: a later match has kicked off.
-   *
-   * Passed in rather than derived here, because deriving it needs the calendar and a clock, and this
-   * module has neither. **It is false for the last match of a season**, which never closes its own
-   * window — see `lib/rating/published.ts` for why that makes the coach, not the deadline, the
-   * backstop.
-   */
-  windowClosed: boolean;
 };
 
 export type SeasonRatingPublication = {
@@ -131,7 +129,6 @@ export function seasonRatingPublication(input: {
       expectedRaterIds,
       completeRaterIds,
       publishedAtMs: row?.publishedAtMs ?? null,
-      windowState: row?.windowClosed ? "closed" : "open",
     });
 
     // Nothing to show and nothing to wait for: a match nobody rated belongs in neither list.

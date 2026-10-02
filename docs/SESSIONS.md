@@ -4081,3 +4081,62 @@ and the author chips — which is the decision, on screen.
 **Still not verified.** The crafted form post. `lib/rating/validation.ts` and `submitRatings` refuse a
 note on yourself and on a 0-minute substitute, and unit tests cover both, but nobody has posted the
 fields directly to prove it is the server rather than the screen that refuses.
+
+## The deadline was a calendar coincidence, so it is gone
+
+**2026-10-02** · `feat/rating-window-until-published` · two commits, decision **138**
+
+The owner's request was one line: *when we are on a match that has already been played, we must have the
+possibility to fill up the notes if we have not yet done it.* The design question it raises is where the
+window ends instead, and it was answered before the work started: **it shuts when the means come out, and
+not before.** So a played match is rateable however old it is, and the coach's « Sortir les moyennes
+maintenant » becomes the real deadline. The guarantee kept, which is the only reason rating does not stay
+open for ever: nobody ever reads a mean before writing his own notes.
+
+**What was wrong with the old lock, and it was wrong in both directions.** Decision 007 shut the window
+at the next kick-off and 137 kept that as its third publication clause. It fired for a man who had been
+away a week — not because anybody had read a mean, none was out, but because a fixture he had nothing to
+do with had started — and it failed to fire for a season's last match, which has no next kick-off, so the
+one match a team most wants its notes for was the one whose window never closed on its own. 137's own
+docblock had already written that second half down as the reason the publish button exists. A clause that
+fires when it should not and does not fire when it should is not a deadline.
+
+**The circle, and why the fix is a deletion.** `ratingsPublication` took `windowState`; the new rule needs
+`ratingWindow` to take `published`. Both cannot hold, so clause 3 went rather than being made
+conditional — and the clause that went is the one the code had already called unreliable. Publication has
+two clauses now, « every set in » and « the coach published », the dependency runs one way, and
+`publicationOf` in `lib/rating/queries.ts` is the single place that answers « are the means out? » so the
+recap and the notation screen cannot give two answers. The recap derives `canStillRate` from the `results`
+it has already loaded rather than calling `getRatingWindow` a second time, for the same reason.
+
+**The calendar left the rating tree entirely.** `getNextKickoffAfter`, `getLatestStartedKickoffMs` and
+`getSeasonStats`'s `nowMs` are deleted, along with `ratingDeadlineFr`, `closesAtMs` and `nextKickoffAtMs`.
+Whether a season's means are out is now a question about rows only: two fewer round trips, and one fewer
+answer that can change between two renders of the same page. `ratingUrgencyFr` replaces the date with one
+sentence that is true for every played match, so the three screens print it unconditionally — the old one
+named the next kick-off and, for the match that needed it most, printed nothing at all.
+
+**`db/seed.ts` had no published match that was also old.** `RatingsFixture` gained `publishedAt`, set in
+an `UPDATE` **after** the notes are inserted so a row is never published over notes that failed the
+half-point check above it. J3 and J5 are published and closed; J2, J6 and J7 are rateable whatever their
+age, and J2 — five weeks old — is the match to open `/notation` on to watch this decision work. Verified
+by querying the reset database rather than by rereading the prose I had just written: J3 published with 34
+notes, J5 published with 8, J7 unpublished with 32, J1/J2/J4/J6 finished and unpublished.
+
+**The 390 px pass found the one defect no test could have.** Eighteen shots, both themes, three roles. The
+coach's publish form said « Les moyennes seront calculées sans les 8 séries qui manquent, et elles ne
+bougeront plus » — which was the whole consequence while the calendar would have closed the window anyway,
+and is half of it now. Nothing else ends the rating, so that tap ends it for everybody who has not
+finished, and a coach who is not told that is being asked to end something without knowing it. It now
+reads « …et plus personne ne pourra noter ce match », in both the singular and the plural branch. That is
+the third defect in two days found by a screenshot and by nothing else, in a slice whose unit tests were
+green the whole time.
+
+**Gates.** `npm run typecheck` clean, `npm test` 1443 across 66 files, `npx eslint app components lib e2e
+db scripts` silent, `npm run test:e2e` 5 passed, `npm run db:reset` clean with the corrected summary. Note
+the test count fell by eight: `lib/rating/window.test.ts` was rewritten around two booleans and
+`lib/stats/ratings.test.ts` lost a describe, because there is less to assert when the inputs are rows
+instead of a clock.
+
+**Still not verified**, carried a second time: the crafted form post proving the *server* refuses a
+self-note and a note on a 0-minute substitute.
