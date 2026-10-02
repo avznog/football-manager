@@ -20,9 +20,9 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `b9a2974`, the squash of **#138, the ratings rebuild**. The newest tag,
+- **`main`** — at `8613e1f`, the squash of **#141, the rating window**. The newest tag,
   `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
-  now **24 commits behind**, so **preview is ahead of production** by all twenty-four and will stay ahead
+  now **27 commits behind**, so **preview is ahead of production** by all twenty-seven and will stay ahead
   until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
   **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
   other machine. Re-derive the two numbers rather than reading them: `git log -1 origin/main` and
