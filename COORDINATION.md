@@ -50,8 +50,7 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **138**. The highest on `main` is now **137**, the ratings rebuild,
-  merged; the number and the pull request happen to share a figure and nothing follows from that.
+- **Next free decision number** — **139**. The highest on `main` is now **138**, the rating window.
   **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
   believing**, and this line is why: it said 133 when 133 *and* 134 were already on `main` — the other
   machine's two placeholders, the ones this line itself called "coming on `feat/retro-one-action-list`,
@@ -83,6 +82,18 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   the whole demo season is **reported by a third session that logged in, and not independently checked
   from here**; treat it as a warning rather than as a fact, and assume preview is a shared instance with
   real-looking data in it rather than a scratch pad.
+- **The rating window is merged** — **#141**, decision **138**. **A played match is rateable for as long
+  as its means are pending, however old it is**, and it stops being rateable the moment they are
+  published — by the last expected rater finishing, or by the coach's button. So **that button is now the
+  only deadline there is**: it publishes the figures *and* ends the rating, which is why its helper
+  sentence says both. The next-kick-off clause is gone, and with it the whole calendar dependency of the
+  rating tree (`getNextKickoffAfter`, `getLatestStartedKickoffMs`, `getSeasonStats`'s `nowMs`,
+  `ratingDeadlineFr`, `closesAtMs`, `nextKickoffAtMs`) — **whether a season's means are out is a question
+  about rows only now**, so do not reach for a clock when you touch this. It supersedes **137's third
+  publication clause** and **079's deadline sentence**; 021's anti-anchoring property is what the limit
+  still exists for. No migration. **`npm run db:reset` is worth running on the other machine**: the seed
+  now publishes J3 and J5 deliberately, and J2 — five weeks old and rateable — is the match to open
+  `/notation` on to see the decision work.
 - **Open pull requests** — **none**. `gh pr list --state open` is empty; everything the two machines had
   open is merged. **#137 was closed without merging**: it was a lone `1.0.0-beta.7` bump, and the owner
   ships this release by hand, so `package.json` stays at **`1.0.0-beta.6`** and the bump belongs to
@@ -909,6 +920,22 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   before the merge. **Nothing is shipped** — `package.json` is still `1.0.0-beta.6` and the bump and the
   hand-cut tag are the owner's. Still owed and recorded in `docs/ROADMAP.md`: the crafted form post that
   proves the server, and not the screen, refuses a self-note and a note on a 0-minute substitute.
+- **2026-10-02 · owner's machine · `feat/rating-window-until-published`** — Decision **138**, #141, the
+  owner's one-line request: a match already played must still be rateable if you have not done it yet. The
+  window now shuts **when the means come out** and at no other moment, so the coach's publish button is
+  the only deadline in the app. The next-kick-off clause went rather than being made conditional, because
+  the new rule needs `ratingWindow` to take `published` and the old one had `ratingsPublication` take
+  `windowState` — a circle, and the clause that broke it was the one 137's own docblock already called
+  unreliable, since it never fires for a season's last match. **The whole calendar dependency of the
+  rating tree is deleted** with it: `getNextKickoffAfter`, `getLatestStartedKickoffMs`,
+  `getSeasonStats`'s `nowMs`, `ratingDeadlineFr`, `closesAtMs`, `nextKickoffAtMs`. If you take one thing
+  from this: **two modules asking each other the same question is a design that has to lose one of
+  them**, and the one to lose is whichever the comments already apologise for. The 390 px pass earned its
+  keep a third time — the publish form said « elles ne bougeront plus » and nothing about ending the
+  rating, which under this decision is the entire point of the tap, and no test could have noticed.
+  `npm test` 1443/66 (eight fewer: there is less to assert when the inputs are rows instead of a clock),
+  `test:e2e` 5, eslint silent, typecheck clean, `db:reset` clean. No migration. **Nothing is shipped** —
+  `package.json` is still `1.0.0-beta.6`.
 
 ### From the other machine
 
