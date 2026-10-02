@@ -662,7 +662,9 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await login(page, striker.username, fixture.password);
     await page.goto(matchUrl);
 
-    await page.getByRole("link", { name: "Noter mes coéquipiers" }).click();
+    // « Noter les joueurs », not « mes coéquipiers »: the reader may not have been on the pitch at all
+    // now that every member rates (decision 139), so the match page's button stopped assuming it.
+    await page.getByRole("link", { name: "Noter les joueurs" }).click();
     await expect(
       page.getByRole("heading", { level: 1, name: "Noter mes coéquipiers" }),
     ).toBeVisible();
@@ -688,8 +690,9 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 
     /*
      * One POST for the whole set — decision 021's atomic submit, now structural rather than a rule to
-     * remember — and a redirect to the recap, because a finished set may be the thing that publishes
-     * the match's means and there is something new there for him either way (`actions.ts`).
+     * remember — and a redirect to the recap. Not because finishing publishes anything: under decision
+     * 139 nothing does but the coach. It is simply where a man with nothing left to send belongs, and
+     * where he finds out whether the means are out (`actions.ts`).
      */
     await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap$`));
 
@@ -700,9 +703,10 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(finalScore).toContainText("1 – 1");
     await expect(finalScore).toContainText("Match nul");
 
-    // Nothing is out, and nothing is owed to *him* any more: under decision 137 rating buys the
-    // rater no access at all, so the card he reads after finishing is the same card everybody else
-    // reads. The man of the match does not exist yet either — its card is gated on publication.
+    // Nothing is out, and nothing is owed to *him* any more: rating buys the rater no access at all
+    // (137), so the card he reads after finishing is the same card everybody else reads, and under 139
+    // his finishing does not bring the means out either. The man of the match does not exist yet — its
+    // card is gated on publication, which only the coach can do.
     await expect(page.getByText("Les moyennes ne sont pas encore sorties")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Homme du match" })).toHaveCount(0);
 
@@ -717,7 +721,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(minutesRow(page, cm1.displayName).getByRole("cell").nth(2)).toHaveText("1");
   });
 
-  await test.step("three more rate, and the means stay in while anybody still owes", async () => {
+  await test.step("three more rate, and the means stay in because the coach has not shown them", async () => {
     for (const rater of [gk, cm1, cm2]) {
       await logout(page);
       await login(page, rater.username, fixture.password);
@@ -729,40 +733,52 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     }
 
     /*
-     * Still `cm2`, on the recap his own submit sent him to, and he has done everything he can: four of
-     * the eight have rated, every player holds at least the three notes `MIN_NOTES_FOR_MEAN` asks for,
-     * and the means are *still* in. A player is told how many series are missing and never whose — the
-     * names would turn a wait into a list of people to blame, and he can do nothing about it either
-     * way. He is offered no way to publish.
+     * Still `cm2`, on the recap his own submit sent him to, and he has done everything he can: four
+     * members have rated, every player holds at least the three notes `MIN_NOTES_FOR_MEAN` asks for,
+     * and the means are *still* in. Under decision 139 that is not a wait for the squad — it is the
+     * coach's decision, and the sentence says so. « quand tout le monde aura noté » was decision 137's
+     * promise and would now be pointing him at the wrong thing entirely.
+     *
+     * He is told neither who is missing nor how many: the names would turn a wait into a list of people
+     * to blame, and the count is the coach's figure. He is offered no way to show the means.
      */
     const ratings = ratingsCard(page);
     await expect(ratings).toContainText("Les moyennes ne sont pas encore sorties");
-    await expect(ratings).toContainText("Elles sortiront d’un coup quand tout le monde aura noté.");
+    await expect(ratings).toContainText("C’est le coach qui décide quand les moyennes sortent.");
+    await expect(ratings).not.toContainText("quand tout le monde aura noté");
     await expect(ratings).not.toContainText(sub.displayName);
-    await expect(
-      ratings.getByRole("button", { name: "Sortir les moyennes maintenant" }),
-    ).toHaveCount(0);
+    await expect(ratings.getByRole("button", { name: "Sortir les moyennes" })).toHaveCount(0);
   });
 
-  await test.step("the coach publishes without the four who never rated, and the striker is crowned", async () => {
+  await test.step("the coach shows the means without the five who never rated, and the striker is crowned", async () => {
     await logout(page);
     await login(page, coach.username, fixture.password);
     await page.goto(`${matchUrl}/recap`);
 
     const pending = ratingsCard(page);
-    // The coach, and only the coach, gets the names: he is the one who can go and ask, and the
-    // alternative is a button that gives up on four people without saying who they are.
-    await expect(pending).toContainText("4 joueurs sur 8 n’ont pas fini");
+    /*
+     * The coach, and only the coach, gets the figures and the names: he is the one who can go and ask,
+     * and the alternative is a button that gives up on five people without saying who they are.
+     *
+     * **Nine, not eight**, and that is decision 139's denominator: every member may rate, so the
+     * fraction counts the eight players *and the coach himself* — who has not rated either, and is
+     * therefore one of the five names. Under 137 it counted « the players with minutes », because they
+     * were who publication waited for.
+     */
+    await expect(pending).toContainText("4 membres sur 9 ont noté.");
     await expect(pending).toContainText(sub.displayName);
-    // What the tap costs, before the tap, and both halves of it: the figures stop moving *and* the
-    // notation closes. Under decision 138 this button is the only thing that closes it — nothing else
-    // does any more — so a coach who is not told that is being asked to end something unknowingly.
+    await expect(pending).toContainText("C’est toi qui décides quand les moyennes sortent.");
+    /*
+     * What the tap costs, before the tap — and the two things it no longer costs. It does **not** freeze
+     * the figures and it does **not** close the notation: both were true under 138 and both are now
+     * false, so the card promising either would be the screen out-stating the server.
+     */
     await expect(pending).toContainText(
-      "Les moyennes seront calculées sans les 4 séries qui manquent, elles ne bougeront plus, et " +
-        "plus personne ne pourra noter ce match.",
+      "Les moyennes seront calculées sans les 5 séries qui manquent, et elles bougeront encore si " +
+        "elles arrivent. Tu peux les masquer à nouveau.",
     );
 
-    await pending.getByRole("button", { name: "Sortir les moyennes maintenant" }).click();
+    await pending.getByRole("button", { name: "Sortir les moyennes" }).click();
 
     const motm = page
       .locator("section")
@@ -776,8 +792,11 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(motm).not.toContainText("note");
 
     const published = ratingsCard(page);
-    // The state of the collection, which is a sentence only he gets: 4 raters × 7 teammates.
-    await expect(published).toContainText("28 notes sur 8 joueurs à noter.");
+    // The state of the collection, which is a sentence only he gets: 4 raters × 7 teammates, out of the
+    // nine members who could have sent a set.
+    await expect(published).toContainText("28 notes, 4 membres sur 9.");
+    // And the way back, which 137 and 138 both said did not exist: the switch goes both ways (139).
+    await expect(published.getByRole("button", { name: "Masquer les moyennes" })).toBeVisible();
 
     const row = ratingRow(page, striker);
     await expect(row).toContainText("9,0");
@@ -796,8 +815,10 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 
     const ratings = ratingsCard(page);
     await expect(ratings).toContainText("La moyenne des notes des coéquipiers");
-    // Not his: the coach's denominator is `raterTotal`, which is 0 for everybody else.
-    await expect(ratings).not.toContainText("à noter.");
+    // Not his: the tally is `null` for everybody who is not the coach, so the fraction is not rendered
+    // at all rather than rendered empty. Nor is the way to take the means back.
+    await expect(ratings).not.toContainText("membres sur");
+    await expect(ratings.getByRole("button", { name: "Masquer les moyennes" })).toHaveCount(0);
 
     const row = ratingRow(page, striker);
     await expect(row).toContainText("9,0");
@@ -811,28 +832,31 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(row).not.toContainText(cm1.displayName);
   });
 
-  await test.step("and the four who never rated have missed it, because the means are out", async () => {
+  await test.step("and the five who never rated can still rate, means out or not", async () => {
     /*
-     * Decision 138's other half, and the only one a test can state: the window is shut now, and the
-     * tap two steps up is what shut it. Before that tap `sub` could still have rated this match —
-     * however long ago it was played, which is the request this decision answers — and the suite
-     * walked past that state without looking at it.
+     * Decision 139's cost, stated out loud and accepted: **nothing closes the notation.** The tap two
+     * steps up showed the means and shut nothing, so `sub` — who never sent a note — can still send a
+     * full set now, having read the figures his notes are about to move. That was the trade the owner
+     * chose when he asked for the coach to be the only gate, and the screen says so rather than letting
+     * him discover it.
+     *
+     * This step is the inverse of what it asserted under 138, which was that he had missed it.
      */
     await logout(page);
     await login(page, sub.username, fixture.password);
     await page.goto(`${matchUrl}/notation`);
 
-    await expect(page.getByRole("heading", { name: "La notation est fermée" })).toBeVisible();
-    // Why it is shut, and what it cost him — he never sent one, and the screen says so rather than
-    // printing « Tu en avais mis 0 sur 7 ».
+    // No refusal, and no « fermée » anywhere: the form is on screen with one slider per man who played.
+    await expect(page.getByRole("heading", { name: "La notation est fermée" })).toHaveCount(0);
+    await expect(page.locator("input[type=range]")).toHaveCount(PLAYED.length - 1);
+    // The badge, which replaces the closed state with the thing that is actually true.
+    await expect(page.getByText("moyennes sorties")).toBeVisible();
+    // And the sentence that tells him what sending them now means, instead of turning him away.
     await expect(
-      page.getByText("Les moyennes de ce match sont sorties, donc les notes ne bougent plus."),
+      page.getByText(
+        "Les moyennes de ce match sont sorties, et tu peux quand même noter : tes notes compteront dedans.",
+      ),
     ).toBeVisible();
-    await expect(page.getByText("Tu n’en avais mis aucune.")).toBeVisible();
-    // No sliders, and not merely a hidden form: there is nothing to submit on this screen.
-    await expect(page.locator("input[type=range]")).toHaveCount(0);
-    // And the sentence that invited him is gone with the window it described.
-    await expect(page.getByText("Tu peux encore noter")).toHaveCount(0);
   });
 
   await test.step("a coach-only screen is a French dead end for a player, with a way out", async () => {

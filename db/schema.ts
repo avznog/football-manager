@@ -318,23 +318,22 @@ export const matches = pgTable(
     operatorUserId: uuid().references(() => users.id, { onDelete: "set null" }),
     entryMode: entryMode().notNull().default("live"),
     /**
-     * When the coach released this match's rating means, or null if he has not (decision 137).
+     * When the coach showed this match's rating means to the team, or null if they are hidden.
      *
-     * It is the **escape hatch, not the normal path**: a match publishes itself once every player
-     * who was on the pitch has submitted his set, and that is what happens when the squad does what
-     * it is asked. This column is for the straggler who never will.
+     * **This column is the whole rule** (decision 139). Null is hidden, a timestamp is visible, and
+     * nothing else anywhere decides it: no derived « everybody has rated », no calendar clause. The
+     * coach writes it per match, and `lib/rating/published.ts` is the one place it is read as a
+     * boolean so that the rating tree and the statistics tree cannot come to spell it differently.
      *
-     * Since decision 138 it carries a second job, and it is the heavier of the two: **it is also the
-     * rating deadline.** Rating a played match stays open for as long as its means are not out, with
-     * no calendar clause at all, so filling this in is what ends it (`lib/rating/window.ts`). There
-     * used to be a third publication clause — the next kick-off — and it never fired for the last
-     * match of a season, which had no next kick-off; this column was its only backstop and is now the
-     * whole of it.
+     * Two things it deliberately is **not**, both of which it was until 139. It is not an escape hatch
+     * — nothing publishes a match by itself any more, so this is the only door. And it is not a
+     * deadline: rating a played match never closes, so a note can arrive after the means are out and
+     * move a figure the squad has read.
      *
-     * A timestamp rather than a boolean, because « published » is an event with a time and the recap
-     * will want to say when. Nullable and set once; nothing un-publishes a mean, since a figure the
-     * squad has already read cannot be recalled — and since 138 that also means the window never
-     * reopens.
+     * A timestamp rather than a boolean, because « shown » is an event with a time and the recap may
+     * want to say when. **Settable back to null**, which 137 and 138 said it never would be: the owner
+     * asked for a switch that goes both ways, with the cost stated and accepted — a mean the squad has
+     * read can vanish, and there is no record of what was visible when.
      */
     ratingsPublishedAt: timestamp({ withTimezone: true }),
     createdBy: uuid().references(() => users.id, { onDelete: "set null" }),

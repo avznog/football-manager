@@ -152,8 +152,12 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
           </div>
         </Card>
       ) : !mayRate ? (
-        /* `rating:submit` said no to a member of this team: somebody put in read-only by his account
-           rather than by this match. Rare, and still owed a reason. */
+        /* `rating:submit` said no. Under decision 139 nothing in the current rules reaches this — every
+           member may rate, and `requireTeamContext` has already turned away anybody who is not one — so
+           this is defence against a future rule rather than a state the app can produce today. It stays
+           because a screen that silently rendered an unusable form instead would be worse, and because
+           invariant 4 means the answer to « may he » is `can()`'s and this page does not get to assume
+           it. */
         <EmptyState
           title="Tu ne peux pas noter ce match"
           description="Ton compte n’a pas le droit de donner des notes dans cette équipe."

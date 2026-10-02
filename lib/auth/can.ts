@@ -87,8 +87,16 @@ export type Action =
   /**
    * Give notes for a match. **Any member of the team** (decision 139) — a supporter on the touchline
    * watched the same hour the players did, and a member who was not on the sheet at all may rate too.
-   * Self-scoped, so a coach cannot rate on somebody's behalf; who may be *rated* is a different
-   * question, answered from the log in `lib/rating/progress.ts`, and no permission can see it.
+   *
+   * Self-scoped, so a coach cannot rate on somebody's behalf — but, unlike every other self-scoped
+   * action, **not conditional on `isPlayer`**. « Any member » is what was asked for, and a non-playing
+   * coach is a member with the best view of the hour; it is also what makes the coach's own tally
+   * honest, since its denominator is the active members and a denominator nobody can reach is a figure
+   * that lies. This is why the action is handled on its own in `can()` rather than through
+   * `SELF_ACTIONS`.
+   *
+   * Who may be *rated* is a different question, answered from the log in `lib/rating/progress.ts`
+   * (`minutes > 0`, decision 137), and no permission can see it.
    */
   | "rating:submit"
   // Read
@@ -143,7 +151,6 @@ const SELF_ACTIONS = new Set<Action>([
   "profile:editPositions",
   "profile:editShirtName",
   "injury:declare",
-  "rating:submit",
 ]);
 
 export function can(actor: Actor, action: Action, context: Context): boolean {
@@ -166,6 +173,16 @@ export function can(actor: Actor, action: Action, context: Context): boolean {
   // Running game mode may be delegated to a non-coach for a single match (decision 004).
   if (action === "match:operate" && context.match?.operatorUserId === actor.userId) {
     return true;
+  }
+
+  /*
+   * Self-scoped, like the block below, but for **every** member rather than every player: a non-playing
+   * coach and a supporter both get to rate (decision 139). It is above the `isPlayer` test rather than
+   * inside it because that test is what would turn « any member » back into « any player ».
+   */
+  if (action === "rating:submit") {
+    const target = context.targetMemberId ?? membership.membershipId;
+    return target === membership.membershipId;
   }
 
   if (SELF_ACTIONS.has(action)) {

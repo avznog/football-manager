@@ -101,8 +101,9 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
 
   /*
    * Invariant 4: every one of these is an answer from `can()` and none of them is a role read here.
-   * The three are genuinely three: `rating:submit` is self-scoped and true for every playing member,
-   * coach included (decision 139), while `rating:readNotes` and `rating:publish` are the coach's alone.
+   * The three are genuinely three: `rating:submit` is self-scoped and true for every member, the
+   * non-playing coach included (decision 139), while `rating:readNotes` and `rating:publish` are the
+   * coach's alone.
    */
   const canSubmit = can(actor, "rating:submit", { teamId: team.id });
   const results = await getRatingResults({
