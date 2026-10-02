@@ -54,6 +54,7 @@ import {
   lineups,
   matchAvailability,
   matchEvents,
+  matchPlayerStats,
   matchSquad,
   matches,
   playerPositions,
@@ -639,9 +640,11 @@ async function seedDemo(): Promise<void> {
       },
       raters: [
         { username: "hugo", delta: 0 },
-        { username: "julien", delta: 1, comment: { about: "leo", text: "Le seul à avoir couru." } },
-        // A partial set, kept as decision 023 says, and still gating him as decision 021 says.
-        { username: "karim", delta: 2, only: ["hugo", "samir", "karim"] },
+        { username: "julien", delta: 1 },
+        // A partial set. It hides nothing from anybody now (decision 021 is gone); it is how this
+        // fixture holds a match whose notes are not all in, so the means stay unpublished until the
+        // coach releases them — the state decision 137's escape hatch exists for.
+        { username: "karim", delta: 2, only: ["hugo", "samir"] },
       ],
     },
   });
@@ -890,11 +893,7 @@ async function seedDemo(): Promise<void> {
         fabien: 5,
       },
       raters: [
-        {
-          username: "karim",
-          delta: 0,
-          comment: { about: "julien", text: "Énorme, il tient la ligne tout seul." },
-        },
+        { username: "karim", delta: 0 },
         { username: "hugo", delta: 1 },
         { username: "julien", delta: -1 },
         { username: "samir", delta: 0 },
@@ -1032,18 +1031,31 @@ type Push = (
 /**
  * A fixed set of notes for one match.
  *
- * `bases` is the average each player is *meant* to end up with, and every rater applies their own
- * `delta` to all of them. When the deltas of a complete round sum to zero, each average is exactly
- * its base — which is what makes the numbers on the recap screen checkable without a calculator.
+ * `bases` is the mean each player is meant to end up with, and it is **exact**: the recap screen
+ * prints « 7,5 » for a player whose base is 7.5, so the fixtures stay checkable without a
+ * calculator. That property used to come from « every rater applies his `delta` to everybody, and
+ * the deltas sum to zero ». Decision 137 broke it, and it is worth saying why rather than quietly
+ * loosening the fixture: **nobody rates himself any more**, so a player's raters are everybody else,
+ * a different set for each player. For every target's mean to land exactly on its base you would
+ * need the deltas of all raters *except that one* to sum to zero, for every target at once — which
+ * forces every delta to zero, and a fixture with no spread in it tests nothing.
+ *
+ * So the last rater of each target absorbs the difference instead: the others apply their `delta`,
+ * and his note is whatever makes the mean exact. `writePlayedMatch` throws if that lands off the
+ * half-point step or outside 0–10, because a fixture that quietly clamps is a fixture that lies
+ * about what the screen will show.
  */
 type RatingsFixture = {
   bases: Record<string, number>;
   raters: ReadonlyArray<{
     username: string;
     delta: number;
-    /** A deliberately **partial** set (decision 023): only these teammates were rated. */
+    /**
+     * A deliberately **partial** set: only these teammates were rated. It no longer hides anything
+     * from anybody (decision 021 is gone) — it is how a fixture holds a match whose notes are *not
+     * all in*, which is the state the new publication rule turns on.
+     */
     only?: readonly string[];
-    comment?: { about: string; text: string };
   }>;
 };
 
@@ -1228,31 +1240,90 @@ async function seedPlayedMatch(spec: PlayedMatchSpec): Promise<void> {
   /* ---- ratings --------------------------------------------------------- */
 
   if (spec.ratings) {
-    // Only `starter` and `substitute` may rate or be rated — a supporter has no card
-    // (decision 007, `lib/rating/progress.ts`).
-    const rateable = [...starterNames, ...spec.substitutes];
-    const clamp = (score: number) => Math.max(0, Math.min(10, score));
+    const fixture = spec.ratings;
 
-    const rows = spec.ratings.raters.flatMap((rater) => {
-      const targets = rater.only ?? rateable;
-      return targets.map((target) => {
-        const base = spec.ratings!.bases[target];
-        if (base === undefined) {
-          throw new Error(
-            `Fixture « ${spec.opponentName} » : pas de note de référence pour « ${target} ».`,
-          );
-        }
-        return {
+    /**
+     * Who played, read from the frozen stats rather than from the sheet (decision 137). The sheet
+     * says who was *named*; `minutes > 0` says who came on, and that is who rates and is rated. A
+     * named substitute who sat out the whole hour is the commonest case in a seven-a-side squad, and
+     * he has neither an opinion to give nor a performance to be judged on.
+     */
+    const played = new Set(
+      (
+        await db
+          .select({ teamMemberId: matchPlayerStats.teamMemberId, minutes: matchPlayerStats.minutes })
+          .from(matchPlayerStats)
+          .where(eq(matchPlayerStats.matchId, match.id))
+      )
+        .filter((row) => row.minutes > 0)
+        .map((row) => row.teamMemberId),
+    );
+
+    const baseOf = (username: string): number => {
+      const base = fixture.bases[username];
+      if (base === undefined) {
+        throw new Error(
+          `Fixture « ${spec.opponentName} » : pas de note de référence pour « ${username} ».`,
+        );
+      }
+      return base;
+    };
+
+    /** Everybody who rates this target: a rater who played, is not the target, and is not opted out. */
+    const ratersOf = (target: string) =>
+      fixture.raters.filter(
+        (rater) =>
+          rater.username !== target &&
+          played.has(m(rater.username)) &&
+          (rater.only === undefined || rater.only.includes(target)),
+      );
+
+    const built: Array<{
+      matchId: string;
+      raterMemberId: string;
+      ratedMemberId: string;
+      score: number;
+    }> = [];
+
+    for (const target of Object.keys(fixture.bases)) {
+      if (!played.has(m(target))) continue;
+      const raters = ratersOf(target);
+      if (raters.length === 0) continue;
+
+      const base = baseOf(target);
+      // Every rater but the last applies his own delta; the last one absorbs what is left, so the
+      // mean is exactly `base`. See `RatingsFixture` for why it cannot be done with deltas alone.
+      const leading = raters.slice(0, -1);
+      const last = raters[raters.length - 1]!;
+      const spread = leading.reduce((sum, rater) => sum + rater.delta, 0);
+      const closing = base - spread;
+
+      for (const rater of leading) {
+        built.push({
           matchId: match.id,
           raterMemberId: m(rater.username),
           ratedMemberId: m(target),
-          score: clamp(base + rater.delta),
-          comment: rater.comment?.about === target ? rater.comment.text : null,
-        };
+          score: base + rater.delta,
+        });
+      }
+      built.push({
+        matchId: match.id,
+        raterMemberId: m(last.username),
+        ratedMemberId: m(target),
+        score: closing,
       });
-    });
+    }
 
-    await db.insert(ratings).values(rows);
+    for (const row of built) {
+      if (row.score < 0 || row.score > 10 || row.score * 2 !== Math.floor(row.score * 2)) {
+        throw new Error(
+          `Fixture « ${spec.opponentName} » : la note ${row.score} est hors de 0–10 ou n’est pas un demi-point. ` +
+            `Corrige les deltas plutôt que de laisser la moyenne mentir.`,
+        );
+      }
+    }
+
+    if (built.length > 0) await db.insert(ratings).values(built);
   }
 }
 
