@@ -40,8 +40,8 @@ import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calend
 import { buildReminderMessage, tallyAvailability, type Responder } from "@/lib/calendar/timeline";
 import { reopenMatch } from "@/lib/match/actions";
 import { getMatch, getMatchAnswers, getMatchScore, hasMatchEvents } from "@/lib/match/queries";
+import { ratingInvitationFr } from "@/lib/rating/labels";
 import { getNotationView } from "@/lib/rating/queries";
-import { ratingUrgencyFr } from "@/lib/rating/window";
 import { getSquad } from "@/lib/team/queries";
 import { FinishMatchCard } from "./_components/finish-match-card";
 import { CompositionCard } from "./composition/_components/composition-card";
@@ -108,17 +108,22 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   // (decision 004). Invariant 4: the permission is `can()`'s answer.
   const mayAmend = can(actor, "match:amend", { teamId: team.id });
   /**
-   * This viewer's rating duty, or null when he has none: he did not play, the means are already out,
-   * or he is not allowed to rate at all. Invariant 4 — the permission is `can()`'s answer, not a role read
-   * here.
+   * This viewer's rating duty, or null when he has none — which is now only two cases: the match is not
+   * finished, or his account may not rate at all. Invariant 4 — the permission is `can()`'s answer, not
+   * a role read here.
    *
-   * `notation.played` where it used to be `notation.onSheet`: under decision 137 a named substitute
-   * who never came on owes nothing, and the sheet cannot tell. The log can.
+   * It used to require `notation.played` and an open window. Decision 139 removed both: every member is
+   * asked, and nothing closes, so a supporter gets this card and a man who has read the means still
+   * gets it if he never sent his notes.
+   *
+   * `requiredCount > 0` stays, and it carries more weight than it looks: an empty set is *vacuously*
+   * complete, so without it a match nobody played would congratulate every reader on having noted
+   * everybody. `notation.played` used to rule that out as a side effect.
    */
   const ratingDuty =
     notation !== null &&
-    notation.played &&
-    notation.window.state === "open" &&
+    notation.finished &&
+    notation.progress.requiredCount > 0 &&
     can(actor, "rating:submit", { teamId: team.id })
       ? notation.progress
       : null;
@@ -263,26 +268,31 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
               <>
                 {/* Both sentences used to end in the bargain decision 021 struck — « tu verras
                     celles des autres quand tu auras fini », « les notes des autres restent cachées
-                    jusque-là ». Decision 137 pays nobody for rating: the means come out when the
-                    whole team has, so what is left is the duty and what will end it. */}
+                    jusque-là ». Decision 137 pays nobody for rating, and decision 139 leaves nothing
+                    to wait for either: what is left is the duty itself. « les joueurs » rather than
+                    « ceux qui étaient sur le terrain avec toi », because the reader may not have been
+                    on it at all. */}
                 <p className="text-sm text-ink-muted">
                   {ratingDuty.partial
                     ? `Il te reste ${ratingDuty.missingIds.length} note${ratingDuty.missingIds.length > 1 ? "s" : ""} à donner.`
-                    : "Tu n’as pas encore noté les joueurs qui étaient sur le terrain avec toi."}
+                    : "Tu n’as pas encore noté les joueurs de ce match."}
                 </p>
-                {/* What ends the duty, which the card used to leave unsaid (decision 079). Not a date
-                    since decision 138: the means coming out is the deadline. */}
-                <p className="text-sm font-medium text-ink">{ratingUrgencyFr()}</p>
+                {/* No deadline to state (decision 079 applied to the absence of one): who decides, and
+                    whether the figures he is about to move are already out. */}
+                <p className="text-sm font-medium text-ink">
+                  {ratingInvitationFr(notation?.meansVisible ?? false)}
+                </p>
                 <ButtonLink href={`/match/${match.id}/notation`} fullWidth>
-                  Noter mes coéquipiers
+                  Noter les joueurs
                 </ButtonLink>
               </>
             ) : null}
 
             {ratingDuty?.complete ? (
               <p className="text-sm text-ink-muted">
-                Tu as noté tout le monde&nbsp;: les moyennes sortiront dans le résumé quand le reste
-                de l’équipe aura noté.
+                {notation?.meansVisible
+                  ? "Tu as noté tout le monde, et les moyennes de ce match sont sorties."
+                  : "Tu as noté tout le monde : les moyennes sortiront quand le coach les sortira."}
               </p>
             ) : null}
 

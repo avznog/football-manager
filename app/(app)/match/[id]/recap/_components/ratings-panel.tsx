@@ -19,10 +19,13 @@
  * ## Why « en attente » is not a locked door any more
  *
  * Decision 007 showed this panel empty with « note tes coéquipiers pour voir les notes » — the reader's
- * own debt was the lock, and the sentence was about him. Decision 021 was that rule and it is gone: the
- * means come out when *everybody* has rated, so the waiting is the team's and the sentence says so.
- * Nobody is reproached for a figure he cannot unlock alone, and the anti-anchoring property the gate
- * existed for is kept more strongly than before — no player reads any individual note, ever.
+ * own debt was the lock, and the sentence was about him. Decision 021 was that rule and it is gone. Under
+ * decision 139 the wait is not the team's either: **it is the coach's call, per match**, and nothing else
+ * ever opens this. So the empty state names who decides rather than counting who is late — a player
+ * reading « on attend encore 4 personnes » would be waiting for something that is not what gates him.
+ *
+ * The switch goes both ways, which is why the published half of this component also carries a form: a
+ * coach who can show the means can always take them back (`ratings-visibility-form.tsx`).
  */
 
 import { Badge } from "@/components/ui/badge";
@@ -33,19 +36,22 @@ import { pluralize } from "@/lib/calendar/labels";
 import { MIN_NOTES_FOR_MEAN } from "@/lib/rating/aggregate";
 import { noteAuthorFr, ratingCountNoteFr, ratingScoreFr } from "@/lib/rating/labels";
 import type { RatedPlayer, RatingResultsView } from "@/lib/rating/queries";
-import { PublishRatingsForm } from "./publish-ratings-form";
+import { RatingsVisibilityForm } from "./ratings-visibility-form";
 
 export function RatingsPanel({
   results,
   teamId,
   matchId,
-  canStillRate,
+  mayRate,
 }: {
   results: RatingResultsView;
   teamId: string;
   matchId: string;
-  /** The window is still open, so the « note tes coéquipiers » button leads somewhere. */
-  canStillRate: boolean;
+  /**
+   * He has notes left to give, so the « noter mes coéquipiers » button leads somewhere. Not « the window
+   * is still open » any more: nothing closes (decision 139), so this is only about his own set.
+   */
+  mayRate: boolean;
 }) {
   if (!results.published) {
     return (
@@ -53,9 +59,9 @@ export function RatingsPanel({
         <div className="space-y-3">
           <EmptyState
             title="Les moyennes ne sont pas encore sorties"
-            description={pendingDescriptionFr(results, canStillRate)}
+            description={pendingDescriptionFr(results, mayRate)}
             action={
-              canStillRate && !results.progress.complete ? (
+              mayRate && !results.progress.complete ? (
                 <ButtonLink href={`/match/${matchId}/notation`}>
                   {results.progress.submittedCount > 0
                     ? "Finir mes notes"
@@ -65,9 +71,15 @@ export function RatingsPanel({
             }
           />
 
-          {/* Coach only, and only while something is actually owed — `canPublish` carries both. */}
+          {/* Coach only, and the only thing that ever opens this (decision 139) — nothing publishes a
+              match by itself any more, so this is not an escape hatch but the door. */}
           {results.canPublish ? (
-            <PublishRatingsForm teamId={teamId} matchId={matchId} owing={results.owing.length} />
+            <RatingsVisibilityForm
+              teamId={teamId}
+              matchId={matchId}
+              mode="show"
+              silent={results.tally?.silent.length ?? 0}
+            />
           ) : null}
         </div>
       </Card>
@@ -88,15 +100,24 @@ export function RatingsPanel({
   if (!hasRows) {
     return (
       <Card title="Les notes" as="h2">
-        <EmptyState
-          title="Pas encore assez de notes"
-          description={`Il en faut au moins ${MIN_NOTES_FOR_MEAN} sur un même joueur pour en faire une moyenne : deux avis ne sont pas un verdict.`}
-          action={
-            canStillRate ? (
-              <ButtonLink href={`/match/${matchId}/notation`}>Noter mes coéquipiers</ButtonLink>
-            ) : undefined
-          }
-        />
+        <div className="space-y-3">
+          <EmptyState
+            title="Pas encore assez de notes"
+            description={`Il en faut au moins ${MIN_NOTES_FOR_MEAN} sur un même joueur pour en faire une moyenne : deux avis ne sont pas un verdict.`}
+            action={
+              mayRate ? (
+                <ButtonLink href={`/match/${matchId}/notation`}>Noter mes coéquipiers</ButtonLink>
+              ) : undefined
+            }
+          />
+
+          {/* The coach has shown a match that has nothing to show, which is exactly the state he will
+              want to undo. Offering the way back here rather than only on the full panel is the whole
+              point of a switch that goes both ways. */}
+          {results.canHide ? (
+            <RatingsVisibilityForm teamId={teamId} matchId={matchId} mode="hide" silent={0} />
+          ) : null}
+        </div>
       </Card>
     );
   }
@@ -104,11 +125,12 @@ export function RatingsPanel({
   return (
     <Card
       title="Les notes"
-      /* The coach alone gets a denominator: « 23 notes de 5 joueurs sur 7 » is the state of the
-         collection, and `raterTotal` is 0 for everybody else. */
+      /* The coach alone gets a denominator, and it is now **the members** rather than the players with
+         minutes: everybody may rate (decision 139), so « 23 notes, 5 membres sur 11 » is the state of the
+         collection. `tally` is null for every other reader. */
       description={
-        results.canSeeNotes
-          ? `${pluralize(results.ratingCount, "note")} sur ${pluralize(results.raterTotal, "joueur")} à noter.` +
+        results.tally
+          ? `${pluralize(results.ratingCount, "note")}, ${results.tally.raterCount} membre${results.tally.raterCount > 1 ? "s" : ""} sur ${results.tally.memberTotal}.` +
             (rated.length === 0
               ? ` Aucune moyenne n’est sortie : il en faut ${MIN_NOTES_FOR_MEAN} sur un même joueur.`
               : "")
@@ -124,6 +146,14 @@ export function RatingsPanel({
           </li>
         ))}
       </ul>
+
+      {/* The other half of the switch. Below the figures rather than above them, because the card is
+          here to be read and this is an action on it — and `flush` means the padding is ours. */}
+      {results.canHide ? (
+        <div className="border-t border-border/60 px-4 py-3">
+          <RatingsVisibilityForm teamId={teamId} matchId={matchId} mode="hide" silent={0} />
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -131,29 +161,41 @@ export function RatingsPanel({
 /**
  * Why the means are not out, said differently to the two people who can read it.
  *
- * The coach is told **who** is missing, by name: he is the one who can go and ask, and the alternative
- * is a button that publishes « sans les séries qui manquent » without saying whose. Everybody else is
- * told how many are missing and not who — the names would turn a wait into a list of people to blame,
- * and a player cannot do anything about it anyway.
+ * The coach is told **who** has sent nothing, by name: he is the one who can go and ask, and the
+ * alternative is a button that shows the means « sans les séries qui manquent » without saying whose. The
+ * denominator is the active members, not the players with minutes, because that is who may rate now
+ * (decision 139).
+ *
+ * Everybody else is told that the coach decides, and nothing else. Not « quand tout le monde aura
+ * noté » — that was decision 137's rule and it published matches by itself; a reader waiting for the
+ * squad would be waiting for the wrong thing. And not the names either: they would turn a wait into a
+ * list of people to blame, when the only person who can end it is the coach.
  */
 function pendingDescriptionFr(
   results: Extract<RatingResultsView, { published: false }>,
-  canStillRate: boolean,
+  mayRate: boolean,
 ): string {
   const mine =
-    canStillRate && !results.progress.complete
+    mayRate && !results.progress.complete
       ? ` Il te reste ${pluralize(results.progress.missingIds.length, "note")} à mettre.`
       : "";
 
-  if (results.canSeeNotes && results.owing.length > 0) {
-    const names = results.owing.map((rater) => rater.displayName).join(", ");
+  const tally = results.tally;
+  // `tally` is the coach's and nobody else's, so it is also what decides the person of the sentence: he
+  // is addressed as the one who decides, everybody else is told who does.
+  const decides = tally
+    ? "C’est toi qui décides quand les moyennes sortent."
+    : "C’est le coach qui décide quand les moyennes sortent.";
+
+  if (tally && tally.silent.length > 0) {
+    const names = tally.silent.map((member) => member.displayName).join(", ");
     return (
-      `${pluralize(results.owing.length, "joueur")} sur ${results.raterTotal} ${results.owing.length > 1 ? "n’ont" : "n’a"} pas fini : ${names}. ` +
-      `Les moyennes sortiront d’un coup quand tout le monde aura noté.${mine}`
+      `${tally.raterCount} membre${tally.raterCount > 1 ? "s" : ""} sur ${tally.memberTotal} ${tally.raterCount > 1 ? "ont" : "a"} noté. ` +
+      `Pas encore de note de ${names}. ${decides}${mine}`
     );
   }
 
-  return `Elles sortiront d’un coup quand tout le monde aura noté.${mine}`;
+  return `${decides}${mine}`;
 }
 
 function PlayerRow({ player }: { player: RatedPlayer }) {

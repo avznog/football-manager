@@ -5,11 +5,13 @@
  * minutes played and the timeline come from `reduceMatch` over the append-only log (invariant 2), and
  * the man of the match from the ratings (decision 007). Nothing here is stored.
  *
- * The ratings section is gated in the query, not here, and under decision 137 the gate asks a
- * different question: not « has this reader earned the notes » but « are this match's means published
- * at all », plus « is this reader the coach ». An unpublished match comes back as `published: false`
- * with no score in the payload, and a reader who is not the coach never receives an individual note or
- * the count behind a mean (`lib/rating/queries.ts`).
+ * The ratings section is gated in the query, not here, and under decision 139 the gate asks the
+ * simplest question it has ever asked: not « has this reader earned the notes » (007 and 021), not « has
+ * the squad finished » (137), but « has the coach shown this match's means », plus « is this reader the
+ * coach ». A hidden match comes back as `published: false` with no score in the payload, and a reader who
+ * is not the coach never receives an individual note or the count behind a mean
+ * (`lib/rating/queries.ts`). The coach's switch goes both ways, so this page is also where a mean the
+ * team has read can be taken back.
  *
  * This lives at its own route rather than inside `/match/[id]`: the match page is the *organising*
  * page — availability, composition, game mode — and this is the *reading* page, with a different
@@ -29,8 +31,8 @@ import { entryModeBadgeFr, venueSideLabel } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import type { MatchRow } from "@/lib/match/queries";
 import { MIN_NOTES_FOR_MEAN } from "@/lib/rating/aggregate";
+import { ratingInvitationFr } from "@/lib/rating/labels";
 import { getMatchRecap, getRatingResults } from "@/lib/rating/queries";
-import { ratingUrgencyFr } from "@/lib/rating/window";
 import { ManOfTheMatchCard } from "./_components/man-of-the-match";
 import { MinutesTable } from "./_components/minutes-table";
 import { RatingsPanel } from "./_components/ratings-panel";
@@ -99,8 +101,8 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
 
   /*
    * Invariant 4: every one of these is an answer from `can()` and none of them is a role read here.
-   * The three are genuinely three: `rating:submit` is self-scoped and false for a coach who did not
-   * play, while `rating:readNotes` and `rating:publish` are his and his alone (decision 137).
+   * The three are genuinely three: `rating:submit` is self-scoped and true for every playing member,
+   * coach included (decision 139), while `rating:readNotes` and `rating:publish` are the coach's alone.
    */
   const canSubmit = can(actor, "rating:submit", { teamId: team.id });
   const results = await getRatingResults({
@@ -113,23 +115,13 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
   });
 
   /*
-   * Whether he is *asked* for notes is the log's answer, not the sheet's (decision 137): a named
-   * substitute who never came on has nothing to judge. `progress.requiredCount` carries it — it is
-   * built from `ratingTargetsFor`, which is empty for anybody who did not play — so the sheet is no
-   * longer read here at all.
+   * Whether he has notes left to give, and that is now the whole question: there is no window to be
+   * inside (decision 139 deleted it) and the means being out does not stop him, so the publication state
+   * has dropped out of this expression entirely. What is left is his permission and whether this match
+   * has anybody to rate — `progress.requiredCount` is 0 for a match nobody played, and 0 for a reader
+   * who may not rate, which is why both of those cases need no clause of their own.
    */
-  /*
-   * And whether the window is still open needs no query of its own any more: under decision 138 it is
-   * shut exactly when the means are out, which `results` has already answered. `getRatingWindow` would
-   * re-read the log and the pairs to arrive at the same boolean, and a second answer is a second
-   * chance to contradict the panel underneath.
-   */
-  const canStillRate =
-    canSubmit &&
-    match.status === "finished" &&
-    results !== null &&
-    !results.published &&
-    results.progress.requiredCount > 0;
+  const mayRate = canSubmit && results !== null && results.progress.requiredCount > 0;
 
   return (
     <div className="space-y-6">
@@ -163,16 +155,22 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
       {/* The prompt of screen 6: the recap asks for the notes, it does not wait to be found. It no
           longer promises anything in return — « tu verras les notes de tout le monde dès que tu auras
           fini » was decision 021's trade, and under 137 his own notes unlock nothing for him
-          (`ratings-panel.tsx`). What is left is that the means come out without him. */}
-      {canStillRate && results !== null && !results.progress.complete ? (
+          (`ratings-panel.tsx`). Under 139 it does not threaten anything either: the card appears whether
+          or not the means are already out, because his notes still count once they are. */}
+      {mayRate && results !== null && !results.progress.complete ? (
         <Card title="À toi de noter" as="h2" className="border-accent/40 bg-accent/10">
           <div className="space-y-3">
+            {/* « qui était sur le terrain », not « avec toi »: the reader may not have been on it — a
+                supporter rates too now (decision 139). */}
             <p className="text-sm text-ink-muted">
-              Une note pour chaque joueur qui était sur le terrain avec toi. L’équipe lira une
-              moyenne par joueur, jamais ta note à toi.
+              Une note pour chaque joueur qui était sur le terrain. L’équipe lira une moyenne par
+              joueur, jamais ta note à toi.
             </p>
-            {/* What closes the window, which this card never said (decision 079). */}
-            <p className="text-sm font-medium text-ink">{ratingUrgencyFr()}</p>
+            {/* No deadline to state, so what is stated is who decides — and, when the figures are
+                already out, that his notes will move one the squad has read (decision 079). */}
+            <p className="text-sm font-medium text-ink">
+              {ratingInvitationFr(results.published)}
+            </p>
             <ButtonLink href={`/match/${match.id}/notation`}>
               {results.progress.submittedCount > 0 ? "Finir mes notes" : "Noter mes coéquipiers"}
             </ButtonLink>
@@ -189,7 +187,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
           results={results}
           teamId={team.id}
           matchId={match.id}
-          canStillRate={canStillRate}
+          mayRate={mayRate}
         />
       ) : null}
 
