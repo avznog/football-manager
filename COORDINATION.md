@@ -67,8 +67,13 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   hedge — and *how* they were observed matters, because a green job does not say it: on the `main` push
   for #113 the `deploy preview` log prints a `*.vercel.app` URL and **no alias line for the pinned
   domain**, so the proof is that `dev.7orteils.bgonzva.fr/connexion` and that deployment's own
-  `/connexion` return **byte-identical bodies** while production's differs. The branch-pinned domain
-  does take a CLI deployment carrying `VERCEL_GIT_COMMIT_REF: main`. Production is simpler: the
+  `/connexion` return **byte-identical bodies** while production's differs. There is now a shorter check
+  — `vercel inspect https://dev.7orteils.bgonzva.fr` prints `target preview` and that alias, recorded in
+  full in the iphone-analyser lane. **Two claims, and only one of them is observed:** the branch-pinned
+  domain does take a CLI preview deployment; that `VERCEL_GIT_COMMIT_REF: main` is *what wins it* is
+  inferred, and the discriminator — a preview deploy with a different ref failing to take the domain —
+  points the owner's own review surface at the wrong commit, so nobody is to run it. Keep setting the
+  variable; do not upgrade the reason to a fact. Production is simpler: the
   `deploy production` log prints `Aliased https://7orteils.bgonzva.fr` itself. Both domains answer
   `307` on `/` then `200` on `/connexion`. Re-check by comparing bodies, not by reading the log.
   **Preview's database is not empty, and `ci.yml` cannot be what filled it** — the `preview migrations`

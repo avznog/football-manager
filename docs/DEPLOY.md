@@ -101,9 +101,11 @@ it once and confirm the host and database name are the preview branch's.
 session cannot resolve a connection string it cannot read, and nothing in the repository names the
 branch. If it does not exist, the answer to question 1 is « production » by default.
 
-Not a question but the thing to watch, and it is in §4: `dev.7orteils.bgonzva.fr` is **pinned to the git
-branch `main`**, so whether a CLI-issued preview actually takes that domain is expected rather than
-observed, and the first `main` push after this merges is the test.
+No longer one of the questions, and §4 has the detail: `dev.7orteils.bgonzva.fr` is **pinned to the git
+branch `main`**, and a CLI-issued preview **is observed to take it** — `vercel inspect` shows a
+`target preview` deployment holding the alias. What that does not show is that
+`VERCEL_GIT_COMMIT_REF: main` is *why*, and the experiment that would settle it is one nobody should run
+against the owner's own review surface.
 
 ## 3. Reference data and the first account — `db:bootstrap`
 
@@ -164,11 +166,35 @@ preview deployment takes that domain only if it carries `main` as its own git-br
 `deploy-preview` sets `VERCEL_GIT_COMMIT_REF: main` explicitly instead of trusting the CLI to infer it
 from the Actions environment.
 
-**This is expected to work and has not been observed.** The first push to `main` after this merges is the
-test: open `https://dev.7orteils.bgonzva.fr` and check it serves the new commit. If it does not, the
-fallback is one dashboard action by the owner — remove the `main` pin from that domain, after which the
-job can alias it explicitly with `vercel alias set <url> dev.7orteils.bgonzva.fr` — and it is on the
-roadmap as the first follow-up rather than as a footnote.
+**The domain is observed to take a CLI preview deployment. The mechanism is still inferred.** Those are
+two claims and only the first has been checked, so they are stated separately rather than as one
+sentence:
+
+```bash
+vercel inspect https://dev.7orteils.bgonzva.fr
+#   id      dpl_6PrsBKkc9hUv23Q7qYcWHFf65ZD2
+#   target  preview
+#   status  ● Ready
+#   Aliases ╶ https://dev.7orteils.bgonzva.fr
+```
+
+`target preview` holding that alias is the observation, and it settles what was doubted: a CLI-issued,
+`--prod`-less deployment does take the branch-pinned domain. It was confirmed a second way on the `main`
+push for #113 — the `deploy preview` log prints a `*.vercel.app` URL and **no alias line at all**, so
+the proof there is that `dev.7orteils.bgonzva.fr/connexion` and that deployment's own `/connexion` return
+byte-identical bodies while production's differs. **Re-check by comparing bodies or by `vercel inspect`,
+never by reading the log for an alias line that is not printed.**
+
+What is *not* observed is that `VERCEL_GIT_COMMIT_REF: main` is what wins the alias. Everything above is
+equally consistent with the pin being irrelevant and the domain going to the latest preview deployment
+whatever branch it claims. The discriminator would be a CLI preview deploy carrying a *different* ref and
+failing to take the domain — and **nobody has run it, deliberately**: it would point the one preview the
+owner reviews at something else, which is the state the whole split exists to prevent. So keep setting
+`VERCEL_GIT_COMMIT_REF`, and treat the reason as a working hypothesis rather than a measured fact.
+
+If the domain ever stops taking the deployment, the fallback is one dashboard action by the owner —
+remove the `main` pin from that domain, after which the job can alias it explicitly with
+`vercel alias set <url> dev.7orteils.bgonzva.fr`.
 
 If it ever has to be re-linked:
 
@@ -516,7 +542,7 @@ Notes worth having before something surprises you:
 | `PREVIEW_DATABASE_URL` | the GitHub secret of that name, only | What `migrate-preview` in `ci.yml` applies the committed SQL to on a push to `main`. The secret exists (verified); that it is the Neon **preview** branch and not production is §2's question 1, and unverifiable from a session. Nothing in the application reads this name. |
 | `VERCEL_TOKEN` | the GitHub secret of that name, only | Lets `deploy-preview` and `deploy-production` deploy with the CLI, each *after* its own migration — the ordering decision 119 bought with it. Since the Git integration deploys nothing, an absent or revoked token means no deployment at all rather than a slower one. Scope it to this project and rotate it if it is ever printed. |
 | `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | GitHub repository **variables**, not secrets | Which project `vercel pull` links to: `team_e14zXSvNznMzT763Do9oZK7N` and `prj_eKPRewuXOp95RI21UTFvBr2V8rNT`, both set (verified). They are identifiers, not credentials, so they are readable on purpose. |
-| `VERCEL_GIT_COMMIT_REF` | set to `main` by `deploy-preview` in `ci.yml`, nowhere else | `dev.7orteils.bgonzva.fr` is pinned to the git branch `main`, so the CLI's deployment has to claim that branch to take the domain (§4). Not yet observed to work. |
+| `VERCEL_GIT_COMMIT_REF` | set to `main` by `deploy-preview` in `ci.yml`, nowhere else | `dev.7orteils.bgonzva.fr` is pinned to the git branch `main`, so the CLI's deployment is believed to need that branch to take the domain (§4). The domain **is** observed to take a CLI preview deployment; that this variable is what wins it is inferred, and the experiment that would settle it is one nobody should run. |
 | `SUPER_ADMIN_USERNAME` | command line, once | The first account, in `db:bootstrap`. |
 | `SUPER_ADMIN_PASSWORD` | command line, once | Its password. Never in Vercel, never in a GitHub secret. |
 | `ALLOW_REMOTE_RESET` | nowhere | Exists so `db:reset` can refuse. Do not set it in production. |
