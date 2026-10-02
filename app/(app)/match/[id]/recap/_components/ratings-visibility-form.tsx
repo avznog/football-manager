@@ -66,8 +66,8 @@ export function RatingsVisibilityForm({
 
       <p className="text-xs text-ink-subtle">
         {mode === "hide"
-          ? "L’équipe ne verra plus que les siennes. Une moyenne déjà lue peut donc disparaître, " +
-            "et tu peux la ressortir quand tu veux."
+          ? "Chacun ne verra plus que ses propres notes. Une moyenne déjà lue peut donc " +
+            "disparaître, et tu peux la ressortir quand tu veux."
           : showHelperFr(silent)}
       </p>
     </form>

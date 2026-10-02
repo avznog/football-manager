@@ -244,8 +244,9 @@ async function seedDemo(): Promise<void> {
     .returning({ id: users.id });
 
   // The super admin runs this team as a non-playing coach: that is the account you log into.
-  // He is on no match sheet, so he never rates and is never rated — and he is the viewer who reads
-  // the individual notes and their authors, which under decision 137 nobody else ever does.
+  // He is on no match sheet, so he is never *rated* — and under decision 139 he may rate anyway, which
+  // is why he counts in the coach's « n membres sur 14 ». He is also the viewer who reads the
+  // individual notes and their authors, which nobody else ever does.
   await db
     .insert(teamMembers)
     .values({
@@ -869,7 +870,9 @@ async function seedDemo(): Promise<void> {
    *   played. Yanis and Fabien were named and never came on, so they are not *rated* (decision 137's
    *   `minutes > 0`, which survives) — but under 139 they may rate, and so may Brice, and so may a
    *   member who was not on the sheet at all. The coach's tally counts **members**, not players, for
-   *   that reason: « 4 membres sur 11 ».
+   *   that reason: « 4 membres sur 14 » — the thirteen players still in the squad plus the non-playing
+   *   super admin, Rayan having left. Looked at on a phone, that denominator is the surprise of the
+   *   new rule: ten names follow it, and all ten are entitled to rate.
    *   Every average is exactly its base, so the moment the coach shows them:
    *   Julien 9,0 · Karim 8,0 · Hugo 8,0 · Ali 8,0 · Léo 7,0 · Samir 7,0 · Thomas 7,0 ·
    *   Nico 6,0 · Momo 6,0 — over **3** notes for the four raters, who are not rated by themselves,
