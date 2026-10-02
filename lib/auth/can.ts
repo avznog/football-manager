@@ -62,9 +62,16 @@ export type Action =
    */
   | "rating:readNotes"
   /**
-   * Release a match's means with notes still owed — the escape hatch for the straggler who never
-   * will. A coach action, not a self-scoped one: `rating:submit` is self-scoped and therefore false
-   * for a coach who did not play, and he is exactly the person who has to be able to do this.
+   * **Show a match's means to the team, or hide them again.** One permission over one column, both
+   * ways (decision 139): `publishRatings` writes the instant, `hideRatings` writes null back, and
+   * splitting them into two actions would let a coach who may show end up unable to undo it.
+   *
+   * It used to be the escape hatch for the straggler who never rated, because the squad finishing
+   * published a match by itself. Nothing publishes anything by itself now — this is the only door, and
+   * the coach decides per match.
+   *
+   * A coach action, not a self-scoped one: `rating:submit` is every member's, and deciding what the
+   * whole team reads is not something a member does for himself.
    */
   | "rating:publish"
   // Self-scoped
@@ -77,6 +84,12 @@ export type Action =
    */
   | "profile:editShirtName"
   | "injury:declare"
+  /**
+   * Give notes for a match. **Any member of the team** (decision 139) — a supporter on the touchline
+   * watched the same hour the players did, and a member who was not on the sheet at all may rate too.
+   * Self-scoped, so a coach cannot rate on somebody's behalf; who may be *rated* is a different
+   * question, answered from the log in `lib/rating/progress.ts`, and no permission can see it.
+   */
   | "rating:submit"
   // Read
   | "team:read";

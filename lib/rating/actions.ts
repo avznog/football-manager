@@ -1,25 +1,32 @@
 "use server";
 
 /**
- * Submitting player ratings, and releasing a match's means.
+ * Submitting player ratings, and showing or hiding a match's means.
  *
  * Same contract as every other mutation in the repository: `assertCan()` first (invariant 4), the
  * `teamId` taken from the submitted form and then verified against the actor's membership, Zod for
  * everything, `revalidatePath` at the end. A forged hidden field must not widen anybody's reach.
  *
- * Four rules are enforced here, in this order, because each one depends on the previous:
+ * Three rules are enforced here, in this order, because each one depends on the previous:
  *
  * 1. `can(actor, "rating:submit")` — a self-scoped action: a coach cannot rate on a player's behalf.
- * 2. The match belongs to the team named in the form, and it is **finished**.
- * 3. The rating **window is open**: the match's means are not out yet (decision 138).
- * 4. The actor **played** — `minutes > 0` in the log — and so did everybody he rates, himself
- *    excepted. Ids that did not play are dropped rather than trusted.
+ * 2. The match belongs to the team named in the form, and it is **finished**. That is the only timing
+ *    rule left: you cannot rate a match that has not been played, and nothing ever closes afterwards.
+ * 3. Everybody he rates **played** — `minutes > 0` in the log — himself excepted. Ids that did not play
+ *    are dropped rather than trusted.
  *
- * Rule 4 is where decision 137 changed this file. It used to read the match sheet, which the form
- * itself was rendered from; it now reads the reduced log, which no form can influence. The set of
- * legal targets is exactly what a crafted post would try to widen — a supporter rating the squad, or
- * a player slipping himself into his own list — so it is re-derived here and never taken from the
- * request. `ratings_no_self` is the same rule stated in the database, for the same reason.
+ * **Two refusals that used to be here are gone, both by decision 139.** « La notation est fermée : les
+ * moyennes sont sorties » went with the window: the means being out no longer stops anybody, so a note
+ * can now arrive after the squad has read the figure it moves — which was stated as the cost of the
+ * change and accepted. And « seuls les joueurs qui ont joué peuvent noter » went with the rule: a
+ * supporter on the touchline watched the same hour and his note counts the same.
+ *
+ * Rule 3 is where decision 137 changed this file, and it is the one that stayed. It used to read the
+ * match sheet, which the form itself was rendered from; it reads the reduced log, which no form can
+ * influence. The set of legal targets is exactly what a crafted post would try to widen — somebody
+ * rating a man who never came on, or slipping himself into his own list — so it is re-derived here and
+ * never taken from the request. `ratings_no_self` is the same rule stated in the database, for the same
+ * reason.
  *
  * ## A note, once given, is final
  *
@@ -39,9 +46,9 @@ import { matches, ratings } from "@/db/schema";
 import { assertCan, membershipIn } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState } from "@/lib/auth/validation";
-import { getMatch } from "@/lib/match/queries";
-import { hasPlayed, ratingProgress, ratingTargetsFor } from "./progress";
-import { getRatingWindow, playedEntriesOf } from "./queries";
+import { getMatch, type MatchRow } from "@/lib/match/queries";
+import { ratingProgress, ratingTargetsFor } from "./progress";
+import { playedEntriesOf } from "./queries";
 import { readRatingEntries, submitRatingsSchema } from "./validation";
 
 export type SubmitRatingsState =
@@ -96,27 +103,19 @@ export async function submitRatings(
   const match = await getMatch(teamId, matchId);
   if (!match) return { error: "Ce match n’existe pas dans cette équipe." };
 
-  const window = await getRatingWindow(match);
-
-  if (window.state === "not-yet") {
+  // The whole of the timing rule, and it is about the match rather than about the clock. A match
+  // abandoned in `live` is not rateable until somebody closes it, which is correct: the recap it would
+  // produce is not a result yet.
+  if (match.status !== "finished") {
     return { error: "La notation ouvrira au coup de sifflet final." };
-  }
-  if (window.state === "closed") {
-    // The only thing that shuts it now (decision 138): the means are out, so a note arriving late
-    // would move a figure the squad has already read. It is also why this is not a race worth
-    // locking — a published mean cannot be unpublished, so the state never goes back to open.
-    return { error: "La notation est fermée : les moyennes de ce match sont sorties." };
   }
 
   const played = await playedEntriesOf(match);
-  if (!hasPlayed(played, membership.membershipId)) {
-    return { error: "Seuls les joueurs qui ont joué ce match peuvent noter." };
-  }
 
   /*
-   * Who he may rate: everybody who played, minus himself. Derived from the log, not from the form —
-   * and `ratingTargetsFor` is the same function the screen built its list from, so a legitimate
-   * submission can never be refused here while a crafted one is.
+   * Who he may rate: everybody who played, minus himself — whether or not *he* played (decision 139).
+   * Derived from the log, not from the form, and `ratingTargetsFor` is the same function the screen
+   * built its list from, so a legitimate submission can never be refused here while a crafted one is.
    */
   const allowed = new Set(ratingTargetsFor(played, membership.membershipId));
   const accepted = entries.filter((entry) => allowed.has(entry.ratedMemberId));
@@ -142,8 +141,9 @@ export async function submitRatings(
 
   revalidateRatings(match.id);
 
-  // Has he finished? His set completing may be what publishes the whole match's means, so there is
-  // something new on the recap for him either way.
+  // Has he finished? Nothing is published by his finishing any more (decision 139) — the recap is
+  // simply where a man who has nothing left to send belongs, and it is where he finds out whether the
+  // coach has shown the means.
   const submitted = await db
     .select({ ratedMemberId: ratings.ratedMemberId })
     .from(ratings)
@@ -168,33 +168,74 @@ export async function submitRatings(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Releasing the means                                                        */
+/* Showing the means, and hiding them again                                   */
 /* -------------------------------------------------------------------------- */
 
-export type PublishRatingsState = undefined | { error?: string; published?: true };
+export type PublishRatingsState = undefined | { error?: string; published?: boolean };
 
 /**
- * Release a match's means with notes still owed — the coach's escape hatch.
+ * Show a match's means to the team. **The only thing that ever does** (decision 139).
  *
- * It exists because the squad finishing is the only other way a mean comes out, and one man who never
- * rates would hold a match's figures back for ever. So somebody has to be able to say « c'est bon, on
- * n'attend plus ». There used to be a third way — the next kick-off shutting the window — and it was
- * no backstop at all: it never fired for the last match of a season, the one match a team most wants
- * its notes for. Decision 138 removed it, which makes **this button the only deadline there is**: it
- * publishes the means and, by the same act, ends the rating (`lib/rating/window.ts`). That is the
- * weight behind the « elles ne bougeront plus » on it.
+ * It used to be an escape hatch: the squad finishing its notes published a match by itself, and this
+ * covered the straggler who never would. The owner turned that round — the means come out when he says
+ * so, per match, and nothing else publishes anything. So this is no longer a hatch but *the* door, and
+ * what used to be its weight has moved: it no longer ends the notation (nothing does), and it no longer
+ * freezes a figure, because `hideRatings` below puts it back.
  *
- * `rating:publish` is a **coach** action, not a self-scoped one: `rating:submit` is false for a coach
- * who did not play, and he is exactly the person who has to be able to do this.
+ * `rating:publish` is a **coach** action, not a self-scoped one: `rating:submit` is true for every
+ * member, and deciding what the whole team reads is not a thing a member does for himself.
  *
- * Idempotent, and deliberately so — the first timestamp is the one kept. Two taps on a slow
- * connection must not move the moment the notes came out, and `ratingsPublishedAt` is read as « when
- * this happened », not as « the last time somebody pressed the button ».
+ * Idempotent, and deliberately so — the first timestamp is the one kept. Two taps on a slow connection
+ * must not move the moment the notes came out, and `ratingsPublishedAt` is read as « when this
+ * happened », not as « the last time somebody pressed the button ». A coach who hides and shows again
+ * does move it, which is right: that is a new decision, not a repeat of the old one.
  */
 export async function publishRatings(
   _prev: PublishRatingsState,
   formData: FormData,
 ): Promise<PublishRatingsState> {
+  const match = await coachsMatch(formData);
+  if ("error" in match) return match;
+  if (match.row.ratingsPublishedAt !== null) return { published: true };
+
+  await setPublishedAt(match.row.id, match.teamId, new Date());
+  return { published: true };
+}
+
+/**
+ * Hide a match's means again, putting every figure back behind `getRatingResults`'s early return.
+ *
+ * The owner asked for a switch that goes both ways, with the cost stated and accepted: **a mean the
+ * squad has already read can vanish.** Nothing softens that and nothing should pretend to — there is no
+ * audit trail of what was visible when, and a player who screenshotted his 4,2 keeps it. What the
+ * reversibility buys is the ability to undo a tap, which on a per-match switch somebody will need.
+ *
+ * Writing `null` is the whole mutation: null *is* the hidden state (`lib/rating/published.ts`), so this
+ * is not a second flag that could disagree with the first. Idempotent for the same reason as its
+ * sibling — hiding an already-hidden match changes nothing and is not an error.
+ */
+export async function hideRatings(
+  _prev: PublishRatingsState,
+  formData: FormData,
+): Promise<PublishRatingsState> {
+  const match = await coachsMatch(formData);
+  if ("error" in match) return match;
+  if (match.row.ratingsPublishedAt === null) return { published: false };
+
+  await setPublishedAt(match.row.id, match.teamId, null);
+  return { published: false };
+}
+
+/**
+ * The checks both halves of the switch share: the form is well-formed, the actor may publish for this
+ * team, and the match is a finished one of that team.
+ *
+ * One function rather than two copies because the two actions differ by a single value written, and a
+ * permission check that exists twice is a permission check that can come to differ once.
+ */
+async function coachsMatch(
+  formData: FormData,
+): Promise<{ error: string } | { row: MatchRow; teamId: string }> {
   const actor = await requireActor();
 
   const teamId = formData.get("teamId");
@@ -205,19 +246,20 @@ export async function publishRatings(
 
   assertCan(actor, "rating:publish", { teamId });
 
-  const match = await getMatch(teamId, matchId);
-  if (!match) return { error: "Ce match n’existe pas dans cette équipe." };
-  if (match.status !== "finished") {
+  const row = await getMatch(teamId, matchId);
+  if (!row) return { error: "Ce match n’existe pas dans cette équipe." };
+  if (row.status !== "finished") {
     return { error: "Les notes d’un match pas encore terminé n’existent pas." };
   }
-  if (match.ratingsPublishedAt !== null) return { published: true };
+  return { row, teamId };
+}
 
+async function setPublishedAt(matchId: string, teamId: string, at: Date | null): Promise<void> {
   await db
     .update(matches)
-    .set({ ratingsPublishedAt: new Date() })
-    // Scoped by team as well as by id: an id from another team is not this coach's to publish.
-    .where(and(eq(matches.id, match.id), eq(matches.teamId, teamId)));
+    .set({ ratingsPublishedAt: at })
+    // Scoped by team as well as by id: an id from another team is not this coach's to touch.
+    .where(and(eq(matches.id, matchId), eq(matches.teamId, teamId)));
 
-  revalidateRatings(match.id);
-  return { published: true };
+  revalidateRatings(matchId);
 }
