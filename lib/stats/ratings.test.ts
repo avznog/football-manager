@@ -41,8 +41,8 @@ const COMPLETE_M1: RatingAuthorRow[] = [
 ];
 
 const OPEN: MatchPublicationRow[] = [
-  { matchId: "m1", publishedAtMs: null, windowClosed: false },
-  { matchId: "m2", publishedAtMs: null, windowClosed: false },
+  { matchId: "m1", publishedAtMs: null },
+  { matchId: "m2", publishedAtMs: null },
 ];
 
 const split = (
@@ -95,8 +95,8 @@ describe("seasonRatingPublication — every rater in", () => {
 describe("seasonRatingPublication — the coach's escape hatch", () => {
   it("publishes a match the coach released, however much is owed", () => {
     const matches: MatchPublicationRow[] = [
-      { matchId: "m1", publishedAtMs: 1_700_000_000_000, windowClosed: false },
-      { matchId: "m2", publishedAtMs: null, windowClosed: false },
+      { matchId: "m1", publishedAtMs: 1_700_000_000_000 },
+      { matchId: "m2", publishedAtMs: null },
     ];
     const season = split([COMPLETE_M1[0]], matches);
     expect(season.publishedMatchIds).toEqual(["m1"]);
@@ -107,8 +107,8 @@ describe("seasonRatingPublication — the coach's escape hatch", () => {
     // Publishing an unrated match publishes nothing: there is no mean to compute, so it belongs in
     // neither list rather than in `publishedMatchIds` where a screen would look for figures.
     const matches: MatchPublicationRow[] = [
-      { matchId: "m1", publishedAtMs: 1_700_000_000_000, windowClosed: false },
-      { matchId: "m2", publishedAtMs: null, windowClosed: false },
+      { matchId: "m1", publishedAtMs: 1_700_000_000_000 },
+      { matchId: "m2", publishedAtMs: null },
     ];
     const season = split([], matches);
     expect(season.publishedMatchIds).toEqual([]);
@@ -116,22 +116,25 @@ describe("seasonRatingPublication — the coach's escape hatch", () => {
   });
 });
 
-describe("seasonRatingPublication — the window closing", () => {
-  it("publishes what there is once the next match has kicked off", () => {
-    // This is the clause that reverses decision 024: a straggler no longer freezes a match for ever.
-    // Whether one note is enough to *print* is a different question, settled by `MIN_NOTES_FOR_MEAN`
-    // in the aggregate — this module only says the notes are out.
-    const matches: MatchPublicationRow[] = [
-      { matchId: "m1", publishedAtMs: null, windowClosed: true },
-      { matchId: "m2", publishedAtMs: null, windowClosed: false },
-    ];
-    const season = split([COMPLETE_M1[0]], matches);
-    expect(season.publishedMatchIds).toEqual(["m1"]);
+describe("seasonRatingPublication — no deadline publishes anything", () => {
+  /**
+   * The clause decision 138 removed. A match of last month with one note on file and nothing
+   * published stays pending for as long as that is true, whatever the calendar has done since — and
+   * `/stats` counts it among the matches still awaiting notes rather than averaging one teammate's
+   * opinion into a season.
+   */
+  it("leaves a long-finished match pending, whatever has kicked off since", () => {
+    const season = split([COMPLETE_M1[0]]);
+    expect(season.publishedMatchIds).toEqual([]);
+    expect(season.pendingMatchIds).toEqual(["m1"]);
   });
 
+  /**
+   * And the case the old clause could never cover, which is the argument for removing it: the last
+   * match of a season had no next kick-off, so the deadline never fired for the one match a team most
+   * wants its notes for. Its answer is unchanged, and now it is every match's answer.
+   */
   it("leaves the last match of a season waiting on its players or its coach", () => {
-    // No next kick-off, so `windowClosed` is false for ever. The coach is the backstop, which is the
-    // whole reason `rating:publish` exists.
     const season = split([COMPLETE_M1[0]]);
     expect(season.pendingMatchIds).toEqual(["m1"]);
   });
@@ -162,8 +165,8 @@ describe("seasonRatingPublication — the edges", () => {
     // The screens count these lists and some of them name the first entry, so the order has to be
     // the caller's — most recent first, as `getSeasonStats` loads them — not insertion order here.
     const matches: MatchPublicationRow[] = [
-      { matchId: "m1", publishedAtMs: null, windowClosed: true },
-      { matchId: "m2", publishedAtMs: null, windowClosed: true },
+      { matchId: "m1", publishedAtMs: 1_700_000_000_000 },
+      { matchId: "m2", publishedAtMs: 1_700_000_000_000 },
     ];
     const authors: RatingAuthorRow[] = [
       { matchId: "m2", raterMemberId: "hugo", ratedMemberId: "karim" },

@@ -8,9 +8,12 @@
  *   came on is told so rather than asked for opinions about a match he watched; a supporter was never
  *   asked under 007 either (decision 039). Nobody rates himself, so the list is who played minus the
  *   reader, and `getNotationView` arrives that way;
- * - the window closes at the **next kick-off**, after which the form is gone rather than merely
- *   disabled — an insert would be refused anyway (`lib/rating/actions.ts`). While it is open, the
- *   screen says when that is: `ratingDeadlineFr` (decision 079);
+ * - **the window closes when the means come out**, and nothing else closes it (decision 138,
+ *   superseding 007's next-kick-off deadline). So a match played five weeks ago whose notes are still
+ *   pending shows this form, and a match published an hour ago does not. After it closes the form is
+ *   gone rather than merely disabled — an insert would be refused anyway (`lib/rating/actions.ts`) —
+ *   and while it is open the screen says what will close it: `ratingUrgencyFr` (decision 079's rule,
+ *   that a limit the app enforces must be stated, applied to a limit that is no longer a date);
  * - this page **never shows anybody else's notes**, and under decision 137 it never will: a player
  *   reads one settled mean per match in the recap, and the individual notes are the coach's alone.
  *   `getRatingResults` is what gates that, and it is a different screen.
@@ -36,7 +39,7 @@ import { matchNameFr, pluralize } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import { getMatch } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
-import { ratingDeadlineFr } from "@/lib/rating/window";
+import { ratingUrgencyFr } from "@/lib/rating/window";
 import { RatingSheet } from "./_components/rating-sheet";
 
 export async function generateMetadata({ params }: PageProps<"/match/[id]/notation">) {
@@ -57,12 +60,10 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
 
   const { match, window, played, sheetRole, blocked, targets, progress } = view;
   const kickoff = new Date(match.kickoffAt);
-  const now = new Date();
 
   // Invariant 4: the permission comes from `can()`, never from a role read on the spot. `played` is
   // the other half — `rating:submit` says « a member may rate », the log says « this one took part ».
   const mayRate = played && blocked === null && can(actor, "rating:submit", { teamId: team.id });
-  const deadline = ratingDeadlineFr(window.closesAtMs, now.getTime());
 
   return (
     <div className="space-y-6">
@@ -139,7 +140,7 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
         <Card title="La notation est fermée" as="h2">
           <div className="space-y-3">
             <p className="text-sm text-ink-muted">
-              Le match suivant a déjà commencé : les notes de ce match ne bougent plus.
+              Les moyennes de ce match sont sorties, donc les notes ne bougent plus.
               {progress.submittedCount > 0
                 ? ` Tu en avais mis ${progress.submittedCount} sur ${progress.requiredCount}.`
                 : " Tu n’en avais mis aucune."}
@@ -175,9 +176,10 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
             L’équipe lira une moyenne par joueur, jamais ta note à toi — seul le coach voit les notes
             une par une.
           </p>
-          {/* The deadline the app enforces, said out loud (decision 079). Null when no next match is
-              on the calendar: the window has no end yet, so there is nothing to announce. */}
-          {deadline ? <p className="text-sm font-medium text-ink">{deadline}</p> : null}
+          {/* What will close the window, said out loud (decision 079). There is no date to print any
+              more — publication is the deadline — so this is unconditional, which is also the first
+              time this paragraph is true for the last match of a season. */}
+          <p className="text-sm font-medium text-ink">{ratingUrgencyFr()}</p>
           <RatingSheet teamId={team.id} matchId={match.id} targets={targets} />
         </>
       )}

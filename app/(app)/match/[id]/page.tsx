@@ -41,7 +41,7 @@ import { buildReminderMessage, tallyAvailability, type Responder } from "@/lib/c
 import { reopenMatch } from "@/lib/match/actions";
 import { getMatch, getMatchAnswers, getMatchScore, hasMatchEvents } from "@/lib/match/queries";
 import { getNotationView } from "@/lib/rating/queries";
-import { ratingDeadlineFr } from "@/lib/rating/window";
+import { ratingUrgencyFr } from "@/lib/rating/window";
 import { getSquad } from "@/lib/team/queries";
 import { FinishMatchCard } from "./_components/finish-match-card";
 import { CompositionCard } from "./composition/_components/composition-card";
@@ -108,8 +108,8 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   // (decision 004). Invariant 4: the permission is `can()`'s answer.
   const mayAmend = can(actor, "match:amend", { teamId: team.id });
   /**
-   * This viewer's rating duty, or null when he has none: he did not play, the window is shut, or he
-   * is not allowed to rate at all. Invariant 4 — the permission is `can()`'s answer, not a role read
+   * This viewer's rating duty, or null when he has none: he did not play, the means are already out,
+   * or he is not allowed to rate at all. Invariant 4 — the permission is `can()`'s answer, not a role read
    * here.
    *
    * `notation.played` where it used to be `notation.onSheet`: under decision 137 a named substitute
@@ -121,11 +121,6 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
     notation.window.state === "open" &&
     can(actor, "rating:submit", { teamId: team.id })
       ? notation.progress
-      : null;
-  /** Only meaningful next to `ratingDuty`: it is the deadline on notes this viewer still owes. */
-  const ratingDeadline =
-    ratingDuty !== null && notation !== null
-      ? ratingDeadlineFr(notation.window.closesAtMs, now.getTime())
       : null;
   /**
    * Whether the « Terminer le match » card is offered, and which of its two slots it goes in.
@@ -269,17 +264,15 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
                 {/* Both sentences used to end in the bargain decision 021 struck — « tu verras
                     celles des autres quand tu auras fini », « les notes des autres restent cachées
                     jusque-là ». Decision 137 pays nobody for rating: the means come out when the
-                    whole team has, so what is left is the duty and its deadline. */}
+                    whole team has, so what is left is the duty and what will end it. */}
                 <p className="text-sm text-ink-muted">
                   {ratingDuty.partial
                     ? `Il te reste ${ratingDuty.missingIds.length} note${ratingDuty.missingIds.length > 1 ? "s" : ""} à donner.`
                     : "Tu n’as pas encore noté les joueurs qui étaient sur le terrain avec toi."}
                 </p>
-                {/* The comment above calls this « the one that expires at the next kick-off », and
-                    the card never said when that was (decision 079). */}
-                {ratingDeadline ? (
-                  <p className="text-sm font-medium text-ink">{ratingDeadline}</p>
-                ) : null}
+                {/* What ends the duty, which the card used to leave unsaid (decision 079). Not a date
+                    since decision 138: the means coming out is the deadline. */}
+                <p className="text-sm font-medium text-ink">{ratingUrgencyFr()}</p>
                 <ButtonLink href={`/match/${match.id}/notation`} fullWidth>
                   Noter mes coéquipiers
                 </ButtonLink>

@@ -20,7 +20,7 @@ import "server-only";
  * M4 freezes a match at the final whistle, a season aggregate replays nothing at all.
  */
 
-import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { db } from "@/db/client";
@@ -167,28 +167,6 @@ async function getFinishedMatches(
     })),
     liveCount: Number(live[0]?.count ?? 0),
   };
-}
-
-/**
- * The team's most recent kick-off that has already happened, in epoch ms, or null.
- *
- * One row, and it answers « has the rating window shut » for **every** match at once: a window closes
- * at the next kick-off (`lib/rating/window.ts`), so it is shut for exactly the matches that kicked
- * off *before* this instant. The alternative — `getNextKickoffAfter` per match, as the single-match
- * screens do — is one round trip per finished match of the season.
- *
- * Deliberately **not** filtered by competition, and deliberately not restricted to finished matches:
- * the window is the calendar's, not the filter's. A cup tie on Wednesday closes the league match of
- * the Sunday before, and a match abandoned without a final whistle still kicked off.
- */
-async function getLatestStartedKickoffMs(teamId: string, nowMs: number): Promise<number | null> {
-  const rows = await db
-    .select({ kickoffAt: sql<Date | null>`max(${matches.kickoffAt})` })
-    .from(matches)
-    .where(and(eq(matches.teamId, teamId), lte(matches.kickoffAt, new Date(nowMs))));
-
-  const latest = rows[0]?.kickoffAt ?? null;
-  return latest === null ? null : new Date(latest).getTime();
 }
 
 /** The match sheets: the source of truth for titulaire / remplaçant / supporter. */
@@ -353,6 +331,11 @@ export type SeasonStatsResult = SeasonStats & {
  * say « d'après les matchs que tu as notés ». A number two teammates can compare is worth more than
  * one each of them had to earn.
  *
+ * It also takes **no clock**. It used to take `nowMs`, to work out which rating windows the calendar
+ * had shut; decision 138 removed that clause, so whether a season's means are out is now a question
+ * about rows only. One round trip fewer, and one fewer thing whose answer changes between two renders
+ * of the same page.
+ *
  * `cache()`d so a page that renders the team card, the tables and a per-player card costs a single
  * pass — and so `generateMetadata` is free.
  */
@@ -360,15 +343,12 @@ export const getSeasonStats = cache(
   async (
     teamId: string,
     filter: StatsFilter = { competitionId: null },
-    nowMs: number = Date.now(),
   ): Promise<SeasonStatsResult> => {
-    const [{ rows: matchRows, liveCount }, members, attendance, latestStartedKickoffMs] =
-      await Promise.all([
-        getFinishedMatches(teamId, filter),
-        getStatsMembers(teamId),
-        getAttendanceMarks(teamId),
-        getLatestStartedKickoffMs(teamId, nowMs),
-      ]);
+    const [{ rows: matchRows, liveCount }, members, attendance] = await Promise.all([
+      getFinishedMatches(teamId, filter),
+      getStatsMembers(teamId),
+      getAttendanceMarks(teamId),
+    ]);
 
     const matchIds = matchRows.map((match) => match.id);
 
@@ -441,10 +421,6 @@ export const getSeasonStats = cache(
         (match): MatchPublicationRow => ({
           matchId: match.id,
           publishedAtMs: match.ratingsPublishedAtMs,
-          // Shut for every match that kicked off before the last one to have started.
-          windowClosed:
-            latestStartedKickoffMs !== null &&
-            new Date(match.kickoffAt).getTime() < latestStartedKickoffMs,
         }),
       ),
     });

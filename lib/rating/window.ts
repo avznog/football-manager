@@ -1,104 +1,93 @@
 /**
  * When a match can be rated.
  *
- * Pure: the caller passes `nowMs` and the next kick-off, so the rule is testable and identical on
- * the server and in a unit test (`CLAUDE.md`, invariant 2's reasoning applied to the same kind of
- * derived state).
+ * Pure: the caller passes the two facts, so the rule is testable and identical on the server and in a
+ * unit test (`CLAUDE.md`, invariant 2's reasoning applied to the same kind of derived state).
  *
- * The rule comes from decision 007: **the rating window closes when the next match kicks off.**
- * The point is that ratings are a fresh impression, not an archive you fill in three months later,
- * and that the recap of a match should stop changing once the team has moved on to the next one.
+ * The rule comes from decision 138: **rating is open from the final whistle until the means come
+ * out.** What ends it is publication — the squad finishing its notes, or the coach's button — and
+ * nothing else. The calendar has no say.
  *
- * Two edges, decided here because nothing else settled them:
+ * ## What this replaces, and why
  *
- * - **It opens at the final whistle, not at kick-off.** You cannot rate a match that has not been
+ * Decision 007 closed the window at the **next match's kick-off**, on the reasoning that a note is a
+ * fresh impression and not an archive you fill in three months later. That is a good reason to want
+ * people to rate quickly and a bad reason to stop them: on a normal season a man who misses one
+ * Sunday's deadline is locked out of that match for ever, and the only thing the lock achieves is that
+ * the mean he would have contributed to is one note thinner. Nothing was gained; a figure was made
+ * worse. The demo season shipped two matches in exactly that state.
+ *
+ * So the deadline moves onto the thing that actually has to stop changing: **a published mean never
+ * moves.** The coach's publish button is the real deadline, and the button already says so
+ * (« elles ne bougeront plus »).
+ *
+ * The anti-anchoring guarantee decision 021 existed for survives untouched, and that is the reason
+ * rating does not simply stay open for ever: a reader who could rate a match whose means are already
+ * out would be writing his notes *after* reading the team's, which is the one thing this feature has
+ * never allowed. **Nobody ever reads a mean before writing his own notes.**
+ *
+ * Two edges, decided here because nothing else settles them:
+ *
+ * - **it opens at the final whistle, not at kick-off.** You cannot rate a match that has not been
  *   played. `finished` is the match's `status`, which game mode sets on the final whistle — so a
  *   match abandoned in `live` is never rateable until somebody closes it, which is correct: the
- *   recap it would produce is not a result yet.
- * - **`nextKickoffAtMs === nowMs` is closed.** The whistle has blown; the window is shut. Being
- *   strict at the boundary means the state can never depend on millisecond jitter between two
- *   renders of the same page.
- *
- * Known limitation, worth writing down: on a tournament day the "next match" is an hour later, so
- * the window shuts almost immediately. That is what decision 007 says, and a tournament is
- * precisely when nobody is going to rate seven matches anyway. If it ever bites, the fix is a new
- * decision (« the window lasts at least N hours »), not a quiet change here.
+ *   recap it would produce is not a result yet;
+ * - **a match nobody played is closed, not open.** `ratingsPublication` publishes it vacuously (no
+ *   set is outstanding), so `published` is true and the state is `"closed"`. There is nobody to rate
+ *   and the screen says so in its own words; this agreeing with publication rather than contradicting
+ *   it is what keeps « the means are out » and « rating is over » one fact instead of two.
  */
-
-import { formatWhen } from "@/lib/calendar/time";
 
 export type RatingWindowState =
   /** The match is not finished: there is nothing to rate yet. */
   | "not-yet"
   /** Ratings accepted. */
   | "open"
-  /** The next match has kicked off; ratings are closed for good. */
+  /** The means are out, so the notes behind them can no longer change. */
   | "closed";
 
 export type RatingWindowInput = {
   /** `match.status === "finished"`. */
   finished: boolean;
-  /** Kick-off of the team's next match *after* this one, or null when there is none scheduled. */
-  nextKickoffAtMs: number | null;
-  nowMs: number;
+  /** `ratingsPublication(...).published` for the same match — what shuts the window (decision 138). */
+  published: boolean;
 };
 
 export type RatingWindow = {
   state: RatingWindowState;
   /** Convenience for the many call sites that only care whether an insert is allowed. */
   isOpen: boolean;
-  /** When the window shuts, if that is already known — the next kick-off. */
-  closesAtMs: number | null;
 };
 
 export function ratingWindow(input: RatingWindowInput): RatingWindow {
-  const closesAtMs = input.nextKickoffAtMs;
-
   if (!input.finished) {
-    return { state: "not-yet", isOpen: false, closesAtMs };
+    return { state: "not-yet", isOpen: false };
   }
 
-  if (closesAtMs !== null && closesAtMs <= input.nowMs) {
-    return { state: "closed", isOpen: false, closesAtMs };
+  if (input.published) {
+    return { state: "closed", isOpen: false };
   }
 
-  return { state: "open", isOpen: true, closesAtMs };
+  return { state: "open", isOpen: true };
 }
 
 /**
- * The deadline, in words, for a player who still owes notes — « À finir avant le coup d’envoi du
- * match suivant, dimanche 27/09/2026 à 10:30 : … ».
+ * What closes the window, in words, for a player who still owes notes — « Tant que les moyennes ne
+ * sont pas sorties, tu peux encore noter : … ».
  *
- * `closesAtMs` was computed by `ratingWindow` from the first day and read by nobody for six
- * milestones: three screens promised « tu verras les notes des autres quand tu auras fini » and not
- * one of them said that finishing has a closing time, while `progress.ts` makes missing it
- * permanent. A deadline the app enforces and never states is the defect family the screen audit
- * exists for.
+ * There is no date to print any more, and that is the point of decision 138. What replaces the date is
+ * the thing a player can actually act on: the means come out the moment the last man finishes or the
+ * coach decides he has waited long enough, and after that his notes are no longer wanted. So the
+ * sentence names the two events rather than a time, which has the side benefit of being true for the
+ * last match of a season — the case the old deadline could not describe at all, because that match had
+ * no next kick-off and so printed nothing.
  *
- * Two silences, both deliberate:
- *
- * - **no next match on the calendar** (`closesAtMs === null`) — the window has no end yet, so there
- *   is nothing to warn about. Naming a deadline here would mean inventing one, and it would change
- *   the moment the coach adds a fixture.
- * - **already closed** — the caller is in a state that says so in its own words
- *   (`state === "closed"`). Printing a deadline in the past would be the very thing this fixes.
- *
- * Only for a viewer whose notes are unfinished: the second half of the sentence is about notes he
- * will not get to give, which is nothing to say to somebody who has already rated everybody.
- *
- * **What the second half may not say any more.** It used to be « tu ne verras pas celles de
- * l’équipe » — the window closing left a man who had not rated with the match's notes hidden for
- * ever, which is decision 024's second edge and the thing decision 137 reversed. The window closing
- * now *publishes* the means, so that sentence would threaten a punishment the app no longer carries
- * out, and the deadline has to earn its urgency on what is actually lost: his say. The notes come out
- * without him.
+ * Only for a viewer whose notes are unfinished: it is about notes he has still to give, which is
+ * nothing to say to somebody who has already rated everybody.
  */
-export function ratingDeadlineFr(closesAtMs: number | null, nowMs: number): string | null {
-  if (closesAtMs === null || closesAtMs <= nowMs) return null;
-
-  const when = formatWhen(new Date(closesAtMs), new Date(nowMs));
+export function ratingUrgencyFr(): string {
   return (
-    `À finir avant le coup d’envoi du match suivant, ${when} : après, tu ne peux plus noter et les ` +
-    "moyennes sortent sans tes notes."
+    "Tu peux encore noter : les moyennes ne sont pas sorties. Elles sortiront dès que tout le monde " +
+    "aura noté, ou quand le coach décidera de les sortir — et tes notes ne compteront plus."
   );
 }

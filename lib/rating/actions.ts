@@ -11,7 +11,7 @@
  *
  * 1. `can(actor, "rating:submit")` — a self-scoped action: a coach cannot rate on a player's behalf.
  * 2. The match belongs to the team named in the form, and it is **finished**.
- * 3. The rating **window is open**: the next kick-off has not happened (decision 007).
+ * 3. The rating **window is open**: the match's means are not out yet (decision 138).
  * 4. The actor **played** — `minutes > 0` in the log — and so did everybody he rates, himself
  *    excepted. Ids that did not play are dropped rather than trusted.
  *
@@ -102,7 +102,10 @@ export async function submitRatings(
     return { error: "La notation ouvrira au coup de sifflet final." };
   }
   if (window.state === "closed") {
-    return { error: "La notation est fermée : le match suivant a déjà commencé." };
+    // The only thing that shuts it now (decision 138): the means are out, so a note arriving late
+    // would move a figure the squad has already read. It is also why this is not a race worth
+    // locking — a published mean cannot be unpublished, so the state never goes back to open.
+    return { error: "La notation est fermée : les moyennes de ce match sont sorties." };
   }
 
   const played = await playedEntriesOf(match);
@@ -173,9 +176,13 @@ export type PublishRatingsState = undefined | { error?: string; published?: true
 /**
  * Release a match's means with notes still owed — the coach's escape hatch.
  *
- * It exists because the alternative backstop does not work: `ratingWindow` never closes for the last
- * match of a season (there is no next kick-off), and that is the one match a team most wants its
- * notes for. So somebody has to be able to say « c'est bon, on n'attend plus ».
+ * It exists because the squad finishing is the only other way a mean comes out, and one man who never
+ * rates would hold a match's figures back for ever. So somebody has to be able to say « c'est bon, on
+ * n'attend plus ». There used to be a third way — the next kick-off shutting the window — and it was
+ * no backstop at all: it never fired for the last match of a season, the one match a team most wants
+ * its notes for. Decision 138 removed it, which makes **this button the only deadline there is**: it
+ * publishes the means and, by the same act, ends the rating (`lib/rating/window.ts`). That is the
+ * weight behind the « elles ne bougeront plus » on it.
  *
  * `rating:publish` is a **coach** action, not a self-scoped one: `rating:submit` is false for a coach
  * who did not play, and he is exactly the person who has to be able to do this.

@@ -29,7 +29,7 @@ import "server-only";
  * favour of it.
  */
 
-import { and, asc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import {
@@ -39,12 +39,11 @@ import {
   lineups,
   matchEvents,
   matchSquad,
-  matches,
   ratings,
   teamMembers,
   users,
 } from "@/db/schema";
-import type { MatchStatus, SquadRole } from "@/db/schema";
+import type { SquadRole } from "@/db/schema";
 import type { SlotInfo } from "@/lib/match/lineup";
 import { getMatch, type MatchRow } from "@/lib/match/queries";
 import {
@@ -70,6 +69,7 @@ import {
 } from "./progress";
 import {
   ratingsPublication,
+  type RatingsPublication,
   type RatingsPublicationReason,
 } from "./published";
 import { buildRecap, type MatchRecap, type RecapMember } from "./recap";
@@ -136,44 +136,64 @@ export async function getTeamDirectory(teamId: string): Promise<DirectoryMember[
 }
 
 /**
- * Kick-off of the team's next match after this one — the instant the rating window shuts
- * (decision 007).
+ * The rating window of a match, with `now` taken once so a page renders one consistent answer.
  *
- * Ordered by kick-off, which is the only thing that matters: a match created later but played
- * earlier still closes the window earlier.
+ * Decision 138 made the window depend on **publication** rather than on the calendar, which is why
+ * this now costs two reads: whether the means are out is a question about who played and who has
+ * rated, not about the next fixture. The previous version read one column from one row
+ * (`getNextKickoffAfter`, deleted with the rule), and the two callers that have those rows in hand
+ * already — `getNotationView` and `getRatingResults` — do not go through here for exactly that
+ * reason. This entry point is for the callers that hold a match and nothing else.
  */
-export async function getNextKickoffAfter(
-  teamId: string,
-  kickoffAt: Date | string,
-): Promise<string | null> {
-  const after = typeof kickoffAt === "string" ? new Date(kickoffAt) : kickoffAt;
-
-  const rows = await db
-    .select({ kickoffAt: matches.kickoffAt })
-    .from(matches)
-    .where(and(eq(matches.teamId, teamId), gt(matches.kickoffAt, after)))
-    .orderBy(asc(matches.kickoffAt))
-    .limit(1);
-
-  return rows[0] ? rows[0].kickoffAt.toISOString() : null;
+export async function getRatingWindow(match: MatchRow, nowMs = Date.now()): Promise<RatingWindow> {
+  const [state, pairs] = await Promise.all([
+    loadMatchState(match, nowMs),
+    getRatingPairs(match.id),
+  ]);
+  return ratingWindow({
+    finished: match.status === "finished",
+    published: publicationOf(match, playedFrom(state), pairs).publication.published,
+  });
 }
 
 /**
- * The rating window of a match, with `now` taken once so a page renders one consistent answer.
+ * Is this match's mean out, from the three facts that decide it — plus who has rated whom, which the
+ * caller invariably wants next.
  *
- * Takes only the three columns the rule uses, so an action that has just read the match row for its
- * own checks does not have to fabricate a whole `MatchRow` to ask the question.
+ * Factored out because the window and the results now ask the same question, and asking it twice with
+ * two spellings of « a complete set » is how the two would come to disagree — the screen saying the
+ * notes are closed over a panel that is still waiting for them.
  */
-export async function getRatingWindow(
-  match: { teamId: string; kickoffAt: Date | string; status: MatchStatus },
-  nowMs = Date.now(),
-): Promise<RatingWindow> {
-  const nextKickoff = await getNextKickoffAfter(match.teamId, match.kickoffAt);
-  return ratingWindow({
-    finished: match.status === "finished",
-    nextKickoffAtMs: nextKickoff === null ? null : new Date(nextKickoff).getTime(),
-    nowMs,
+function publicationOf(
+  match: { ratingsPublishedAt: string | null },
+  played: readonly PlayedEntry[],
+  pairs: readonly { raterMemberId: string; ratedMemberId: string }[],
+): {
+  publication: RatingsPublication;
+  expectedRaterIds: string[];
+  /** rater → whom he has rated, which is what « il te reste 3 notes » is counted from. */
+  submittedBy: Map<string, Set<string>>;
+} {
+  const expectedRaterIds = playedMemberIds(played);
+
+  // One rater's set is complete when he has a note on every other player who played.
+  const submittedBy = new Map<string, Set<string>>();
+  for (const pair of pairs) {
+    const set = submittedBy.get(pair.raterMemberId) ?? new Set<string>();
+    set.add(pair.ratedMemberId);
+    submittedBy.set(pair.raterMemberId, set);
+  }
+  const completeRaterIds = expectedRaterIds.filter((raterId) =>
+    ratingTargetsFor(played, raterId).every((target) => submittedBy.get(raterId)?.has(target)),
+  );
+
+  const publication = ratingsPublication({
+    expectedRaterIds,
+    completeRaterIds,
+    publishedAtMs: match.ratingsPublishedAt === null ? null : Date.parse(match.ratingsPublishedAt),
   });
+
+  return { publication, expectedRaterIds, submittedBy };
 }
 
 /** The rows one rater has already written for one match. Nobody else's scores are selected. */
@@ -294,11 +314,11 @@ export async function getNotationView(input: {
   if (!match) return null;
 
   const nowMs = input.nowMs ?? Date.now();
-  const [sheet, directory, window, state] = await Promise.all([
+  const [sheet, directory, state, pairs] = await Promise.all([
     getMatchSheet(match.id),
     getTeamDirectory(match.teamId),
-    getRatingWindow(match, nowMs),
     loadMatchState(match, nowMs),
+    getRatingPairs(match.id),
   ]);
 
   /*
@@ -310,6 +330,16 @@ export async function getNotationView(input: {
    */
   const played = playedFrom(state);
   const minutesOf = new Map(played.map((entry) => [entry.teamMemberId, entry.minutes]));
+
+  /*
+   * The window now depends on whether the means are out (decision 138), so it is derived here from the
+   * pairs rather than fetched: this screen has to read who has rated whom anyway to tell the viewer
+   * what he still owes, and a second round trip for the same answer could come back different.
+   */
+  const window = ratingWindow({
+    finished: match.status === "finished",
+    published: publicationOf(match, played, pairs).publication.published,
+  });
 
   const viewerPlayed = hasPlayed(played, input.membershipId);
   const requiredIds = ratingTargetsFor(played, input.membershipId);
@@ -491,34 +521,15 @@ export async function getRatingResults(input: {
   if (!match) return null;
 
   const nowMs = input.nowMs ?? Date.now();
-  const [sheet, directory, window, state, pairs] = await Promise.all([
+  const [sheet, directory, state, pairs] = await Promise.all([
     getMatchSheet(match.id),
     getTeamDirectory(match.teamId),
-    getRatingWindow(match, nowMs),
     loadMatchState(match, nowMs),
     getRatingPairs(match.id),
   ]);
 
   const played = playedFrom(state);
-  const expectedRaterIds = playedMemberIds(played);
-
-  // One rater's set is complete when he has a note on every other player who played.
-  const submittedBy = new Map<string, Set<string>>();
-  for (const pair of pairs) {
-    const set = submittedBy.get(pair.raterMemberId) ?? new Set<string>();
-    set.add(pair.ratedMemberId);
-    submittedBy.set(pair.raterMemberId, set);
-  }
-  const completeRaterIds = expectedRaterIds.filter((raterId) =>
-    ratingTargetsFor(played, raterId).every((target) => submittedBy.get(raterId)?.has(target)),
-  );
-
-  const publication = ratingsPublication({
-    expectedRaterIds,
-    completeRaterIds,
-    publishedAtMs: match.ratingsPublishedAt === null ? null : Date.parse(match.ratingsPublishedAt),
-    windowState: window.state,
-  });
+  const { publication, expectedRaterIds, submittedBy } = publicationOf(match, played, pairs);
 
   const byMembership = new Map(directory.map((member) => [member.membershipId, member]));
   const nameOf = (memberId: string) =>

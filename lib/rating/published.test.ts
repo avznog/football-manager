@@ -7,7 +7,6 @@ function publication(overrides: Partial<RatingsPublicationInput> = {}) {
     expectedRaterIds: ["hugo", "karim", "yanis"],
     completeRaterIds: [],
     publishedAtMs: null,
-    windowState: "open",
     ...overrides,
   });
 }
@@ -41,33 +40,29 @@ describe("ratingsPublication", () => {
     });
   });
 
-  it("publishes once the next match has kicked off", () => {
-    expect(publication({ completeRaterIds: ["hugo"], windowState: "closed" })).toEqual({
-      published: true,
-      reason: "window-closed",
+  /**
+   * The clause decision 138 removed. A match played weeks ago, with notes still owed and nothing
+   * published, stays **pending** — and that is what keeps its rating window open, which is the whole
+   * of what was asked for. Under decision 137 the passing of the next kick-off published this.
+   */
+  it("does not publish a long-finished match on its own", () => {
+    expect(publication({ completeRaterIds: ["hugo"] })).toEqual({
+      published: false,
+      reason: "pending",
       owingRaterIds: ["karim", "yanis"],
     });
   });
 
-  it("holds back before the window opens, which is not the same as closed", () => {
-    // `not-yet` is a match that has not finished. Nothing to publish, and nothing owed yet either.
-    expect(publication({ windowState: "not-yet" }).published).toBe(false);
-  });
-
-  it("prefers the squad's own doing to a deadline, when both are true", () => {
-    // Two clauses hold; the reason reported is the one that explains the most, because « toute
-    // l'équipe a noté » is a better thing to tell a reader than « la date est passée ».
+  it("prefers the squad's own doing to the coach's button, when both are true", () => {
+    // Both clauses hold; the reason reported is the one that explains the most, because « toute
+    // l'équipe a noté » is a better thing to tell a reader than « le coach les a sorties », and it
+    // is also the one that left nobody out.
     expect(
       publication({
         completeRaterIds: ["hugo", "karim", "yanis"],
         publishedAtMs: 1,
-        windowState: "closed",
       }).reason,
     ).toBe("every-set-in");
-  });
-
-  it("prefers the coach to the window", () => {
-    expect(publication({ publishedAtMs: 1, windowState: "closed" }).reason).toBe("coach-published");
   });
 
   it("publishes a match nobody played, vacuously", () => {
@@ -98,7 +93,6 @@ describe("ratingsPublication", () => {
         expectedRaterIds: ["yanis", "hugo", "karim"],
         completeRaterIds: ["hugo"],
         publishedAtMs: null,
-        windowState: "open",
       }).owingRaterIds,
     ).toEqual(["yanis", "karim"]);
   });
