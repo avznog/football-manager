@@ -20,9 +20,9 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `7be9919`, the squash of **#143, the coach's switch**. The newest tag,
+- **`main`** — at `def63f8`, the squash of **#145, the pointage that stopped deleting marks**. The newest tag,
   `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
-  now **29 commits behind**, so **preview is ahead of production** by all twenty-nine and will stay ahead
+  now **31 commits behind**, so **preview is ahead of production** by all thirty-one and will stay ahead
   until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
   **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
   other machine. Re-derive the two numbers rather than reading them: `git log -1 origin/main` and
@@ -50,7 +50,7 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **140**. The highest on `main` is **139**, the coach's switch.
+- **Next free decision number** — **141**. The highest on `main` is **140**, the pointage's marks.
   **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
   believing**, and this line is why: it said 133 when 133 *and* 134 were already on `main` — the other
   machine's two placeholders, the ones this line itself called "coming on `feat/retro-one-action-list`,
@@ -94,6 +94,18 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   own tally counts him as entitled to. No migration. `npm run db:reset` on the other machine: J7 is the
   fixture that exercises the switch in both directions, and `/match/<J7>/notation` **as Brice, a
   supporter**, is the one screen that shows the new rule by itself.
+- **The pointage no longer deletes what the coach just entered, and it is a Client Component now** —
+  merged as **#145** (`def63f8`), decision **140**. `D1` was real and was reproduced twice: two separate
+  forms plus uncontrolled radios meant « Tout le monde est là » wrote thirteen rows, left all thirteen
+  radios on « — », and the next save posted `unset` for the eleven nobody had touched and **deleted their
+  rows**. `app/(app)/entrainements/_components/attendance-list.tsx` is now one form with two submit
+  buttons and the marks in `useState`, counted by the new pure `lib/training/attendance.ts`; both
+  actions **return a `FormState`** instead of swallowing three refusals in silence, and the
+  `…NoScript` pair exists only so `action={}` keeps its `Promise<void>` type. **No migration, and the
+  no-JavaScript path is still the fallback** — do not "simplify" either away. `e2e/attendance.spec.ts`
+  walks the four taps and asserts the radios, not the card. **Still open on purpose**: a pointage taken
+  with no connection is discarded (`D4(b)`/`A4`); the outbox was costed and rejected and the
+  localStorage draft did not ship, so Slice 1 is `[~]` in `docs/ROADMAP.md`.
 - **Open pull requests** — **none**; everything both machines had open is merged. `gh pr list --state
   open` is the only answer worth believing. **#137 was closed without merging**: it was a lone `1.0.0-beta.7` bump, and the owner
   ships this release by hand, so `package.json` stays at **`1.0.0-beta.6`** and the bump belongs to
@@ -1447,3 +1459,25 @@ nothing here needs rewriting — it is dated history either way.
   the gate answering. Neither response means anything alone. Re-run from here before writing it: preview
   404/307, production 307/307 — so production carries no trace route, no tag having been cut. In
   `docs/DEPLOY.md` §4. Next: `git status -sb` clean; PR 3 (the ratings rebuild) is the piece left.
+- **2026-10-05 10:45 · owner's machine · `feat/attendance-keeps-its-marks`** — Slice 1 of the UX audit,
+  merged as **#145** (`def63f8`), decision **140**. `D1` was not trusted, it was walked: on the demo
+  Monday séance, « Tout le monde est là » → card « 13 présents sur 13 pointés » with **all thirteen
+  radios still reading « — »** → two flipped to Absent → « Enregistrer » → « 0 présent sur 2 pointés »,
+  eleven rows gone. The mechanism is worth remembering because nothing about it is specific to this
+  screen: **React does not reset an uncontrolled input when a Server Action revalidates and the tree
+  re-renders onto the same keys, and the only form it does reset on submit is the one that was
+  submitted** — which, with the shortcut in a *second* form, was the empty one. So a stale DOM posted
+  `unset` and the action cannot tell that from a coach clearing a mark. The fix is one form, two submit
+  buttons, marks in `useState`, and a card counted from the same value the radios show; the new
+  `lib/training/attendance.ts` holds the arithmetic so the four taps are a unit test
+  (`lib/training/attendance.test.ts`) rather than a hand walk, and `e2e/attendance.spec.ts` asserts the
+  **radios**, not the card — run against the old component it fails at step 2 with `Received:
+  unchecked` on an input whose HTML attribute reads `checked`. `D4(a)` and `A3` came with it: a failed
+  save is a `role="alert"` above the list with every mark still under it, and the two actions say why
+  they refused instead of returning in silence. Gates: typecheck clean, eslint silent, **1454 vitest**,
+  **6 e2e**, both themes at 390 px in three card states, coach's card against the player's summary in
+  one pass. **Left undone and said out loud in the roadmap and the pull request**: the offline pointage
+  (`D4(b)`/`A4`) is still discarded — `lib/match/outbox.ts` is event-specific and reusing it needs a
+  second IndexedDB store and a new POST route, and the localStorage draft meant to substitute for it did
+  not ship either. Next: nothing open; the eleven `S` questions, `A1` and the `1.0.0-beta.7` bump are
+  still the owner's.
