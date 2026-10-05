@@ -13,6 +13,29 @@ const nextConfig: NextConfig = {
   // Every corner of a 393 px phone is occupied, so this is the least bad one: top-left is the team
   // name in the app shell and the back button in game mode, neither of which is tapped in a hurry.
   devIndicators: { position: "top-left" },
+
+  // Testing on the owner's own phone, against `next dev` on his laptop over the LAN.
+  //
+  // `next dev` already listens on every interface, so the phone reaches the page — and then gets
+  // **403 on every `/_next/*` asset**, because Next 16 refuses a dev request whose `Host` is not one
+  // it was told to expect. The page arrives, nothing hydrates, and the failure looks exactly like the
+  // bug you were trying to reproduce: this is decision 043's trap (`127.0.0.1` silently testing the
+  // no-JavaScript fallbacks) with a different hostname. Measured before this line was written —
+  // `curl` of a chunk over the LAN address answered 403 and the dev server printed this very
+  // configuration key as the remedy.
+  //
+  // It is read from the environment rather than written here because the value is one machine's DHCP
+  // lease, which the next session cannot inherit and should not have to correct. **Use
+  // `npm run dev:lan`**, which resolves the address and sets the variable for you — and note the
+  // thing that is easy to assume the other way round: this file is evaluated *before* Next loads
+  // `.env.local`, so a `DEV_LAN_ORIGINS` written there reads as absent here and the 403 comes back
+  // with nothing to say the value exists. Measured both ways. Comma-separated for a second device.
+  // **Development only** — Next ignores it in a production build, and `npm run build` is unaffected
+  // whether the variable is set or absent (decision 075: a build must not depend on the environment).
+  allowedDevOrigins: (process.env.DEV_LAN_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 };
 
 export default nextConfig;
