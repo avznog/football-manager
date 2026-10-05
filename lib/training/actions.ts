@@ -16,7 +16,12 @@ import { teamMembers, trainingAttendance, trainingAvailability, trainings } from
 import { assertCan, membershipIn } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
-import { attendanceIsOpen, trainingWindowMinutes } from "@/lib/calendar/timeline";
+import { attendanceNotOpenFr } from "@/lib/calendar/labels";
+import {
+  ATTENDANCE_OPENS_MINUTES_BEFORE,
+  attendanceIsOpen,
+  trainingWindowMinutes,
+} from "@/lib/calendar/timeline";
 import {
   createTrainingSchema,
   markAttendanceSchema,
@@ -182,8 +187,18 @@ export async function setTrainingAvailability(formData: FormData): Promise<void>
  *
  * `"unset"` deletes the row rather than storing `present = false`: "not judged yet" and "absent"
  * are different facts, and the attendance rate in M5 depends on the difference.
+ *
+ * **Returns a `FormState` and keeps its `(formData)` signature.** Both halves matter. It used to
+ * `return` on each of its three refusals with nothing to show, so a coach who tapped « Enregistrer »
+ * thirty-five minutes too early watched the screen do absolutely nothing and had no way to learn
+ * why (`D4`); now each refusal says which one it is. And the signature stays single-argument so a
+ * form can still bind it for a browser with no JavaScript — a `(prev, formData)` shape would break
+ * the touchline fallback this screen exists for.
+ *
+ * The markup binds `markTrainingAttendanceNoScript` rather than this, for a type reason that is
+ * really a design statement: see its docblock.
  */
-export async function markTrainingAttendance(formData: FormData): Promise<void> {
+export async function markTrainingAttendance(formData: FormData): Promise<FormState> {
   const actor = await requireActor();
 
   const parsed = markAttendanceSchema.safeParse({
@@ -191,7 +206,7 @@ export async function markTrainingAttendance(formData: FormData): Promise<void> 
     trainingId: formData.get("trainingId"),
     marks: readAttendanceMarks(formData.entries()),
   });
-  if (!parsed.success) return;
+  if (!parsed.success) return toFormState(parsed.error);
 
   assertCan(actor, "training:markAttendance", { teamId: parsed.data.teamId });
 
@@ -199,11 +214,13 @@ export async function markTrainingAttendance(formData: FormData): Promise<void> 
     where: and(eq(trainings.id, parsed.data.trainingId), eq(trainings.teamId, parsed.data.teamId)),
     columns: { id: true, startsAt: true },
   });
-  if (!training) return;
+  if (!training) return { error: "Cet entraînement n’existe pas dans cette équipe." };
   // A présence is an observation, so it cannot be recorded about an evening nobody has lived
   // (decision 090, enforced by decision 099). The page hides the list, and this is the rule: the
   // page is a courtesy, the action is the guard.
-  if (!attendanceIsOpen(training.startsAt, new Date())) return;
+  if (!attendanceIsOpen(training.startsAt, new Date())) {
+    return { error: attendanceNotOpenFr(ATTENDANCE_OPENS_MINUTES_BEFORE) };
+  }
 
   // Only members of this team, so a crafted form cannot mark a stranger present.
   const allowed = await activePlayerIds(parsed.data.teamId);
@@ -249,6 +266,7 @@ export async function markTrainingAttendance(formData: FormData): Promise<void> 
   });
 
   revalidateTraining(training.id);
+  return undefined;
 }
 
 /** Everyone who can be marked present: active members of the team who actually play. */
@@ -269,15 +287,19 @@ async function activePlayerIds(teamId: string): Promise<Set<string>> {
 /**
  * Marks the whole squad present in one tap — the common case on a good evening. The coach then
  * flips the two or three who are missing.
+ *
+ * Returns a `FormState` for the same reasons as `markTrainingAttendance`, and matters more here: it
+ * is the tap that used to leave the screen looking unchanged whether it had written thirteen rows
+ * or refused. The markup binds `markEveryonePresentNoScript`.
  */
-export async function markEveryonePresent(formData: FormData): Promise<void> {
+export async function markEveryonePresent(formData: FormData): Promise<FormState> {
   const actor = await requireActor();
 
   const parsed = trainingTargetSchema.safeParse({
     teamId: formData.get("teamId"),
     trainingId: formData.get("trainingId"),
   });
-  if (!parsed.success) return;
+  if (!parsed.success) return toFormState(parsed.error);
 
   assertCan(actor, "training:markAttendance", { teamId: parsed.data.teamId });
 
@@ -285,13 +307,17 @@ export async function markEveryonePresent(formData: FormData): Promise<void> {
     where: and(eq(trainings.id, parsed.data.trainingId), eq(trainings.teamId, parsed.data.teamId)),
     columns: { id: true, startsAt: true },
   });
-  if (!training) return;
+  if (!training) return { error: "Cet entraînement n’existe pas dans cette équipe." };
   // « Tout le monde est là » is the sentence this whole rule exists for: it was one tap, on a séance
   // four days away, and it wrote thirteen rows (decision 099).
-  if (!attendanceIsOpen(training.startsAt, new Date())) return;
+  if (!attendanceIsOpen(training.startsAt, new Date())) {
+    return { error: attendanceNotOpenFr(ATTENDANCE_OPENS_MINUTES_BEFORE) };
+  }
 
   const players = [...(await activePlayerIds(parsed.data.teamId))];
-  if (players.length === 0) return;
+  if (players.length === 0) {
+    return { error: "Il n’y a aucun joueur à pointer dans cette équipe." };
+  }
 
   await db
     .insert(trainingAttendance)
@@ -309,4 +335,36 @@ export async function markEveryonePresent(formData: FormData): Promise<void> {
     });
 
   revalidateTraining(training.id);
+  return undefined;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The same two actions, bound by the markup                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The no-JavaScript bindings for the two actions above.
+ *
+ * React's own types say an `action` or a `formAction` attribute returns `void | Promise<void>`, and
+ * they are right to: in the no-JS path the browser posts the form and renders whatever comes back,
+ * so **there is nobody to hand a `FormState` to**. The two actions above return one because the
+ * enhanced path awaits them and renders the message; these two are what the markup binds, and the
+ * discarded return value is the honest description of what a full page POST can do with it.
+ *
+ * They must be separate `"use server"` exports rather than arrow functions written in the component:
+ * progressive enhancement works by React serialising a *server reference* into the form's `action`
+ * attribute, and a closure defined in a Client Component is not one — binding that would silently
+ * make this screen require JavaScript, which is the one thing it may not do (it gets filled in on a
+ * touchline, which is where the signal is worst).
+ *
+ * The refusals they swallow are therefore not a regression: without JavaScript the server re-renders
+ * the page, and the card states what is actually in the table. The message is for the path that can
+ * show one.
+ */
+export async function markTrainingAttendanceNoScript(formData: FormData): Promise<void> {
+  await markTrainingAttendance(formData);
+}
+
+export async function markEveryonePresentNoScript(formData: FormData): Promise<void> {
+  await markEveryonePresent(formData);
 }

@@ -4192,3 +4192,61 @@ that it may now be set back to null.
 **Still not verified**, carried a third time: the crafted form post proving the *server* refuses a
 self-note and a note on a 0-minute substitute. **Nothing is shipped** — `package.json` is still
 `1.0.0-beta.6` and the `beta.7` bump and tag are the owner's.
+
+## The pointage stops deleting what the coach just entered
+
+**2026-10-05** · `feat/attendance-keeps-its-marks` · decision **140**
+
+`D1` was re-proved against the current code before anything was changed, with a throwaway probe on the
+demo season: « Tout le monde est là » → flip two → « Enregistrer les présences » ended at **« 0 présent
+sur 2 pointés »** with eleven rows deleted. Then it was proved fixed at three levels. The same four taps
+now end at « 11 présents sur 13 pointés » with the eleven untouched men still present; psql reads
+thirteen rows, `present t = 11 / f = 2`; and the new `e2e/attendance.spec.ts` reloads the page so the last
+word belongs to the server rather than to client state telling itself a story.
+
+**The mechanism, because it is worth recognising again elsewhere.** Two *separate* forms and uncontrolled
+radios. React re-renders onto the same keys and does not reset an uncontrolled input, and the only form it
+resets on submit is the one that was submitted — which was the other one. So the card said « 13 présents »
+over thirteen radios reading « — », and the next save posted `unset` for all eleven untouched players.
+`markTrainingAttendance` deleted them, unable to tell « the coach cleared this » from « the DOM is stale ».
+It was **JavaScript-only**: with JS off the shortcut is a full page POST and the DOM is rebuilt.
+
+`AttendanceList` is a Client Component now, one form with two submit buttons, every radio controlled from
+state, and the card's figures counted from that same state. The arithmetic is pure and lives in
+`lib/training/attendance.ts` with eighteen tests, one of which walks the four steps of `D1` as arithmetic
+(decision 097: Vitest collects `lib/**`, not `app/`). Progressive enhancement survives through a second
+pair of exports, `markTrainingAttendanceNoScript` / `markEveryonePresentNoScript` — React's DOM types
+require `void` where the real actions return `FormState`, and an arrow function in a client component is
+not a server reference, so binding one would have killed the no-JS path in silence.
+
+**The regression test was proved to fail on the old code**, which is the only way to know it tests
+anything: the pre-fix component was put back in place and the spec failed at exactly the step-2 radio
+assertion — `Received: unchecked` on an input whose HTML attribute read `checked`. That is `D1` in one
+line. The fix was restored and the spec re-run green.
+
+`D4`(a) came with it: a save that throws is caught and becomes a sentence above the list with every mark
+still under it, instead of the error boundary taking the whole page and offering a « Réessayer » that
+resubmits nothing. The two actions also stopped refusing in silence — unparseable form, unknown training,
+pointage not open for another half hour are French now. `A3`: both buttons take `pending`.
+
+**The 390 px pass, both themes, coach and player in one pass.** The alert sits above the list and the
+marks survive a failed save in both themes; « 2 présences modifiées, pas encore enregistrées. » sits
+directly above the save button, which is what keeps the card honest while its figures are ahead of the
+table; the empty state reads « Personne n'est encore pointé. » with all thirteen on « — »; and the
+player's `PresenceSummary` states the same figure in the same words as the coach's card, no drift. It cost
+two probe rewrites — centring a long card hides both of its ends, so each shot is anchored on the heading
+or on the save button, and the dark « empty » shot was not empty until `training_attendance` was cleared
+between themes.
+
+**Gates.** `npm run typecheck` clean, `npx eslint app components lib e2e db scripts` silent, `npm test`
+**1454 across 66 files**, `npm run test:e2e` **6 passed** in 1.1m.
+
+**Deliberately not done, and `A4` stays open on the ROADMAP:** the offline pointage is **still
+discarded**. The full outbox was costed and rejected for this slice — `lib/match/outbox.ts` is
+event-specific and would need a second IndexedDB store and a new POST API — and the localStorage draft
+designed as the cheap substitute was not shipped either. This slice stopped the losses that happen
+*online*, which were the ones destroying rows.
+
+**Still not verified**, carried a fourth time: the crafted form post proving the *server* refuses a
+self-note and a note on a 0-minute substitute. **Nothing is shipped** — `package.json` is still
+`1.0.0-beta.6` and the `beta.7` bump and tag are the owner's.

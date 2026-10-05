@@ -1282,9 +1282,23 @@ Evidence and reasoning: `docs/UX_AUDIT_2026-10-01.md`. Slices and ranking:
 
 Ordered by harm, which is not the order they are cheapest to fix.
 
-- [ ] **Slice 1 — attendance stops losing data.** `D1`: « Tout le monde est là » writes 13 présent rows,
-      leaves all 13 radios reading « — », and the next save deletes eleven of them. Also `D4` (offline
-      pointage discarded, « Réessayer » cannot work), `A3`, `A4`
+- [~] **Slice 1 — attendance stops losing data.** `D1` is **fixed** and has the regression test the audit
+      asked for: `AttendanceList` is one `<form>` with two submit buttons, holding its marks in client
+      state (`lib/training/attendance.ts`), so the card and the radios are counted from the same value
+      and no submit can carry a mark the coach cannot see. Proved both ways — the new
+      `e2e/attendance.spec.ts` fails against the old component at exactly the radio assertion, with the
+      input's attribute reading `checked` while its live state is `unchecked`, which is `D1` in one line.
+      `D4`(a) is **fixed**: a save that throws is caught and becomes a `role="alert"` above the list with
+      every mark still under it, and the three refusals the two actions used to swallow in silence
+      (unparseable form, unknown training, pointage not open yet) now return a French `FormState`. `A3` is
+      **fixed**: both buttons take `Button`'s `pending`. **`D4`(b) and `A4` are still open** — the offline
+      pointage is still discarded. The full outbox was costed and rejected for this slice:
+      `lib/match/outbox.ts` is event-specific (`PendingEvent`, `client_event_id`,
+      `POST /api/match-events`, backoff, permanent-vs-retryable) and would need a second IndexedDB
+      store and a new POST API. A localStorage
+      draft surviving a reload was designed as the substitute and **was not shipped either**, so nothing
+      about offline changed: this slice stopped the losses that happen *online*, which were the ones
+      destroying rows
 - [ ] **Slice 2 — one tap-acknowledgement token, applied everywhere.** `D2`: no `:active` rule exists in
       the served stylesheet outside a `pointer-events` utility block, and in all 18 throttled samples the
       first thing that changes after a tap *is* the next screen. #114 is the first surface, not the last

@@ -5131,3 +5131,66 @@ played would congratulate every reader on having noted everybody; `played` used 
 side effect.
 
 **No migration.** `ratings_published_at` was already a nullable `timestamptz`, so hiding is `set null`.
+
+## 140 — The pointage holds its marks in client state, and a refused save says so
+
+**2026-10-05** · accepted · the fix for `D1`, `D4`(a) and `A3` of `docs/UX_AUDIT_2026-10-01.md` ·
+does **not** close `D4`(b) / `A4`, which stay open
+
+`AttendanceList` was a Server Component with **two separate forms** and **uncontrolled radios**, and that
+pair deleted rows a coach had just entered. The four taps, which are the ones he makes every Tuesday:
+
+1. « Tout le monde est là » submits its own little form; the action writes thirteen rows and revalidates;
+2. the card re-renders and says « 13 présents sur 13 pointés » — while the thirteen radios under it still
+   read « — », because React re-renders onto the same keys and **does not reset an uncontrolled input**,
+   and the only form it does reset on submit is *the one that was submitted*, which was the other one;
+3. the coach flips the two who are missing and taps « Enregistrer les présences »;
+4. that form posts `presence:<id>=unset` for the eleven he never touched, and `markTrainingAttendance`
+   deletes their eleven rows — because « the coach cleared this » and « the DOM is stale » are the same
+   bytes on the wire.
+
+**The decision: the marks are client state, one form, and the card is counted from the same value the
+radios show.** `app/(app)/entrainements/_components/attendance-list.tsx` is `"use client"`; the shortcut is
+a second submit button inside the one form, not a form of its own; every radio is controlled. The
+arithmetic moved to pure helpers in `lib/training/attendance.ts` — `markOf`, `withMark`, `allPresent`,
+`marksSignature`, `attendanceTally`, `unsavedCount`, `unsavedMarksNoteFr` — because Vitest collects
+`lib/**` and nothing under `app/` (decision 097), so the four steps are a unit test as well as an e2e one.
+Two properties follow, and they are the whole point: **the card and the radios can no longer describe two
+different evenings**, and **no submit can carry a mark the coach cannot see**.
+
+**What was rejected.** Keeping it a Server Component and giving the radios `key`s that change with the
+server's marks would reset them — and would also throw away a mark in flight every time something else
+revalidated the page. Making the shortcut write nothing and only set the DOM would leave the common case
+unsaved on a dropped connection. Making the delete conditional (« only delete what was explicitly set to
+`unset` ») was the tempting one and is wrong: it fixes the symptom by making the wire protocol lossy, and
+a coach who really does want to un-point a player would then have no way to say it.
+
+**It still works with no JavaScript**, which this screen of all screens needs: it is filled in standing on
+a touchline. Progressive enhancement serialises a **server reference** into the `action` attribute, so the
+bound function must be a `"use server"` export — and React's DOM types require `action`/`formAction` to
+return `void | Promise<void>`, which an action returning `FormState` cannot. Hence a second exported pair,
+`markTrainingAttendanceNoScript` / `markEveryonePresentNoScript`, each one line over the real action. The
+alternatives both lose the no-JS path: an arrow function defined in the client component is not a server
+reference, and a cast hides exactly that. The types are right and the swallowed `FormState` in that path
+costs nothing — there is nobody to hand it to, and the server re-renders the page anyway.
+
+**A save that does not land keeps the screen** (`D4`(a)). The direct call is wrapped in `useTransition` +
+`try/catch` rather than `useActionState`, because a thrown action error propagates to the error boundary —
+which is what used to replace the whole page, thirteen marks included, and offer a « Réessayer » that
+re-renders a segment rather than resubmitting anything. Now it is a `role="alert"` above the list with
+every mark still under it: « Les présences n'ont pas été enregistrées. Tes réponses sont toujours là :
+réessaie. » And the two actions return `FormState` instead of returning in silence, so the three refusals
+nobody could see — unparseable form, unknown training, pointage not open for another half hour — are
+French sentences now. Both buttons take `Button`'s `pending` (`A3`).
+
+**« Not yet saved » is said out loud**, next to the button that would settle it: « 2 présences modifiées,
+pas encore enregistrées. » The card's figures are deliberately ahead of the table between a flip and a
+save — that is what makes the screen responsive — and this line is what keeps that honest. It is counted
+over the union of the saved and current key sets, so un-pointing somebody counts too.
+
+**What is still broken, and was not attempted here.** The pointage is **still discarded when the save
+happens offline** (`D4`(b) / `A4`). `lib/match/outbox.ts` is event-specific — `PendingEvent`,
+`client_event_id`, `POST /api/match-events`, backoff, permanent-vs-retryable — and reusing it would need a
+second IndexedDB store and a new POST API. A localStorage draft surviving a reload was designed as the
+cheap substitute and **was not shipped either**. So this decision stopped the losses that happen *online*,
+which were the ones destroying rows; the ROADMAP item stays open.

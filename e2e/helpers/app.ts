@@ -96,3 +96,23 @@ export function parisDate(date: Date): string {
   // fr-CA gives ISO-ordered `2026-09-22`.
   return parts;
 }
+
+/**
+ * The same thing with the hour and the minute: `2026-09-22T19:12`, the full value a
+ * `datetime-local` field holds.
+ *
+ * `parisDate` plus a hard-coded `T15:00` is enough for an event dated *tomorrow*, and it is what the
+ * match tests use. It is not enough for one dated « ten minutes ago »: the day in Paris is a
+ * function of the time, so composing the two separately is how a test run at 00:05 types a moment
+ * twenty-four hours out and then wonders why the screen disagrees with it.
+ */
+export function parisDateTime(date: Date): string {
+  const time = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+  // fr-FR gives `19:12`, which is what the field wants after the `T`.
+  return `${parisDate(date)}T${time}`;
+}
