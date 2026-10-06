@@ -137,11 +137,16 @@ export const teamMembers = pgTable(
      * all — « MOMO », « BENJI », « PROFESSOR ».
      *
      * Free text rather than a copy of `users.display_name`, because it is neither: the same man is
-     * « Mohammed Diarra » on his account and « MOMO » on his back. Capped at 12 characters, and the
-     * cap is the shirt rather than the database: a 7-a-side kit prints the flocage across the width
-     * of the back, and past a dozen characters the printer either shrinks it to nothing or refuses.
-     * The check also rejects the empty string, so « no flocage » has exactly one representation —
-     * `null` — and no screen has to tell `''` and `null` apart.
+     * « Mohammed Diarra » on his account and « MOMO » on his back. **Uncapped**: the twelve-character
+     * ceiling was removed on the owner's instruction (2026-10-06), because what a flocking machine
+     * prints legibly is a decision for whoever orders the shirts, not a reason for the app to refuse
+     * to remember what the player typed.
+     *
+     * `team_members_shirt_name_length` is **kept all the same**, now as a lower bound only: it is
+     * what stops a one-space flocage from landing in the column as an empty string, so « no flocage »
+     * keeps exactly one representation — `null` — and no screen has to tell `''` and `null` apart.
+     * That is the invariant `shirtNameSchema`'s `trim()` + `transform` relies on from the other side,
+     * and dropping the constraint would leave it enforced in one place instead of two.
      */
     shirtName: text(),
     joinedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -154,7 +159,7 @@ export const teamMembers = pgTable(
     check("team_members_jersey_range", sql`${t.jerseyNumber} is null or ${t.jerseyNumber} between 1 and 99`),
     check(
       "team_members_shirt_name_length",
-      sql`${t.shirtName} is null or char_length(${t.shirtName}) between 1 and 12`,
+      sql`${t.shirtName} is null or char_length(${t.shirtName}) >= 1`,
     ),
   ],
 );
