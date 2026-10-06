@@ -20,10 +20,10 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `2141f47`, the squash of **#150: the formations reach a fresh database, the flocage
-  loses its character cap, and the wish picker offers six codes instead of eight**. The newest tag,
+- **`main`** — at `ded1821`, the squash of **#152, the wish picker's third rule in two days**; the
+  production fix of the day is #150, which seeds the formations a fresh database never had. The newest tag,
   `v1.0.0-beta.7`, is on **`0e5b619`** (the squash of #148),
-  now **2 commits behind**, so **preview is ahead of production** by both and will stay ahead
+  now **4 commits behind**, so **preview is ahead of production** by all four and will stay ahead
   until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
   **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
   other machine. Re-derive the two numbers rather than reading them: `git log -1 origin/main` and
@@ -55,8 +55,8 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **142**. The highest on `main` is **141**, #150's migration-seeds-too
-  rule and the two limits that came off with it.
+- **Next free decision number** — **143**. The highest on `main` is **142**, the wish picker's seven
+  hand-named codes, which superseded **141**'s picker third the same day it was written.
   **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
   believing**, and this line is why: it said 133 when 133 *and* 134 were already on `main` — the other
   machine's two placeholders, the ones this line itself called "coming on `feat/retro-one-action-list`,
@@ -1523,3 +1523,26 @@ nothing here needs rewriting — it is dated history either way.
   `ratings.comment` and deletes rows on the unrechecked assumption that production holds no ratings —
   `select count(*) from ratings;` is the check and it is irreversible if the answer is not `0`. Next:
   nothing open from this work; `S1`–`S11`, `A1`, the `TRACE_SECRET` rotation and the tag are his.
+- **2026-10-06 11:58 · owner's machine · `fix/wish-picker-seven-codes`** — **#152 is merged (`ded1821`):
+  the wish picker is `GB DG DD MC AG AT AD`, the seven the owner named.** Decision **142**, superseding the
+  picker third of **141** the same day it was written — 130 derived the list from two shapes, 141 from one,
+  142 from none. The thing to know before touching it again: **this set is the code set of no built-in
+  formation** (`1-3-2-1` fields a `DC` and no winger, `1-2-1-3` the wingers and neither full-back), so the
+  test that used to *recompute* the list from `BUILTIN_FORMATIONS` is gone and the literal in the test is
+  now the specification. The replacement invariant is « every wish is fielded by some built-in formation »,
+  and **both the test and the decision state that it is weak**: all eleven codes are fielded somewhere, so
+  it holds for any subset and bites only on a change to the *formations*. Two mismatches with `1-3-2-1` are
+  deliberate and pinned by a test named for looking like bugs — `AG`/`AD` are wishable though it has no
+  winger, `DC` is not though it fields one; a wish is a preference, not a promise. **Two words in the
+  request matched two codes each and I asked instead of guessing**, which was worth it: both answers went
+  against my reading (the wings are `AD`/`AG`, not `MD`/`MG`; the two defenders are two chips `DG`/`DD`,
+  not one `DC`), and either guess would have shipped the wrong French on a chip with nothing failing a
+  test. Gates: typecheck clean, eslint silent, **1456 vitest in 66 files**, **7 e2e**. **The screen was
+  actually looked at** — a throwaway Playwright spec screenshotted `/joueur/<id>` at 390×844 in both themes
+  and both roles and I read the images; `colorScheme` works for this because `"system"` stores no class and
+  falls through to the media query. It raised two things and measurement cleared both: `GB` overlaps the
+  tab bar by 13 px where `scrollIntoViewIfNeeded` stops but is **187 px clear** after the 200 px of scroll
+  a finger gives it, with a full 48 px target; and the coach's discs look tappable because he gets
+  `<PositionPicker … readOnly />` with « Chaque joueur choisit ses postes lui-même. » below the fold
+  (`positions-editor.tsx:66`). Next: nothing open from this work. **`package.json` is `1.0.0-beta.8` and
+  the tag is still uncut**, so #150's three migrations and this all ship together when the owner cuts it.
