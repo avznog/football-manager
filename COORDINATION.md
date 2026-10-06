@@ -45,11 +45,15 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   older tag confirms it. **Use `git rev-parse <tag>^{commit}`**, or `git log -1 <tag>`, which dereferences
   for you. `git rev-list --count <tag>..origin/main` dereferences too, which is why the count stayed
   right while the hash was wrong — a wrong fact next to a right one, with no failure in between.
-- **Last shipped** — **`v1.0.0-beta.7`**, on `0e5b619`: the pointage that stopped deleting marks.
-  **`package.json` is `1.0.0-beta.8` and that tag is not cut**, so #150's three migrations are on
-  preview and not on production; `git tag --list` is what answers « what is shipped », and reading
-  `package.json` for it is the mistake a session made here on 2026-10-06 — it reported beta.7 as being
-  held when the tag had already been pushed and released the day before.
+- **Last shipped** — **`v1.0.0-beta.8`**, on `f811f8e`: the formations seed that made compositions
+  possible again, plus the uncapped flocage. **It carries the *six*-code picker of decision 141, not the
+  seven-code one of 142** — the owner cut the tag at 09:35 and #152 merged after it, so `package.json` is
+  now **`1.0.0-beta.9`** and the picker he asked for is on preview only until that tag is cut. `git tag
+  --list` is what answers « what is shipped », and reading `package.json` for it is the mistake a session
+  made here on 2026-10-06 — it reported beta.7 as being held when the tag had been pushed and released the
+  day before. **The general lesson, which cost a release: `main` moves while a tag is being decided.**
+  Check `git merge-base --is-ancestor <fix> <tag>^{commit}` before telling anybody a tag contains their
+  fix.
   A version is `package.json`'s `version`; the annotated tag, cut **by hand** on `main`, is the act
   that ships it and the only thing that migrates and deploys production (decision 119). Nothing cuts a
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
