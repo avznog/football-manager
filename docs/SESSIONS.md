@@ -4400,3 +4400,26 @@ here:
   the screen looked wrong — the explanation exists and is one scroll away from where the pitch is.
 
 **Shipping:** `package.json` stays at `1.0.0-beta.8`; this lands before the tag, so beta.8 carries it.
+
+## `v1.0.0-beta.8` shipped two commits before the picker fix
+
+**2026-10-06** · no decision · a release-mechanics note, written because it cost a release
+
+The owner cut `v1.0.0-beta.8` at 09:35 on `f811f8e`, and the release run succeeded. **#152, the seven-code
+picker he had just asked for, merged after that** (`ded1821`). So production runs beta.8 with the formations
+seed and the uncapped flocage — the composition page works again, which was the emergency — and with the
+**six**-code picker of decision 141 rather than the seven of 142.
+
+Nothing malfunctioned. `main` simply moved while the tag was being decided, and the tag is a pointer to a
+commit rather than to a branch. `package.json` is bumped to **`1.0.0-beta.9`** here so there is a version
+for the next tag to match: beta.8 is taken, and re-pushing an unchanged tag prints `Everything up-to-date`
+and fires nothing, so a release cannot be « redone » at a newer commit under the same number.
+
+**The check that would have caught it, and the one to run before telling anybody a tag carries their fix:**
+
+```bash
+git merge-base --is-ancestor <fix-commit> v1.0.0-beta.8^{commit} && echo in || echo "not in"
+```
+
+`git log --oneline -1 <tag>` for the commit, and `^{commit}` because `v1.0.0-beta.8` is annotated and
+`rev-parse` on it alone yields the tag object — the trap `COORDINATION.md` already records for beta.6.
