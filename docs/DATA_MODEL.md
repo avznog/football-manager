@@ -233,8 +233,8 @@ match is amended. **Never** written incrementally — that would let it drift fr
 ## Ratings
 
 ### `ratings`
-`id`, `match_id`, `rater_member_id`, `rated_member_id`, `score` (`numeric(3,1)`, 0–10 in
-half-points), `created_at`. Unique `(match_id, rater_member_id, rated_member_id)`.
+`id`, `match_id`, `rater_member_id`, `rated_member_id`, `score` (`numeric(3,1)`, 0–10 with one
+decimal), `created_at`. Unique `(match_id, rater_member_id, rated_member_id)`.
 
 Rewritten by decision 137, which supersedes 007 on three of its clauses and 024 entirely; decision **139**
 then replaced the rules around it — who may write a row, and what makes one readable — while leaving the
@@ -244,10 +244,15 @@ table itself untouched. 021 is gone with it.
 irreversible on purpose.
 
 Invariants:
-- `score` is between 0 and 10 **and lands on a half-point**: two checks, `ratings_score_range` and
-  `ratings_score_half_step` (`(score * 2) = floor(score * 2)`). The step the slider implies is stated
-  by the database rather than implied by it, because a `smallint` behind a half-point control rounds
-  silently
+- `score` is between 0 and 10 **and lands on a tenth**: two checks, `ratings_score_range` and
+  `ratings_score_one_decimal` (`(score * 10) = floor(score * 10)`, `0010_puzzling_karen_page.sql`,
+  decision **144**, superseding `ratings_score_half_step`). The *column* is one decimal because a
+  historical per-match mean imported from real notes lands on 7.3 and rounding it to the half-point
+  collapses a season's ranking into ties; the **match-day slider still steps by half a point** and
+  `lib/rating/validation.ts` still refuses anything else, so the form is stricter than the table on
+  purpose. The one-decimal check is **documentation, not enforcement**: `numeric(3,1)` rounds on
+  insert rather than erroring, so it can never fire — kept for the same reason `ratings_score_range`
+  coexists with the Zod schema
 - **nobody rates himself** — `ratings_no_self`, `rater_member_id <> rated_member_id`
 - **the rated member must have played**: `minutes > 0` in the log, not a role on the sheet. The **rater**
   needs nothing of the sort — any member of the team may rate, supporter and non-playing coach included

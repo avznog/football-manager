@@ -607,10 +607,13 @@ export const injuries = pgTable(
  * - **the mean is only published when it is a verdict.** `matches.ratingsPublishedAt` and the
  *   three-note floor in `lib/stats/aggregate.ts` decide that.
  *
- * `score` is `numeric(3,1)` because the slider steps by half a point, and the step is checked rather
- * than implied: a `smallint` column with a `0.5` slider in front of it is a rounding bug waiting for
- * the first person to look at the data. There is no `comment` column — decision 137 dropped it with
- * the free-text field it fed.
+ * `score` is `numeric(3,1)` because a note is never a whole number: a `smallint` column with a `0.5`
+ * slider in front of it is a rounding bug waiting for the first person to look at the data. The
+ * **match-day slider still steps by half a point** and `lib/rating/validation.ts` still refuses
+ * anything else, but the *column* only asks for one decimal (`ratings_score_one_decimal`, decision
+ * 144): a historical per-match mean imported from real notes lands on 7.3, and rounding it to the
+ * half-point collapses a season's ranking into five-way ties. There is no `comment` column —
+ * decision 137 dropped it with the free-text field it fed.
  */
 export const ratings = pgTable(
   "ratings",
@@ -632,7 +635,7 @@ export const ratings = pgTable(
     unique("ratings_unique").on(t.matchId, t.raterMemberId, t.ratedMemberId),
     index("ratings_match_idx").on(t.matchId),
     check("ratings_score_range", sql`${t.score} between 0 and 10`),
-    check("ratings_score_half_step", sql`(${t.score} * 2) = floor(${t.score} * 2)`),
+    check("ratings_score_one_decimal", sql`(${t.score} * 10) = floor(${t.score} * 10)`),
     check("ratings_no_self", sql`${t.raterMemberId} <> ${t.ratedMemberId}`),
   ],
 );

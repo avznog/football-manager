@@ -57,6 +57,29 @@ describe("aggregateRatings", () => {
     expect(aggregate.byMember.get("hugo")?.averageLabel).toBe("7,3");
   });
 
+  it("keeps a one-decimal note, which is what an imported historical mean is", () => {
+    // Decision 144: the column asks for one decimal, not a half-point, because a per-match mean
+    // computed from real notes lands on 7.3 and rounding it to 7.5 collapses the ranking. The rule
+    // the range and the self-check state is unchanged, so both still drop their row here.
+    const aggregate = aggregateRatings([
+      rate("import", "hugo", 7.3),
+      rate("import", "yanis", 4.2),
+      rate("import", "leo", 3.9),
+      // Still refused: off the scale, and a note somebody gave himself.
+      rate("import", "momo", 10.5),
+      rate("samir", "samir", 7.1),
+    ]);
+
+    expect(aggregate.byMember.get("hugo")).toMatchObject({ count: 1, average: 7.3 });
+    expect(aggregate.byMember.get("yanis")?.averageLabel).toBe("4,2");
+    expect(aggregate.byMember.get("leo")?.averageLabel).toBe("3,9");
+    expect(aggregate.byMember.get("momo")).toBeUndefined();
+    expect(aggregate.byMember.get("samir")).toBeUndefined();
+    expect(aggregate.ratingCount).toBe(3);
+    // Three one-decimal means rank in their own order rather than tying.
+    expect(aggregate.players.map((player) => player.memberId)).toEqual(["hugo", "yanis", "leo"]);
+  });
+
   it("keeps a player rated by a single teammate, with a count of one", () => {
     const aggregate = aggregateRatings([rate("karim", "momo", 10)]);
 
@@ -88,7 +111,8 @@ describe("aggregateRatings", () => {
     const aggregate = aggregateRatings([
       rate("karim", "hugo", 11),
       rate("samir", "hugo", -1),
-      // Off the half-step: no slider produces it and `ratings_score_half_step` refuses it.
+      // Off the tenth: `ratings_score_one_decimal` is what the column states (decision 144), and a
+      // quarter-point is neither a note nor a mean the app ever computed.
       rate("julien", "hugo", 7.25),
       rate("leo", "hugo", 7),
     ]);
@@ -276,14 +300,23 @@ describe("formatAverage", () => {
 });
 
 describe("isValidScore", () => {
-  it("accepts 0 to 10 in half-points", () => {
+  it("accepts 0 to 10 in half-points, which is what the slider submits", () => {
     expect(isValidScore(0)).toBe(true);
     expect(isValidScore(0.5)).toBe(true);
     expect(isValidScore(7.5)).toBe(true);
     expect(isValidScore(10)).toBe(true);
   });
 
-  it("refuses what no slider can produce and the column would not hold", () => {
+  it("accepts a tenth, because that is what the column holds", () => {
+    // Decision 144: `ratings_score_one_decimal` replaced `ratings_score_half_step`, so an imported
+    // historical mean is a legal row. It used to be dropped here, which would have emptied the very
+    // season table it was imported for. Every tenth, since `7.3 * 10` is not exactly `73` in float.
+    for (let tenths = 0; tenths <= 100; tenths += 1) {
+      expect(isValidScore(tenths / 10)).toBe(true);
+    }
+  });
+
+  it("refuses what the column would not hold", () => {
     expect(isValidScore(-1)).toBe(false);
     expect(isValidScore(-0.5)).toBe(false);
     expect(isValidScore(11)).toBe(false);

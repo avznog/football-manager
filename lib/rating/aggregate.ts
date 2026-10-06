@@ -89,7 +89,14 @@ export type AggregateOptions = {
 export const RATING_SCORE_MIN = 0;
 export const RATING_SCORE_MAX = 10;
 
-/** Half-points (decision 137). The slider's `step`, and `ratings_score_half_step` in the database. */
+/**
+ * Half-points (decision 137). The slider's `step`, and what `lib/rating/validation.ts` refuses a
+ * submission for.
+ *
+ * It is **not** what the column holds any more: `ratings_score_one_decimal` asks only for one
+ * decimal, so an imported historical mean of 7.3 is a legal row (decision 144). This constant is
+ * about the match-day form, which is unchanged.
+ */
 export const RATING_SCORE_STEP = 0.5;
 
 /**
@@ -120,16 +127,25 @@ export const MIN_NOTES_FOR_MEAN = 3;
 
 /**
  * A score the database could not hold is not a score: `ratings_score_range` says 0..10 and
- * `ratings_score_half_step` says the step is a half.
+ * `ratings_score_one_decimal` says one decimal.
  *
- * The step is checked by `score * 2` being whole rather than with a modulo on `0.5`, because `0.5` is
- * exact in binary floating point and so the doubling is exact too — no tolerance, and the same
- * expression the check constraint uses.
+ * **This is the read side, so it follows the column and not the slider** (decision 144). It used to
+ * demand a half-point, which was true of every row the form could write and false of an imported
+ * historical mean: 7.3 would have been dropped here, silently, and the season table it was imported
+ * for would have been missing exactly the rows it was about.
+ *
+ * One decimal is checked with a rounding tolerance rather than `Number.isInteger(score * 10)`. Not
+ * because the naive form is wrong today: a tenth is inexact in binary floating point, but the
+ * multiplication rounds back to the integer for all 101 values in 0..10, and the test walks every one
+ * of them to pin that. The tolerance is there because the half-point version could *rely* on `0.5`
+ * being exact and this one cannot, so the next person to widen the scale — hundredths, or a mean
+ * arriving as a `numeric` string parsed elsewhere — gets a predicate that still means « is this a
+ * tenth, give or take the float » instead of one that happened to hold.
  */
 export function isValidScore(score: number): boolean {
   if (!Number.isFinite(score)) return false;
   if (score < RATING_SCORE_MIN || score > RATING_SCORE_MAX) return false;
-  return Number.isInteger(score * 2);
+  return Math.abs(score * 10 - Math.round(score * 10)) < 1e-9;
 }
 
 type Acc = {
@@ -145,7 +161,7 @@ type Acc = {
  *
  * Works for one match or for a whole season: nothing here looks at `matchId`, so the same call
  * gives the recap its per-match averages and the stats screen its per-season ones. Rows whose
- * score is off the scale or off the half-step are dropped rather than trusted, and so is a row where
+ * score is off the scale or off the tenth are dropped rather than trusted, and so is a row where
  * a member rated himself — the column has check constraints, but a fixture or a future import path
  * might not, and under decision 137 a self-note is not a row the mean can reinterpret.
  */

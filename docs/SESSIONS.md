@@ -4485,3 +4485,54 @@ database and not by housekeeping. Wiring a pruner is a separate decision about w
 runs on Vercel; it is safe to make now, which it was not before.
 
 **Shipping:** `package.json` stays at `1.0.0-beta.9`; this lands before that tag is cut.
+
+---
+
+## `ratings.score` holds a tenth, so the seasons before the app can be imported
+
+**2026-10-06** · decision **144** · migration `0010_puzzling_karen_page.sql`
+
+The owner is importing historical per-match figures that are **already means** of the notes real
+teammates gave — 7.3, 4.2, 3.9 — and `ratings_score_half_step` refused every one of them. Rounding to
+the nearest half-point was the only way through the old check, and it turns eleven distinguishable
+players into five-way ties, which deletes the ranking the import exists to produce.
+
+**The storage rule is relaxed; the match-day flow is untouched.** `ratings_score_one_decimal`
+(`(score * 10) = floor(score * 10)`) replaces the half-step check. `ratings_score_range`,
+`ratings_no_self` and the unique triple are unchanged, and no row had to move: everything the old
+check admitted satisfies the new one, so the migration is a `DROP CONSTRAINT` and an
+`ADD CONSTRAINT`, nothing else. The rating screen still carries `step={0.5}` and `ratingScoreSchema`
+still answers « Une note va par demi-points : 7 ou 7,5, pas 7,2. » — the form is now deliberately
+stricter than the column, because the half-point is a property of somebody reading a slider and not
+of the quantity.
+
+**The check it replaces cannot fire, and is kept knowingly.** `numeric(3,1)` *rounds* on insert
+rather than erroring, so `7.26` is already `7.3` before any check runs. The constraint is
+documentation — the same kind of thing `ratings_score_range` is next to the Zod schema — it is the
+only written trace that the resolution was considered, and it becomes live enforcement if the scale
+is ever widened. The honest consequence, written down in decision 144 rather than glossed: a bad
+import writes a rounded value instead of failing loudly, so an import script owns its own precision.
+
+**The read side was the part that would have bitten silently.** `isValidScore` in
+`lib/rating/aggregate.ts` filters rows *already read from the database* — it exists for « a fixture or
+a future import path » — and it demanded a half-point. With only the constraint relaxed, every
+imported mean would have inserted cleanly and then been dropped on the way out, leaving the season
+table empty of exactly the rows it was about, with nothing failing and the screen reading « — ». It
+now follows the column. One claim made while doing this was **checked and found false**, and is
+recorded because it is the kind that survives into three documents: a tenth is indeed inexact in
+binary floating point, but `7.3 * 10` is exactly `73`, and `Number.isInteger(score * 10)` holds for
+every one of the 101 tenths in 0..10. So the naive form would have worked. The test is
+`Math.abs(score * 10 - Math.round(score * 10)) < 1e-9` anyway — the half-point version could *rely*
+on `0.5` being exact and this one only happens to hold — and the unit test walks all 101 tenths
+rather than the three the owner happened to name, which is what makes the claim checkable at all.
+
+Files: `db/schema.ts`, `db/migrations/0010_puzzling_karen_page.sql` (+ snapshot),
+`lib/rating/aggregate.ts`, `lib/rating/validation.ts` (comments only),
+`lib/rating/aggregate.test.ts`, `docs/DECISIONS.md`, `docs/DATA_MODEL.md`, `docs/ROADMAP.md`.
+
+**Gates:** `npm run typecheck` clean · `npx eslint app components lib e2e db proxy.ts proxy.test.ts`
+clean · `npm test` 1465 passed in 67 files, up from 1463 (two new tests: a one-decimal row survives
+aggregation while the range and self rules still drop theirs, and `isValidScore` accepts every
+tenth). No screen changed, so nothing to walk at 390 px. The migration was applied to the **local**
+`football_prod` restore and the constraint list read back from `pg_constraint`:
+`ratings_score_one_decimal` present, `ratings_score_half_step` gone, the other six untouched.
