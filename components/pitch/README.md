@@ -234,13 +234,14 @@ the same.
 
 ### `PositionPicker` — `'use client'`
 
-The player profile picker: the six positions of `PREFERRED_POSITIONS` — the distinct codes of the one
-shape this team lines up in, `1-3-2-1` — as tappable targets on the turf.
+The player profile picker: the seven positions of `PREFERRED_POSITIONS` — the ones the owner named,
+`GB DG DD MC AG AT AD`, which are **not** the codes of any one formation — as tappable targets on the
+turf.
 Each tap cycles **non souhaité → secondaire → principal → non souhaité**, i.e.
 `player_positions.preference` (no row / `secondary` / `primary`). The composition editor is *not*
 narrowed with it and still places any of the eleven.
 
-A record written before the list narrowed may hold `MG`, `MD`, `MOC`, `AG` or `AD` — after a
+A record written before the list changed may hold `DC`, `MG`, `MD` or `MOC` — after a
 `db:reset`, half the demo squad does. Nothing drops such a code — the profile posts the selection's own keys — so the
 picker renders those as a small row of removable chips under the legend, derived from `value` like
 the grid. One-way: a chip removes, nothing adds one back, and `cyclePosition` is not involved.

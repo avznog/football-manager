@@ -11,8 +11,8 @@ import { POSITION_CODES } from "@/db/reference";
 import { isIsoDate } from "./injury";
 
 /**
- * All eleven codes, deliberately — **not** the six the picker offers. The form posts back the
- * codes already stored for the player, so a record still holding one of the five the picker no
+ * All eleven codes, deliberately — **not** the seven the picker offers. The form posts back the
+ * codes already stored for the player, so a record still holding one of the four the picker no
  * longer shows posts it too; narrowing this enum would make Zod reject that player's whole
  * submission and leave them unable to save anything ever again. Dropping a stored code is the
  * picker's job, not the schema's.

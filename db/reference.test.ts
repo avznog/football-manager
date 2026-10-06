@@ -171,13 +171,18 @@ describe("positions", () => {
 });
 
 /**
- * The narrower list the preference picker offers. Its definition is « the distinct codes of the one
- * shape the team actually lines up in, `1-3-2-1` », so that set is **recomputed here from the
- * formation data** rather than compared with a hand-typed list: move a slot in that template and
- * this fails, which is the only way the stated rule and the shipped constant cannot drift apart.
+ * The narrower list the preference picker offers: **the seven codes the owner named**, and no longer
+ * anything derived from a formation (decision 142). That matters to how this block is written. While
+ * the rule was arithmetic — the union of two shapes' slots, then the distinct codes of `1-3-2-1`
+ * alone — the set could be *recomputed* from `BUILTIN_FORMATIONS` and compared, and no hand-typed
+ * list could drift away from the rule it claimed to follow. A free list cannot be checked that way,
+ * so the literal below is the specification and the derivation is replaced by the invariant a free
+ * list can really break: **every wish must be fieldable in some shape this app ships.**
  */
 describe("preferred positions", () => {
-  const USUAL_SHAPE = "1-3-2-1";
+  /** The owner's seven, in his words: keeper, left and right at the back, the middle, the two wings,
+   *  the striker. Typed out here on purpose — this test is the specification, not a mirror of it. */
+  const OWNERS_SEVEN = ["GB", "DG", "DD", "MC", "AG", "AT", "AD"] as const;
 
   function slotCodesOf(label: string): PositionCode[] {
     const formation = formationByLabel(label);
@@ -185,14 +190,11 @@ describe("preferred positions", () => {
     return (formation as FormationTemplate).slots.map((slot) => slot.positionCode);
   }
 
-  it("is exactly the distinct codes of the shape the team lines up in", () => {
-    const codes = slotCodesOf(USUAL_SHAPE);
-    const distinct = new Set(codes);
-
-    // Seven on the pitch, six distinct codes: the double pivot is two `MC`.
-    expect(codes).toHaveLength(FORMATION_SLOT_COUNT);
-    expect(distinct.size).toBe(PREFERRED_POSITION_CODES.length);
-    expect(new Set(PREFERRED_POSITION_CODES)).toEqual(distinct);
+  it("is exactly the seven codes the owner named", () => {
+    expect(PREFERRED_POSITION_CODES).toEqual(OWNERS_SEVEN);
+    // Seven wishes for a seven-a-side team, which is what he asked for. It is a coincidence of
+    // counting rather than a derivation: the shapes have seven *slots*, and this has seven *codes*.
+    expect(PREFERRED_POSITION_CODES).toHaveLength(FORMATION_SLOT_COUNT);
   });
 
   it("has no duplicate, and is a subset of the wide vocabulary", () => {
@@ -202,22 +204,50 @@ describe("preferred positions", () => {
     }
   });
 
-  it("excludes exactly MG, MD, MOC, AG and AD", () => {
+  it("offers no wish that no built-in formation can field", () => {
+    // The invariant that replaces the lost derivation: asking a player where he would like to play
+    // and offering a position no shape this app ships has a slot for is a question with no possible
+    // answer. **Be honest about its strength** — all eleven codes are currently fielded somewhere,
+    // so this passes for *any* subset of the vocabulary and cannot fail on a change to the picker
+    // alone. What it really guards is the formations: delete `1-2-1-3`, or move its wingers to
+    // `MG`/`MD`, and `AG`/`AD` become unreachable wishes and this turns red. That is a real way for
+    // the picker to rot, and it is not one anybody editing a formation would think to check.
+    const fieldable = new Set(
+      BUILTIN_FORMATIONS.flatMap((formation) => slotCodesOf(formation.label)),
+    );
+    expect(fieldable.size).toBe(POSITION_CODES.length);
+    for (const code of PREFERRED_POSITION_CODES) {
+      expect(fieldable, `${code} is wishable but no built-in formation fields it`).toContain(code);
+    }
+  });
+
+  it("excludes exactly DC, MG, MD and MOC", () => {
     const excluded = POSITION_CODES.filter((code) => !isPreferredPositionCode(code));
-    expect(excluded).toEqual(["MG", "MD", "MOC", "AG", "AD"]);
+    expect(excluded).toEqual(["DC", "MG", "MD", "MOC"]);
+  });
+
+  it("does not match the default shape, in both directions, on purpose", () => {
+    // Pinned because it looks like a bug and is not. A wish is a preference, not a promise. The
+    // owner reads his two centre-backs as « left » and « right », so he chose `DG`/`DD` and `DC`
+    // fell out of the picker even though `1-3-2-1` fields one; and he wanted the wings wishable
+    // even though `1-3-2-1` has no winger at all (owner's decisions, 2026-10-06).
+    const usual = slotCodesOf(DEFAULT_FORMATION_LABEL);
+    expect(usual).toContain("DC");
+    expect(isPreferredPositionCode("DC")).toBe(false);
+    expect(usual).not.toContain("AG");
+    expect(usual).not.toContain("AD");
+    expect(isPreferredPositionCode("AG")).toBe(true);
+    expect(isPreferredPositionCode("AD")).toBe(true);
   });
 
   it("keeps the wide vocabulary at eleven: the composition editor is not narrowed with it", () => {
-    // Deliberate, not an oversight. All seven built-in formations stay shippable, so the five
+    // Deliberate, not an oversight. All seven built-in formations stay shippable, so the four
     // excluded codes are still fieldable — which is why the picker never says they do not exist.
-    // `1-2-3-1` is the pointed case: the team can be put out in it, and nobody can wish for its
-    // wings (owner's decision, 2026-10-06).
     expect(POSITION_CODES).toHaveLength(11);
+    expect(slotCodesOf("1-3-2-1")).toContain("DC");
     expect(slotCodesOf("1-2-3-1")).toContain("MG");
     expect(slotCodesOf("1-2-3-1")).toContain("MD");
     expect(slotCodesOf("1-3-3-0")).toContain("MOC");
-    expect(slotCodesOf("1-2-1-3")).toContain("AG");
-    expect(slotCodesOf("1-2-1-3")).toContain("AD");
   });
 
   it("carries the matching definitions, in canonical sort order", () => {
