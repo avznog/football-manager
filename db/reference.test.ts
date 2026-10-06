@@ -171,13 +171,13 @@ describe("positions", () => {
 });
 
 /**
- * The narrower list the preference picker offers. Its definition is « the union of the slots of the
- * two shapes this team really plays », so the union is **recomputed here from the formation data**
- * rather than compared with a hand-typed list: change either formation and this fails, which is the
- * only way the stated rule and the shipped constant cannot drift apart.
+ * The narrower list the preference picker offers. Its definition is « the distinct codes of the one
+ * shape the team actually lines up in, `1-3-2-1` », so that set is **recomputed here from the
+ * formation data** rather than compared with a hand-typed list: move a slot in that template and
+ * this fails, which is the only way the stated rule and the shipped constant cannot drift apart.
  */
 describe("preferred positions", () => {
-  const USUAL_SHAPES = ["1-3-2-1", "1-2-3-1"] as const;
+  const USUAL_SHAPE = "1-3-2-1";
 
   function slotCodesOf(label: string): PositionCode[] {
     const formation = formationByLabel(label);
@@ -185,33 +185,36 @@ describe("preferred positions", () => {
     return (formation as FormationTemplate).slots.map((slot) => slot.positionCode);
   }
 
-  it("is exactly the union of the slots of the two shapes the team plays", () => {
-    const union = new Set(USUAL_SHAPES.flatMap(slotCodesOf));
-    // Seven on the pitch in each, eight distinct codes across the two.
-    expect(union.size).toBe(8);
-    expect(new Set(PREFERRED_POSITION_CODES)).toEqual(union);
-    for (const label of USUAL_SHAPES) {
-      expect(slotCodesOf(label)).toHaveLength(FORMATION_SLOT_COUNT);
-    }
+  it("is exactly the distinct codes of the shape the team lines up in", () => {
+    const codes = slotCodesOf(USUAL_SHAPE);
+    const distinct = new Set(codes);
+
+    // Seven on the pitch, six distinct codes: the double pivot is two `MC`.
+    expect(codes).toHaveLength(FORMATION_SLOT_COUNT);
+    expect(distinct.size).toBe(PREFERRED_POSITION_CODES.length);
+    expect(new Set(PREFERRED_POSITION_CODES)).toEqual(distinct);
   });
 
-  it("has eight entries, no duplicate, and is a subset of the wide vocabulary", () => {
-    expect(PREFERRED_POSITION_CODES).toHaveLength(8);
+  it("has no duplicate, and is a subset of the wide vocabulary", () => {
     expect(new Set(PREFERRED_POSITION_CODES).size).toBe(PREFERRED_POSITION_CODES.length);
     for (const code of PREFERRED_POSITION_CODES) {
       expect(POSITION_CODES).toContain(code);
     }
   });
 
-  it("excludes exactly MOC, AG and AD", () => {
+  it("excludes exactly MG, MD, MOC, AG and AD", () => {
     const excluded = POSITION_CODES.filter((code) => !isPreferredPositionCode(code));
-    expect(excluded).toEqual(["MOC", "AG", "AD"]);
+    expect(excluded).toEqual(["MG", "MD", "MOC", "AG", "AD"]);
   });
 
   it("keeps the wide vocabulary at eleven: the composition editor is not narrowed with it", () => {
-    // Deliberate, not an oversight. All seven built-in formations stay shippable, so the three
+    // Deliberate, not an oversight. All seven built-in formations stay shippable, so the five
     // excluded codes are still fieldable — which is why the picker never says they do not exist.
+    // `1-2-3-1` is the pointed case: the team can be put out in it, and nobody can wish for its
+    // wings (owner's decision, 2026-10-06).
     expect(POSITION_CODES).toHaveLength(11);
+    expect(slotCodesOf("1-2-3-1")).toContain("MG");
+    expect(slotCodesOf("1-2-3-1")).toContain("MD");
     expect(slotCodesOf("1-3-3-0")).toContain("MOC");
     expect(slotCodesOf("1-2-1-3")).toContain("AG");
     expect(slotCodesOf("1-2-1-3")).toContain("AD");
