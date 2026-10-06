@@ -4329,3 +4329,74 @@ production on the push. `0007` is the one to look at before pushing it: it drops
 deletes rows on the stated assumption that production holds no ratings at all, and that assumption has
 not been rechecked since it was written. `select count(*) from ratings;` is the check, and it is
 irreversible if the answer is not `0`.
+
+## The wish picker becomes seven positions the owner named
+
+**2026-10-06** · decision **142**
+
+Same day, same screen, third rule. He asked for « GK, central defense right and left, middle, right wing,
+left wing and BU », which is **`GB DG DD MC AG AT AD`** — seven chips.
+
+**Two words in that list matched two codes each, so I asked rather than guessed**, and both answers went
+against what I would have picked:
+
+- « right wing » / « left wing » → **`AD`/`AG`**, the wingers at `y≈850`, not the wide midfielders
+  `MD`/`MG` at `y≈520`. My own reading had been `MD`/`MG`, because his whole list otherwise describes the
+  built-in `1-2-3-1` exactly — keeper, two centre-backs, three across the middle, one striker — and that
+  would have made the set a formation's codes again;
+- « central defense right and left » → **two chips, `DG`/`DD`**, shown to him with the warning that the
+  French labels read « Défenseur gauche » / « Défenseur droit », i.e. full-backs rather than centre-backs.
+  He took them anyway, which is also what makes the count seven rather than six.
+
+Guessing either one would have shipped the wrong French on a chip and the wrong spot on the turf, and
+neither would have failed a test.
+
+**What actually changed is the kind of rule, not the list.** 130 derived the picker from two shapes, 141
+from one; 142 derives it from nothing. `GB DG DD MC AG AT AD` is the code set of no built-in formation, so
+the test can no longer recompute the set from `BUILTIN_FORMATIONS` and prove the constant has not drifted
+from its stated rule — the property both earlier decisions rested on. The test now types the seven out and
+says in a comment that it *is* the specification.
+
+**The replacement invariant, and its real strength.** « Every wish is fielded by some built-in formation »
+is the one thing worth keeping: offering a position no shipped shape has a slot for would be a question
+with no answer. But all eleven codes are fielded somewhere today, so **the test passes for any subset and
+cannot fail on an edit to the picker alone** — it guards the *formations* (delete `1-2-1-3` and `AG`/`AD`
+become unreachable). Both the test and decision 142 say so in those words rather than letting it pose as a
+guard on the list.
+
+**Two deliberate mismatches with the team's own shape**, pinned by a test named for the fact that they look
+like bugs: `AG`/`AD` are wishable though `DEFAULT_FORMATION_LABEL` (`1-3-2-1`) has no winger, and `DC` is
+not wishable though `1-3-2-1` fields one. The resolution is naming the thing correctly — **a wish is a
+preference, not a promise.** `DC` is the first code the default shape fields that cannot be wished for:
+anyone who already chose it keeps the row, sees the chip, and can remove it, but cannot pick it again.
+
+`POSITION_CODES` and `positionCodeSchema` are untouched for the third time and the same reason: the form
+posts back stored codes, so narrowing the enum would make a player holding `DC` unable to save anything
+ever again.
+
+**Gates:** typecheck clean, `npx eslint app components lib e2e db scripts` silent, **1456 vitest in 66
+files** (two new tests), **7 e2e**.
+
+**Looked at, rather than asserted**, through a throwaway Playwright spec that provisioned a fixture and
+screenshotted `/joueur/<id>` at **390×844 in both themes and in both roles**, read as images — the four
+shots are in `audit/`, which is gitignored. Colour schemes came from Playwright's `colorScheme` rather
+than the toggle, which works because `"system"` stores no class and falls through to the media query
+(`components/theme/theme.ts`). What it showed: **seven discs, `GB DG DD MC AG AT AD`, the right French on
+each, none touching** — and no new spacing check is needed for that, because every pair of the eleven
+clears `MIN_MARKER_DISTANCE` and any subset of such a set does too.
+
+Two things the look raised and the measurement settled, neither of them a defect and neither introduced
+here:
+
+- **`GB` sits under the tab bar mid-scroll.** Measured: the disc is `48×48` at `y=752` and the nav's top
+  edge is `787`, so it overlaps by 13 px where `scrollIntoViewIfNeeded` stops — which it would, since the
+  browser does not know about a fixed nav. Two hundred more pixels of scroll, which is what a finger does,
+  puts the disc's bottom at `600` against the same `787`: **187 px clear, and the target is a full 48 px.**
+  Worth writing down because « a tap target under the tab bar » is the single defect class this repo keeps
+  finding, and the first screenshot looked exactly like one;
+- **the coach's discs look tappable and he has no save button.** Also not a bug: `positions-editor.tsx:66`
+  branches on `canEdit` and gives him `<PositionPicker … readOnly />` plus « Chaque joueur choisit ses
+  postes lui-même. » underneath. The sentence was below the fold in the shot, which is the whole reason
+  the screen looked wrong — the explanation exists and is one scroll away from where the pitch is.
+
+**Shipping:** `package.json` stays at `1.0.0-beta.8`; this lands before the tag, so beta.8 carries it.

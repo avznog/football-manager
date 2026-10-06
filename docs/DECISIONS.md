@@ -5199,8 +5199,10 @@ which were the ones destroying rows; the ROADMAP item stays open.
 
 ## 141 — `db:migrate` owes a fresh database a usable one, and two of the owner's limits come off
 
-**2026-10-06** · accepted · supersedes the open item of decision 129 that left `formations` unseeded,
-and supersedes decision **130** on the size of the wish picker · the migration half is the production fix
+**2026-10-06** · accepted; **the wish-picker third of it superseded the same day by decision 142**, which
+replaces the six derived codes with seven the owner named · supersedes the open item of decision 129 that
+left `formations` unseeded, and supersedes decision **130** on the size of the wish picker · the migration
+half is the production fix and still stands entirely
 
 Three changes the owner asked for in one sitting. They share a thread — each one is a number or a rule the
 app had decided for him, and he has taken all three back — but the middle one is the only emergency, and it
@@ -5296,3 +5298,68 @@ count needed correcting, from « the eight the picker offers » to six. A player
 fail forever, and leave them unable to save anything ever again. Dropping a stored code is the picker's
 job, not the schema's. `POSITION_CODES` stays at eleven for the same reason it did under 130: all seven
 built-in formations stay shippable and the composition editor still places any of them.
+
+## 142 — The wish picker is seven positions the owner named, and stops being derived from a formation
+
+**2026-10-06** · accepted · supersedes the wish-picker third of decision **141**, and with it what
+survived of **130** · no migration, no schema change
+
+The picker now offers **`GB DG DD MC AG AT AD`** — in the owner's words: keeper, central defence left and
+right, the middle, the two wings, and the striker.
+
+### What this changes, and it is not the list
+
+The list itself is a one-line edit. What changes is the **kind of rule** behind it, and that is the part
+worth recording, because it is the third rule in two days and the first one that is not arithmetic:
+
+| | the rule | codes |
+|---|---|---|
+| 130 | the union of the slots of the two shapes the team plays, `1-3-2-1` ∪ `1-2-3-1` | 8 |
+| 141 | the distinct codes of the one shape the team lines up in, `1-3-2-1` | 6 |
+| **142** | **the seven the owner named** | **7** |
+
+`GB DG DD MC AG AT AD` is the code set of **no built-in formation**: `1-3-2-1` fields a `DC` and no winger
+at all, and `1-2-1-3` fields the two wingers and neither `DG` nor `DD`. So the derivation is gone, and so
+is the property that 130 and 141 both leaned on — that `db/reference.test.ts` could *recompute* the set
+from `BUILTIN_FORMATIONS` and prove the shipped constant had not drifted from the stated rule. **A list
+chosen by a person cannot be checked that way**, and pretending otherwise would be worse than admitting
+it: the test now types the seven codes out as the specification and says in a comment that it is one.
+
+### Two mismatches with the team's actual shape, both deliberate
+
+Pinned in a test named `does not match the default shape, in both directions, on purpose`, because each
+one reads like a bug to anybody who finds it later:
+
+- **`DC` is not wishable, though `1-3-2-1` fields one.** The owner reads his two centre-backs as « left »
+  and « right » and chose `DG`/`DD` for them. He was shown that the French labels say « Défenseur gauche »
+  and « Défenseur droit » — full-backs, not centre-backs — and picked them anyway. A player who plays in
+  the middle of the back three therefore has no chip that names his position exactly;
+- **`AG` and `AD` are wishable, though `1-3-2-1` has no winger.** `DEFAULT_FORMATION_LABEL` is unchanged,
+  so a player can now wish for a position the team's usual shape has no slot for. That is sound once the
+  thing being asked is named correctly: **a wish is a preference, not a promise.** The wish is reachable —
+  `1-2-1-3` is a built-in and a coach can field it — which is the one invariant kept from the derived era,
+  now stated directly: *every code the picker offers is fielded by some built-in formation.*
+
+Be honest about that invariant's strength. All eleven codes are fielded by some shape today, so the test
+holds for **any** subset of the vocabulary and cannot fail on an edit to the picker alone. What it guards
+is the formations: delete `1-2-1-3`, or move its wingers to `MG`/`MD`, and `AG`/`AD` become unanswerable
+questions and it turns red. That is a real way for this to rot and not one anybody editing a formation
+would think to check.
+
+### What deliberately does not change
+
+`POSITION_CODES` stays at eleven and `positionCodeSchema` stays `z.enum(POSITION_CODES)`, for the third
+time and the same reason: the profile form posts back the codes already stored for a player, so a record
+holding one of the four the picker no longer shows — `DC`, `MG`, `MD`, `MOC` — posts it too, and narrowing
+the enum would make Zod reject that player's **whole** submission and leave him unable to save anything
+ever again. Dropping a stored code is the picker's job, and the chip row is how it is done. All seven
+built-in formations stay shippable and the composition editor still places any of the eleven.
+
+**`DC` falling out of the picker is the new case of this**, and the first where a code the *default* shape
+fields is no longer wishable: anyone who had already wished for « défenseur central » keeps that row, sees
+it in the chip row, and can remove it — but cannot pick it again.
+
+The picker's own layout needs no spacing check. Every pair of the eleven clears `MIN_MARKER_DISTANCE`
+(`lib/pitch/geometry.ts`), and any subset of a set whose every pair clears it clears it too, so narrowing
+or re-choosing the picker can never crowd the turf — which is why the eleven-wide spacing rule is kept
+even though no screen draws all eleven at once.
