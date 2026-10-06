@@ -16,7 +16,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db/client";
 import { invites, teamMembers, users } from "@/db/schema";
 import { ACTIVE_TEAM_COOKIE } from "./cookies";
-import { getCurrentUser } from "./dal";
+import { getCurrentUser, redirectSignedOut } from "./dal";
 import { hashPassword, verifyPassword } from "./password";
 import { createSession, destroySession } from "./session";
 import {
@@ -188,7 +188,9 @@ export async function joinWithExistingAccount(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) redirect("/connexion");
+  // Not `redirect("/connexion")`: a cookie that resolves to nothing has to be *cleared*, or the
+  // proxy sends it straight back into the app (decision 143).
+  if (!user) return redirectSignedOut();
 
   const parsed = joinWithExistingAccountSchema.safeParse({ code: formData.get("code") });
   if (!parsed.success) return toFormState(parsed.error);
@@ -265,7 +267,9 @@ export async function setActiveTeam(teamId: string): Promise<void> {
 /** Team switcher for the rare user who belongs to several teams. */
 export async function switchTeam(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
-  if (!user) redirect("/connexion");
+  // Not `redirect("/connexion")`: a cookie that resolves to nothing has to be *cleared*, or the
+  // proxy sends it straight back into the app (decision 143).
+  if (!user) return redirectSignedOut();
 
   const teamId = String(formData.get("teamId") ?? "");
   const membership = await db.query.teamMembers.findFirst({

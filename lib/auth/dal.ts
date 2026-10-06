@@ -21,7 +21,8 @@ import { db } from "@/db/client";
 import { teamMembers, teams, users } from "@/db/schema";
 import type { Actor } from "./can";
 import { ACTIVE_TEAM_COOKIE } from "./cookies";
-import { readSession } from "./session";
+import { type SessionState, signedOutDestination } from "./session-state";
+import { readSessionState } from "./session";
 
 export type CurrentUser = {
   id: string;
@@ -30,10 +31,19 @@ export type CurrentUser = {
   isSuperAdmin: boolean;
 };
 
+/**
+ * The session cookie, resolved once per request.
+ *
+ * Kept separate from `getCurrentUser` because the *shape* of the negative answer matters: a
+ * request with no cookie and a request holding a cookie that resolves to nothing both have no
+ * user, and sending them to the same place is the bug of decision 143.
+ */
+const getSessionState = cache(readSessionState);
+
 /** The authenticated user, or null. Never redirects — use `requireUser` for that. */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
-  const session = await readSession();
-  if (!session) return null;
+  const session = await getSessionState();
+  if (session.status !== "active") return null;
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, session.userId),
@@ -61,15 +71,32 @@ export const getActor = cache(async (): Promise<Actor | null> => {
   return { userId: user.id, isSuperAdmin: user.isSuperAdmin, memberships };
 });
 
+/**
+ * Where to send a request that turned out to have no identity.
+ *
+ * `/connexion` for a visitor; `/deconnexion` for a cookie that resolves to nothing, so that the
+ * cookie is actually deleted before the login screen is shown. Sending the second case to
+ * `/connexion` is what looped: the proxy sees a cookie there and bounces back to `/`, forever,
+ * and the cookie is `httpOnly` so nothing in the browser can break the tie (decision 143).
+ *
+ * The `active` case is folded in deliberately: a session whose row is live but whose *user* row is
+ * gone has no actor either, and that cookie is just as unusable as a pruned one — it too has to be
+ * cleared rather than argued with.
+ */
+export async function redirectSignedOut(): Promise<never> {
+  const state: SessionState = await getSessionState();
+  redirect(signedOutDestination(state));
+}
+
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
-  if (!user) redirect("/connexion");
+  if (!user) return redirectSignedOut();
   return user;
 }
 
 export async function requireActor(): Promise<Actor> {
   const actor = await getActor();
-  if (!actor) redirect("/connexion");
+  if (!actor) return redirectSignedOut();
   return actor;
 }
 
