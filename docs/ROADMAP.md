@@ -122,10 +122,18 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       says « Chaque joueur choisit ses postes lui-même. », a failed write says « Tes postes n'ont pas
       été enregistrés. Réessaie. » instead of throwing, and a `ForbiddenError` still reaches the
       error boundary on purpose
-- [x] The picker offers the eight codes the team's two usual shapes actually use, recomputed in the
-      test from `BUILTIN_FORMATIONS` so the list cannot drift from the formations it is drawn from. A
-      chip row lets a player remove a stored `MOC`/`AG`/`AD`, one way only, and `POSITION_CODES` stays
-      at eleven: the composition editor is not narrowed
+- [x] The picker offers the **six** codes of the one shape the team lines up in, `1-3-2-1` —
+      `GB DG DC DD MC AT` — recomputed in the test from `BUILTIN_FORMATIONS` so the list cannot drift
+      from the formation it is drawn from. It offered eight, the union of `1-3-2-1` and `1-2-3-1`
+      (decision 130); the owner narrowed it to the one shape on 2026-10-06, so **`MG` and `MD` are no
+      longer a wish even though `1-2-3-1` is still fieldable**. A chip row lets a player remove a
+      stored `MG`/`MD`/`MOC`/`AG`/`AD`, one way only, and `POSITION_CODES` stays at eleven: the
+      composition editor is not narrowed
+- [x] The flocage has **no character limit**. It was capped at 12 in three places — a constant, the
+      Zod schema and the check constraint — and the owner removed the ceiling on 2026-10-06
+      (`0008_true_johnny_storm.sql`). The constraint stays as a lower bound, `char_length >= 1`, which
+      is the half that keeps « no flocage » a single value; the squad row already truncates with an
+      ellipsis at 390 px, so a long one breaks no layout
 - [x] `POSITION_BY_CODE` is `Partial<Record<…>>` rather than a cast, so an unknown code is
       `undefined` at the type level instead of a `TypeError` that could 500 four screens from one bad
       row; the honest type found 16 errors across 5 files, one of them in `db/reference.ts` itself
@@ -873,8 +881,19 @@ it stands.
       outstanding owner action across three sessions' notes and is **done**. Note it is no longer
       load-bearing: with the Git integration off for every branch, it is a second thing that would have to
       be wrong before a push could reach production, not the thing that keeps `main` off production
-- [ ] **Decide whether `formations` and `formation_slots` get seeded by a migration too — the owner's
-      call, deliberately not taken.** The eleven `positions` now are, because
+- [x] **`formations` and `formation_slots` are seeded by a migration too — the owner decided, after
+      hitting it on production.** `db/migrations/0009_seed_formations.sql` inserts the seven
+      `BUILTIN_FORMATIONS` with `team_id is null` and their 49 slots, idempotently and insert-only,
+      guarded on `label` among the rows with no team — the same key `seedReference()` uses, so the two
+      writers agree and neither duplicates the other's rows. Proven from empty, not assumed: a scratch
+      database given `npm run db:migrate` and nothing else ends with **11 positions, 7 built-in
+      formations and 49 slots**, and re-running the file twice more inserts nothing. Decision NNN,
+      which generalises 0006 and supersedes the paragraph below. The reasons the item below gave for
+      leaving it out all survive and none of them were a reason to ship an unusable screen: a team
+      still forks a template into its own `formations` row (decision 005), and `seedReference()` still
+      owns every later change to a label or a coordinate, because the migration never updates
+- [x] ~~**Decide whether `formations` and `formation_slots` get seeded by a migration too — the owner's
+      call, deliberately not taken.**~~ **Taken — see the item above.** The eleven `positions` now are, because
       `player_positions.position_code` and `formation_slots.position_code` both reference
       `positions.code` (`db/migrations/0000_wealthy_radioactive_man.sql:264` and `:239`) and no
       migration had ever inserted a single row. **Measured on a fresh database after `db:migrate`
@@ -1531,7 +1550,7 @@ not over them; the score must not be editable; the same actions as in game mode 
       is not a third way to format a date. Decision 133 supersedes the carve-out at the end of 109 rather
       than opening a second decision about date formats
 
-### Preferred positions belong to the player, and the picker offers eight
+### Preferred positions belong to the player, and the picker offers eight (now six — 2026-10-06)
 
 - [x] **The coach must not be able to edit a player's preferred positions.** `assertCanActFor`
       (`lib/player/actions.ts:53-61`) tries the self action and then falls back to `member:update`,
@@ -1552,7 +1571,11 @@ not over them; the score must not be editable; the same actions as in game mode 
       order with a supplier and a deadline. `lib/auth/can.test.ts` already asserted a coach may not, and
       passed unchanged — thinner cover than it sounds, since nothing unit or Playwright exercises the
       positions editor at all
-- [x] **The picker offers eight positions, not eleven: `GB DG DC DD MG MC MD AT`.** `MOC`, `AG` and
+- [x] **The picker offers eight positions, not eleven: `GB DG DC DD MG MC MD AT`.** *(Superseded on
+      2026-10-06: the owner reversed the choice recorded below and took the **one** shape rather than
+      the union, so the list is the six codes of `1-3-2-1`. The history is kept because the question
+      he was put — « only 7 » is not expressible — and the answer he gave then are what make the new
+      answer legible.)* `MOC`, `AG` and
       `AD` are 11-a-side positions this team never fields. The owner asked for « only 7, as we are
       playing with 7 players », and that is not expressible — `1-2-3-1` is `GB,DC,DC,MG,MC,MD,AT` and
       `1-3-2-1` is `GB,DG,DC,DD,MC,MC,AT`, which is seven slots each but **six** distinct codes each and

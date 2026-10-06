@@ -9,11 +9,10 @@ import { z } from "zod";
 
 import { POSITION_CODES } from "@/db/reference";
 import { isIsoDate } from "./injury";
-import { SHIRT_NAME_MAX_CHARS } from "./shirt";
 
 /**
- * All eleven codes, deliberately — **not** the eight the picker offers. The form posts back the
- * codes already stored for the player, so a record still holding one of the three the picker no
+ * All eleven codes, deliberately — **not** the six the picker offers. The form posts back the
+ * codes already stored for the player, so a record still holding one of the five the picker no
  * longer shows posts it too; narrowing this enum would make Zod reject that player's whole
  * submission and leave them unable to save anything ever again. Dropping a stored code is the
  * picker's job, not the schema's.
@@ -65,17 +64,16 @@ export const updatePositionsSchema = z.object({
 });
 
 /**
- * The flocage, as typed. Trimmed and length-checked against the shirt back, and **not** uppercased:
- * that happens in `shirtNameDisplay` so the player's own « El Professor » survives in the column
- * (`lib/player/shirt.ts`).
+ * The flocage, as typed. Trimmed, **no maximum length** (the ceiling was removed on the owner's
+ * instruction — see `lib/player/shirt.ts`), and **not** uppercased: that happens in
+ * `shirtNameDisplay` so the player's own « El Professor » survives in the column.
+ *
+ * The `.trim()` stays load-bearing even without a length to measure: it is what makes a field
+ * holding nothing but spaces come out as `""`, which `updateShirtNameSchema` below turns into
+ * `null`. Drop it and a one-space flocage would hit the column, pass the check constraint's lower
+ * bound, and print as a blank where a name should be.
  */
-export const shirtNameSchema = z
-  .string()
-  .trim()
-  .max(
-    SHIRT_NAME_MAX_CHARS,
-    `Ce flocage est trop long (${SHIRT_NAME_MAX_CHARS} caractères maximum).`,
-  );
+export const shirtNameSchema = z.string().trim();
 
 /**
  * The « Nom sur le maillot » form: one field, and an empty one means « enlève-le ».

@@ -34,8 +34,11 @@ Invariants:
 - unique `(team_id, user_id)` where `left_at is null`
 - unique `(team_id, jersey_number)` among active members, when the number is set
 - `shirt_name` is the flocage — what is printed on the back of the shirt, often a nickname rather
-  than a name. Nullable and null for most members; `char_length between 1 and 12`, so « no flocage »
-  has exactly one representation and no screen has to tell `''` from `null`. Deliberately **not**
+  than a name. Nullable and null for most members. **No maximum length** — the twelve-character cap
+  was removed on the owner's instruction (`0008_true_johnny_storm.sql`), because how short a name has
+  to be to print legibly is a decision for whoever orders the shirts. `team_members_shirt_name_length`
+  is kept as a lower bound only, `char_length >= 1`, so « no flocage » has exactly one representation
+  and no screen has to tell `''` from `null`. Deliberately **not**
   unique: two players may both be floqués « JUNIOR ». Stored as typed and uppercased at display time
   only (`lib/player/shirt.ts`), so a player's own capitalisation survives
 - `role = 'coach'` with `is_player = true` means a player-coach: they get both permission sets
@@ -67,6 +70,15 @@ and any formation containing an `AT` slot matches.
 ### `formation_slots`
 `id`, `formation_id`, `position_code`, `x`, `y`, `sort`.
 Exactly 7 slots per formation, exactly one with `position_code = 'GB'`.
+
+**The seven built-ins are seeded by a migration**, `0009_seed_formations.sql`, exactly as the eleven
+`positions` are by `0006_seed_positions.sql`. `db/migrate` alone therefore leaves a database with 11
+positions, 7 formations with `team_id is null` and 49 slots, and the composition editor works on it —
+`seedReference()` is no longer the only writer of those rows. It had been, and production had never
+run it, so `/match/<id>/composition` and `/match/<id>/saisie` both said « Les formations types n'ont
+pas été chargées dans la base » and no composition could be made at all. Both seed migrations are
+idempotent and insert-only: `db/reference.ts` stays the single source of truth and `seedReference()`
+still owns every later change to a label or a coordinate (decision 141).
 
 ### `player_positions`
 `team_member_id`, `position_code`, `preference` (`primary` | `secondary`).

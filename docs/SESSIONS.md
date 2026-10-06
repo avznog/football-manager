@@ -4250,3 +4250,82 @@ designed as the cheap substitute was not shipped either. This slice stopped the 
 **Still not verified**, carried a fourth time: the crafted form post proving the *server* refuses a
 self-note and a note on a 0-minute substitute. **Nothing is shipped** — `package.json` is still
 `1.0.0-beta.6` and the `beta.7` bump and tag are the owner's.
+
+## Migrating leaves a usable database, and two of the owner's limits come off
+
+**2026-10-06** · decision **141**
+
+Three fixes the owner asked for. The middle one is the production bug and the other two are limits the app
+had decided for him.
+
+**The formations were missing on production, and that is `db:migrate`'s fault, not the seeder's.**
+`/match/<id>/composition` said « Aucune formation disponible · Les formations types n'ont pas été chargées
+dans la base. » and `/match/<id>/saisie` the same, so no composition could be made at all. `seedReference()`
+was the only writer of the built-in formations and it runs from `db:seed` / `db:bootstrap` only, neither of
+which has ever touched production. `db/migrations/0009_seed_formations.sql` now inserts the seven
+`BUILTIN_FORMATIONS` with `team_id is null` and their 49 slots — a `DO` block, insert-only, guarded on
+`label` among the rows with no team, which is the same key the seeder uses, and writing slots only for a
+formation that has none. It is `0006_seed_positions.sql`'s principle taken one step further: migrating is
+what creates the schema, so migrating is what has to leave it usable.
+
+**It was proved from empty, because the no-op proof demonstrates nothing.** On the local database, 11
+positions / 7 built-ins / 49 slots before and after — unchanged, which is all that test can say. Then a
+scratch database, `createdb` and `npm run db:migrate` **alone**, no seed and no bootstrap: **11 / 7 / 49**,
+and all 49 slots' `position_code`, `x`, `y`, `sort` diffed row by row against `BUILTIN_FORMATIONS` —
+identical. Running the file twice more by hand: `DO`, `DO`, counts still 7 / 49. `db:seed` on top of it:
+still 7 / 49, so the migration and the seeder do not duplicate each other's rows. Scratch dropped.
+
+**The flocage has no ceiling.** `SHIRT_NAME_MAX_CHARS = 12` is deleted; `shirtNameSchema` loses its
+`.max()` and keeps the `trim()` and the transform to `null`; the `maxLength` attribute comes off the input;
+and `0008_true_johnny_storm.sql` relaxes `team_members_shirt_name_length` to `char_length >= 1` rather than
+dropping it, because the **lower** bound is the half that keeps « no flocage » a single value. The hint no
+longer states a number and says the useful thing instead. The order of the two migrations was deliberate:
+the constraint change is 0008 and is `db:generate`'s own output, which keeps the drizzle snapshot chain
+honest without hand-forging JSON, and the formations data migration is 0009 with a copied snapshot and a
+hand-written journal entry, which is what 0006 did.
+
+**The picker offers six codes, not eight** — the distinct codes of `1-3-2-1` alone, `GB DG DC DD MC AT`.
+`MG` and `MD` are no longer a wish even though `1-2-3-1` still uses them and a coach can still field it:
+the owner's call, stated in the docblock so nobody reads it as an oversight. The test was **rewritten
+rather than renumbered** — it recomputes the distinct codes of the `1-3-2-1` template from
+`BUILTIN_FORMATIONS` and asserts the constant equals that set, so the anti-drift property decision 130
+built it for survives. `positionCodeSchema` stays at eleven for the reason its docblock already gave.
+
+**The 390 px pass, both themes, coach and player in one pass.** `/joueur/<id>` for the same player side by
+side in both roles: six discs on the turf (`AT`, `MC`, `DG`, `DC`, `DD`, `GB`) and no crowding where `MG`
+and `MD` used to sit; the flocage hint reads « … dans son dos … » for the coach and « … dans ton dos … »
+for the player, same sentence otherwise, no number in either. The composition editor in both themes. And
+the one layout risk of an uncapped flocage was **looked at** rather than reasoned about: a 27-character
+flocage saved end-to-end renders on the `/equipe` row as « floqué LE PROFESSEUR DE SAINT-OU… », truncated
+inside the card, nothing overflowing. The demo row was put back to `null` afterwards.
+
+**Gates.** `npm run typecheck` clean, `npx eslint app components lib e2e db scripts` silent, `npm test`
+**1454 across 66 files**, `npm run test:e2e` **7 passed** in 1.2m against the dev server on 3000, whose
+`/proc/<pid>/cwd` was checked to be this checkout.
+
+**One thing found that is not in scope and is not fixed: `/match/nouveau/composition` returns a 500**, not
+a 404. `nouveau` is a real segment of `/match/nouveau`, so appending `/composition` reaches the
+compositions page, which hands `nouveau` to Postgres as a `uuid` and gets a driver error — the error
+boundary, « Cet écran n'a pas pu s'afficher ». `lib/player/validation.ts`'s `isUuid` is the guard that
+exists for exactly this and the match routes do not use it. Nothing links to that URL, which is why it has
+survived; it was hit by a screenshot probe walking the first `a[href^="/match/"]` on `/calendrier`.
+
+**Shipping:** `package.json` is bumped to **`1.0.0-beta.8`** here, and the tag is the owner's to cut, by
+hand, as always. The bump is in this pull request rather than a later one so that the version and the
+migrations it ships are the **same commit** — `release.yml`'s gate compares the tag against
+`package.json` *at the commit the tag points at*, so a bump that lands separately makes the tag refuse
+one of the two commits.
+
+**`v1.0.0-beta.7` was already cut**, on `0e5b619`, on 2026-10-05, and its release run succeeded — after
+the gate had correctly refused a malformed `v1.0.0.0-beta.7` eleven seconds earlier. So production is
+**running beta.7 right now**, which carries the pointage fix of #145 and **not** the formations seed:
+that is the whole of why the owner could still not build a composition after a release that looked
+healthy. beta.8 is the first tag that makes production usable. An earlier note in this session said the
+beta.7 tag was still being held; it was not, and the mistake was reading `package.json` for what is
+shipped instead of `git tag`.
+
+**`db:migrate` is what the tag runs**, so the three migrations `0007`, `0008` and `0009` all apply to
+production on the push. `0007` is the one to look at before pushing it: it drops `ratings.comment` and
+deletes rows on the stated assumption that production holds no ratings at all, and that assumption has
+not been rechecked since it was written. `select count(*) from ratings;` is the check, and it is
+irreversible if the answer is not `0`.

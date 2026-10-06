@@ -57,6 +57,20 @@
       "when": 1790939693711,
       "tag": "0007_chubby_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791277649980,
+      "tag": "0008_true_johnny_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791277999001,
+      "tag": "0009_seed_formations",
+      "breakpoints": true
     }
   ]
 }

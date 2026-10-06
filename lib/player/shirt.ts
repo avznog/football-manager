@@ -9,15 +9,17 @@
  */
 
 /**
- * How many characters a 7-a-side shirt back actually holds.
+ * There is **no ceiling on the length of a flocage** any more, on the owner's instruction
+ * (2026-10-06). The twelve-character cap this module used to export was a guess at what a flocking
+ * machine prints legibly, and it was being enforced in three places — here, in `shirtNameSchema`
+ * and in the `team_members_shirt_name_length` check — which made « the printer will shrink it »
+ * into « the app refuses to remember it ». Whoever orders the shirts can shorten a name that does
+ * not fit; the app's job is to hold what the player typed.
  *
- * The limit is the kit, not the column: the flocage is printed across the width of the back above
- * the number, and past a dozen characters the printer either shrinks it to something unreadable or
- * refuses the job. Enforced three times, on purpose — here for the form and its hint, in
- * `shirtNameSchema` for the submission, and by the `team_members_shirt_name_length` check so no
- * other writer can get round it.
+ * What survives is the **lower** bound: the check constraint still rejects the empty string, so
+ * « no flocage » has exactly one representation (`null`) and no screen has to tell `''` and `null`
+ * apart. That is the half the Zod `transform` relies on from the other side.
  */
-export const SHIRT_NAME_MAX_CHARS = 12;
 
 /**
  * What a flocage reads as on a shirt: trimmed, uppercase, or `null` when there is none.
@@ -76,5 +78,5 @@ export function shirtNameHintFr(isPlayer: boolean, isSelf: boolean): string {
     ? "Ce qui est imprimé dans ton dos, souvent un surnom plutôt qu’un nom de famille."
     : "Ce qui est imprimé dans son dos, souvent un surnom plutôt qu’un nom de famille.";
 
-  return `${who} ${SHIRT_NAME_MAX_CHARS} caractères au plus, et c’est écrit en majuscules sur le maillot.`;
+  return `${who} C’est écrit en majuscules sur le maillot, donc plus c’est court, plus c’est lisible.`;
 }

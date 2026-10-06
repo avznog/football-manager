@@ -4336,7 +4336,9 @@ is now safe.
 
 ## 130 — The wish picker offers eight codes, and the vocabulary stays at eleven
 
-**2026-10-01** · accepted · narrows one component and nothing else
+**2026-10-01** · **superseded on 2026-10-06 by decision 141**, which narrows the picker again to the six
+distinct codes of `1-3-2-1` alone · everything below about the vocabulary staying at eleven, about the
+Zod enum, and about the chip row still holds; only « eight, the union of two shapes » does not
 
 **Decision.** The preference picker draws `PREFERRED_POSITION_CODES` (`db/reference.ts:164`) — eight
 codes: `GB DG DC DD MG MC MD AT`. `POSITION_CODES` stays at eleven, the composition editor keeps all
@@ -5194,3 +5196,103 @@ happens offline** (`D4`(b) / `A4`). `lib/match/outbox.ts` is event-specific — 
 second IndexedDB store and a new POST API. A localStorage draft surviving a reload was designed as the
 cheap substitute and **was not shipped either**. So this decision stopped the losses that happen *online*,
 which were the ones destroying rows; the ROADMAP item stays open.
+
+## 141 — `db:migrate` owes a fresh database a usable one, and two of the owner's limits come off
+
+**2026-10-06** · accepted · supersedes the open item of decision 129 that left `formations` unseeded,
+and supersedes decision **130** on the size of the wish picker · the migration half is the production fix
+
+Three changes the owner asked for in one sitting. They share a thread — each one is a number or a rule the
+app had decided for him, and he has taken all three back — but the middle one is the only emergency, and it
+is a statement about what migrating owes a database rather than a preference.
+
+### The seven built-in formations are seeded by a migration
+
+**The bug.** On production, `/match/<id>/composition` said « Aucune formation disponible · Les formations
+types n'ont pas été chargées dans la base. » (`editor-screen.tsx:136-144`), and `/match/<id>/saisie` the
+same at `:125`. **No composition could be made at all.** The `formations` table was empty.
+
+**The cause, measured and not inferred.** `seedReference()` in `db/seed-reference.ts` was the only writer
+of the built-in formations, and it runs from `npm run db:seed` and `npm run db:bootstrap` only — neither of
+which has ever run against production. The local database has 11 positions, 7 built-ins and 49 slots
+because a developer runs `db:reset`, which is exactly why this never showed up in development: the one
+machine anybody would check on is the one machine where the bug cannot happen. Decision 129 had already
+written that sentence about `positions`; it recorded `formations` as « 0 either way, and deliberately left
+that way », pending the owner's call.
+
+**The decision.** `db/migrations/0009_seed_formations.sql` inserts the seven `BUILTIN_FORMATIONS` with
+`team_id is null` and their 49 slots. This is `0006_seed_positions.sql`'s principle — *migrating is what
+creates the constraint, so migrating is what has to satisfy it* — generalised one step: **migrating is what
+creates the schema, so migrating is what has to leave it usable.** A foreign key with nothing to point at
+and a `<select>` with nothing in it are the same defect wearing two faces, and the first got a migration
+while the second got a note.
+
+**What keeps it safe.** It is **insert-only and idempotent**, guarded on `label` among the rows with
+`team_id is null` — the same key `seedReference()` uses to identify a built-in — and it writes slots only
+for a formation that has none. So `db/reference.ts` remains the single source of truth: the file is a copy
+of `BUILTIN_FORMATIONS` at one moment in time, and `seedReference()` still owns every later change,
+replacing a built-in's slots wholesale on each seed. A migration that *updated* would fight the seeder and
+would move a slot somebody's saved composition points at; one that inserts cannot. It depends on
+`positions` being populated, which 0006 guarantees and the journal orders.
+
+**Verified from empty, which is the only test that demonstrates the fix.** A no-op on the local database
+(11 / 7 / 49 before and after). Then a scratch database given `npm run db:migrate` **and nothing else** —
+no `db:seed`, no `db:bootstrap` — ends with **11 positions, 7 formations with `team_id is null`, 49
+slots**, every slot's `position_code`, `x`, `y` and `sort` identical to `BUILTIN_FORMATIONS` compared row
+by row. Running the file twice more inserts nothing, and `db:seed` on top of it duplicates nothing.
+
+**What was rejected.** Making `db:bootstrap` a required step that something checks. It is the alternative
+decision 129 named, and it is worse for the reason the owner met: a required step that nothing runs is a
+screen that lies about why it is empty. The reasons 129 gave for leaving the formations out all survive —
+they were reasons not to *update* from a migration, and none of them was a reason to ship a dead end.
+
+### The flocage has no character limit
+
+`SHIRT_NAME_MAX_CHARS = 12` is gone, on the owner's instruction. The number was a guess at what a flocking
+machine prints legibly across a 7-a-side back, and it was enforced in three places by design — the
+constant and its hint, `shirtNameSchema`, and the `team_members_shirt_name_length` check. Three places
+agreeing on a guess is still a guess, and the consequence was that « the printer will shrink it » had
+become « the app refuses to remember it ». How short a name has to be to fit is a decision for whoever
+orders the shirts.
+
+**The check constraint is relaxed, not dropped** (`0008_true_johnny_storm.sql`): `char_length >= 1` rather
+than `between 1 and 12`. Its lower bound is doing different work from its upper one — it is what stops a
+one-space flocage from reaching the column as an empty string, so « no flocage » keeps exactly one
+representation, `null`, and no screen has to tell `''` and `null` apart. `shirtNameSchema` keeps its
+`trim()` and its transform to `null` for the same invariant from the other side; dropping the check would
+have left it held in one place instead of two. The hint stops stating a ceiling and says the useful thing
+instead — it is printed in capitals, so shorter reads better — and the `maxLength` attribute comes off the
+input, because an attribute that silently swallows keystrokes explains nothing.
+
+The one layout risk of an unbounded flocage was looked at rather than reasoned about: a 27-character
+flocage saved from `/joueur/<id>` renders on the `/equipe` squad row as « floqué LE PROFESSEUR DE
+SAINT-OU… », truncated with an ellipsis inside the card at 390 px. Nothing overflows.
+
+### The wish picker offers six codes, not eight
+
+**This supersedes decision 130.** That one drew the picker from « the union of the slots of the two shapes
+this team really plays », `1-3-2-1` and `1-2-3-1` — eight distinct codes. The owner has narrowed it to
+**the one shape the team actually lines up in**, `1-3-2-1` = `GB DG DC DD MC MC AT`: seven slots, **six
+distinct codes**, `GB DG DC DD MC AT`, because the double pivot is two `MC`.
+
+**State the consequence rather than letting it be discovered: `MG` and `MD` are no longer offered as a
+wish, even though `1-2-3-1` still uses them and a coach can still field it.** That is the owner's decision,
+not an oversight. Being asked where you would like to play is a question about the shape the team turns out
+in on a Sunday, and that shape is one shape. The excluded five are now `MG MD MOC AG AD`, which is what the
+chip row in `PositionPicker` exists for: a record written before the list narrowed keeps its code, the
+profile posts the selection's own keys so nothing drops it, and a chip is the one way to remove it.
+
+**The guard was rewritten rather than renumbered.** `db/reference.test.ts` recomputed the union from
+`BUILTIN_FORMATIONS` and asserted `size === 8`; changing the 8 to a 6 would have left a test measuring a
+union nobody claims any more. It now recomputes **the distinct codes of the `1-3-2-1` template** and
+asserts `PREFERRED_POSITION_CODES` equals that set, so the property 130 built the test for survives: move
+a slot in that formation and the test fails, and the stated rule cannot drift from the shipped constant.
+The sort-order check and the subset-of-`POSITION_CODES` check are untouched, and the exclusion test names
+all five.
+
+**`positionCodeSchema` stays at eleven codes, and its docblock's reasoning stays load-bearing** — only its
+count needed correcting, from « the eight the picker offers » to six. A player whose row already holds
+`MG` or `MD` posts it back on every save; narrowing the Zod enum would make that player's whole submission
+fail forever, and leave them unable to save anything ever again. Dropping a stored code is the picker's
+job, not the schema's. `POSITION_CODES` stays at eleven for the same reason it did under 130: all seven
+built-in formations stay shippable and the composition editor still places any of them.
