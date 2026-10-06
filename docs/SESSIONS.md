@@ -4536,3 +4536,46 @@ aggregation while the range and self rules still drop theirs, and `isValidScore`
 tenth). No screen changed, so nothing to walk at 390 px. The migration was applied to the **local**
 `football_prod` restore and the constraint list read back from `pg_constraint`:
 `ratings_score_one_decimal` present, `ratings_score_half_step` gone, the other six untouched.
+
+## 2026-10-06 — beta.10, because beta.9 was tagged before three merges landed
+
+`v1.0.0-beta.9` was cut by hand at `3c7c006` and `release.yml` ran at 10:10. Three pull requests
+merged afterwards, so the tag ships none of them and `git tag --contains` is empty for all three:
+
+- **#155** — a stale `fm_session` cookie clears itself instead of looping forever. The owner was
+  hitting `ERR_TOO_MANY_REDIRECTS` on `7orteils.bgonzva.fr`, with no way out: no page loads, so no
+  logout button, and the cookie is `httpOnly`.
+- **#156** — `ratings.score` tolerates one decimal (migration `0010`, decision 144).
+- **#157** — the radarlocal importer.
+
+Re-cutting beta.9 was rejected: the gate would pass, because `package.json` still said beta.9 at
+both commits, but the pre-release GitHub had already published would then describe a different
+commit. Bumping is the honest option.
+
+**Why this bump is on the critical path rather than housekeeping.** The owner asked for the two
+imported matches to be written to production. That cannot happen on beta.9 for two independent
+reasons, both verified against the live database rather than reasoned about:
+
+1. production is at migration `0009` and still carries `ratings_score_half_step`, so **12 of the 21
+   per-match means violate a live CHECK** — 7,3 · 7,1 · 6,4 · 6,3 · 6,2 · 5,7 · 5,3 · 4,2 · 4,1 ·
+   3,9 · 3,8 · 3,7 · 3,6. The insert would fail part-way;
+2. even if it were forced, beta.9's `isValidScore` demands a half-point and **filters rows read
+   *from* the database**, so every imported mean would be dropped on read and the site would show
+   « — ». That is the silent bug #156 exists to fix.
+
+So production must reach beta.10 — migrated *and* deployed — before the import is run. Only
+`release.yml` on a tag migrates production (decision 119), and the tag is cut by hand.
+
+**A fresh production dump was compared against the 15:58 one before any of this**, as the owner
+asked. All 22 `public` tables identical, table for table; `match_events`, `match_player_stats` and
+`ratings` all still 0. The only differences were Neon's own metadata — three Vercel preview domains
+appended to the `neon_auth` project-config row by today's three CI preview deployments, and two
+`ALTER DEFAULT PRIVILEGES` lines. Nothing the application wrote.
+
+**Incidental finding: `.env` line 2 is not production.** It points at `ep-sweet-cake-zap6xql9` and
+its password no longer authenticates, where production is `ep-gentle-cherry-zar3v5jz`. The standing
+worry that `.env` was one deleted line in `.env.local` away from being what `npm run dev` talks to
+is therefore smaller than recorded — but it is a stale credential sitting in a file that looks
+authoritative, and it should be deleted or labelled.
+
+Files: `package.json`, `package-lock.json`, `docs/SESSIONS.md`.
