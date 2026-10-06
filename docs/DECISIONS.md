@@ -5474,3 +5474,86 @@ sanity check: the spec fails. This spec is also the one place the suite forges a
 instead of logging in through the form (`e2e/helpers/app.ts`), because here the forgery *is* the
 subject — the honest alternative, logging in and deleting the row underneath, needs a second database
 connection to produce exactly what garbage already produces.
+
+---
+
+## 144 — The slider still steps by half a point; the column only asks for one decimal
+
+**2026-10-06** · accepted · **supersedes the `ratings_score_half_step` clause of decision 137**,
+leaving the rest of 137 and the 0–10 range of decision 007 standing · migration
+`0010_puzzling_karen_page.sql`
+
+The owner is importing the seasons that happened before the app existed. Each of those matches has a
+per-player figure that is **already a mean** — computed from the notes real teammates gave at the
+time — and those means land where means land: 7.3, 4.2, 3.9. `ratings_score_half_step` refused every
+one of them, and the only way through it was to round to the nearest half-point, which turns eleven
+distinguishable players into five-way ties. The thing the import exists to produce is a *ranking*, so
+rounding does not degrade the data, it deletes it.
+
+So the check becomes `ratings_score_one_decimal` — `(score * 10) = floor(score * 10)` — and nothing
+else about the table moves. `ratings_score_range` (0..10), `ratings_no_self` and the unique triple
+`(match_id, rater_member_id, rated_member_id)` are untouched, and no row has to change: every value
+the old check admitted satisfies the new one, which is why the migration is a `DROP CONSTRAINT` plus
+an `ADD CONSTRAINT` and nothing more.
+
+### What does **not** change: the match-day flow
+
+The rating screen is exactly as decision 137 left it. `RATING_SCORE_STEP` is still `0.5`, the
+`<input type="range">` still carries `step={0.5}`, and `ratingScoreSchema` still refuses « 7,2 » with
+« Une note va par demi-points : 7 ou 7,5, pas 7,2. » A player sliding a control cannot produce a
+tenth and will not be allowed to.
+
+That makes **the form deliberately stricter than the column**, which is the opposite of how the two
+layers have lined up everywhere else in this codebase, so it is worth saying why it is right rather
+than sloppy: the half-point is a property of *one way of writing a row* — a human reading a slider —
+and not a property of the quantity. A note is a judgement on a scale with a resolution; an imported
+mean is an arithmetic result. The table holds both, so it states the weaker rule, and the stricter
+rule lives where the stricter claim is true.
+
+### The subtlety, and why the new check is kept anyway
+
+**`numeric(3,1)` rounds on insert rather than erroring.** Postgres casts `7.26` to `7.3` before any
+check runs, so `(score * 10) = floor(score * 10)` is satisfied by every value that can ever reach
+it: the constraint **can never fire**. It is documentation, not enforcement, and it was written
+knowing that.
+
+It is kept, for three reasons:
+
+- it is the same kind of statement `ratings_score_range` already is. That check *can* fire, but in
+  practice `ratingScoreSchema` has rejected 11 long before Postgres sees it; it is there so the
+  column says its own shape to whoever opens `psql` or reads `schema.ts`, rather than making them
+  trust that every writer is well behaved. Deleting the step line entirely would leave the column
+  silently one-decimal by virtue of its type declaration, which is a fact a reader has to *infer*
+  from `numeric(3,1)` instead of read;
+- it is the only remaining written trace of the rule that was relaxed. A schema with a half-step
+  check that became a one-decimal check tells the next session that the resolution was considered;
+  a schema with the check simply gone tells it nothing, and the old half-step line will be a
+  plausible-looking re-addition to somebody importing the next batch;
+- it becomes live enforcement the moment the scale changes. `numeric(3,2)` or an untyped `numeric`
+  would stop rounding for us, and the check already in place would then refuse the quarter-point
+  rather than the quarter-point being discovered in the data.
+
+What is **not** claimed anywhere, because it is untrue: that the check protects the column. It does
+not. `numeric(3,1)` does, by rounding — and the honest consequence is that a bad import writes a
+*rounded* value rather than failing loudly, so an import script is responsible for its own precision
+before it inserts.
+
+### The read side had to move with the column, and that was the real bug
+
+`isValidScore` in `lib/rating/aggregate.ts` is not validation of a submission — it filters rows
+**already read from the database** before `aggregateRatings` trusts them, for exactly the case the
+comment names: « a fixture or a future import path might not » have gone through the checks. It
+demanded a half-point. So with only the constraint relaxed, every imported historical mean would have
+been inserted successfully and then **silently dropped on the way out**, and the season table the
+import exists to fill would have been empty of precisely the rows it was about. No test would have
+failed; the screen would simply have said « — ».
+
+It now follows the column: one decimal. The check is `Math.abs(score * 10 - Math.round(score * 10)) <
+1e-9` rather than `Number.isInteger(score * 10)`, and the reason is **not** the one first written
+here, which was wrong and is worth leaving corrected rather than deleted: a tenth is inexact in
+binary floating point, but the multiplication rounds back, `7.3 * 10` is exactly `73`, and the naive
+form holds for all 101 tenths in 0..10 — the test walks every one of them to pin that. The tolerance
+earns its place differently. The half-point test could *rely* on `0.5` being exact; this one merely
+happens to hold, so the next person to widen the scale to hundredths, or to route a `numeric` through
+a different parser, gets a predicate that still asks « is this a tenth, give or take the float »
+instead of one that was true by luck.

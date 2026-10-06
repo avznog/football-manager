@@ -11,10 +11,13 @@ import { RATING_SCORE_MAX, RATING_SCORE_MIN, RATING_SCORE_STEP } from "./aggrega
 
 /**
  * A note runs from 0 to 10 **in half-points** (decision 137, keeping decision 007's range and adding
- * the step). The same two bounds as the `ratings_score_range` check and the same step as
- * `ratings_score_half_step`, so a form this schema accepts can never produce a row the database
- * refuses — and, the direction that actually bites, a slider the screen renders can never produce a
- * note this schema refuses.
+ * the step). The same two bounds as the `ratings_score_range` check, so a form this schema accepts
+ * can never produce a row the database refuses — and, the direction that actually bites, a slider the
+ * screen renders can never produce a note this schema refuses.
+ *
+ * The step is **stricter than the column**, deliberately, since decision 144: `ratings_score_one_decimal`
+ * tolerates a tenth so a historical mean can be imported, while a note *submitted through the
+ * match-day slider* is still a half-point and anything else means a mangled or forged request.
  *
  * `coerce` because it arrives as a string from an `<input type="range">`. The step is checked by
  * arithmetic on a doubled value rather than with `multipleOf`: `0.5` is exact in binary floating

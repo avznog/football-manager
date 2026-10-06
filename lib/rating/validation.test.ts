@@ -14,7 +14,7 @@ describe("ratingScoreSchema", () => {
     }
   });
 
-  it("refuses anything the column could not hold", () => {
+  it("refuses anything outside the scale the column holds", () => {
     expect(ratingScoreSchema.safeParse("11").success).toBe(false);
     expect(ratingScoreSchema.safeParse("-1").success).toBe(false);
     expect(ratingScoreSchema.safeParse("10.5").success).toBe(false);
@@ -22,7 +22,8 @@ describe("ratingScoreSchema", () => {
   });
 
   it("refuses a note off the half-step, and says which step", () => {
-    // `ratings_score_half_step` would refuse the row; this is the message that gets there first.
+    // The slider cannot produce it, so a request carrying it was mangled or forged. The *column*
+    // would accept 7.2 since decision 144 — the form is stricter than the table on purpose.
     const result = ratingScoreSchema.safeParse("7.2");
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues[0]?.message).toContain("demi-points");

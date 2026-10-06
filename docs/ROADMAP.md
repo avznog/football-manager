@@ -1825,3 +1825,21 @@ browser could not be told to drop it. Decision **143** has the full account.
       path above is reached today by a restore or a rebuilt database rather than by housekeeping. Left
       open deliberately: wiring a pruner is a separate decision about where periodic work runs on
       Vercel, and it is now safe to make, which it was not before this change
+
+## Importing the seasons that happened before the app — 2026-10-06
+
+- [x] **`ratings.score` tolerates one decimal, not only half-points.** The historical per-match
+      figures are already *means* of real notes — 7.3, 4.2, 3.9 — and `ratings_score_half_step`
+      refused all of them; rounding to the half-point was the only way through and it collapses a
+      season's ranking into five-way ties. `ratings_score_one_decimal`
+      (`0010_puzzling_karen_page.sql`, decision **144**) replaces it, with the range check, the
+      no-self check and the unique triple untouched and no row needing to change. The **match-day
+      slider is deliberately unchanged**: still `step=0.5`, still « Une note va par demi-points », so
+      the form is stricter than the column on purpose
+- [x] **The read-side filter moved with the column**, which was the part that would have bitten
+      silently: `isValidScore` filters rows *already read from the database*, so with only the
+      constraint relaxed every imported mean would have inserted fine and then been dropped on the
+      way out, leaving the season table empty of the rows the import was for. It now accepts a tenth
+      — with a float tolerance, not because the naive `Number.isInteger(score * 10)` is wrong today
+      (it holds for all 101 tenths, and the test walks them) but because the half-point version could
+      *rely* on `0.5` being exact and this one cannot
