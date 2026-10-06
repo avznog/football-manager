@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { db } from "@/db/client";
 import { sessions } from "@/db/schema";
 import { SESSION_COOKIE } from "./cookies";
+import type { SessionState } from "./session-state";
 
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 /** Below this remaining lifetime, a session is extended on use. */
@@ -43,24 +44,31 @@ export async function createSession(userId: string): Promise<void> {
 }
 
 /**
- * Resolves the current session, or null. Also prunes the row if it has expired and extends
- * sessions that are close to expiry.
+ * Resolves the current session. Also prunes the row if it has expired and extends sessions that
+ * are close to expiry.
  *
  * Safe to call from a Server Component: cookie writes are attempted but swallowed, because
  * Next only permits them in Server Actions and Route Handlers.
+ *
+ * **Returns three outcomes, not two.** « No cookie » and « a cookie that resolves to nothing » used
+ * to be the same `null`, and that is what made the redirect loop of decision 143 possible: the
+ * caller could only send both to `/connexion`, where `proxy.ts` — which sees a cookie and asks no
+ * database — sent the second one straight back. `stale` is the case that has to be *cleared*, and
+ * clearing it is a cookie write, so the decision of where to send it lives in
+ * `session-state.ts` and the writing in `app/deconnexion/route.ts`.
  */
-export async function readSession(): Promise<{ userId: string } | null> {
+export async function readSessionState(): Promise<SessionState> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
+  if (!token) return { status: "anonymous" };
 
   const id = hashToken(token);
   const row = await db.query.sessions.findFirst({ where: eq(sessions.id, id) });
-  if (!row) return null;
+  if (!row) return { status: "stale" };
 
   if (row.expiresAt.getTime() <= Date.now()) {
     await db.delete(sessions).where(eq(sessions.id, id));
-    return null;
+    return { status: "stale" };
   }
 
   if (row.expiresAt.getTime() - Date.now() < SESSION_REFRESH_THRESHOLD_MS) {
@@ -74,7 +82,7 @@ export async function readSession(): Promise<{ userId: string } | null> {
     }
   }
 
-  return { userId: row.userId };
+  return { status: "active", userId: row.userId };
 }
 
 /** Deletes the session row and clears the cookie. Server Action / Route Handler only. */

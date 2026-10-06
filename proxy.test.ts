@@ -91,3 +91,26 @@ describe("proxy — redirects", () => {
     expect(proxy(request("/calendrier", { session: true })).headers.get("location")).toBeNull();
   });
 });
+
+/**
+ * The loop of decision 143, asserted from the proxy's side.
+ *
+ * `/deconnexion` is the escape hatch for a session cookie that resolves to nothing, and it is
+ * reached *holding that cookie*. If this guard touched it at all — in either direction — the
+ * cookie would never be deleted and the app would stay unloadable.
+ */
+describe("proxy — /deconnexion is never intercepted", () => {
+  it("lets a stale session through, so the route can delete the cookie", () => {
+    expect(proxy(request("/deconnexion", { session: true })).headers.get("location")).toBeNull();
+  });
+
+  it("lets a request with no cookie through, so a second tab or a bookmark is harmless", () => {
+    // The dangerous answer here is `/connexion?suivant=/deconnexion`: the login screen would then
+    // carry a logout in its pocket for after the next successful login.
+    expect(proxy(request("/deconnexion")).headers.get("location")).toBeNull();
+  });
+
+  it("is matched by the proxy at all, so this is a decision and not an accident", () => {
+    expect(MATCHER.test("/deconnexion")).toBe(true);
+  });
+});

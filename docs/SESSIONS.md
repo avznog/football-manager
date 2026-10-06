@@ -4423,3 +4423,65 @@ git merge-base --is-ancestor <fix-commit> v1.0.0-beta.8^{commit} && echo in || e
 
 `git log --oneline -1 <tag>` for the commit, and `^{commit}` because `v1.0.0-beta.8` is annotated and
 `rev-parse` on it alone yields the tag object — the trap `COORDINATION.md` already records for beta.6.
+
+## A dead session cookie bricked the app, and `/deconnexion` is the way out
+
+**2026-10-06** · decision **143** · no migration
+
+Reported from production and reproduced in one command:
+
+```
+$ curl -sI -H 'Cookie: fm_session=x' https://7orteils.bgonzva.fr/connexion
+HTTP/2 307
+location: /
+```
+
+A `fm_session` cookie with no `sessions` row behind it made **every** screen unreachable. `proxy.ts`
+saw a cookie and bounced `/connexion` → `/`; the `(app)` layout guard resolved the cookie, found
+nobody, and redirected `/` → `/connexion`. Neither could end it, because neither could delete the
+cookie — the proxy must not touch the database and a Server Component may not write cookies — and
+`httpOnly` meant the browser could not drop it either. `/moi`, the only logout button, is behind the
+loop. The only escape was clearing site data by hand.
+
+**Changed**
+
+- `lib/auth/session-state.ts` (new) — the `SessionState` union and `signedOutDestination()`, a leaf
+  with no database so the one decision that was missing is unit-testable;
+- `lib/auth/session.ts` — `readSessionState()` replaces `readSession()`: three outcomes instead of
+  two. The collapsed `null` was the bug;
+- `lib/auth/dal.ts` — `requireUser`/`requireActor` go through `redirectSignedOut()`, which sends a
+  visitor to `/connexion` and a dead cookie to `/deconnexion`;
+- `lib/auth/actions.ts` — the two `getCurrentUser()` guards use the same helper;
+- `app/deconnexion/route.ts` (new) — a Route Handler, the only thing here that may read the database
+  *and* write a cookie: `destroySession()`, then 303 to `/connexion?expiree=1`;
+- `proxy.ts` — `/deconnexion` added to `PUBLIC_PATHS`;
+- `app/(auth)/connexion/page.tsx` — « Ta session a expiré, reconnecte-toi. » on `?expiree=1`;
+- `lib/auth/session-state.test.ts`, `proxy.test.ts`, `e2e/stale-session.spec.ts`.
+
+**Verified by hand, with a cookie jar rather than `-H Cookie`** — which matters: `curl -L -H 'Cookie:
+…'` re-sends the header on every hop and *ignores* the `Set-Cookie` that deletes it, so it loops
+forever and looks like the bug is still there. With a jar, three responses:
+
+```
+HTTP/1.1 307 Temporary Redirect   location: /deconnexion?raison=expiree
+HTTP/1.1 303 See Other            location: http://localhost:3000/connexion?expiree=1
+                                  set-cookie: fm_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT
+HTTP/1.1 200 OK
+```
+
+`/deconnexion` with no cookie at all answers `303 /connexion`, with no expiry claim — the
+`?raison=expiree` round trip exists so the sentence is only shown when it is true.
+
+**Gates:** `npm run typecheck` clean · `npx eslint app components lib e2e db scripts proxy.ts
+proxy.test.ts` clean · `npm test` 1463 passed in 67 files · `npm run test:e2e` 8 passed in 2.1 min.
+The login screen screenshotted at 390 × 844 in both themes and read as images (`audit/`, gitignored):
+the panel is `warning`-toned, sits between the subtitle and the username field, wraps on one line,
+and clears the gutters in both.
+
+**One thing deliberately left open**, now in `docs/ROADMAP.md`: `pruneExpiredSessions()` has **no
+caller anywhere** — verified by grep over `app lib db scripts e2e .github`. It is the function whose
+routine use produces exactly this state, so today the path is reached by a restore or a rebuilt
+database and not by housekeeping. Wiring a pruner is a separate decision about where periodic work
+runs on Vercel; it is safe to make now, which it was not before.
+
+**Shipping:** `package.json` stays at `1.0.0-beta.9`; this lands before that tag is cut.

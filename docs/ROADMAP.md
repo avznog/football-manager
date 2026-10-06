@@ -1795,3 +1795,33 @@ as the defects, so the only thing that can promote any box below is a reading fr
       `deviceScaleFactor` we set ourselves, and it is what the `w-[390px]` assumptions and the
       `--tabbar-h` / safe-area work have to be checked against. The audit script taking its viewport from
       one list of devices is still the fix; this only supplies the measurements it should be built on
+
+## The redirect loop a dead session cookie caused — 2026-10-06
+
+Found on production, not by a test: `curl -H 'Cookie: fm_session=x' https://7orteils.bgonzva.fr/connexion`
+answered `307 location: /`. A cookie whose `sessions` row has gone made every screen of the app
+unreachable, including the one with the logout button, and the cookie being `httpOnly` meant the
+browser could not be told to drop it. Decision **143** has the full account.
+
+- [x] **A cookie that identifies nobody is now deleted instead of bounced.** `readSessionState()`
+      returns `anonymous | stale | active` where `readSession()` returned `{ userId } | null`, and
+      that collapsed third case is the whole bug: the layout guard could only send both negatives to
+      `/connexion`, where `proxy.ts` — which sees a cookie and asks no database — sent one of them
+      straight back. `app/deconnexion/route.ts` is the piece neither guard could be: a Route Handler
+      may write cookies, so it calls `destroySession()` and answers 303 to `/connexion?expiree=1`.
+      After that hop there is nothing left for the optimistic and the authoritative guard to disagree
+      about, which is why the loop cannot re-form rather than merely being longer
+- [x] **The user is told, in one sentence and tutoied** — « Ta session a expiré, reconnecte-toi. »
+      above the login form, and only when the guard said so, so a deliberate `/deconnexion` does not
+      claim an expiry. Walked at 390 × 844 in both themes, read as images
+- [x] **Covered at both levels, because this shipped with nothing on it.**
+      `lib/auth/session-state.test.ts` pins the decision, `proxy.test.ts` pins that `/deconnexion` is
+      never intercepted in any of the three cookie states, and `e2e/stale-session.spec.ts` is the one
+      that would have caught the outage: a forged cookie, a visit to `/`, and an assertion that the
+      itinerary is **at most four navigations** — a loop being a property of the whole chain, which
+      only a browser walks. Confirmed non-vacuous by reverting the fix and watching it fail
+- [ ] **Nothing prunes sessions on a schedule, and `pruneExpiredSessions()` has no caller.** It is
+      the function whose routine use produces this state, and it is currently dead code — so the
+      path above is reached today by a restore or a rebuilt database rather than by housekeeping. Left
+      open deliberately: wiring a pruner is a separate decision about where periodic work runs on
+      Vercel, and it is now safe to make, which it was not before this change

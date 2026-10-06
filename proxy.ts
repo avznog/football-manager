@@ -24,8 +24,15 @@ import { SESSION_COOKIE } from "@/lib/auth/cookies";
  * redirect there would make the bookmark's `<script src>` load HTML. Being public here is not being
  * open — the sink itself only exists off production and demands a shared secret on both verbs
  * (`lib/dev/trace.ts`, `isTraceRequestAllowed`).
+ *
+ * `/deconnexion` is here for the opposite reason to the others: it is reached **with** a cookie, and
+ * its whole job is to delete it (decision 143). Without it in this list the second rule below would
+ * not catch it — that one only fires on `/connexion` — but the first would, on the day a visitor
+ * with no cookie at all hits it, sending a logout to `/connexion?suivant=/deconnexion` and leaving a
+ * loop one trivial change away. Listing it says the route needs no session, which is true: it
+ * removes one.
  */
-const PUBLIC_PATHS = ["/connexion", "/rejoindre", "/api/dev/trace"];
+const PUBLIC_PATHS = ["/connexion", "/rejoindre", "/deconnexion", "/api/dev/trace"];
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;

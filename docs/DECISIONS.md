@@ -5363,3 +5363,114 @@ The picker's own layout needs no spacing check. Every pair of the eleven clears 
 (`lib/pitch/geometry.ts`), and any subset of a set whose every pair clears it clears it too, so narrowing
 or re-choosing the picker can never crowd the turf — which is why the eleven-wide spacing rule is kept
 even though no screen draws all eleven at once.
+
+## 143 — A session cookie that identifies nobody is cleared, not argued with
+
+**2026-10-06** · accepted · fixes a production outage mode · no migration, no schema change
+
+A `fm_session` cookie whose `sessions` row no longer exists made the **entire application
+unloadable**, with no way out from inside the browser. Reproduced against production with one
+command:
+
+```
+$ curl -sI -H 'Cookie: fm_session=x' https://7orteils.bgonzva.fr/connexion
+HTTP/2 307
+location: /
+```
+
+`/connexion` — the one screen that is supposed to be reachable without a session — answered « go
+away, you are signed in » to a cookie that signed nobody in.
+
+### The two guards, and why being individually right was not enough
+
+Nothing here was a mistake in a query. It was two guards answering **different questions** about the
+same cookie, each correctly:
+
+| | asks | costs | verdict on a dead cookie |
+|---|---|---|---|
+| `proxy.ts` | « is there a cookie » | no database | signed in → bounce `/connexion` to `/` |
+| `requireTeamContext()` in the `(app)` layout | « does it resolve to a member » | one query | signed out → redirect to `/connexion` |
+
+The split is deliberate and stays (`docs/NEXTJS16.md` §6): the proxy runs on every navigation and
+every prefetch, and a guard that queried Postgres there would be both slow and a lie, since a forged
+cookie passes it. The proxy is optimistic by design; the layout is authoritative.
+
+What was missing is that the authoritative guard had **only two answers to give**. `readSession()`
+returned `{ userId } | null`, collapsing « no cookie » and « a cookie that resolves to nothing » into
+the same `null`, so the layout could only send both to `/connexion` — and for the second one the
+proxy sent it straight back. 307 `/` → 307 `/connexion` → 307 `/` → … The optimistic guard and the
+authoritative one disagreed, permanently, and neither could win because **neither could delete the
+cookie**: the proxy must not touch the database, and a Server Component is forbidden from writing
+cookies at all. The cookie is `httpOnly`, so no script in the page could drop it either, and `/moi` —
+which holds the only logout button — is behind the layout, hence behind the loop. The sole escape was
+clearing site data in the browser's settings, which is not something to ask of a dozen people who
+play football on a Sunday.
+
+How a user gets into that state, in production, without anybody doing anything wrong:
+`pruneExpiredSessions()` deleting the row while the cookie's own 30-day expiry still has weeks to
+run; the database rebuilt or restored (`db:reset`, the production restore of decision 132) under a
+browser that kept its cookie; a `users` row deleted beneath a live session. None of these is exotic
+and the first is routine housekeeping.
+
+### The fix: a third outcome, and a route that can act on it
+
+`readSessionState()` replaces `readSession()` and returns `anonymous | stale | active`
+(`lib/auth/session-state.ts` holds the type and the one pure function that maps it to a
+destination). `stale` is the case the old `null` hid, and its destination is **not** `/connexion`:
+
+- no cookie → `/connexion`, exactly as before;
+- a cookie that resolves to nobody → `/deconnexion?raison=expiree`.
+
+`app/deconnexion/route.ts` is a Route Handler, which is the only kind of thing in this codebase that
+may both read the database *and* write a cookie. It calls `destroySession()` and answers **303** to
+`/connexion?expiree=1`.
+
+**Why the loop cannot re-form, rather than being papered over:** after that one hop there is no
+cookie left for the two guards to disagree about. They are not reconciled — the proxy still sniffs
+and the layout still queries — but the state in which their answers differ is now *destroyed on
+sight* instead of being bounced between them. `/deconnexion` is in `PUBLIC_PATHS`, so the proxy lets
+it through in all three cases, and that is checked in `proxy.test.ts`: with a cookie (the real path),
+with none (a bookmark, a second tab — the handler is idempotent and just redirects), and the matcher
+matching it at all. The chain, walked by hand against the local app with a cookie jar, is three
+responses long: `307 /deconnexion?raison=expiree` → `303 /connexion?expiree=1` + `Set-Cookie:
+fm_session=; Expires=Thu, 01 Jan 1970` → `200`.
+
+The `logout` Server Action on `/moi` is untouched and remains how a user logs out on purpose. The two
+`getCurrentUser()` guards inside `lib/auth/actions.ts` now route through the same helper, so a Server
+Action met by a dead cookie clears it too rather than handing the loop back to the next navigation.
+
+### `GET`, and the CSRF question answered out loud
+
+The handler supports `GET`, and that is a real decision, not an oversight. It is reached by
+`redirect()` from a Server Component, which can only produce a `GET`; a `POST`-only handler would be
+unreachable from the only caller that needs it, and we would be back to the brick.
+
+So it is forgeable: a third-party page can embed `<img src="…/deconnexion">` and log a visitor out.
+Stated plainly — **logging somebody out is a nuisance, not a privilege escalation.** It grants the
+attacker nothing, reveals nothing, and is undone by typing a password. Against the alternative, which
+is an application the user cannot load at all and cannot repair from inside the browser, the nuisance
+is the cheaper of the two by a wide margin. Two consequences accepted knowingly: a link-prefetcher or
+a mail scanner that follows `GET`s could log the user out, and so could a stray prefetch — mitigated
+only by the fact that **nothing in the app ever links here**, so there is no `<Link>` for Next to
+prefetch. The route is entered by a server-side redirect or by typing the URL.
+
+### The user is told, and tutoied
+
+A silent logout reads as the app having forgotten you. `/connexion?expiree=1` prints one line —
+« **Ta session a expiré, reconnecte-toi.** » — in a `warning`-toned panel above the form, and only
+then: somebody who typed `/deconnexion` deliberately is logging out, not expiring, and gets plain
+`/connexion`. That is what the `?raison=expiree` round trip is for. Tutoiement per decision 074, no
+`title` anywhere per decision 072. Looked at at 390 px in both themes.
+
+### Why the e2e test is the one that matters
+
+`lib/auth/session-state.test.ts` asserts the decision — a stale cookie must route to the clearing
+path and must *not* route to `/connexion` — and that is the logic. But a loop is a property of the
+whole chain, and only a browser walks the whole chain: proxy, Route Handler, `Set-Cookie`, layout
+guard. `e2e/stale-session.spec.ts` sets a garbage `fm_session`, visits `/`, and asserts it lands on
+`/connexion` with the form visible, the French line shown, the cookie gone, and the itinerary **at
+most four navigations long**. Reverting `signedOutDestination` to the old answer was run as a
+sanity check: the spec fails. This spec is also the one place the suite forges a session cookie
+instead of logging in through the form (`e2e/helpers/app.ts`), because here the forgery *is* the
+subject — the honest alternative, logging in and deleting the row underneath, needs a second database
+connection to produce exactly what garbage already produces.
