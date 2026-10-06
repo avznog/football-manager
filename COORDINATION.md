@@ -20,13 +20,14 @@ Keep it to these labelled lines, and keep them short. The 200 lines this section
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
 
-- **`main`** — at `def63f8`, the squash of **#145, the pointage that stopped deleting marks**. The newest tag,
-  `v1.0.0-beta.6`, is on **`646b830`** (the squash of #113),
-  now **31 commits behind**, so **preview is ahead of production** by all thirty-one and will stay ahead
+- **`main`** — at `2141f47`, the squash of **#150: the formations reach a fresh database, the flocage
+  loses its character cap, and the wish picker offers six codes instead of eight**. The newest tag,
+  `v1.0.0-beta.7`, is on **`0e5b619`** (the squash of #148),
+  now **2 commits behind**, so **preview is ahead of production** by both and will stay ahead
   until the next tag — which is normal and is what the split is for, not a thing to fix. Managed from
   **the owner's machine**, the gatekeeper: it reviews and squash-merges, including work pushed from the
   other machine. Re-derive the two numbers rather than reading them: `git log -1 origin/main` and
-  `git rev-list --count v1.0.0-beta.6..origin/main`.
+  `git rev-list --count v1.0.0-beta.7..origin/main`.
 - **Two dev servers are up on this machine, and the port tells you whose code you are testing.**
   **3000 is the owner's checkout** (`…/football-manager`) and **3451 is the other machine's worktree**
   (`.claude/worktrees/binary-spinning-hickey`). `playwright.config.ts` reuses an existing server outside
@@ -44,13 +45,18 @@ it. If a line takes more than a few seconds to correct, it will rot too.
   older tag confirms it. **Use `git rev-parse <tag>^{commit}`**, or `git log -1 <tag>`, which dereferences
   for you. `git rev-list --count <tag>..origin/main` dereferences too, which is why the count stayed
   right while the hash was wrong — a wrong fact next to a right one, with no failure in between.
-- **Last shipped** — **`v1.0.0-beta.6`**, on `646b830`: the `REMARK` event and the drawn action tiles.
+- **Last shipped** — **`v1.0.0-beta.7`**, on `0e5b619`: the pointage that stopped deleting marks.
+  **`package.json` is `1.0.0-beta.8` and that tag is not cut**, so #150's three migrations are on
+  preview and not on production; `git tag --list` is what answers « what is shipped », and reading
+  `package.json` for it is the mistake a session made here on 2026-10-06 — it reported beta.7 as being
+  held when the tag had already been pushed and released the day before.
   A version is `package.json`'s `version`; the annotated tag, cut **by hand** on `main`, is the act
   that ships it and the only thing that migrates and deploys production (decision 119). Nothing cuts a
   tag for you. **`npm version <v> --no-git-tag-version` rather than editing by hand**:
   `package-lock.json` read `beta.3` at the `beta.4` and `beta.5` tags because the earlier bumps were
   hand-edited, and the release gate only reads `package.json`, so nothing complained.
-- **Next free decision number** — **141**. The highest on `main` is **140**, the pointage's marks.
+- **Next free decision number** — **142**. The highest on `main` is **141**, #150's migration-seeds-too
+  rule and the two limits that came off with it.
   **`grep -c '^## ' docs/DECISIONS.md` on an up-to-date `main` is the only answer worth
   believing**, and this line is why: it said 133 when 133 *and* 134 were already on `main` — the other
   machine's two placeholders, the ones this line itself called "coming on `feat/retro-one-action-list`,
@@ -1481,3 +1487,39 @@ nothing here needs rewriting — it is dated history either way.
   second IndexedDB store and a new POST route, and the localStorage draft meant to substitute for it did
   not ship either. Next: nothing open; the eleven `S` questions, `A1` and the `1.0.0-beta.7` bump are
   still the owner's.
+- **2026-10-06 11:40 · owner's machine · `fix/formations-seed-and-flocage`** — **#150 is merged (`2141f47`)
+  and `package.json` is `1.0.0-beta.8`; the tag is the owner's and is not cut.** Three fixes he named in
+  one message. The one that mattered: on production, `/match/<id>/composition` offered « composition de
+  départ » and dead-ended on « Les formations types n'ont pas été chargées dans la base », so no
+  composition could be made at all — and **it is data, not code**. `seedReference()` is the only writer
+  of the positions, the built-in formations and their slots, and it is reachable only from `db:seed` and
+  `db:bootstrap`, **neither of which is in the deployment path**: a tag runs `db:migrate` and stops. So a
+  deployed instance has every table and none of the reference rows, and the screen was telling the truth.
+  `0009_seed_formations.sql` inserts the seven shapes and 49 slots itself, generalising what `0006` already
+  does for the positions — insert-only, idempotent, looked up by `label` among `team_id IS NULL`, so
+  `db/reference.ts` stays the single source of truth and the file never rewrites a coordinate somebody has
+  since moved. It was chosen over telling him to run `db:bootstrap` against production for one reason:
+  **bootstrap needs `SUPER_ADMIN_*` and resets that account's password on a re-run.** With it, the flocage
+  loses its twelve-character ceiling everywhere (Zod, `maxLength`, the French hint, and the check
+  constraint in `0008`, which is **relaxed rather than dropped** because its lower bound is what stops a
+  one-space flocage landing as `''`), and the wish picker drops from eight codes to the six distinct codes
+  of `1-3-2-1` — `POSITION_CODES` and `positionCodeSchema` deliberately unchanged, because a player whose
+  row already holds `MG` posts it back and narrowing the enum would make his submission fail for ever.
+  Decision **141**, superseding **130** on the picker and closing what **129** left open.
+  **Two things worth carrying forward, both of which cost time here.** First, **`git tag --list` is what
+  answers « what is shipped », not `package.json`** — I reported the beta.7 tag as still being held when
+  it had been cut and released the day before, and the `## NOW` line above now says so. Production has
+  been running beta.7, with the pointage fix and without the formations seed, which is the whole reason a
+  release that looked healthy left him unable to build a composition. Second, **the version bump belongs
+  in the same commit as the migrations it ships**: the release gate compares the tag against `package.json`
+  *at the commit the tag points at*, so a separate bump commit gives him two commits and no single one a
+  tag will accept. **Verification, run in this checkout rather than taken on report** — a scratch database
+  created empty and migrated with nothing else ended at 11 positions / 7 built-in formations / 49 slots,
+  with all **49 slot rows diffed field-by-field against `BUILTIN_FORMATIONS`** and identical, the position
+  codes identical to `POSITION_CODES` in order, and the file re-applied twice by hand afterwards still at
+  `11|7|49`; typecheck clean, `npx eslint app components lib e2e db scripts` silent, **1454 vitest in 66
+  files**, **7 e2e** with nothing on port 3000 beforehand so Playwright started its own server from this
+  checkout. **Before he pushes the tag:** `db:migrate` will apply `0007` as well, which drops
+  `ratings.comment` and deletes rows on the unrechecked assumption that production holds no ratings —
+  `select count(*) from ratings;` is the check and it is irreversible if the answer is not `0`. Next:
+  nothing open from this work; `S1`–`S11`, `A1`, the `TRACE_SECRET` rotation and the tag are his.
