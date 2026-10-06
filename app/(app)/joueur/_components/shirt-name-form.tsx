@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { updateShirtName } from "@/lib/player/actions";
-import { SHIRT_NAME_MAX_CHARS, shirtNameHintFr } from "@/lib/player/shirt";
+import { shirtNameHintFr } from "@/lib/player/shirt";
 
 export type ShirtNameFormProps = {
   teamId: string;
@@ -60,9 +60,9 @@ export function ShirtNameForm({
             id={id}
             name="shirtName"
             type="text"
-            /* The cap the column and the Zod schema both enforce. `maxLength` only spares the
-               player a rejected save; it is never the thing that makes it true. */
-            maxLength={SHIRT_NAME_MAX_CHARS}
+            /* No `maxLength`: the flocage has no ceiling any more (owner's instruction, 2026-10-06),
+               and an attribute capping it here would silently swallow the keystrokes past the limit
+               with nothing to explain why. */
             autoCapitalize="characters"
             autoComplete="off"
             spellCheck={false}

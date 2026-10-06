@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import { shirtNameSchema, updateShirtNameSchema } from "./validation";
 import {
-  SHIRT_NAME_MAX_CHARS,
   shirtNameDisplay,
   shirtNameHintFr,
   shirtNameRowFr,
@@ -93,31 +92,28 @@ describe("shirtNameHintFr", () => {
     expect(hint).not.toContain("dos");
   });
 
-  it("states the real limit rather than a number of its own", () => {
-    expect(shirtNameHintFr(true, true)).toContain(`${SHIRT_NAME_MAX_CHARS} caractères`);
+  it("announces no ceiling, because there is none to announce", () => {
+    // The limit was removed on the owner's instruction, so a hint stating a number of characters
+    // would be the one thing on the screen that is untrue.
+    const hint = shirtNameHintFr(true, true);
+
+    expect(hint).not.toMatch(/\d/);
+    expect(hint).toContain("majuscules");
   });
 });
 
 describe("shirtNameSchema", () => {
-  it("accepts a flocage exactly as long as a shirt back holds", () => {
-    const twelve = "A".repeat(SHIRT_NAME_MAX_CHARS);
-
-    expect(shirtNameSchema.safeParse(twelve).success).toBe(true);
+  it("accepts a flocage of any length: the ceiling was removed", () => {
+    expect(shirtNameSchema.safeParse("A".repeat(12)).success).toBe(true);
+    expect(shirtNameSchema.safeParse("A".repeat(13)).success).toBe(true);
+    expect(shirtNameSchema.safeParse("A".repeat(200)).success).toBe(true);
   });
 
-  it("refuses one character more", () => {
-    const thirteen = "A".repeat(SHIRT_NAME_MAX_CHARS + 1);
-    const parsed = shirtNameSchema.safeParse(thirteen);
-
-    expect(parsed.success).toBe(false);
-  });
-
-  it("trims before measuring, so padding never spends the budget", () => {
-    const padded = `  ${"A".repeat(SHIRT_NAME_MAX_CHARS)}  `;
-    const parsed = shirtNameSchema.safeParse(padded);
+  it("still trims, which is what keeps « no flocage » a single value", () => {
+    const parsed = shirtNameSchema.safeParse("  Momo  ");
 
     expect(parsed.success).toBe(true);
-    expect(parsed.success && parsed.data).toBe("A".repeat(SHIRT_NAME_MAX_CHARS));
+    expect(parsed.success && parsed.data).toBe("Momo");
   });
 
   it("stores what was typed: the uppercasing is a display choice, not a column", () => {
@@ -148,28 +144,42 @@ describe("updateShirtNameSchema", () => {
     expect(parsed.success && parsed.data.shirtName).toBe("Momo");
   });
 
-  it("refuses a flocage longer than a shirt back with a French message", () => {
+  it("accepts a long flocage rather than rejecting the whole submission", () => {
     const parsed = updateShirtNameSchema.safeParse({
       ...MEMBER,
-      shirtName: "A".repeat(SHIRT_NAME_MAX_CHARS + 1),
+      shirtName: "LE PROFESSOR DE SAINT-OUEN",
     });
 
-    expect(parsed.success).toBe(false);
-    expect(parsed.success === false && parsed.error.issues[0].message).toContain("caractères");
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.shirtName).toBe("LE PROFESSOR DE SAINT-OUEN");
   });
 });
 
-describe("the length limit is one number", () => {
+describe("the flocage has a floor and no ceiling", () => {
   /**
-   * Three places enforce it — the constant, the Zod schema and the database — and a form that
-   * accepts what the column rejects is a 500 on a save, not a validation error. This is the cheapest
-   * thing that notices them drifting, in the spirit of `lib/composition/copy.test.ts`.
+   * Two places used to agree on a maximum; now they have to agree that there is none, and that the
+   * **minimum** survives. `shirtNameSchema` turning `"   "` into `null` and the check constraint
+   * refusing `''` are the two halves of one invariant — « no flocage » is `null`, never an empty
+   * string — and a schema that let `''` through would be a 500 on a save rather than a validation
+   * error. This is the cheapest thing that notices either half drifting, in the spirit of
+   * `lib/composition/copy.test.ts`.
    */
-  it("is the same in db/schema.ts as in SHIRT_NAME_MAX_CHARS", () => {
+  it("keeps db/schema.ts's check as a lower bound only", () => {
     const schema = readFileSync(join(process.cwd(), "db/schema.ts"), "utf8");
-    const check = /team_members_shirt_name_length[\s\S]{0,240}?between 1 and (\d+)/.exec(schema);
+    const check = /team_members_shirt_name_length[\s\S]{0,240}?char_length\([^)]*\) (\S+) (\d+)/.exec(
+      schema,
+    );
 
     expect(check).not.toBeNull();
-    expect(Number(check?.[1])).toBe(SHIRT_NAME_MAX_CHARS);
+    expect(check?.[1]).toBe(">=");
+    expect(Number(check?.[2])).toBe(1);
+    expect(schema).not.toContain("between 1 and 12");
+  });
+
+  it("never produces the empty string the check rejects", () => {
+    for (const typed of ["", " ", "   ", "\t\n"]) {
+      const parsed = updateShirtNameSchema.safeParse({ ...MEMBER, shirtName: typed });
+      expect(parsed.success && parsed.data.shirtName).toBeNull();
+    }
   });
 });
