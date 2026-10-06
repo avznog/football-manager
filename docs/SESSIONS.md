@@ -4310,4 +4310,22 @@ boundary, « Cet écran n'a pas pu s'afficher ». `lib/player/validation.ts`'s `
 exists for exactly this and the match routes do not use it. Nothing links to that URL, which is why it has
 survived; it was hit by a screenshot probe walking the first `a[href^="/match/"]` on `/calendrier`.
 
-**Nothing is shipped**: `package.json` is `1.0.0-beta.7` and the tag is the owner's.
+**Shipping:** `package.json` is bumped to **`1.0.0-beta.8`** here, and the tag is the owner's to cut, by
+hand, as always. The bump is in this pull request rather than a later one so that the version and the
+migrations it ships are the **same commit** — `release.yml`'s gate compares the tag against
+`package.json` *at the commit the tag points at*, so a bump that lands separately makes the tag refuse
+one of the two commits.
+
+**`v1.0.0-beta.7` was already cut**, on `0e5b619`, on 2026-10-05, and its release run succeeded — after
+the gate had correctly refused a malformed `v1.0.0.0-beta.7` eleven seconds earlier. So production is
+**running beta.7 right now**, which carries the pointage fix of #145 and **not** the formations seed:
+that is the whole of why the owner could still not build a composition after a release that looked
+healthy. beta.8 is the first tag that makes production usable. An earlier note in this session said the
+beta.7 tag was still being held; it was not, and the mistake was reading `package.json` for what is
+shipped instead of `git tag`.
+
+**`db:migrate` is what the tag runs**, so the three migrations `0007`, `0008` and `0009` all apply to
+production on the push. `0007` is the one to look at before pushing it: it drops `ratings.comment` and
+deletes rows on the stated assumption that production holds no ratings at all, and that assumption has
+not been rechecked since it was written. `select count(*) from ratings;` is the check, and it is
+irreversible if the answer is not `0`.
