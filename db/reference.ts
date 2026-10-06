@@ -82,10 +82,11 @@ export type PositionDefinition = {
  * 71 px there — see `MIN_MARKER_DISTANCE` in `lib/pitch/geometry.ts`, and the test in
  * `db/reference.test.ts` that holds the whole list to it.
  *
- * The preference picker draws only `PREFERRED_POSITIONS` — a wish is one of the six codes the
- * team's usual shape actually uses — so `MOC` is no longer tapped next to `MC` there. The
- * spacing rule is kept for the eleven all the same: the composition editor places a slot anywhere
- * on this list, and a narrower picker must not license a crowded layout elsewhere.
+ * The preference picker draws only `PREFERRED_POSITIONS` — the seven codes the owner named — so
+ * `MOC` is no longer tapped next to `MC` there. The spacing rule is kept for the eleven all the
+ * same, and it is what makes the picker's own layout safe for free: the editor places a slot
+ * anywhere on this list, and any subset of a list whose every pair clears `MIN_MARKER_DISTANCE`
+ * clears it too, so narrowing the picker can never crowd it.
  */
 export const POSITIONS: readonly PositionDefinition[] = [
   { code: "GB", labelFr: "Gardien de but", line: "GB", defaultX: 500, defaultY: 60, sort: 1 },
@@ -149,29 +150,50 @@ export function isPositionCode(value: string): value is PositionCode {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The codes a player may wish for: exactly the **distinct codes of the one shape the team actually
- * lines up in**, `1-3-2-1` — `GB DG DC DD MC MC AT`, seven slots and six distinct codes, because
- * the double pivot is two `MC`. `db/reference.test.ts` recomputes that set from `BUILTIN_FORMATIONS`
- * so this list cannot drift away from the formation it is drawn from.
+ * The codes a player may wish for: **the seven the owner named**, in the words he used — keeper,
+ * the two defenders on the left and the right, the middle, the two wings, and the striker:
  *
- * The rule used to be the union of *two* shapes, `1-3-2-1` and `1-2-3-1`. It is not any more:
- * **`MG` and `MD` are no longer offered as a wish**, even though `1-2-3-1` still uses them and a
- * coach can still field it. That is the owner's decision (2026-10-06), not an oversight — being
- * asked where you would like to play is a question about the shape the team turns out in on a
- * Sunday, and that shape is `1-3-2-1`.
+ * ```
+ *   GB   gardien              DG   défenseur gauche     DD   défenseur droit
+ *   MC   milieu central       AG   ailier gauche        AD   ailier droit
+ *   AT   attaquant
+ * ```
+ *
+ * **This list is deliberately not derived from a formation, and that is the change to understand.**
+ * The rule was twice an arithmetic one — first the union of the slots of two shapes (`1-3-2-1` and
+ * `1-2-3-1`, eight codes, decision 130), then the distinct codes of `1-3-2-1` alone (six codes,
+ * decision 141) — and it is now neither. `GB DG DD MC AG AT AD` is the code set of **no** built-in
+ * formation: `1-3-2-1` has a `DC` and no winger, `1-2-1-3` has the two wingers and no `DG`/`DD`.
+ * So the derivation that `db/reference.test.ts` used to perform is gone, and with it the property
+ * that the list could not drift from the shape it was drawn from (decision 142).
+ *
+ * What replaces it, because a hand-chosen list needs *something* holding it:
+ *
+ * - **every code here is fieldable in at least one built-in formation** — `AG` and `AD` through
+ *   `1-2-1-3`, `DG` and `DD` through `1-3-2-1`. Offering a wish no shipped shape can satisfy would
+ *   be asking a player a question with no answer. The test says plainly that this bites on the
+ *   *formations* rather than on this list: all eleven codes are fielded somewhere today, so it holds
+ *   for any subset and only turns red if a formation is deleted or re-slotted;
+ * - **the mismatch with the default shape is deliberate and is stated out loud.** A wish is a
+ *   preference, not a promise: `DEFAULT_FORMATION_LABEL` is still `1-3-2-1`, so a player who wishes
+ *   for `AG` is asking for something the team's usual shape has no slot for, and a player who plays
+ *   centre-back in it cannot wish for `DC` at all, because the owner reads his two centre-backs as
+ *   « left » and « right » and picked `DG`/`DD` for them. Both are his call, made with the French
+ *   labels in front of him.
  *
  * A strict subset of `POSITION_CODES`, which deliberately does **not** change: all seven built-in
- * formations stay shippable and the composition editor keeps the whole eleven, so `MG`, `MD`, `MOC`,
- * `AG` and `AD` still exist in this app. They are simply not wishes. `satisfies` is what keeps the
+ * formations stay shippable and the composition editor keeps the whole eleven, so `DC`, `MG`, `MD`
+ * and `MOC` still exist in this app. They are simply not wishes. `satisfies` is what keeps the
  * subset honest rather than a comment.
  */
 export const PREFERRED_POSITION_CODES = [
   "GB",
   "DG",
-  "DC",
   "DD",
   "MC",
+  "AG",
   "AT",
+  "AD",
 ] as const satisfies readonly PositionCode[];
 
 export type PreferredPositionCode = (typeof PREFERRED_POSITION_CODES)[number];

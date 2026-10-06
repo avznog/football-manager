@@ -122,13 +122,18 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
       says « Chaque joueur choisit ses postes lui-même. », a failed write says « Tes postes n'ont pas
       été enregistrés. Réessaie. » instead of throwing, and a `ForbiddenError` still reaches the
       error boundary on purpose
-- [x] The picker offers the **six** codes of the one shape the team lines up in, `1-3-2-1` —
-      `GB DG DC DD MC AT` — recomputed in the test from `BUILTIN_FORMATIONS` so the list cannot drift
-      from the formation it is drawn from. It offered eight, the union of `1-3-2-1` and `1-2-3-1`
-      (decision 130); the owner narrowed it to the one shape on 2026-10-06, so **`MG` and `MD` are no
-      longer a wish even though `1-2-3-1` is still fieldable**. A chip row lets a player remove a
-      stored `MG`/`MD`/`MOC`/`AG`/`AD`, one way only, and `POSITION_CODES` stays at eleven: the
-      composition editor is not narrowed
+- [x] The picker offers the **seven positions the owner named** — `GB DG DD MC AG AT AD`: keeper,
+      central defence left and right, the middle, the two wings, the striker. Three rules in two days:
+      eight as the union of `1-3-2-1` and `1-2-3-1` (decision 130), six as the distinct codes of
+      `1-3-2-1` alone (decision 141), and now **seven that are not derived from any formation at all**
+      (decision 142) — `1-3-2-1` fields a `DC` and no winger, `1-2-1-3` fields the wingers and neither
+      full-back. So the test no longer recomputes the set from `BUILTIN_FORMATIONS`; it types the seven
+      out as the specification and keeps the one invariant that survives, *every wish is fielded by some
+      built-in formation*. Two mismatches with the usual shape are deliberate and pinned by a test: a
+      **wish is a preference, not a promise**, so `AG`/`AD` are wishable though `1-3-2-1` has no winger,
+      and `DC` is not though it fields one. A chip row lets a player remove a stored
+      `DC`/`MG`/`MD`/`MOC`, one way only, and `POSITION_CODES` stays at eleven: the composition editor
+      is not narrowed
 - [x] The flocage has **no character limit**. It was capped at 12 in three places — a constant, the
       Zod schema and the check constraint — and the owner removed the ceiling on 2026-10-06
       (`0008_true_johnny_storm.sql`). The constraint stays as a lower bound, `char_length >= 1`, which

@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * The position picker on a player's profile: the six positions this team's usual shape `1-3-2-1`
- * uses (`PREFERRED_POSITIONS`) as tappable targets on the turf. Each tap cycles
+ * The position picker on a player's profile: the seven positions the owner named
+ * (`PREFERRED_POSITIONS`) as tappable targets on the turf. Each tap cycles
  * **non souhaité → secondaire → principal → non souhaité**, which is exactly
  * `player_positions.preference` (no row / `secondary` / `primary`).
  *
- * A record written before the list narrowed may still hold `MG`, `MD`, `MOC`, `AG` or `AD`. Nothing
+ * A record written before the list changed may still hold `DC`, `MG`, `MD` or `MOC`. Nothing
  * deletes such a code — the form posts the selection's own keys — so without the chip row below it
  * would be invisible *and* unremovable. The chips are derived from `value`, exactly like the grid, which is
  * what keeps `cyclePosition` and the whole write path out of this: a chip only ever removes. Each one
