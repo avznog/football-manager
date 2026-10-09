@@ -5,6 +5,7 @@ import {
   batchEffects,
   prepareEventBatch,
   resolveStoredEvents,
+  voidsStartingLineup,
   type PreparedEvent,
 } from "./ingest";
 
@@ -245,5 +246,35 @@ describe("the ingestion envelope", () => {
     });
 
     expect(parsed.success).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The starting composition (decision 150)                                    */
+/* -------------------------------------------------------------------------- */
+
+describe("voidsStartingLineup", () => {
+  const seven = () => Array.from({ length: 7 }, () => ({ slotId: uuid(), memberId: uuid() }));
+  const starting = seven();
+  const later = starting.map((slot, i) => (i === 6 ? { ...slot, memberId: uuid() } : slot));
+
+  /** The log as `getMatchEvents` returns it: what the device sent, plus the server's id and seq. */
+  const stored = [
+    input("LINEUP_APPLIED", 0, { payload: { lineupId: uuid(), slots: starting } }),
+    input("KICKOFF", 0),
+    input("LINEUP_APPLIED", 20, { payload: { lineupId: null, slots: later } }),
+  ].map((event, i) => ({ ...event, id: uuid(), seq: i }));
+  const [startingEvent, , laterEvent] = stored;
+
+  it("refuses a VOID aimed at the composition that filled the empty pitch", () => {
+    const crafted = input("VOID", 25, { voidsEventId: startingEvent.id });
+    expect(voidsStartingLineup(stored, [crafted])).toBe(true);
+  });
+
+  it("lets a later composition be annulled, and anything else", () => {
+    expect(voidsStartingLineup(stored, [input("VOID", 25, { voidsEventId: laterEvent.id })])).toBe(
+      false,
+    );
+    expect(voidsStartingLineup(stored, [input("GOAL_FOR", 25)])).toBe(false);
   });
 });

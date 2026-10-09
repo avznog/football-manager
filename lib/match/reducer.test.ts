@@ -850,6 +850,30 @@ describe("annulled events", () => {
     expect(state.timeline[3].type).toBe("VOID");
   });
 
+  it("marks the composition that filled an empty pitch as the starting one, and only that one", () => {
+    const state = reduceMatch(
+      log([
+        { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN, "l-initial") },
+        { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload({ ...STARTING_ELEVEN, [SLOT.at]: "momo" }) },
+        { type: "KICKOFF", min: 0, period: 1 },
+        { type: "LINEUP_APPLIED", min: 20, payload: lineupPayload({ ...STARTING_ELEVEN, [SLOT.mc1]: "yanis" }) },
+        { type: "VOID", min: 21, voids: 4 },
+      ]),
+      [],
+      CONFIG,
+    );
+    expect(state.timeline.map((entry) => entry.startingLineup)).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    // Annulling the 20′ change puts the pitch back exactly as the re-applied composition left it.
+    expect(state.onPitch.map((player) => player.memberId)).toContain("momo");
+    expect(state.onPitch.map((player) => player.memberId)).toContain("leo");
+  });
+
   it("undoes a substitution that never happened", () => {
     const state = reduceMatch(
       log([
@@ -1210,6 +1234,35 @@ describe("planned compositions", () => {
     const state = reduceMatch(events, planned, CONFIG);
     expect(state.plannedLineups[0]).toMatchObject({ lineupId: "l-initial", applied: true });
     expect(state.plannedLineups[0].diff.isEmpty).toBe(true);
+  });
+
+  it("proposes a later plan again once its application is annulled (decision 150)", () => {
+    // `lineups.applied_event_id` is written once and never cleared, so the plan below still carries
+    // it after the VOID. The log is what decides.
+    const applied = [
+      ...events,
+      ...log([
+        { type: "LINEUP_APPLIED", min: 31, payload: lineupPayload({ ...STARTING_ELEVEN, [SLOT.mc1]: "yanis" }, "l-second-half") },
+        { type: "VOID", min: 32, voids: 1 },
+      ]).map((event, i) => ({
+        ...event,
+        id: `e-late-${i + 1}`,
+        seq: 20 + i,
+        voidsEventId: event.voidsEventId ? "e-late-1" : null,
+      })),
+    ];
+    const stillMarked = planned.map((lineup) =>
+      lineup.id === "l-second-half" ? { ...lineup, appliedEventId: "e-late-1" } : lineup,
+    );
+
+    const notYetVoided = reduceMatch(applied.slice(0, -1), stillMarked, { ...CONFIG, nowMs: T0 + 33 * MIN });
+    expect(notYetVoided.plannedLineups[1].applied).toBe(true);
+    expect(notYetVoided.pendingLineup).toBeNull();
+
+    const state = reduceMatch(applied, stillMarked, { ...CONFIG, nowMs: T0 + 33 * MIN });
+    expect(state.plannedLineups[1].applied).toBe(false);
+    expect(state.pendingLineup?.lineupId).toBe("l-second-half");
+    expect(state.onPitch.map((player) => player.memberId)).toContain("leo");
   });
 
   it("flags a planned player who has been injured in this match", () => {

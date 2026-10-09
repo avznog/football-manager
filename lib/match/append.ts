@@ -38,8 +38,10 @@ import {
   batchEffects,
   prepareEventBatch,
   resolveStoredEvents,
+  voidsStartingLineup,
   type IngestSuccess,
 } from "./ingest";
+import { getMatchEvents } from "./live";
 
 export type AppendFailure = {
   ok: false;
@@ -107,6 +109,11 @@ export async function appendMatchEvents(actor: Actor, raw: unknown): Promise<App
     const known = new Set(stored.map((row) => row.clientEventId));
     if (!clientEventIds.every((id) => known.has(id))) return fail(409, INGEST_ERRORS.finished);
     return respond(matchId, events, stored);
+  }
+
+  // Decision 150: the starting composition cannot be annulled — game mode would lose its pitch.
+  if (await refusesStartingLineupVoid(matchId, events, stored)) {
+    return fail(409, INGEST_ERRORS.startingLineup);
   }
 
   await insertNewEvents(matchId, actor.userId, events, stored);
@@ -210,6 +217,11 @@ export async function amendMatchEvents(actor: Actor, raw: unknown): Promise<Appe
 
   const targetIssue = await checkVoidTargets(matchId, events);
   if (targetIssue) return fail(409, targetIssue);
+  // The retro screens never offer this (`isAmendableEventType`); a crafted POST meets the same rule
+  // game mode does.
+  if (await refusesStartingLineupVoid(matchId, events, stored)) {
+    return fail(409, INGEST_ERRORS.startingLineup);
+  }
 
   await insertNewEvents(matchId, actor.userId, events, stored);
   stored = await selectStored(clientEventIds);
@@ -278,6 +290,24 @@ async function checkVoidTargets(
   if (existingVoids.length > 0) return AMEND_ERRORS.alreadyVoided;
 
   return null;
+}
+
+/**
+ * True when a `VOID` this batch would newly write targets the starting composition (decision 150).
+ *
+ * Events already in the log are left out, so a retry of a batch accepted before this rule existed
+ * is answered rather than refused (invariant 6). The log is read only when a new `VOID` exists,
+ * which is rare: a match produces a handful of them at most.
+ */
+async function refusesStartingLineupVoid(
+  matchId: string,
+  events: readonly MatchEventInput[],
+  stored: readonly StoredRow[],
+): Promise<boolean> {
+  const known = new Set(stored.map((row) => row.clientEventId));
+  const incoming = events.filter((event) => !known.has(event.clientEventId));
+  if (!incoming.some((event) => event.type === "VOID")) return false;
+  return voidsStartingLineup(await getMatchEvents(matchId), incoming);
 }
 
 /* -------------------------------------------------------------------------- */
