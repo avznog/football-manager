@@ -766,6 +766,28 @@ it stands.
       match nobody watched; `appliedNoticeFr` and `lineupsFrozenFr` take `entry_mode` and say
       « enregistrée avec la saisie du match » where that is what happened (decision 089)
 
+## M8 — Rework from the cahier des charges (2026-10-09)
+
+The owner's review after two real matches, `cahier-des-charges.md`. Plan: the top section of
+`docs/PLAN.md`. Tracked on the GitHub Project « Football-manager », one issue per slice. **No production
+tag during this rework** (decision 146): every item below reaches the preview only.
+
+- [x] **The board** — the 158 merged pull requests added to the Project as *Done*; one issue per slice
+      below, labelled `cahier-des-charges` (#160–#172)
+- [ ] **S1** · #160 · voiding the starting composition makes the pitch disappear
+- [ ] **S2** · #161 · remove trainings (tables dropped)
+- [ ] **S3** · #162 · remove match availability and the reminder message (table and enum dropped)
+- [ ] **S4** · #163 · one formation, `1-2-3-1`, positions GB / DC / MC / AIL / AT
+- [ ] **S5** · #164 · preferred positions set by coaches only, gone from `/moi`
+- [ ] **S6** · #165 · the composition page replaces the match sheet
+- [ ] **S7** · #166 · game mode: But, But encaissé, Changement, Autre; « Sifflet » replaces « Fin »
+- [ ] **S8** · #167 · unpaired group changes, goal-before-change ordering, tap a player to act
+- [ ] **S9** · #168 · the starting composition applied when game mode opens
+- [ ] **S10** · #169 · add changes after the match, realistically
+- [ ] **S11** · #170 · only starters, substitutes and supporters may rate
+- [ ] **S12** · #171 · stats data: goals for while on, minutes per position, rates, impact per position
+- [ ] **S13** · #172 · équipe type: offensive, défensive, 7 de légende, notes
+
 ## Deployment
 - [x] First-run bootstrap — `npm run db:bootstrap` writes the reference data and the one
       super-admin account an invite-only app cannot otherwise have (decision 052). Verified

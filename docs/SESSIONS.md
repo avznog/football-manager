@@ -4579,3 +4579,33 @@ is therefore smaller than recorded — but it is a stale credential sitting in a
 authoritative, and it should be deleted or labelled.
 
 Files: `package.json`, `package-lock.json`, `docs/SESSIONS.md`.
+
+## 2026-10-09 — The cahier des charges becomes the plan, and the board fills up
+
+The owner wrote `cahier-des-charges.md` (#159) after two real matches and asked for three things in
+order: a GitHub Project holding all past work, a new plan from the cahier, and the plan pushed once
+confirmed.
+
+**The board.** The Project « Football-manager » (number 5) had one card. The `gh` token lacked the
+`project` scope until the owner ran `gh auth refresh -s project`. The repository has **no issues at all**
+and 158 merged pull requests (#137 was closed unmerged and is left off), so the owner chose the pull
+requests themselves as *Done* cards over 158 issues written after the fact. Added with a script that
+skips what is already on the board. **One trap worth knowing:** `gh project item-list -L 1000` reported
+120, then 122, then 126 items while the adds were still propagating — the true count, paged through
+GraphQL, reached 158 a minute later. Re-check with `items(first:100,after:…)` and `totalCount` before
+concluding anything is missing.
+
+**The plan.** Three code maps (match mode, compositions and the removals, statistics) and one design pass
+on the change model, then ten questions to the owner — recorded in decision 145 — and three decisions
+taken on the latitude the cahier gave: 146 (no tag during the rework; the board is the tracker) and 147
+(a change is a `LINEUP_APPLIED` snapshot; at an identical reading, facts before pitch events). The
+reported bug was found by reading, not reproduced: voiding the starting composition from the game-mode
+timeline empties the pitch, and the proposal never comes back because `lineups.applied_event_id` is
+written once and never cleared.
+
+**One finding against the cahier, put to the owner rather than worked around:** « par défaut la compo
+principale est appliquée » reverses non-negotiable invariant 3 of `CLAUDE.md`. He confirmed it — applied
+as soon as game mode opens — and the change to `CLAUDE.md` rides the slice that changes the behaviour.
+
+Files: `docs/PLAN.md`, `docs/ROADMAP.md`, `docs/DECISIONS.md` (145–147), `COORDINATION.md`,
+`docs/SESSIONS.md`.
