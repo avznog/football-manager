@@ -22,8 +22,6 @@ import {
   DEFAULT_DIRECTION,
   DIRECTION_PARAM,
   DIRECTION_VALUES,
-  FORMATION_PARAM,
-  NO_FORMATION_FR,
   SEVEN_CONTROL_LABEL_FR,
   aggregationLabelFr,
   cleanSheetReadingsFr,
@@ -32,11 +30,7 @@ import {
   equipeTypeHref,
   excludedFromSquadFr,
   formatCriterionValue,
-  formationOverrideFr,
-  formationUsageFr,
   goalkeeperShrinkageSentenceFr,
-  matchesWithoutCompositionFr,
-  mostUsedFormationOptionFr,
   noBasisFr,
   observedFigureFr,
   optimumComparisonFr,
@@ -45,7 +39,6 @@ import {
   parseCriterion,
   parseDirection,
   resetLabelFr,
-  resolveFormationOverride,
   sevenHeadingFr,
   sevenQuestionKey,
   showsCompetitionSelect,
@@ -104,7 +97,6 @@ describe("reading the query string", () => {
         competitionId: null,
         criterion: DEFAULT_CRITERION,
         direction: DEFAULT_DIRECTION,
-        formationId: null,
       }),
     ).toBe("/stats/equipe-type");
 
@@ -112,17 +104,17 @@ describe("reading the query string", () => {
       competitionId: "c1",
       criterion: "ratings",
       direction: "worst",
-      formationId: "f1",
     });
     const params = new URLSearchParams(href.split("?")[1]);
     expect(params.get("competition")).toBe("c1");
     expect(params.get(CRITERION_PARAM)).toBe("ratings");
-    expect(params.get(FORMATION_PARAM)).toBe("f1");
+    // There is one formation (decision 157), so nothing about it travels in the URL.
+    expect(params.has("formation")).toBe(false);
     expect(parseDirection(params.get(DIRECTION_PARAM) ?? undefined)).toBe("worst");
   });
 
   /**
-   * The no-JavaScript path, and the only reason these four cases exist.
+   * The no-JavaScript path, and the only reason these cases exist.
    *
    * The controls are `<select>`s inside a `<form method="get">`, so a browser with no JavaScript submits
    * **every** name it holds — including the ones the reader left at their default, as `?critere=`.
@@ -130,26 +122,18 @@ describe("reading the query string", () => {
    * produce that URL and no other test would ever visit it. One parser throwing or mistaking `""` for a
    * real id is a screen that works for everybody except the reader who needs the fallback most.
    */
-  it("reads an empty value as « nothing chosen », on all four parameters", () => {
+  it("reads an empty value as « nothing chosen », on every parameter", () => {
     const competitions = [{ id: "c1" }, { id: "c2" }];
-    const formations = [
-      { formationId: "f1", matches: 5 },
-      { formationId: "f2", matches: 2 },
-    ];
 
     expect(parseCriterion("")).toBe(DEFAULT_CRITERION);
     expect(parseDirection("")).toBe(DEFAULT_DIRECTION);
     expect(parseCompetitionId("", competitions)).toBeNull();
-    expect(resolveFormationOverride("", formations, "f1")).toBeNull();
 
-    // And the whole form at once, exactly as a `method="get"` submit of four untouched selects arrives.
-    const params = new URLSearchParams("critere=&sens=&formation=&competition=");
+    // And the whole form at once, exactly as a `method="get"` submit of untouched selects arrives.
+    const params = new URLSearchParams("critere=&sens=&competition=");
     expect(parseCriterion(params.get(CRITERION_PARAM) ?? undefined)).toBe(DEFAULT_CRITERION);
     expect(parseDirection(params.get(DIRECTION_PARAM) ?? undefined)).toBe(DEFAULT_DIRECTION);
     expect(parseCompetitionId(params.get("competition") ?? undefined, competitions)).toBeNull();
-    expect(
-      resolveFormationOverride(params.get(FORMATION_PARAM) ?? undefined, formations, "f1"),
-    ).toBeNull();
   });
 
   it("keeps a competition only if the team has it", () => {
@@ -160,24 +144,6 @@ describe("reading the query string", () => {
     expect(parseCompetitionId("c9", competitions)).toBeNull();
     expect(parseCompetitionId(undefined, competitions)).toBeNull();
     expect(parseCompetitionId("c1", [])).toBeNull();
-  });
-
-  it("refuses a shape the team has not played, and the most-played one", () => {
-    const formations = [
-      { formationId: "f1", matches: 5, label: "1-3-2-1" },
-      { formationId: "f2", matches: 2, label: "2-3-1" },
-      { formationId: "f3", matches: 0, label: "1-2-3" },
-    ];
-
-    expect(resolveFormationOverride("f2", formations, "f1")?.label).toBe("2-3-1");
-    // Never the most-played shape: it is what `override ?? mostUsed` falls back to anyway, and calling
-    // it an override makes `formationOverrideFr` print « Ce n'est pas la forme… » about the one that is.
-    expect(resolveFormationOverride("f1", formations, "f1")).toBeNull();
-    // Played nothing, so laying the seven out on it would be a shape this team does not use.
-    expect(resolveFormationOverride("f3", formations, "f1")).toBeNull();
-    expect(resolveFormationOverride("bidon", formations, "f1")).toBeNull();
-    // With no most-played shape to protect, the same id *is* an honest override.
-    expect(resolveFormationOverride("f1", formations, null)?.label).toBe("1-3-2-1");
   });
 });
 
@@ -190,32 +156,17 @@ describe("keying the pitch to the question", () => {
     competitionId: null,
     criterion: "goals",
     direction: "best",
-    formationId: null,
   };
 
   it("changes with every value that changes which seven is right", () => {
-    const base = sevenQuestionKey(query, "f1");
-    expect(sevenQuestionKey({ ...query, criterion: "ratings" }, "f1")).not.toBe(base);
-    expect(sevenQuestionKey({ ...query, direction: "worst" }, "f1")).not.toBe(base);
-    expect(sevenQuestionKey({ ...query, competitionId: "c1" }, "f1")).not.toBe(base);
-    expect(sevenQuestionKey(query, "f2")).not.toBe(base);
+    const base = sevenQuestionKey(query);
+    expect(sevenQuestionKey({ ...query, criterion: "ratings" })).not.toBe(base);
+    expect(sevenQuestionKey({ ...query, direction: "worst" })).not.toBe(base);
+    expect(sevenQuestionKey({ ...query, competitionId: "c1" })).not.toBe(base);
   });
 
   it("is the same key for the same question, asked twice", () => {
-    expect(sevenQuestionKey({ ...query }, "f1")).toBe(sevenQuestionKey({ ...query }, "f1"));
-  });
-
-  /**
-   * « la plus jouée » and an explicit override of the *same* shape are one question, because
-   * `resolveFormationOverride` has already collapsed them: the resolved id is what goes in, so the seven
-   * on screen and the key agree about which shape it is laid out on.
-   */
-  it("reads the resolved shape, not the overridden one", () => {
-    expect(sevenQuestionKey({ ...query, formationId: "f1" }, "f1")).toBe(
-      sevenQuestionKey(query, "f1"),
-    );
-    // No shape at all is still a question — one the page answers with an empty state.
-    expect(sevenQuestionKey(query, null)).not.toBe(sevenQuestionKey(query, "f1"));
+    expect(sevenQuestionKey({ ...query })).toBe(sevenQuestionKey({ ...query }));
   });
 });
 
@@ -267,21 +218,15 @@ describe("the page hands that key to the pitch", () => {
 /* The controls, which are the only writers of that query string               */
 /* -------------------------------------------------------------------------- */
 
-describe("naming the four controls", () => {
+describe("naming the controls", () => {
   it("labels every select, and tutoies nobody into « vous »", () => {
     const labels = Object.values(SEVEN_CONTROL_LABEL_FR);
-    expect(labels).toHaveLength(4);
+    // Criterion, direction, competition: the shape is not a control any more (decision 157).
+    expect(labels).toHaveLength(3);
     for (const label of labels) {
       expect(label).not.toMatch(/\bvo(tre|s)\b/i);
       expect(label.length).toBeGreaterThan(0);
     }
-  });
-
-  it("offers the most-played shape once, and says why it is the default", () => {
-    expect(mostUsedFormationOptionFr("1-3-2-1")).toBe("1-3-2-1 (la plus jouée)");
-    // Unreachable from the screen (no shape played means no select at all), but the option must still
-    // not read « null (la plus jouée) » if it ever is.
-    expect(mostUsedFormationOptionFr(null)).toBe("La plus jouée");
   });
 
   it("spells the direction the way the URL does, so a GET submit round-trips", () => {
@@ -289,13 +234,6 @@ describe("naming the four controls", () => {
     // « pire » in the component would be a filter that silently stops working without JavaScript.
     expect(parseDirection(DIRECTION_VALUES.worst)).toBe("worst");
     expect(parseDirection(DIRECTION_VALUES.best)).toBe("best");
-  });
-
-  it("never sends the reader to a control that is not on screen", () => {
-    // The formation select only lists shapes the team has played, so the state this sentence describes
-    // — none played — is exactly the state in which there is nothing to choose from.
-    expect(NO_FORMATION_FR).not.toContain("ci-dessus");
-    expect(NO_FORMATION_FR).not.toContain("ci-dessous");
   });
 
   /**
@@ -638,40 +576,10 @@ describe("honesty 4 — which invincibilité", () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* The shape, the squad and the missing cases                                 */
+/* The squad and the missing cases                                            */
 /* -------------------------------------------------------------------------- */
 
-describe("the shape and the squad", () => {
-  it("never names a formation without the matches behind it", () => {
-    // « sur les 8 matchs terminés » said « matchs » twice; French puts the number alone after « sur les ».
-    expect(formationUsageFr({ label: "1-3-2-1", matches: 7, matchesConsidered: 8 })).toBe(
-      "1-3-2-1, utilisée dans 7 matchs sur les 8 terminés de cette sélection.",
-    );
-    expect(formationUsageFr({ label: "1-3-2-1", matches: 1, matchesConsidered: 4 })).toBe(
-      "1-3-2-1, utilisée dans 1 match sur les 4 terminés de cette sélection.",
-    );
-  });
-
-  it("does not say « tous ceux » about a single match", () => {
-    expect(formationUsageFr({ label: "1-3-2-1", matches: 8, matchesConsidered: 8 })).toBe(
-      "1-3-2-1, utilisée dans 8 matchs — tous ceux de cette sélection.",
-    );
-    expect(formationUsageFr({ label: "1-3-2-1", matches: 1, matchesConsidered: 1 })).toBe(
-      "1-3-2-1, utilisée dans 1 match — le seul de cette sélection.",
-    );
-  });
-
-  it("claims no usage for a shape the reader chose himself", () => {
-    expect(formationOverrideFr("2-3-1")).toContain("choisie par toi");
-    expect(formationOverrideFr("2-3-1")).toContain("n’est pas la forme que l’équipe a le plus jouée");
-  });
-
-  it("says when the winning shape is a majority of what was drawn, not of what was played", () => {
-    expect(matchesWithoutCompositionFr(0)).toBeNull();
-    expect(matchesWithoutCompositionFr(1)).toContain("1 match terminé n’a aucune");
-    expect(matchesWithoutCompositionFr(3)).toContain("3 matchs terminés n’ont aucune");
-  });
-
+describe("the squad", () => {
   it("names who could not be chosen from, in singular and plural", () => {
     expect(excludedFromSquadFr({ departedWithData: 0, nonPlayers: 0 })).toBeNull();
     expect(excludedFromSquadFr({ departedWithData: 1, nonPlayers: 0 })).toContain("1 joueur parti a");
@@ -716,14 +624,10 @@ describe("the tutoiement (decision 074)", () => {
       ),
       squadMeanStandInFr(1),
       squadMeanStandInFr(3),
-      formationUsageFr({ label: "1-3-2-1", matches: 1, matchesConsidered: 1 }),
-      formationUsageFr({ label: "1-3-2-1", matches: 1, matchesConsidered: 4 }),
       outOfPositionNoteFr(2),
       excludedFromSquadFr({ departedWithData: 2, nonPlayers: 1 }),
       emptySlotsFr(2),
       noBasisFr("cleanSheet"),
-      matchesWithoutCompositionFr(2),
-      formationOverrideFr("2-3-1"),
     ].join(" ");
 
     expect(everything).not.toMatch(/\bvous\b|\bvotre\b|\bvos\b/i);

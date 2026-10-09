@@ -21,7 +21,7 @@
  * `delete` against `match_events` themselves (invariant 1 — the log of a fixture match dies with
  * its match, which is the only way rows leave that table).
  *
- * Reference data (`positions`, the shared `1-3-2-1` formation) is *ensured*, never re-created: it
+ * Reference data (`positions`, the one shared `1-2-3-1` formation) is *ensured*, never re-created: it
  * is shared with the rest of the database, so this only fills in what a fresh machine is missing.
  */
 
@@ -29,12 +29,7 @@ import { and, eq, isNull, like } from "drizzle-orm";
 
 import "../../db/load-env";
 import { db, sql } from "../../db/client";
-import {
-  BUILTIN_FORMATIONS,
-  DEFAULT_FORMATION_LABEL,
-  POSITIONS,
-  type FormationTemplate,
-} from "../../db/reference";
+import { POSITIONS, THE_FORMATION } from "../../db/reference";
 import {
   competitions,
   formationSlots,
@@ -62,7 +57,7 @@ const COACH_DISPLAY_NAME = "Coach Renard";
 const ADMIN_DISPLAY_NAME = "Patron Vasseur";
 
 /**
- * Eight players: seven starters in a 1-3-2-1 and one substitute. The names are distinct enough that
+ * Eight players: seven starters in the 1-2-3-1 and one substitute. The names are distinct enough that
  * no one of them is a substring of another — the specs look players up by visible French text, and
  * « Martin » inside « Martineau » is exactly how such a suite starts lying.
  */
@@ -121,9 +116,7 @@ async function ensureReferenceData(): Promise<void> {
     )
     .onConflictDoNothing();
 
-  const template: FormationTemplate =
-    BUILTIN_FORMATIONS.find((candidate) => candidate.label === DEFAULT_FORMATION_LABEL) ??
-    BUILTIN_FORMATIONS[0];
+  const template = THE_FORMATION;
 
   const [existing] = await db
     .select({ id: formations.id })

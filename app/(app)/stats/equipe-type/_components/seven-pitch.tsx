@@ -53,7 +53,7 @@ import { adjustedBesideRawFr, formatMinutes } from "@/lib/stats/format";
 /* -------------------------------------------------------------------------- */
 
 export type SevenSlotView = {
-  /** `formation_slots.id`. **Never the post code**: 1-3-2-1 has two `MC`. */
+  /** `formation_slots.id`. **Never the post code**: 1-2-3-1 has two `DC` and two `AIL`. */
   slotId: string;
   positionCode: string;
   x: number;
@@ -398,7 +398,7 @@ export function SevenPitch({
  *
  * This is the answer to the obvious objection — « 7,0 is not his average » — and it cannot be a
  * tooltip, because there is no hover on a phone (decision 072). The chip is capped at 104 px, which is
- * measured rather than chosen: the closest two posts in any built-in formation are 330‰ apart, which
+ * measured rather than chosen: the closest two posts of the formation are 340‰ apart, which
  * came out at 109 px between disc centres on a 390 px screen, so anything wider would have two
  * captions printing over each other.
  *

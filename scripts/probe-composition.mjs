@@ -561,29 +561,6 @@ async function main() {
     }
   }
 
-  /* --- 4. the « Postes » mode, where the arrow keys move a slot ------------ */
-
-  // The visible control is the `<label>`: `SegmentedControl`'s `role="radio"` input is a 1 × 1
-  // sr-only box, so `getByRole("radio")` times out on a hit-target check that is not a defect.
-  const postesTab = page
-    .locator("label")
-    .filter({ hasText: /^Postes$/ })
-    .first();
-  if ((await postesTab.count()) > 0) {
-    taps.push(await tapInClear(page, postesTab, "« Postes » segment (its label)"));
-    await state("08-postes-mode", "« Postes » mode");
-    // The keyboard path: arrow keys nudge the focused slot around the pitch.
-    const keeper = page.locator("main button[aria-label*='gardien']").first();
-    if ((await keeper.count()) > 0) {
-      await keeper.focus();
-      await page.keyboard.press("ArrowLeft");
-      await page.keyboard.press("ArrowLeft");
-      await page.keyboard.press("ArrowUp");
-      await state("09-postes-after-nudge", "« Postes » mode, keeper slot nudged");
-    }
-  } else {
-    notes.push("no « Postes » segment found.");
-  }
   notes.push("taps: " + JSON.stringify(taps, null, 1));
 
   /* --- 4b. the *other* editable state: creating a composition -------------- */

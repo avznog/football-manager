@@ -57,14 +57,16 @@ describe("sortPreferredPositions", () => {
 
 describe("toSelection", () => {
   it("maps rows onto the picker's value", () => {
-    expect(toSelection(rows(["MC", "primary"], ["MOC", "secondary"]))).toEqual({
+    expect(toSelection(rows(["MC", "primary"], ["AIL", "secondary"]))).toEqual({
       MC: "primary",
-      MOC: "secondary",
+      AIL: "secondary",
     });
   });
 
   it("drops codes the reference data does not know", () => {
     expect(toSelection([{ code: "LIBERO", preference: "primary" }])).toEqual({});
+    // A retired code is one of those (decision 157): `positions` keeps the row, the vocabulary not.
+    expect(toSelection([{ code: "MG", preference: "primary" }])).toEqual({});
   });
 
   it("demotes a second primary rather than showing two", () => {
@@ -93,24 +95,24 @@ describe("fromSelection", () => {
 
 describe("toPositionRows", () => {
   it("keeps at most one primary", () => {
-    const result = toPositionRows("MC", ["MOC", "AT"]);
+    const result = toPositionRows("MC", ["AIL", "AT"]);
     expect(result.filter((row) => row.preference === "primary")).toEqual(
       rows(["MC", "primary"]),
     );
-    expect(secondaryCodesOf(result)).toEqual(["MOC", "AT"]);
+    expect(secondaryCodesOf(result)).toEqual(["AIL", "AT"]);
   });
 
   it("counts a code posted twice once, as primary", () => {
-    expect(toPositionRows("AT", ["AT", "MOC"])).toEqual(
-      rows(["AT", "primary"], ["MOC", "secondary"]),
+    expect(toPositionRows("AT", ["AT", "AIL"])).toEqual(
+      rows(["AT", "primary"], ["AIL", "secondary"]),
     );
     expect(toPositionRows("AT", ["AT"])).toEqual(rows(["AT", "primary"]));
     expect(primaryCodeOf(toPositionRows("AT", ["AT"]))).toBe("AT");
   });
 
   it("dedupes repeated secondaries", () => {
-    expect(toPositionRows(null, ["DC", "DC", "DG"])).toEqual(
-      rows(["DG", "secondary"], ["DC", "secondary"]),
+    expect(toPositionRows(null, ["MC", "MC", "DC"])).toEqual(
+      rows(["DC", "secondary"], ["MC", "secondary"]),
     );
   });
 
@@ -142,34 +144,28 @@ describe("positionsSignature and selectionsEqual", () => {
     // the order of *known* codes would remount every profile once. Spelled out rather than derived
     // so that any such change has to be made here on purpose.
     const every = rows(
-      ["AD", "secondary"],
       ["AT", "secondary"],
-      ["AG", "secondary"],
-      ["MOC", "secondary"],
-      ["MD", "secondary"],
+      ["AIL", "secondary"],
       ["MC", "primary"],
-      ["MG", "secondary"],
-      ["DD", "secondary"],
       ["DC", "secondary"],
-      ["DG", "secondary"],
       ["GB", "secondary"],
     );
     expect(positionsSignature(every)).toBe(
-      "MC:primary|GB:secondary|DG:secondary|DC:secondary|DD:secondary|MG:secondary|MD:secondary|MOC:secondary|AG:secondary|AT:secondary|AD:secondary",
+      "MC:primary|GB:secondary|DC:secondary|AIL:secondary|AT:secondary",
     );
   });
 });
 
 describe("positionsSummaryFr", () => {
   it("names the primary and the secondaries", () => {
-    expect(positionsSummaryFr(rows(["MC", "primary"], ["MOC", "secondary"]))).toBe(
-      "Poste principal : Milieu central · poste secondaire : Milieu offensif central",
+    expect(positionsSummaryFr(rows(["MC", "primary"], ["AIL", "secondary"]))).toBe(
+      "Poste principal : Milieu central · poste secondaire : Ailier",
     );
   });
 
   it("uses the plural for several secondaries", () => {
-    expect(positionsSummaryFr(rows(["MC", "primary"], ["MOC", "secondary"], ["AT", "secondary"]))).toBe(
-      "Poste principal : Milieu central · postes secondaires : Milieu offensif central, Attaquant",
+    expect(positionsSummaryFr(rows(["MC", "primary"], ["AIL", "secondary"], ["AT", "secondary"]))).toBe(
+      "Poste principal : Milieu central · postes secondaires : Ailier, Attaquant",
     );
   });
 

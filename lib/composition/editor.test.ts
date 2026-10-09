@@ -11,7 +11,6 @@ import {
   isOnPitch,
   memberInSlot,
   placeInSlot,
-  remapToShape,
   removeMember,
   restrictToMembers,
   restrictToSlots,
@@ -33,17 +32,17 @@ function shapeOf(label: string): ShapeSlot[] {
   );
 }
 
-const SHAPE = shapeOf("1-3-2-1");
-const [GK, LB, CB, RB, PIVOT_LEFT, PIVOT_RIGHT, STRIKER] = SHAPE;
+const SHAPE = shapeOf("1-2-3-1");
+const [GK, CB_LEFT, CB_RIGHT, WING_LEFT, PIVOT, WING_RIGHT, STRIKER] = SHAPE;
 
 /** The seven starters of the demo season, near enough. */
 const TEAM: SlotAssignment[] = [
   { slotId: GK.key, memberId: "hugo" },
-  { slotId: LB.key, memberId: "samir" },
-  { slotId: CB.key, memberId: "thomas" },
-  { slotId: RB.key, memberId: "nico" },
-  { slotId: PIVOT_LEFT.key, memberId: "leo" },
-  { slotId: PIVOT_RIGHT.key, memberId: "karim" },
+  { slotId: CB_LEFT.key, memberId: "samir" },
+  { slotId: CB_RIGHT.key, memberId: "thomas" },
+  { slotId: WING_LEFT.key, memberId: "nico" },
+  { slotId: PIVOT.key, memberId: "leo" },
+  { slotId: WING_RIGHT.key, memberId: "karim" },
   { slotId: STRIKER.key, memberId: "julien" },
 ];
 
@@ -68,7 +67,7 @@ describe("placeInSlot", () => {
     const after = placeInSlot(TEAM, STRIKER.key, "leo");
 
     expect(memberInSlot(after, STRIKER.key)).toBe("leo");
-    expect(memberInSlot(after, PIVOT_LEFT.key)).toBe("julien");
+    expect(memberInSlot(after, PIVOT.key)).toBe("julien");
     expect(after).toHaveLength(7);
     expectConsistent(after);
   });
@@ -87,7 +86,7 @@ describe("placeInSlot", () => {
     const after = placeInSlot(short, STRIKER.key, "karim");
 
     expect(memberInSlot(after, STRIKER.key)).toBe("karim");
-    expect(memberInSlot(after, PIVOT_RIGHT.key)).toBeNull();
+    expect(memberInSlot(after, WING_RIGHT.key)).toBeNull();
     expect(after).toHaveLength(6);
     expectConsistent(after);
   });
@@ -99,19 +98,19 @@ describe("placeInSlot", () => {
   it("stays consistent through a chain of swaps", () => {
     // A rotation the long way round: three drops that shuffle the same three players.
     let state: readonly SlotAssignment[] = TEAM;
-    state = placeInSlot(state, PIVOT_RIGHT.key, "leo");
+    state = placeInSlot(state, WING_RIGHT.key, "leo");
     state = placeInSlot(state, STRIKER.key, "karim");
-    state = placeInSlot(state, PIVOT_LEFT.key, "julien");
+    state = placeInSlot(state, PIVOT.key, "julien");
 
     expect(state).toHaveLength(7);
     expectConsistent(state);
-    expect(memberInSlot(state, PIVOT_RIGHT.key)).toBe("leo");
+    expect(memberInSlot(state, WING_RIGHT.key)).toBe("leo");
     expect(memberInSlot(state, STRIKER.key)).toBe("karim");
-    expect(memberInSlot(state, PIVOT_LEFT.key)).toBe("julien");
+    expect(memberInSlot(state, PIVOT.key)).toBe("julien");
   });
 
   it("keeps the slot order stable so a re-render does not reshuffle the pitch", () => {
-    const after = placeInSlot(TEAM, PIVOT_LEFT.key, "karim");
+    const after = placeInSlot(TEAM, PIVOT.key, "karim");
     expect(after.map((assignment) => assignment.slotId)).toEqual(
       TEAM.map((assignment) => assignment.slotId),
     );
@@ -120,8 +119,8 @@ describe("placeInSlot", () => {
 
 describe("clearSlot and removeMember", () => {
   it("frees one slot and nothing else", () => {
-    const after = clearSlot(TEAM, CB.key);
-    expect(memberInSlot(after, CB.key)).toBeNull();
+    const after = clearSlot(TEAM, CB_RIGHT.key);
+    expect(memberInSlot(after, CB_RIGHT.key)).toBeNull();
     expect(after).toHaveLength(6);
   });
 
@@ -136,42 +135,13 @@ describe("clearSlot and removeMember", () => {
 
 describe("restrictToSlots / restrictToMembers", () => {
   it("drops the pairs whose slot has disappeared", () => {
-    const kept = restrictToSlots(TEAM, [GK.key, CB.key]);
+    const kept = restrictToSlots(TEAM, [GK.key, CB_RIGHT.key]);
     expect(kept.map((assignment) => assignment.memberId)).toEqual(["hugo", "thomas"]);
   });
 
   it("drops a player who is no longer on the match sheet", () => {
     const sheet = TEAM.map((assignment) => assignment.memberId).filter((id) => id !== "leo");
     expect(isOnPitch(restrictToMembers(TEAM, sheet), "leo")).toBe(false);
-  });
-});
-
-describe("remapToShape", () => {
-  it("carries the team over when the coach changes formation", () => {
-    const target = shapeOf("1-2-3-1");
-    const after = remapToShape(TEAM, SHAPE, target);
-
-    expect(after).toHaveLength(7);
-    expectConsistent(after);
-    // The keeper stays in goal: both shapes list the goalkeeper first.
-    const keeperSlot = target.find((slot) => slot.positionCode === "GB");
-    expect(memberInSlot(after, keeperSlot?.key ?? "")).toBe("hugo");
-    // And the striker stays up front: it is the last slot of both shapes.
-    const strikerSlot = target[target.length - 1];
-    expect(memberInSlot(after, strikerSlot.key)).toBe("julien");
-  });
-
-  it("benches the players the new shape has no room for", () => {
-    const target = shapeOf("1-2-3-1").slice(0, 5);
-    const after = remapToShape(TEAM, SHAPE, target);
-    expect(after).toHaveLength(5);
-    expectConsistent(after);
-  });
-
-  it("keeps an incomplete composition incomplete", () => {
-    const short = clearSlot(TEAM, STRIKER.key);
-    const after = remapToShape(short, SHAPE, shapeOf("1-2-3-1"));
-    expect(after).toHaveLength(6);
   });
 });
 
@@ -188,7 +158,7 @@ describe("derived views", () => {
 
   it("counts the slots still to fill", () => {
     expect(emptySlotCount(TEAM, SHAPE)).toBe(0);
-    expect(emptySlotCount(clearSlot(TEAM, CB.key), SHAPE)).toBe(1);
+    expect(emptySlotCount(clearSlot(TEAM, CB_RIGHT.key), SHAPE)).toBe(1);
   });
 
   it("sorts assignments into store order", () => {
@@ -206,6 +176,6 @@ describe("derived views", () => {
 
   it("signs a composition independently of the order of the gestures", () => {
     expect(assignmentsSignature([...TEAM].reverse())).toBe(assignmentsSignature(TEAM));
-    expect(assignmentsSignature(clearSlot(TEAM, CB.key))).not.toBe(assignmentsSignature(TEAM));
+    expect(assignmentsSignature(clearSlot(TEAM, CB_RIGHT.key))).not.toBe(assignmentsSignature(TEAM));
   });
 });

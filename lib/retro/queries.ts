@@ -84,15 +84,15 @@ export type RetroView = {
   timeline: readonly RetroTimelineLine[];
 };
 
-/** French names of the posts. Same vocabulary as the composition editor. */
+/**
+ * French names of the posts, shorter than `positionLabelFr` because the form prints one per row. The
+ * five codes of the one formation (decision 157); the two `AIL` rows read alike, as the owner wants.
+ */
 const POSITION_LABELS_FR: Record<string, string> = {
   GB: "Gardien",
-  DG: "Arrière gauche",
   DC: "Défenseur central",
-  DD: "Arrière droit",
   MC: "Milieu",
-  MG: "Milieu gauche",
-  MD: "Milieu droit",
+  AIL: "Ailier",
   AT: "Attaquant",
 };
 

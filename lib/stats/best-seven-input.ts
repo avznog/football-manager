@@ -154,13 +154,10 @@ export function toBestSevenSquad(
  *
  * Two things this does that a `map` over the rows would get wrong if written at the call site. The
  * identity is `formation_slots.id` and never the post code, because **a code is not unique within a
- * formation** — 1-3-2-1 has two `MC`, and keying on the code would collapse them into one slot and
- * lose a man. And `isGoalkeeper` is computed here, once: `best-seven.ts` is told which slot is the
- * goal rather than comparing a string to `"GB"` itself, so decision 011's two clean-sheet readings
- * do not hinge on a magic code buried in a pure module. The comparison is the same one
- * `isGoalkeeperSlot` makes in `lib/formation/shape.ts`; it is spelled out rather than imported
- * because that function wants a `ShapeSlot` with a narrowed `PositionCode`, and a `formation_slots`
- * row carries plain text.
+ * formation** — 1-2-3-1 has two `DC` and two `AIL`, and keying on the code would collapse them into
+ * one slot and lose a man. And `isGoalkeeper` is computed here, once: `best-seven.ts` is told which
+ * slot is the goal rather than comparing a string to `"GB"` itself, so decision 011's two clean-sheet
+ * readings do not hinge on a magic code buried in a pure module.
  */
 export function toBestSevenSlots(
   slots: readonly { id: string; positionCode: string }[],

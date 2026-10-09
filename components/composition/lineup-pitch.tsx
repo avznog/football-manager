@@ -32,7 +32,7 @@ export type LineupPitchProps = {
   size?: DiscSize;
   /** False once game mode has confirmed the composition — it is then a fact, not a plan. */
   planned?: boolean;
-  /** French accessible name, e.g. « Composition de départ, 1-3-2-1 ». */
+  /** French accessible name, e.g. « Composition de départ, 1-2-3-1 ». */
   label?: string;
   className?: string;
 };

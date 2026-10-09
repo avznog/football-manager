@@ -64,8 +64,10 @@
  *    and no `lineups`. Anything else aborts.
  *  - **Old formation `2-3-1` is this app's built-in `1-2-3-1`.** The old app counted outfield players
  *    and this one counts the goalkeeper too. The slot map is `GK→GB`, `DEF_L→the DC at x=330`,
- *    `DEF_R→the DC at x=670`, `MID_L→MG`, `MID_C→MC`, `MID_R→MD`, `ATT→AT`, resolved by querying
- *    `formation_slots`; no uuid is hardcoded.
+ *    `DEF_R→the DC at x=670`, `MID_L→the AIL at x=160`, `MID_C→MC`, `MID_R→the AIL at x=840`,
+ *    `ATT→AT`, resolved by querying `formation_slots`; no uuid is hardcoded. The two wingers were
+ *    `MG` and `MD` until decision 157 made them one position, `AIL`, so like the two centre-backs
+ *    they are told apart by `x` (`db/reference.test.ts` pins those four numbers).
  *  - **Players are mapped by name, declared in `OLD_TO_TARGET_DISPLAY_NAME` below and verified
  *    against the database.** The old `profiles.full_name` is free text and mixes first names,
  *    "Prénom NOM" and nicknames, so the pairing is a judgement that cannot be computed: « Leo COACH »
@@ -274,14 +276,17 @@ const OLD_TO_TARGET_DISPLAY_NAME: Readonly<Record<string, string | null>> = {
   "Alexis CHARRIER": null,
 };
 
-/** Old slot code to the `position_code` + `x` of the 1-2-3-1 slot it means. */
+/**
+ * Old slot code to the `position_code` + `x` of the 1-2-3-1 slot it means. `x` wherever the code is
+ * shared: the two centre-backs are both `DC` and the two wingers both `AIL` (decision 157).
+ */
 const SLOT_MAP: Readonly<Record<OldSlot, { positionCode: string; x?: number }>> = {
   GK: { positionCode: "GB" },
   DEF_L: { positionCode: "DC", x: 330 },
   DEF_R: { positionCode: "DC", x: 670 },
-  MID_L: { positionCode: "MG" },
+  MID_L: { positionCode: "AIL", x: 160 },
   MID_C: { positionCode: "MC" },
-  MID_R: { positionCode: "MD" },
+  MID_R: { positionCode: "AIL", x: 840 },
   ATT: { positionCode: "AT" },
 };
 
@@ -559,7 +564,10 @@ function resolvePlayers(
   return { byOldId, unmapped };
 }
 
-/** The 1-2-3-1 slot each old code means, by `position_code` and, for the two centre-backs, by `x`. */
+/**
+ * The 1-2-3-1 slot each old code means, by `position_code` and, for the two centre-backs and the two
+ * wingers, by `x`.
+ */
 async function resolveSlots(): Promise<{
   formationId: string;
   slots: SlotInfo[];

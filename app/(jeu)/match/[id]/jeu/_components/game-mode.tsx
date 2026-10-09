@@ -395,19 +395,20 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     });
   }, [prompt, live.slots, players, state.onPitch]);
 
-  const formations = useMemo<ComposerFormation[]>(
-    () =>
-      live.formations.map((formation) => ({
-        id: formation.id,
-        label: formation.label,
-        slots: formation.slots.map((slot) => ({
-          id: slot.id,
-          positionCode: slot.positionCode,
-          sort: slot.sort,
-        })),
+  /** The one formation the composer lists (decision 157). */
+  const composerFormation = useMemo<ComposerFormation | null>(() => {
+    const formation = live.formations[0];
+    if (!formation) return null;
+    return {
+      id: formation.id,
+      label: formation.label,
+      slots: formation.slots.map((slot) => ({
+        id: slot.id,
+        positionCode: slot.positionCode,
+        sort: slot.sort,
       })),
-    [live.formations],
-  );
+    };
+  }, [live.formations]);
 
   const clockAction = clockActionFr(state);
   // `FOUL` stands in for "an action that takes the clock as it reads" — every type but `KICKOFF`
@@ -892,8 +893,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           onClose={closeFlow}
           title={state.started ? "Composition" : "Composition de départ"}
           description="Elle remplace ce qu’il y a sur le terrain à cette minute."
-          formations={formations}
-          initialFormationId={currentFormationId}
+          formation={composerFormation}
           options={[...onPitch, ...available]}
           initialAssignments={flow.initial ?? onPitchAssignments}
           confirmLabel="Valider"

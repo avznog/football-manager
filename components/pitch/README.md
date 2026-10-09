@@ -234,24 +234,14 @@ the same.
 
 ### `PositionPicker` — `'use client'`
 
-The player profile picker: the seven positions of `PREFERRED_POSITIONS` — the ones the owner named,
-`GB DG DD MC AG AT AD`, which are **not** the codes of any one formation — as tappable targets on the
-turf.
+The player profile picker: the five positions of `POSITIONS` — `GB DC MC AIL AT`, the posts of the
+one formation (decisions 157 and 158) — as tappable targets on the turf.
 Each tap cycles **non souhaité → secondaire → principal → non souhaité**, i.e.
-`player_positions.preference` (no row / `secondary` / `primary`). The composition editor is *not*
-narrowed with it and still places any of the eleven.
+`player_positions.preference` (no row / `secondary` / `primary`).
 
-A record written before the list changed may hold `DC`, `MG`, `MD` or `MOC` — after a
-`db:reset`, half the demo squad does. Nothing drops such a code — the profile posts the selection's own keys — so the
-picker renders those as a small row of removable chips under the legend, derived from `value` like
-the grid. One-way: a chip removes, nothing adds one back, and `cyclePosition` is not involved.
-Removing the primary leaves the player with no primary rather than promoting a secondary nobody
-chose.
-
-A chip prints the position **in full** (« Ailier gauche »), not its code: it is the control that ends
-the wish, and WCAG 2.5.3 Label in Name (decision 117) wants its visible text inside « Retirer Ailier
-gauche de tes postes souhaités ». Three full names wrap onto several rows at 320 px and overflow
-nothing.
+There used to be a narrower « preferred » list and a row of removable chips for wishes on a code
+the picker no longer offered. Migration `0011_single_formation.sql` mapped every such wish onto the
+five codes, and the readers drop any code outside the vocabulary, so both are gone.
 
 ```ts
 type PositionSelection = Partial<Record<PositionCode, "primary" | "secondary">>;
@@ -281,32 +271,31 @@ Primary and secondary are distinguishable **without colour**: primary is filled 
 ring, secondary is hollow with a solid outline, unwanted is a dashed outline — plus a visible
 legend. The three shapes read the same for a colour-blind user and in direct sunlight.
 
-The eleven canonical coordinates in `db/reference.ts` are spaced so that the closest pair
-(`MC`/`MOC`) is 240 units apart — about 71 px on a 320 px pitch, comfortable for 48 px targets. That
-rule is kept for the whole eleven even though the picker now draws eight of them: the composition
-editor can place a slot anywhere on the list.
+The five canonical coordinates in `db/reference.ts` are spaced beyond `MIN_MARKER_DISTANCE`, so the
+picker's 48 px targets never touch on a 320 px pitch. `AIL` is one position with two slots in the
+formation; the picker draws it once, at the left winger's spot.
 
 ---
 
 ## Reference data — `db/reference.ts`
 
-The typed source of the `positions` rows and of the built-in formation templates
-(`formations.team_id = null`), which `db/seed.ts` inserts. Safe to import from the UI: it has no
+The typed source of the `positions` rows and of the one built-in formation, the `1-2-3-1`
+(`formations.team_id = null`, decision 157), which `db/seed.ts` inserts. Safe to import from the UI: it has no
 database dependency (its only import from `db/schema.ts` is a type).
 
 - `POSITIONS`, `POSITION_CODES`, `POSITION_BY_CODE`, `positionLabelFr`, `isPositionCode`
 - `LINE_LABELS_FR`, `LINE_ORDER`
-- `BUILTIN_FORMATIONS`, `formationByLabel`, `DEFAULT_FORMATION_LABEL`
+- `BUILTIN_FORMATIONS` (exactly one), `THE_FORMATION`, `formationByLabel`, `DEFAULT_FORMATION_LABEL`
 - `formationLabelOf(slots)`, `formationDistribution(slots)`, `FORMATION_SLOT_COUNT`
 
-**Label convention: the leading `1` is the goalkeeper.** `1-3-2-1` = GB + 3 defenders +
-2 midfielders + 1 forward = 7. The four groups are the four `line` values in the order
+**Label convention: the leading `1` is the goalkeeper.** `1-2-3-1` = GB + 2 defenders +
+3 midfielders + 1 forward = 7. The four groups are the four `line` values in the order
 `GB`, `DEF`, `MIL`, `ATT`, so a label is derivable from its slots — `formationLabelOf()` does it
-and `db/reference.test.ts` asserts every template agrees with its own label. Empty lines are still
-printed, hence `1-3-3-0`.
+and `db/reference.test.ts` asserts the template agrees with its own label. `AIL` is on the `MIL`
+line, which is what makes the two wingers count as midfielders. Empty lines are still printed.
 
-A `positionCode` may appear twice in one formation — two centre-backs are both `DC`, a double
-pivot is two `MC` — exactly as in eleven-a-side notation.
+A `positionCode` appears twice in the formation — the two centre-backs are both `DC`, the two
+wingers both `AIL` — exactly as in eleven-a-side notation, so a slot is always addressed by its id.
 
 ---
 

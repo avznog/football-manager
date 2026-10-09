@@ -85,6 +85,13 @@
       "when": 1791557380123,
       "tag": "0011_calm_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791559319900,
+      "tag": "0012_single_formation",
+      "breakpoints": true
     }
   ]
 }

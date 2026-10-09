@@ -75,10 +75,11 @@ import { finalizeMatchById } from "../lib/match/finalize";
 /* -------------------------------------------------------------------------- */
 
 /**
- * The seven slots of the default 1-3-2-1, by `sort` (see `BUILTIN_FORMATIONS`): goalkeeper
- * first, then back to front and left to right. Named so the fixtures below read as football.
+ * The seven slots of the one formation, the 1-2-3-1, by `sort` (see `BUILTIN_FORMATIONS`):
+ * goalkeeper first, then back to front and left to right. Named so the fixtures below read as
+ * football — two centre-backs, then winger, centre midfielder, winger, then the striker.
  */
-const SLOT = { gb: 1, dg: 2, dc: 3, dd: 4, mcLeft: 5, mcRight: 6, at: 7 } as const;
+const SLOT = { gb: 1, dcLeft: 2, dcRight: 3, ailLeft: 4, mc: 5, ailRight: 6, at: 7 } as const;
 
 const TEAM_NAME = "AS Dimanche";
 const TEAM_SLUG = "as-dimanche";
@@ -115,23 +116,23 @@ type PlayerFixture = {
  * seven-a-side squad with a bench, a couple of absences and a departure.
  */
 const PLAYERS: PlayerFixture[] = [
-  { username: "karim", displayName: "Karim", jerseyNumber: 8, primary: "MC", secondary: ["MOC"], isCoach: true },
+  { username: "karim", displayName: "Karim", jerseyNumber: 8, primary: "MC", secondary: ["AIL"], isCoach: true },
   { username: "hugo", displayName: "Hugo", jerseyNumber: 1, primary: "GB", secondary: [] },
   { username: "mehdi", displayName: "Mehdi", jerseyNumber: 12, primary: "GB", secondary: ["DC"] },
-  { username: "julien", displayName: "Julien", jerseyNumber: 9, primary: "AT", secondary: ["MOC"] },
-  { username: "momo", displayName: "Momo", jerseyNumber: 11, primary: "AG", secondary: ["AT"], shirtName: "Momo" },
-  { username: "ali", displayName: "Ali", jerseyNumber: 7, primary: "AD", secondary: ["MD"] },
+  { username: "julien", displayName: "Julien", jerseyNumber: 9, primary: "AT", secondary: ["MC"] },
+  { username: "momo", displayName: "Momo", jerseyNumber: 11, primary: "AIL", secondary: ["AT"], shirtName: "Momo" },
+  { username: "ali", displayName: "Ali", jerseyNumber: 7, primary: "AIL", secondary: [] },
   { username: "thomas", displayName: "Thomas", jerseyNumber: 4, primary: "DC", secondary: ["MC"] },
-  { username: "nico", displayName: "Nico", jerseyNumber: 2, primary: "DD", secondary: ["MD"] },
-  { username: "samir", displayName: "Samir", jerseyNumber: 3, primary: "DG", secondary: ["MG"] },
-  { username: "leo", displayName: "Léo", jerseyNumber: 6, primary: "MG", secondary: ["AG", "DG"], shirtName: "Léo" },
+  { username: "nico", displayName: "Nico", jerseyNumber: 2, primary: "DC", secondary: ["AIL"] },
+  { username: "samir", displayName: "Samir", jerseyNumber: 3, primary: "DC", secondary: ["AIL"] },
+  { username: "leo", displayName: "Léo", jerseyNumber: 6, primary: "AIL", secondary: ["DC"], shirtName: "Léo" },
   // Twelve characters exactly: the longest flocage a shirt back holds, so the squad row and the
   // fiche are both reviewed at the limit rather than at four characters.
-  { username: "yanis", displayName: "Yanis", jerseyNumber: 10, primary: "MOC", secondary: ["AT"], shirtName: "El Professor" },
-  { username: "brice", displayName: "Brice", jerseyNumber: 5, primary: "DC", secondary: ["DD"] },
-  { username: "fabien", displayName: "Fabien", jerseyNumber: 14, primary: "MD", secondary: ["AD"] },
+  { username: "yanis", displayName: "Yanis", jerseyNumber: 10, primary: "MC", secondary: ["AT"], shirtName: "El Professor" },
+  { username: "brice", displayName: "Brice", jerseyNumber: 5, primary: "DC", secondary: [] },
+  { username: "fabien", displayName: "Fabien", jerseyNumber: 14, primary: "AIL", secondary: [] },
   // Left the club in the autumn — after scoring on J2. His goal must survive in every season table.
-  { username: "rayan", displayName: "Rayan", jerseyNumber: 13, primary: "AT", secondary: ["AD"], leftDaysAgo: 20 },
+  { username: "rayan", displayName: "Rayan", jerseyNumber: 13, primary: "AT", secondary: ["AIL"], leftDaysAgo: 20 },
 ];
 
 /* ---- dates ---------------------------------------------------------------- */
@@ -334,7 +335,7 @@ async function seedDemo(): Promise<void> {
 
   /**
    * Slots are addressed by their `sort`, not by position code: a formation may legitimately
-   * hold the same code twice (1-3-2-1 has two `MC`), so the code alone is ambiguous.
+   * hold the same code twice (1-2-3-1 has two `DC` and two `AIL`), so the code alone is ambiguous.
    */
   const slotFor = (sort: number): string => {
     const slot = slots.find((s) => s.sort === sort);
@@ -375,11 +376,11 @@ async function seedDemo(): Promise<void> {
     entryMode: "retro",
     starters: [
       [SLOT.gb, "hugo"],
-      [SLOT.dg, "samir"],
-      [SLOT.dc, "thomas"],
-      [SLOT.dd, "nico"],
-      [SLOT.mcLeft, "leo"],
-      [SLOT.mcRight, "karim"],
+      [SLOT.dcLeft, "samir"],
+      [SLOT.dcRight, "thomas"],
+      [SLOT.ailRight, "nico"],
+      [SLOT.ailLeft, "leo"],
+      [SLOT.mc, "karim"],
       [SLOT.at, "julien"],
     ],
     substitutes: ["momo", "yanis", "ali", "fabien"],
@@ -398,19 +399,19 @@ async function seedDemo(): Promise<void> {
       push("SUBSTITUTION", 38, {
         outId: m("leo"),
         inId: m("yanis"),
-        slotId: slotFor(SLOT.mcLeft),
+        slotId: slotFor(SLOT.ailLeft),
       });
       push("PENALTY_SCORED", 44, { scorerId: m("julien") });
       push("OWN_GOAL", 51, { scorerId: m("nico") });
       push("POSITION_CHANGE", 55, {
         memberId: m("karim"),
-        fromSlotId: slotFor(SLOT.mcRight),
+        fromSlotId: slotFor(SLOT.mc),
         toSlotId: slotFor(SLOT.at),
       });
       push("SUBSTITUTION", 55, {
         outId: m("julien"),
         inId: m("momo"),
-        slotId: slotFor(SLOT.mcRight),
+        slotId: slotFor(SLOT.mc),
       });
       push("PENALTY_MISSED", 58, { scorerId: m("momo") });
     },
@@ -455,11 +456,11 @@ async function seedDemo(): Promise<void> {
     entryMode: "live",
     starters: [
       [SLOT.gb, "hugo"],
-      [SLOT.dg, "samir"],
-      [SLOT.dc, "thomas"],
-      [SLOT.dd, "nico"],
-      [SLOT.mcLeft, "leo"],
-      [SLOT.mcRight, "karim"],
+      [SLOT.dcLeft, "samir"],
+      [SLOT.dcRight, "thomas"],
+      [SLOT.ailRight, "nico"],
+      [SLOT.ailLeft, "leo"],
+      [SLOT.mc, "karim"],
       [SLOT.at, "rayan"],
     ],
     substitutes: ["ali", "fabien", "yanis"],
@@ -469,7 +470,7 @@ async function seedDemo(): Promise<void> {
       push("SUBSTITUTION", 20, {
         outId: m("leo"),
         inId: m("ali"),
-        slotId: slotFor(SLOT.mcLeft),
+        slotId: slotFor(SLOT.ailLeft),
       });
       push("PERIOD_END", 30);
       push("KICKOFF", 30, {}, { period: 2 });
@@ -477,19 +478,19 @@ async function seedDemo(): Promise<void> {
       // and the midfielder goes up front.
       push("POSITION_CHANGE", 38, {
         memberId: m("karim"),
-        fromSlotId: slotFor(SLOT.mcRight),
+        fromSlotId: slotFor(SLOT.mc),
         toSlotId: slotFor(SLOT.at),
       });
       push("POSITION_CHANGE", 38, {
         memberId: m("rayan"),
         fromSlotId: slotFor(SLOT.at),
-        toSlotId: slotFor(SLOT.mcRight),
+        toSlotId: slotFor(SLOT.mc),
       });
       push("GOAL_AGAINST", 44);
       push("SUBSTITUTION", 50, {
         outId: m("ali"),
         inId: m("leo"),
-        slotId: slotFor(SLOT.mcLeft),
+        slotId: slotFor(SLOT.ailLeft),
       });
       push("GOAL_FOR", 56, { scorerId: m("karim"), assistId: m("rayan") });
     },
@@ -531,11 +532,11 @@ async function seedDemo(): Promise<void> {
     entryMode: "live",
     starters: [
       [SLOT.gb, "hugo"],
-      [SLOT.dg, "samir"],
-      [SLOT.dc, "brice"],
-      [SLOT.dd, "nico"],
-      [SLOT.mcLeft, "leo"],
-      [SLOT.mcRight, "karim"],
+      [SLOT.dcLeft, "samir"],
+      [SLOT.dcRight, "brice"],
+      [SLOT.ailRight, "nico"],
+      [SLOT.ailLeft, "leo"],
+      [SLOT.mc, "karim"],
       [SLOT.at, "julien"],
     ],
     substitutes: ["momo", "yanis", "thomas"],
@@ -548,14 +549,14 @@ async function seedDemo(): Promise<void> {
       push("SUBSTITUTION", 36, {
         outId: m("brice"),
         inId: m("thomas"),
-        slotId: slotFor(SLOT.dc),
+        slotId: slotFor(SLOT.dcRight),
       });
       push("FOUL", 42, { memberId: m("karim") });
       push("GOAL_AGAINST", 49);
       push("SUBSTITUTION", 53, {
         outId: m("leo"),
         inId: m("momo"),
-        slotId: slotFor(SLOT.mcLeft),
+        slotId: slotFor(SLOT.ailLeft),
       });
     },
     ratings: {
@@ -617,11 +618,11 @@ async function seedDemo(): Promise<void> {
     entryMode: "live",
     starters: [
       [SLOT.gb, "mehdi"],
-      [SLOT.dg, "samir"],
-      [SLOT.dc, "thomas"],
-      [SLOT.dd, "nico"],
-      [SLOT.mcLeft, "leo"],
-      [SLOT.mcRight, "karim"],
+      [SLOT.dcLeft, "samir"],
+      [SLOT.dcRight, "thomas"],
+      [SLOT.ailRight, "nico"],
+      [SLOT.ailLeft, "leo"],
+      [SLOT.mc, "karim"],
       [SLOT.at, "momo"],
     ],
     substitutes: ["julien", "yanis", "ali"],
@@ -679,11 +680,11 @@ async function seedDemo(): Promise<void> {
     entryMode: "live",
     starters: [
       [SLOT.gb, "hugo"],
-      [SLOT.dg, "samir"],
-      [SLOT.dc, "thomas"],
-      [SLOT.dd, "nico"],
-      [SLOT.mcLeft, "leo"],
-      [SLOT.mcRight, "karim"],
+      [SLOT.dcLeft, "samir"],
+      [SLOT.dcRight, "thomas"],
+      [SLOT.ailRight, "nico"],
+      [SLOT.ailLeft, "leo"],
+      [SLOT.mc, "karim"],
       [SLOT.at, "julien"],
     ],
     substitutes: ["mehdi", "momo", "yanis", "ali"],
@@ -753,11 +754,11 @@ async function seedDemo(): Promise<void> {
     entryMode: "retro",
     starters: [
       [SLOT.gb, "hugo"],
-      [SLOT.dg, "samir"],
-      [SLOT.dc, "thomas"],
-      [SLOT.dd, "nico"],
-      [SLOT.mcLeft, "leo"],
-      [SLOT.mcRight, "karim"],
+      [SLOT.dcLeft, "samir"],
+      [SLOT.dcRight, "thomas"],
+      [SLOT.ailRight, "nico"],
+      [SLOT.ailLeft, "leo"],
+      [SLOT.mc, "karim"],
       [SLOT.at, "julien"],
     ],
     substitutes: ["momo", "yanis"],
@@ -808,11 +809,11 @@ async function seedDemo(): Promise<void> {
     entryMode: "live",
     starters: [
       [SLOT.gb, "hugo"],
-      [SLOT.dg, "samir"],
-      [SLOT.dc, "thomas"],
-      [SLOT.dd, "nico"],
-      [SLOT.mcLeft, "leo"],
-      [SLOT.mcRight, "karim"],
+      [SLOT.dcLeft, "samir"],
+      [SLOT.dcRight, "thomas"],
+      [SLOT.ailRight, "nico"],
+      [SLOT.ailLeft, "leo"],
+      [SLOT.mc, "karim"],
       [SLOT.at, "julien"],
     ],
     substitutes: ["momo", "yanis", "ali", "fabien"],
@@ -918,11 +919,11 @@ async function seedDemo(): Promise<void> {
 
   await db.insert(lineupSlots).values([
     { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.gb), teamMemberId: m("hugo") },
-    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.dg), teamMemberId: m("samir") },
-    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.dc), teamMemberId: m("thomas") },
-    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.dd), teamMemberId: m("nico") },
-    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.mcLeft), teamMemberId: m("leo") },
-    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.mcRight), teamMemberId: m("karim") },
+    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.dcLeft), teamMemberId: m("samir") },
+    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.dcRight), teamMemberId: m("thomas") },
+    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.ailRight), teamMemberId: m("nico") },
+    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.ailLeft), teamMemberId: m("leo") },
+    { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.mc), teamMemberId: m("karim") },
     { lineupId: initialLineup.id, formationSlotId: slotFor(SLOT.at), teamMemberId: m("julien") },
   ]);
 
@@ -940,12 +941,12 @@ async function seedDemo(): Promise<void> {
 
   await db.insert(lineupSlots).values([
     { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.gb), teamMemberId: m("hugo") },
-    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.dg), teamMemberId: m("samir") },
-    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.dc), teamMemberId: m("thomas") },
-    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.dd), teamMemberId: m("nico") },
+    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.dcLeft), teamMemberId: m("samir") },
+    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.dcRight), teamMemberId: m("thomas") },
+    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.ailRight), teamMemberId: m("nico") },
     // Léo makes way for Yanis, and Karim drops into midfield.
-    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.mcLeft), teamMemberId: m("karim") },
-    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.mcRight), teamMemberId: m("yanis") },
+    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.ailLeft), teamMemberId: m("karim") },
+    { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.mc), teamMemberId: m("yanis") },
     { lineupId: plannedLineup.id, formationSlotId: slotFor(SLOT.at), teamMemberId: m("momo") },
   ]);
 

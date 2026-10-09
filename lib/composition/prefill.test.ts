@@ -25,16 +25,16 @@ function slotsOf(label: string): PlanSlot[] {
   }));
 }
 
-const SLOTS = slotsOf("1-3-2-1");
-const [GK, LB, CB, RB, PIVOT_LEFT, PIVOT_RIGHT, STRIKER] = SLOTS;
+const SLOTS = slotsOf("1-2-3-1");
+const [GK, CB_LEFT, CB_RIGHT, WING_LEFT, PIVOT, WING_RIGHT, STRIKER] = SLOTS;
 
 const STARTERS: SlotAssignment[] = [
   { slotId: GK.id, memberId: "hugo" },
-  { slotId: LB.id, memberId: "samir" },
-  { slotId: CB.id, memberId: "thomas" },
-  { slotId: RB.id, memberId: "nico" },
-  { slotId: PIVOT_LEFT.id, memberId: "leo" },
-  { slotId: PIVOT_RIGHT.id, memberId: "karim" },
+  { slotId: CB_LEFT.id, memberId: "samir" },
+  { slotId: CB_RIGHT.id, memberId: "thomas" },
+  { slotId: WING_LEFT.id, memberId: "nico" },
+  { slotId: PIVOT.id, memberId: "leo" },
+  { slotId: WING_RIGHT.id, memberId: "karim" },
   { slotId: STRIKER.id, memberId: "ali" },
 ];
 
@@ -61,7 +61,7 @@ function plan(
   return {
     isInitial: overrides.fromMinute === 0,
     formationId: "f1",
-    formationLabel: "1-3-2-1",
+    formationLabel: "1-2-3-1",
     isApplied: false,
     assignments: STARTERS,
     slots: SLOTS,

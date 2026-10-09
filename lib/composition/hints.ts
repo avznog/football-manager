@@ -19,8 +19,6 @@ function s(count: number): string {
 }
 
 export type BenchHintInput = {
-  /** Which of the editor's two modes is on. `shape` moves the postes, not the players. */
-  mode: "players" | "shape";
   /** Players on the match sheet who are not on the pitch yet. */
   benchCount: number;
   /** Slots of the current formation with nobody in them. */
@@ -39,9 +37,7 @@ export type BenchHintInput = {
  * It is the tap path that is spelled out, not the drag: on a phone the tap is the path that works
  * every time, and the drag is discoverable from the disc itself.
  */
-export function benchHintFr({ mode, benchCount, freeSlots }: BenchHintInput): string {
-  if (mode === "shape") return "Repasse en « Joueurs » pour placer quelqu’un.";
-
+export function benchHintFr({ benchCount, freeSlots }: BenchHintInput): string {
   if (benchCount === 0) {
     return freeSlots === 0
       ? "Les sept sont placés, le banc est vide."

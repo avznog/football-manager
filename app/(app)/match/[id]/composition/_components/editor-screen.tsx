@@ -15,7 +15,6 @@ import { CompositionEditor, type EditorMember } from "@/components/composition";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { BUILTIN_FORMATIONS } from "@/db/reference";
 import type { ActiveTeam } from "@/lib/auth/dal";
 import { matchNameFr } from "@/lib/calendar/labels";
 import { capitalizeFirst } from "@/lib/calendar/time";
@@ -29,11 +28,8 @@ import {
 } from "@/lib/composition/plan";
 import { prefillFromPlans, prefillNoticeFr } from "@/lib/composition/prefill";
 import { getCompositionMembers, getMatchLineups, toPlannedLineup } from "@/lib/composition/queries";
-import { getFormations } from "@/lib/formation/queries";
+import { getTheFormation } from "@/lib/formation/queries";
 import type { MatchRow } from "@/lib/match/queries";
-
-/** The shape a coach gets when nothing else is indicated: the 7-a-side default (decision 005). */
-const DEFAULT_LABEL = BUILTIN_FORMATIONS[0].label;
 
 export type EditorScreenProps = {
   team: ActiveTeam;
@@ -45,10 +41,10 @@ export type EditorScreenProps = {
 };
 
 export async function EditorScreen({ team, match, lineupId, requestedMinute }: EditorScreenProps) {
-  const [members, lineups, formations] = await Promise.all([
+  const [members, lineups, formation] = await Promise.all([
     getCompositionMembers(team.id, match.id),
     getMatchLineups(match.id),
-    getFormations(team.id),
+    getTheFormation(),
   ]);
 
   const backHref = `/match/${match.id}/composition`;
@@ -133,11 +129,11 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
     );
   }
 
-  if (formations.length === 0) {
+  if (formation === null) {
     return shell(
       <Guidance
         title="Aucune formation disponible"
-        description="Les formations types n’ont pas été chargées dans la base."
+        description="La formation n’a pas été chargée dans la base."
         backHref={backHref}
       />,
     );
@@ -159,15 +155,21 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
           plans,
           minute: fromMinute,
           placeableMemberIds: selectable.map((member) => member.membershipId),
-          formationIds: formations.map((formation) => formation.id),
+          formationIds: [formation.id],
         })
       : null;
 
-  const formationId =
-    target?.formationId ??
-    prefill?.formationId ??
-    (formations.find((formation) => formation.isBuiltin && formation.label === DEFAULT_LABEL)?.id ??
-      formations[0].id);
+  /*
+   * What the pitch opens with, always on the one formation's slots (decision 157). A plan drawn before
+   * that, on a shape that is no longer offered, is carried over **post by post in store order** — the
+   * keeper stays the keeper, the back two stay at the back — and saving it moves it onto the formation.
+   * Every such plan on production was already a `1-2-3-1`, so this is the theoretical case.
+   */
+  const assignments = target
+    ? target.formationId === formation.id
+      ? target.assignments
+      : carryOver(target.assignments, target.slots, formation.slots)
+    : (prefill?.assignments ?? []);
 
   const editorMembers: EditorMember[] = members.map((member) => ({
     membershipId: member.membershipId,
@@ -185,9 +187,8 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
         lineupId={target?.id ?? null}
         kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
         members={editorMembers}
-        formations={formations}
-        formationId={formationId}
-        assignments={target?.assignments ?? prefill?.assignments ?? []}
+        formation={formation}
+        assignments={assignments}
         prefillNoticeFr={prefill ? prefillNoticeFr(prefill, nameOfMembers(members)) : []}
         fromMinute={fromMinute}
         otherPlans={otherPlans}
@@ -195,6 +196,25 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
       cancelHref={backHref}
     />,
   );
+}
+
+/**
+ * A composition's players moved from one formation's slots to another's, by `sort`: the n-th post of
+ * the old shape becomes the n-th post of the new one. Both shapes number their slots goalkeeper first,
+ * then back to front (`db/reference.ts`), so the keeper always lands in goal.
+ */
+function carryOver(
+  assignments: readonly { slotId: string; memberId: string }[],
+  fromSlots: readonly { id: string; sort: number }[],
+  toSlots: readonly { id: string; sort: number }[],
+): { slotId: string; memberId: string }[] {
+  const from = [...fromSlots].sort((a, b) => a.sort - b.sort);
+  const to = [...toSlots].sort((a, b) => a.sort - b.sort);
+  return assignments.flatMap((assignment) => {
+    const index = from.findIndex((slot) => slot.id === assignment.slotId);
+    const slot = index >= 0 ? to[index] : undefined;
+    return slot ? [{ slotId: slot.id, memberId: assignment.memberId }] : [];
+  });
 }
 
 /** The back link, the title and the match, above whatever state the editor is in. */

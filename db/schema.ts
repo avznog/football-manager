@@ -210,7 +210,7 @@ export const formations = pgTable(
     /** Null means a built-in template shared by every team. */
     teamId: uuid().references(() => teams.id, { onDelete: "cascade" }),
     name: text().notNull(),
-    /** e.g. "1-3-2-1" */
+    /** e.g. "1-2-3-1" */
     label: text().notNull(),
     createdBy: uuid().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
