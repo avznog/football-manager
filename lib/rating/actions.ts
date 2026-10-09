@@ -12,14 +12,17 @@
  * 1. `can(actor, "rating:submit")` — a self-scoped action: a coach cannot rate on a player's behalf.
  * 2. The match belongs to the team named in the form, and it is **finished**. That is the only timing
  *    rule left: you cannot rate a match that has not been played, and nothing ever closes afterwards.
- * 3. Everybody he rates **played** — `minutes > 0` in the log — himself excepted. Ids that did not play
+ * 3. He was **on this match's sheet** — starter, substitute or supporter — or played in it
+ *    (`mayRateMatch`, decision 159). `can()` cannot answer this: it is a fact about `match_squad`, and
+ *    `can()` has no data. A member who was not selected is refused with a sentence, not a silent drop,
+ *    because his form can only exist if somebody crafted it.
+ * 4. Everybody he rates **played** — `minutes > 0` in the log — himself excepted. Ids that did not play
  *    are dropped rather than trusted.
  *
- * **Two refusals that used to be here are gone, both by decision 139.** « La notation est fermée : les
- * moyennes sont sorties » went with the window: the means being out no longer stops anybody, so a note
- * can now arrive after the squad has read the figure it moves — which was stated as the cost of the
- * change and accepted. And « seuls les joueurs qui ont joué peuvent noter » went with the rule: a
- * supporter on the touchline watched the same hour and his note counts the same.
+ * « La notation est fermée : les moyennes sont sorties » went with the window (decision 139): the means
+ * being out no longer stops anybody, so a note can arrive after the squad has read the figure it moves
+ * — which was stated as the cost of that change and accepted. Rule 3 is the one decision 139 deleted
+ * and decision 159 put back, narrower than decision 007's: supporters keep the vote 139 gave them.
  *
  * Rule 3 is where decision 137 changed this file, and it is the one that stayed. It used to read the
  * match sheet, which the form itself was rendered from; it reads the reduced log, which no form can
@@ -47,8 +50,8 @@ import { assertCan, membershipIn } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState } from "@/lib/auth/validation";
 import { getMatch, type MatchRow } from "@/lib/match/queries";
-import { ratingProgress, ratingTargetsFor } from "./progress";
-import { playedEntriesOf } from "./queries";
+import { mayRateMatch, ratingProgress, ratingTargetsFor } from "./progress";
+import { getMatchSheet, playedEntriesOf } from "./queries";
 import { readRatingEntries, submitRatingsSchema } from "./validation";
 
 export type SubmitRatingsState =
@@ -110,10 +113,19 @@ export async function submitRatings(
     return { error: "La notation ouvrira au coup de sifflet final." };
   }
 
-  const played = await playedEntriesOf(match);
+  const [played, sheet] = await Promise.all([playedEntriesOf(match), getMatchSheet(match.id)]);
+
+  // Rule 3, decision 159: the sheet decides who has a vote. Read from `match_squad`, never from the
+  // form, so a crafted post from a member who was not selected is refused here.
+  if (!mayRateMatch(sheet, played, membership.membershipId)) {
+    return {
+      error:
+        "Tu n’étais pas sur la feuille de ce match : seuls les titulaires, les remplaçants et les supporters le notent.",
+    };
+  }
 
   /*
-   * Who he may rate: everybody who played, minus himself — whether or not *he* played (decision 139).
+   * Who he may rate: everybody who played, minus himself — whether or not *he* played.
    * Derived from the log, not from the form, and `ratingTargetsFor` is the same function the screen
    * built its list from, so a legitimate submission can never be refused here while a crafted one is.
    */

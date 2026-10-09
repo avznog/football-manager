@@ -3,10 +3,10 @@
  *
  * Who may be here, and what they see, is decided on the server:
  *
- * - **every member may note, played or not** (decision 139, superseding 137 and 007 on this). A
- *   supporter on the touchline watched the same hour, and a member who was not on the sheet at all may
- *   note too. The old screen turned both away with « seuls les joueurs qui ont joué donnent des notes »,
- *   and that EmptyState is gone;
+ * - **the match sheet notes, played or not** (decision 159, narrowing 139): every starter, every
+ *   substitute and every supporter of this match. A supporter on the touchline watched the same hour
+ *   and keeps the vote decision 139 gave him; a member who was **not selected** gets an explanation
+ *   instead of the form, and `submitRatings` refuses him with the same rule if he posts one anyway;
  * - **only the men who played are noted** — `minutes > 0` in the log, not a role on the sheet (decision
  *   137, which survives). Nobody notes himself, so a reader who played gets the list minus his own name
  *   and everybody else gets all of it. `getNotationView` arrives that way;
@@ -45,10 +45,10 @@ import { RatingSheet } from "./_components/rating-sheet";
 /**
  * Why a reader who did not play is being asked for notes anyway, in his own case.
  *
- * Three people, three sentences, because the old screen's three EmptyStates told them apart and losing
- * that would read as a bug: a supporter was on the sheet *as* a supporter (decision 039), a named
- * substitute who never came on was on it too, and somebody not on it at all is a third thing. Telling
- * any of them the wrong one contradicts a sheet he can read two taps away.
+ * Two people, two sentences: a supporter was on the sheet *as* a supporter (decision 039), and a named
+ * substitute who never came on was on it too. Telling either the wrong one contradicts a sheet he can
+ * read two taps away. The third case the old screen had — somebody not on the sheet at all — is no
+ * longer asked (decision 159) and gets `notSelectedFr` instead of the form.
  *
  * `null` for a man who played — he needs no explanation for being asked.
  */
@@ -60,7 +60,26 @@ function whyAskedFr(played: boolean, sheetRole: string | null): string | null {
   if (sheetRole !== null) {
     return "Tu n’es pas entré en jeu, et tu notes quand même ceux qui ont joué.";
   }
-  return "Tu n’étais pas sur la feuille de match, et tu peux noter quand même.";
+  return null;
+}
+
+/**
+ * Why this reader is not given the form (decision 159). Two cases, because a match with no sheet at
+ * all is a statement about the match and must not read as one about him.
+ */
+function notSelectedFr(sheetEmpty: boolean): { title: string; description: string } {
+  if (sheetEmpty) {
+    return {
+      title: "Personne n’est sur la feuille de ce match",
+      description:
+        "Seuls les titulaires, les remplaçants et les supporters d’un match le notent, et ce match n’a pas de feuille.",
+    };
+  }
+  return {
+    title: "Tu n’étais pas sur la feuille de ce match",
+    description:
+      "Seuls les titulaires, les remplaçants et les supporters d’un match le notent.",
+  };
 }
 
 export async function generateMetadata({ params }: PageProps<"/match/[id]/notation">) {
@@ -79,7 +98,8 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
   });
   if (!view) notFound();
 
-  const { match, finished, meansVisible, played, sheetRole, targets, progress } = view;
+  const { match, finished, eligible, sheetEmpty, meansVisible, played, sheetRole, targets, progress } =
+    view;
   const kickoff = new Date(match.kickoffAt);
 
   // Invariant 4: the permission comes from `can()`, never from a role read on the spot. It used to be
@@ -126,10 +146,22 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
             </ButtonLink>
           }
         />
+      ) : !eligible ? (
+        /* Not selected for this match: no starter, substitute or supporter row, and no minutes
+           (decision 159). Before the « personne à noter » branch, because for him an empty list is
+           not a fact about the match. */
+        <EmptyState
+          {...notSelectedFr(sheetEmpty)}
+          action={
+            <ButtonLink href={`/match/${match.id}/recap`} variant="secondary">
+              Voir le résumé du match
+            </ButtonLink>
+          }
+        />
       ) : targets.length === 0 ? (
         /* Nobody played: a match whose log is empty (decision 013), or one with a single minute on it
            belonging to the reader. Not an error, and not a form. Under decision 139 this is the *only*
-           thing an empty list can mean — it used to double as « tu n'as pas joué ». */
+           thing an empty list can mean for a reader who may rate — the one who may not is above. */
         <EmptyState
           title="Personne à noter sur ce match"
           description="Le déroulé de ce match ne retient aucun joueur sur le terrain."
@@ -152,9 +184,10 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
           </div>
         </Card>
       ) : !mayRate ? (
-        /* `rating:submit` said no. Under decision 139 nothing in the current rules reaches this — every
-           member may rate, and `requireTeamContext` has already turned away anybody who is not one — so
-           this is defence against a future rule rather than a state the app can produce today. It stays
+        /* `rating:submit` said no. Nothing in the current rules reaches this — `can()` gives it to every
+           member, `requireTeamContext` has already turned away anybody who is not one, and the sheet half
+           of the rule is the `!eligible` branch above — so this is defence against a future rule rather
+           than a state the app can produce today. It stays
            because a screen that silently rendered an unusable form instead would be worse, and because
            invariant 4 means the answer to « may he » is `can()`'s and this page does not get to assume
            it. */

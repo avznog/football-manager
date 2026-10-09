@@ -81,15 +81,16 @@ export type Action =
   | "profile:editShirtName"
   | "injury:declare"
   /**
-   * Give notes for a match. **Any member of the team** (decision 139) — a supporter on the touchline
-   * watched the same hour the players did, and a member who was not on the sheet at all may rate too.
+   * Give notes for a match. **Any member of the team, as far as `can()` can tell** (decision 139) — and
+   * then only for a match whose sheet names him as a starter, a substitute or a supporter (decision
+   * 159). That second half is data: `can()` has no match sheet, so it is `mayRateMatch` in
+   * `lib/rating/progress.ts`, applied by `submitRatings` and by the reads that build the form and the
+   * coach's tally. This answer is the permission; it is never the whole of « may he rate this match ».
    *
    * Self-scoped, so a coach cannot rate on somebody's behalf — but, unlike every other self-scoped
-   * action, **not conditional on `isPlayer`**. « Any member » is what was asked for, and a non-playing
-   * coach is a member with the best view of the hour; it is also what makes the coach's own tally
-   * honest, since its denominator is the active members and a denominator nobody can reach is a figure
-   * that lies. This is why the action is handled on its own in `can()` rather than through
-   * `SELF_ACTIONS`.
+   * action, **not conditional on `isPlayer`**. A supporter on the sheet may be a non-playing member, and
+   * a non-playing coach named as a supporter has the best view of the hour. This is why the action is
+   * handled on its own in `can()` rather than through `SELF_ACTIONS`.
    *
    * Who may be *rated* is a different question, answered from the log in `lib/rating/progress.ts`
    * (`minutes > 0`, decision 137), and no permission can see it.
@@ -169,7 +170,8 @@ export function can(actor: Actor, action: Action, context: Context): boolean {
 
   /*
    * Self-scoped, like the block below, but for **every** member rather than every player: a non-playing
-   * coach and a supporter both get to rate (decision 139). It is above the `isPlayer` test rather than
+   * coach and a supporter both get to rate (decision 139; which *match* is decision 159's question,
+   * answered from the sheet outside `can()`). It is above the `isPlayer` test rather than
    * inside it because that test is what would turn « any member » back into « any player ».
    */
   if (action === "rating:submit") {

@@ -15,7 +15,8 @@
  *
  * Once the match is played this page becomes the hub for the two screens that read it: the recap,
  * and the rating flow for whoever still owes notes. Whether he owes any is asked of
- * `getNotationView`, which owns decision 007's rule — this page restates none of it.
+ * `getNotationView`, which owns the rule (decision 159: the sheet's starters, substitutes and
+ * supporters) — this page restates none of it.
  */
 
 import { notFound } from "next/navigation";
@@ -108,13 +109,14 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   // (decision 004). Invariant 4: the permission is `can()`'s answer.
   const mayAmend = can(actor, "match:amend", { teamId: team.id });
   /**
-   * This viewer's rating duty, or null when he has none — which is now only two cases: the match is not
-   * finished, or his account may not rate at all. Invariant 4 — the permission is `can()`'s answer, not
-   * a role read here.
+   * This viewer's rating duty, or null when he has none: the match is not finished, his account may
+   * not rate, or he was not on this match's sheet (`notation.eligible`, decision 159 — a member who was
+   * not selected is not asked). Invariant 4 — the permission is `can()`'s answer, and the sheet half is
+   * `getNotationView`'s; neither is a role read here.
    *
-   * It used to require `notation.played` and an open window. Decision 139 removed both: every member is
-   * asked, and nothing closes, so a supporter gets this card and a man who has read the means still
-   * gets it if he never sent his notes.
+   * It used to require `notation.played` and an open window. Decision 139 removed both and nothing
+   * closes, so a supporter gets this card and a man who has read the means still gets it if he never
+   * sent his notes.
    *
    * `requiredCount > 0` stays, and it carries more weight than it looks: an empty set is *vacuously*
    * complete, so without it a match nobody played would congratulate every reader on having noted
@@ -123,6 +125,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   const ratingDuty =
     notation !== null &&
     notation.finished &&
+    notation.eligible &&
     notation.progress.requiredCount > 0 &&
     can(actor, "rating:submit", { teamId: team.id })
       ? notation.progress

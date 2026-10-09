@@ -750,9 +750,25 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(ratings.getByRole("button", { name: "Sortir les moyennes" })).toHaveCount(0);
   });
 
-  await test.step("the coach shows the means without the five who never rated, and the striker is crowned", async () => {
+  await test.step("the coach, on no sheet, is told why he does not rate and is not asked to", async () => {
+    /*
+     * Decision 159: the match sheet rates — starters, substitutes, supporters — and a member it does
+     * not name does not. The fixture's coach never plays, so he is on no sheet: the match page carries
+     * no « Noter les joueurs » for him, and the notation screen explains instead of offering a form.
+     * `submitRatings` refuses him with the same predicate if a form is posted anyway.
+     */
     await logout(page);
     await login(page, coach.username, fixture.password);
+    await page.goto(matchUrl);
+    await expect(page.getByRole("link", { name: "Voir le résumé" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Noter les joueurs" })).toHaveCount(0);
+
+    await page.goto(`${matchUrl}/notation`);
+    await expect(page.getByText("Tu n’étais pas sur la feuille de ce match")).toBeVisible();
+    await expect(page.locator("input[type=range]")).toHaveCount(0);
+  });
+
+  await test.step("the coach shows the means without the four who never rated, and the striker is crowned", async () => {
     await page.goto(`${matchUrl}/recap`);
 
     const pending = ratingsCard(page);
@@ -760,13 +776,14 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
      * The coach, and only the coach, gets the figures and the names: he is the one who can go and ask,
      * and the alternative is a button that gives up on five people without saying who they are.
      *
-     * **Nine, not eight**, and that is decision 139's denominator: every member may rate, so the
-     * fraction counts the eight players *and the coach himself* — who has not rated either, and is
-     * therefore one of the five names. Under 137 it counted « the players with minutes », because they
-     * were who publication waited for.
+     * **Eight, not nine**, and that is decision 159's denominator: the match sheet rates — seven
+     * starters and one substitute — and the coach, who never plays and so is on no sheet, is not in
+     * the fraction and not among the names. Under 139 it was nine, every member; under 137 « the
+     * players with minutes ».
      */
-    await expect(pending).toContainText("4 membres sur 9 ont noté.");
+    await expect(pending).toContainText("4 sur 8 de la feuille de match ont noté.");
     await expect(pending).toContainText(sub.displayName);
+    await expect(pending).not.toContainText(coach.displayName);
     await expect(pending).toContainText("C’est toi qui décides quand les moyennes sortent.");
     /*
      * What the tap costs, before the tap — and the two things it no longer costs. It does **not** freeze
@@ -774,7 +791,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
      * false, so the card promising either would be the screen out-stating the server.
      */
     await expect(pending).toContainText(
-      "Les moyennes seront calculées sans les 5 séries qui manquent, et elles bougeront encore si " +
+      "Les moyennes seront calculées sans les 4 séries qui manquent, et elles bougeront encore si " +
         "elles arrivent. Tu peux les masquer à nouveau.",
     );
 
@@ -793,8 +810,8 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 
     const published = ratingsCard(page);
     // The state of the collection, which is a sentence only he gets: 4 raters × 7 teammates, out of the
-    // nine members who could have sent a set.
-    await expect(published).toContainText("28 notes, 4 membres sur 9.");
+    // eight on the sheet who could have sent a set.
+    await expect(published).toContainText("28 notes, 4 sur 8 de la feuille de match.");
     // And the way back, which 137 and 138 both said did not exist: the switch goes both ways (139).
     await expect(published.getByRole("button", { name: "Masquer les moyennes" })).toBeVisible();
 
@@ -817,7 +834,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(ratings).toContainText("La moyenne des notes des coéquipiers");
     // Not his: the tally is `null` for everybody who is not the coach, so the fraction is not rendered
     // at all rather than rendered empty. Nor is the way to take the means back.
-    await expect(ratings).not.toContainText("membres sur");
+    await expect(ratings).not.toContainText("de la feuille de match");
     await expect(ratings.getByRole("button", { name: "Masquer les moyennes" })).toHaveCount(0);
 
     const row = ratingRow(page, striker);
@@ -832,7 +849,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(row).not.toContainText(cm1.displayName);
   });
 
-  await test.step("and the five who never rated can still rate, means out or not", async () => {
+  await test.step("and the four who never rated can still rate, means out or not", async () => {
     /*
      * Decision 139's cost, stated out loud and accepted: **nothing closes the notation.** The tap two
      * steps up showed the means and shut nothing, so `sub` — who never sent a note — can still send a

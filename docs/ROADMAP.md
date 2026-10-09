@@ -799,7 +799,15 @@ tag during this rework** (decision 146): every item below reaches the preview on
 - [ ] **S8** · #167 · unpaired group changes, goal-before-change ordering, tap a player to act
 - [ ] **S9** · #168 · the starting composition applied when game mode opens
 - [ ] **S10** · #169 · add changes after the match, realistically
-- [ ] **S11** · #170 · only starters, substitutes and supporters may rate
+- [x] **S11** · #170 · only starters, substitutes and supporters may rate
+      - [x] **Only the match sheet rates** — starters, substitutes and supporters of that match, plus anybody
+            the log has playing; an unselected member is refused (decision **159**, superseding rule 1 of 139).
+            `mayRateMatch` in `lib/rating/progress.ts` is the pure predicate; `submitRatings` refuses with a
+            French sentence, the notation screen explains instead of offering the form, the match page's duty
+            card is not shown, and the coach's tally counts eligible raters only (« 10 sur 12 de la feuille de
+            match »). A match with no sheet has no raters. Who is **rated** is unchanged (`minutes > 0`)
+      - [x] Tests: the predicate and the tally in `progress.test.ts`, the refusal in `actions.test.ts` (I/O
+            mocked), the coach on no sheet in the happy path
 - [ ] **S12** · #171 · stats data: goals for while on, minutes per position, rates, impact per position
 - [ ] **S13** · #172 · équipe type: offensive, défensive, 7 de légende, notes
 

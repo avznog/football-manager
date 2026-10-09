@@ -236,9 +236,9 @@ async function seedDemo(): Promise<void> {
     .returning({ id: users.id });
 
   // The super admin runs this team as a non-playing coach: that is the account you log into.
-  // He is on no match sheet, so he is never *rated* — and under decision 139 he may rate anyway, which
-  // is why he counts in the coach's « n membres sur 14 ». He is also the viewer who reads the
-  // individual notes and their authors, which nobody else ever does.
+  // He is on no match sheet, so he is never *rated* — and under decision 159 he does not rate either:
+  // the sheet rates, and he is not in the coach's « n sur 12 de la feuille de match ». He is the viewer
+  // who reads the individual notes and their authors, which nobody else ever does.
   await db
     .insert(teamMembers)
     .values({
@@ -786,18 +786,17 @@ async function seedDemo(): Promise<void> {
    *   his **second** clean sheet of the season.
    * - Ratings: Karim, Hugo, Julien and Samir each submitted a complete set of the **nine** men who
    *   played. Yanis and Fabien were named and never came on, so they are not *rated* (decision 137's
-   *   `minutes > 0`, which survives) — but under 139 they may rate, and so may Brice, and so may a
-   *   member who was not on the sheet at all. The coach's tally counts **members**, not players, for
-   *   that reason: « 4 membres sur 14 » — the thirteen players still in the squad plus the non-playing
-   *   super admin, Rayan having left. Looked at on a phone, that denominator is the surprise of the
-   *   new rule: ten names follow it, and all ten are entitled to rate.
+   *   `minutes > 0`, which survives) — but they were on the sheet, so they may rate, and so may Brice
+   *   (decision 159). A member who was not on the sheet may not. The coach's tally counts **the
+   *   sheet**: « 4 sur 12 de la feuille de match » — the nine who played, Yanis, Fabien and Brice;
+   *   the non-playing super admin is on no sheet and is neither counted nor named.
    *   Every average is exactly its base, so the moment the coach shows them:
    *   Julien 9,0 · Karim 8,0 · Hugo 8,0 · Ali 8,0 · Léo 7,0 · Samir 7,0 · Thomas 7,0 ·
    *   Nico 6,0 · Momo 6,0 — over **3** notes for the four raters, who are not rated by themselves,
    *   and **4** for the five others. Man of the match: **Julien, 9,0**. Until then, nothing.
    * - **Brice is a supporter**: he may not be rated and appears in nobody's list, but **he may rate**
-   *   (decision 139, superseding 007/020/022 on this half) — he watched the same hour from the
-   *   touchline. `/match/<id>/notation` as Brice is the case to check the new rule on.
+   *   (decisions 139 and 159) — he watched the same hour from the touchline. `/match/<id>/notation`
+   *   as Brice is the case to check the rule on, and as a player left off the sheet the refusal.
    */
   await seedPlayedMatch({
     ...common,

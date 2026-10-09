@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  eligibleRaterIds,
   hasPlayed,
+  mayRateMatch,
   playedLabelFr,
   playedMemberIds,
   ratingProgress,
   ratingTargetsFor,
+  tallyOf,
   type PlayedEntry,
+  type SquadEntry,
+  type TallyMember,
 } from "./progress";
 
 function played(...entries: [string, number][]): PlayedEntry[] {
@@ -89,6 +94,100 @@ describe("ratingTargetsFor", () => {
     // used to produce the same empty list for a different reason, which is exactly what made it
     // ambiguous.
     expect(ratingTargetsFor([], "pierre")).toEqual([]);
+  });
+});
+
+/**
+ * Decision 159: the sheet rates. Hugo and Karim started, Momo was a substitute who never came on,
+ * Pierre was a supporter; Rayan was not selected, and neither was the coach, who never plays.
+ */
+const SHEET: SquadEntry[] = [
+  { teamMemberId: "hugo", role: "starter" },
+  { teamMemberId: "karim", role: "starter" },
+  { teamMemberId: "momo", role: "substitute" },
+  { teamMemberId: "pierre", role: "supporter" },
+];
+
+describe("mayRateMatch", () => {
+  it("lets a starter, a substitute who never came on, and a supporter rate", () => {
+    for (const id of ["hugo", "karim", "momo", "pierre"]) {
+      expect(mayRateMatch(SHEET, PLAYED, id)).toBe(true);
+    }
+  });
+
+  it("refuses a player who was not selected", () => {
+    expect(mayRateMatch(SHEET, PLAYED, "rayan")).toBe(false);
+  });
+
+  it("refuses a coach who is not on the sheet, whatever his permissions say", () => {
+    // `can()` gives `rating:submit` to every member; the sheet is the data half and it says no.
+    expect(mayRateMatch(SHEET, PLAYED, "coach")).toBe(false);
+  });
+
+  it("lets a coach rate when the sheet names him, as a supporter for instance", () => {
+    expect(mayRateMatch([...SHEET, { teamMemberId: "coach", role: "supporter" }], PLAYED, "coach")).toBe(
+      true,
+    );
+  });
+
+  it("refuses a viewer with no membership", () => {
+    expect(mayRateMatch(SHEET, PLAYED, null)).toBe(false);
+    expect(mayRateMatch(SHEET, PLAYED, undefined)).toBe(false);
+  });
+
+  it("lets a man the log has playing rate even when the sheet forgot him", () => {
+    // He is rated, so he rates: he was a starter or a substitute in fact, whatever the sheet says.
+    expect(mayRateMatch(SHEET, played(["late", 20]), "late")).toBe(true);
+  });
+
+  it("gives nobody a vote on a match with no sheet that nobody played", () => {
+    expect(mayRateMatch([], [], "hugo")).toBe(false);
+    expect(eligibleRaterIds([], [])).toEqual([]);
+  });
+});
+
+describe("eligibleRaterIds", () => {
+  it("is the sheet plus whoever played, sorted and without duplicates", () => {
+    expect(eligibleRaterIds(SHEET, [...PLAYED, ...played(["late", 20])])).toEqual([
+      "hugo",
+      "karim",
+      "late",
+      "momo",
+      "pierre",
+    ]);
+  });
+});
+
+describe("tallyOf", () => {
+  const directory: TallyMember[] = [
+    { membershipId: "coach", displayName: "Coach", hasLeft: false },
+    { membershipId: "hugo", displayName: "Hugo", hasLeft: false },
+    { membershipId: "karim", displayName: "Karim", hasLeft: false },
+    { membershipId: "momo", displayName: "Momo", hasLeft: false },
+    { membershipId: "pierre", displayName: "Pierre", hasLeft: false },
+    { membershipId: "rayan", displayName: "Rayan", hasLeft: false },
+  ];
+
+  it("counts the eligible raters only, so the unselected are neither counted nor chased", () => {
+    const tally = tallyOf(directory, eligibleRaterIds(SHEET, PLAYED), ["hugo", "pierre"]);
+    expect(tally.memberTotal).toBe(4);
+    expect(tally.raterCount).toBe(2);
+    expect(tally.silent.map((member) => member.displayName)).toEqual(["Karim", "Momo"]);
+  });
+
+  it("leaves out an eligible member who has left the team", () => {
+    const left = directory.map((member) =>
+      member.membershipId === "momo" ? { ...member, hasLeft: true } : member,
+    );
+    const tally = tallyOf(left, eligibleRaterIds(SHEET, PLAYED), []);
+    expect(tally.memberTotal).toBe(3);
+    expect(tally.silent.map((member) => member.memberId)).toEqual(["hugo", "karim", "pierre"]);
+  });
+
+  it("does not count a stray note from somebody the sheet does not name", () => {
+    const tally = tallyOf(directory, eligibleRaterIds(SHEET, PLAYED), ["rayan"]);
+    expect(tally.raterCount).toBe(0);
+    expect(tally.memberTotal).toBe(4);
   });
 });
 
