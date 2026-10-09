@@ -18,7 +18,6 @@ import { SquadSheet, type SheetMember } from "@/components/composition";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { positionLabelFr } from "@/db/reference";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { MATCH_STATUS_LABELS, venuePhraseFr } from "@/lib/calendar/labels";
@@ -65,9 +64,6 @@ export default async function MatchSheetPage({
       squadRole: member.squadRole,
       isPlayer: member.isPlayer,
       isInjured: member.isInjured,
-      primaryPositionLabelFr: member.primaryPositionCode
-        ? positionLabelFr(member.primaryPositionCode)
-        : null,
     }));
 
   const kickoff = new Date(match.kickoffAt);

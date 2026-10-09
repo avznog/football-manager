@@ -131,7 +131,6 @@ export type EditorMember = {
   /** `null` = not on the match sheet. Such a player is never offered, only flagged. */
   squadRole: SquadRole | null;
   isInjured: boolean;
-  primaryPositionCode: string | null;
 };
 
 /** The one formation (decision 157), with its slots. */
@@ -872,7 +871,6 @@ function BenchDisc({ member, kit, selected, disabled, gesture, onKeyDown }: Benc
           secondaryColor={kit.secondaryColor}
           variant={member.isInjured ? "unavailable" : selected ? "selected" : "normal"}
           statusLabel={statusLabelOf(member)}
-          positionCode={member.primaryPositionCode ?? undefined}
           size="md"
           showName={false}
         />

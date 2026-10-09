@@ -5992,3 +5992,48 @@ entry and 155. « Déjà passé » (decision 088) and the rest of decision 098 s
 **Consequences.** The enum `availability_status` is dropped in the same migration, after the table that
 held its last column. The happy path no longer has a step in which two players answer; it has a player
 opening the match and finding nothing that asks him to declare anything.
+
+## 163 — Preferred positions are the coach's to set, and only the coach's
+
+**2026-10-09** · accepted · supersedes decision **129** (« a wish about where you play is the player's
+own ») and the self-editing assumption decisions **130**, **141**, **142** and **158** were written under ·
+no schema change, no migration
+
+The cahier: « Désormais, c'est les coachs, et uniquement les coachs, qui peuvent indiquer quels sont les
+postes favoris des joueurs. Ces postes seront utilisés plus tard dans la section statistiques […] Ces postes
+là ne sont pas importants pour les compositions, ou en match. C'est uniquement à titre indicatif (et pour
+les stats). » And: « Supprimer les postes préférés sur la page de profil. »
+
+- **`profile:editPositions` moves from `SELF_ACTIONS` to `COACH_ACTIONS`.** A coach — playing or not — may
+  set the positions of any member of his team; a player may set none, **his own included**. The team scope
+  of the target is `updatePlayerPositions`' `findActiveMember(teamId, memberId)`, as for every coach
+  action. `can.test.ts` pins both halves, plus another team being refused.
+- **`/joueur/[id]`**: the editable picker for a coach, the read-only one for everybody else — including the
+  player looking at his own fiche. I kept the read-only card there rather than hiding it from him: the fiche
+  is the team's view of a player, every teammate can read it, and hiding from a man the one thing written
+  about him that everybody else can see would be odd. Its line under the pitch now says who sets them,
+  « Ce sont les coachs qui indiquent les postes. », where it said « Chaque joueur choisit ses postes
+  lui-même. ».
+- **`/moi`** no longer prints the summary: that is the « page de profil » the cahier names.
+- The picker's vocabulary stops talking about a wish: « non souhaité » is now **« pas son poste »** (the
+  legend, the accessible state, the tap instruction), the words the équipe type already uses for an
+  out-of-position pick.
+
+## 164 — Compositions and game mode do not read preferred positions
+
+**2026-10-09** · accepted · follows decision **163** · no schema change
+
+« Pas importants pour les compositions, ou en match » is read literally: nothing a coach looks at while
+composing or running a match shows or uses them any more.
+
+- the composition editor's bench discs no longer carry the player's primary code
+  (`EditorMember.primaryPositionCode` is gone), and `getCompositionMembers` returns neither
+  `primaryPositionCode` nor `positionCodes`;
+- the match sheet's rows no longer print the primary position (the page goes in S6 anyway);
+- `LivePlayer.positionCodes` (game mode) and `RetroRosterPlayer.positionCodes` (retro entry) are removed.
+  Neither was read by anything — no sort, no label — so the retro form's player order is unchanged.
+
+What still reads them, on purpose: **the équipe type** (`lib/stats/best-seven-input.ts`), which is what
+the coach sets them for, and **the squad list on `/equipe`** (`member-row.tsx`), kept as information —
+it is the one place a coach reads his whole squad's positions at a glance, which is exactly « à titre
+indicatif ».

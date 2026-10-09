@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { logout, switchTeam } from "@/lib/auth/actions";
 import { requireTeamContext, requireUser } from "@/lib/auth/dal";
 import { injuryStatus, injurySummaryFr, parisDate } from "@/lib/player/injury";
-import { positionsSummaryFr } from "@/lib/player/positions";
 import { getPlayerProfile } from "@/lib/player/queries";
 import {
   memberBadgesFr,
@@ -28,7 +27,7 @@ export default async function MePage() {
   // condition stays where it was rather than becoming a query that returns nothing.
   const [teams, profile] = await Promise.all([
     getUserTeams(user.id),
-    // A non-playing coach has no player profile at all: no positions, no injuries, nothing to show.
+    // A non-playing coach has no player profile at all: no injuries, nothing to show.
     team.isPlayer && team.membershipId
       ? getPlayerProfile(team.id, team.membershipId)
       : null,
@@ -92,10 +91,9 @@ export default async function MePage() {
         <ThemeToggle />
       </Card>
 
-      <Card
-        title={myPlayerCardTitleFr(profile !== null)}
-        description={profile ? positionsSummaryFr(profile.positions) : undefined}
-      >
+      {/* No preferred positions here any more (cahier des charges, decision 163): the coach sets them,
+          and they live on the fiche, read-only for the player, behind « Ouvrir ma fiche ». */}
+      <Card title={myPlayerCardTitleFr(profile !== null)}>
         {profile ? (
           <div className="space-y-4">
             <p className={status.injured ? "text-sm text-danger" : "text-sm text-ink-muted"}>

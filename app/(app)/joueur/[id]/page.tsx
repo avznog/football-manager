@@ -45,13 +45,12 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
 
   const isSelf = team.membershipId === profile.membershipId;
   const context = { teamId: team.id, targetMemberId: profile.membershipId };
-  // A player's wishes are the player's: `profile:editPositions` is self-only and has no coach
-  // fallback, so a coach sees the card read-only and the editor says why.
+  // The coach's, and only the coach's (decision 163): `profile:editPositions` is a coach action, so a
+  // coach edits any player's card and everybody else — the player himself included — reads it.
   const canEditPositions = can(actor, "profile:editPositions", context);
   const canEditJersey = can(actor, "member:update", context);
   // The flocage is not the number: « MOMO » agrees with nothing and nobody, so the player owns his
-  // own, and the coach may still type one for a teammate — unlike the positions above, which are
-  // nobody else's to choose.
+  // own, and the coach may still type one for a teammate.
   const canEditShirtName =
     can(actor, "profile:editShirtName", context) || can(actor, "member:update", context);
   const canManageInjuries = can(actor, "injury:declare", context);
@@ -106,7 +105,7 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
 
       {profile.isPlayer ? (
         <PositionsEditor
-          // Remounted when the stored wishes change, so a save (or somebody else's) resets the
+          // Remounted when the stored positions change, so a save (or somebody else's) resets the
           // local selection instead of leaving a stale « non enregistré ».
           key={positionsSignature(profile.positions)}
           teamId={team.id}

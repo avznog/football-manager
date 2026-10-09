@@ -4787,3 +4787,22 @@ enum's only remaining column.
   player: 404, as before).
 - Gates: typecheck, eslint, Vitest 65 files / 1370 tests, Playwright 6/6 on port 3102.
 - Not done: `npm run db:seed` was not run, for the same reason as S2.
+
+## 2026-10-09 — S5 `feat/coach-positions`: the coach sets the positions
+
+Track C. Decisions 163–164.
+
+- `lib/auth/can.ts`: `profile:editPositions` is a coach action (out of `SELF_ACTIONS`); `can.test.ts`
+  rewritten for it (player refused for himself and others, coach and player-coach allowed for any
+  player, another team refused). `updatePlayerPositions` comments and its failure copy follow (« Les
+  postes n'ont pas été enregistrés »).
+- `/joueur/[id]`: editable for coaches, read-only for everyone else including the player himself, under
+  « Ce sont les coachs qui indiquent les postes. ». `/moi`: summary removed.
+- Positions dropped from compositions and game mode: bench discs, `getCompositionMembers`, the match
+  sheet, `LivePlayer`, the retro roster. Kept on the équipe type and `/equipe`.
+- Picker copy: « non souhaité » → « pas son poste ».
+
+Looked at, 390 px, light and dark, in one pass: `/joueur/[id]` as coach (editable) and as Thomas
+himself (read-only, with the new line), `/moi` as Thomas, and the composition editor's bench as coach
+(no position code on the discs). Thomas's local password on `football_wc` was set again by a scratch
+script, deleted afterwards.

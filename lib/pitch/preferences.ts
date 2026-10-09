@@ -2,7 +2,7 @@
  * The tri-state logic behind the position picker on a player's profile.
  *
  * A player taps a position on the pitch diagram and it cycles
- * **non souhaité → secondaire → principal → non souhaité**, which maps onto
+ * **pas son poste → secondaire → principal → pas son poste**, which maps onto
  * `player_positions`: no row, a row with `preference = 'secondary'`, a row with
  * `preference = 'primary'`.
  *
@@ -31,7 +31,7 @@ export const PREFERENCE_CYCLE: readonly (PositionPreference | undefined)[] = [
 export function preferenceLabelFr(preference: PositionPreference | undefined): string {
   if (preference === "primary") return "poste principal";
   if (preference === "secondary") return "poste secondaire";
-  return "poste non souhaité";
+  return "pas son poste";
 }
 
 /** The next state for one position: undefined → secondary → primary → undefined. */

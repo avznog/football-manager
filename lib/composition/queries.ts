@@ -16,7 +16,6 @@ import { db } from "@/db/client";
 import { formations, lineupSlots, lineups, matchSquad } from "@/db/schema";
 import type { SquadRole } from "@/db/schema";
 import { getFormationSlots, type FormationSlotRow } from "@/lib/formation/queries";
-import { primaryCodeOf } from "@/lib/player/positions";
 import { getSquad } from "@/lib/team/queries";
 
 import type { PlanMember, PlanSlot, PlannedLineup } from "./plan";
@@ -47,12 +46,11 @@ export async function getMatchSquad(matchId: string): Promise<SquadSheetEntry[]>
  */
 export type CompositionMember = PlanMember & {
   jerseyNumber: number | null;
-  /** Their preferred position, to hint who belongs in the slot being filled. */
-  primaryPositionCode: string | null;
-  /** Every position they have declared, primary first. */
-  positionCodes: string[];
   isPlayer: boolean;
 };
+
+// No preferred positions here (decision 163): they are the coach's indication for the statistics,
+// and a composition is drawn without them.
 
 export async function getCompositionMembers(
   teamId: string,
@@ -68,8 +66,6 @@ export async function getCompositionMembers(
     isInjured: member.isInjured,
     isPlayer: member.isPlayer,
     squadRole: roles.get(member.membershipId) ?? null,
-    primaryPositionCode: primaryCodeOf(member.positions) ?? null,
-    positionCodes: member.positions.map((position) => position.code),
   }));
 }
 

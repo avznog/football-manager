@@ -70,8 +70,14 @@ export type Action =
    * whole team reads is not something a member does for himself.
    */
   | "rating:publish"
-  // Self-scoped
+  /**
+   * A player's preferred positions. **The coach's, and only the coach's** (decision 163): the owner
+   * wants the posts the équipe type is built on to be the coach's reading of his squad, not what each
+   * man says about himself. A coach may set them for any member of his team; a player may set none,
+   * his own included. It used to be self-scoped (decision 005, the picker of decisions 130–142).
+   */
   | "profile:editPositions"
+  // Self-scoped
   /**
    * The flocage — the name printed on the shirt. Self-scoped, unlike the **number**, which stays a
    * coach's `member:update`: a squad's numbers have to agree with each other (`updateMember` refuses
@@ -129,6 +135,7 @@ const COACH_ACTIONS = new Set<Action>([
   "match:amend",
   "rating:readNotes",
   "rating:publish",
+  "profile:editPositions",
   "injury:declare",
   "team:read",
 ]);
@@ -139,7 +146,6 @@ const COACH_ACTIONS = new Set<Action>([
  * in both sets.
  */
 const SELF_ACTIONS = new Set<Action>([
-  "profile:editPositions",
   "profile:editShirtName",
   "injury:declare",
 ]);

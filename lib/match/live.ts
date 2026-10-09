@@ -268,7 +268,6 @@ function toLivePlayer(member: SquadMember, squadRoles: Map<string, SquadRole>): 
     jerseyNumber: member.jerseyNumber,
     isInjured: member.isInjured,
     squadRole: squadRoles.get(member.membershipId) ?? null,
-    positionCodes: member.positions.map((position) => position.code),
     isPlayer: member.isPlayer,
   };
 }
@@ -284,7 +283,6 @@ function toDepartedLivePlayer(
     jerseyNumber: member.jerseyNumber,
     isInjured: false,
     squadRole: squadRoles.get(member.teamMemberId) ?? null,
-    positionCodes: [],
     isPlayer: member.isPlayer,
   };
 }

@@ -3,7 +3,7 @@
 /**
  * The position picker on a player's profile: the five positions of the one formation
  * (`POSITIONS`, decision 158) as tappable targets on the turf. Each tap cycles
- * **non souhaité → secondaire → principal → non souhaité**, which is exactly
+ * **pas son poste → secondaire → principal → pas son poste**, which is exactly
  * `player_positions.preference` (no row / `secondary` / `primary`).
  *
  * There used to be a row of chips under the turf for wishes on a code the picker no longer offered,
@@ -43,7 +43,7 @@ import { Pitch, PitchPoint } from "./Pitch";
 import { DISC_SIZES } from "./sizes";
 
 export type PositionPickerProps = {
-  /** Current wishes, keyed by position code. A missing key means « non souhaité ». */
+  /** Current wishes, keyed by position code. A missing key means « pas son poste ». */
   value: PositionSelection;
   /** Called with the complete next selection. Persisting it is the caller's job. */
   onChange: (next: PositionSelection) => void;
@@ -53,7 +53,7 @@ export type PositionPickerProps = {
    */
   singlePrimary?: boolean;
   /**
-   * These wishes are not this reader's to change — a teammate's or the coach's view of the card.
+   * These positions are not this reader's to change — anybody but a coach (decision 163).
    * The targets stay visible and keep their labels.
    */
   readOnly?: boolean;
@@ -83,7 +83,7 @@ function actionLabelFr(preference: PositionPreference | undefined): string {
   const next = nextPreference(preference);
   if (next === "secondary") return "appuyer pour en faire un poste secondaire";
   if (next === "primary") return "appuyer pour en faire le poste principal";
-  return "appuyer pour ne plus souhaiter ce poste";
+  return "appuyer pour retirer ce poste";
 }
 
 export function PositionPicker({
@@ -95,14 +95,14 @@ export function PositionPicker({
   className,
 }: PositionPickerProps) {
   // Two reasons not to respond to a tap, and only one of them is a reason to change what the copy
-  // says: « ces postes ne sont pas les tiens » is permanent for this reader, « on enregistre » is a
+  // says: « ce n'est pas à toi de les indiquer » is permanent for this reader, « on enregistre » is a
   // second. Mixing them made the sentence flicker to the coach's wording mid-save.
   const inert = readOnly || disabled;
   const primary = primaryPosition(value);
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <div role="group" aria-label="Postes souhaités sur le terrain">
+      <div role="group" aria-label="Postes du joueur sur le terrain">
         <Pitch label="Terrain de football à 7, vu depuis nos buts">
           {POSITIONS.map((position) => {
             const preference = value[position.code];
@@ -167,7 +167,7 @@ function Legend() {
   const items: { state: "none" | PositionPreference; label: string }[] = [
     { state: "primary", label: "Poste principal" },
     { state: "secondary", label: "Poste secondaire" },
-    { state: "none", label: "Non souhaité" },
+    { state: "none", label: "Pas son poste" },
   ];
 
   return (

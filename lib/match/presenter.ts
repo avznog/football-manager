@@ -127,8 +127,6 @@ export type LivePlayer = {
   isInjured: boolean;
   /** From `match_squad`; null when the match sheet says nothing about them. */
   squadRole: SquadRole | null;
-  /** Position codes they asked for, primary first. */
-  positionCodes: readonly string[];
   isPlayer: boolean;
 };
 

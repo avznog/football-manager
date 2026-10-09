@@ -33,7 +33,6 @@ export type RetroRosterPlayer = {
   isInjured: boolean;
   /** From `match_squad` when a sheet was drawn: the convocated players sort first. */
   inSquad: boolean;
-  positionCodes: readonly string[];
 };
 
 /** A slot of the formation the starting seven is placed in. */
@@ -135,7 +134,6 @@ export async function getRetroView(teamId: string, matchId: string): Promise<Ret
         jerseyNumber: player.jerseyNumber,
         isInjured: player.isInjured,
         inSquad: player.squadRole !== null,
-        positionCodes: player.positionCodes,
       }))
       .sort(byConvocatedThenName),
     formationId: formation?.id ?? null,
