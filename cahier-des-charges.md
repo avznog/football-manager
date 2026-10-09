@@ -1,74 +1,63 @@
-# To drop from application
+**If there is a slight question, where you are not sure, ASK ME. Do not hesitate, better you ask me than improvise. No tagging in production allowed, we are only working in main, so "latest" on the image**
+# GitHub Project management
+I created a "project" in GitHub. Fill in all the past issues that we did in this kanban, so we can see the project working. It will also be useful for multi sessions of claude if I work on multiple computers
+
+# First steps : cleaning
 - Entrainements. Plus besoin de gérer ça.
 - Disponibilité pour le match
 - Message de relance pour ceux qui n'ont pas répondu
 - Quand on rentre une feuille de match, pas besoin de faire une feuille de match. a partir de maintenant, on place les joueurs sur le terrain, et sur la meme page, en bas on peut dire qui est supporters / remplacant.
 - Sur la page de composition / composition de départ, supprimer les différentes formations : il n'y a à partir de maintenant qu'une seule formation -> 1 (GK), 2 (DC * 2), 3 (MC, AT * 2 (gauche et droite, mais ne pas faire de différence, ce sont les ailliers), 1 (BU))
 - Supprimer les changements de postes
+- N'afficher dans le bouton "Action" que BUT (avec passe D), But Encaissé, Changement et autre (comprendra ce qu'il y a dans remarque, autre, et commentaire).
+- Supprimer le bouton "fin" -> remplacer directement par "Sifflet"
+- Supprimer les postes préférés sur la page de profil
 
 # New instructions
-[pre match]
-rentre sa compo
-supporter peut noter à la fin car il a vu le match
+## Compositions
+La nouvelle formation, unique, est le 1 2 3 1, comme indiquée au dessus.
+Dans la page de composition, le coach peut donc indiquer qui est supporter. Le reste des joueurs est considéré comme pas sélectionné.
 
-[post match]
-il indique le match comme terminé
-il indique minute par minute ce qu'il s'est passé 
+## Mode match
+Par défaut la compo principale est appliquée.
+Les postes de joueurs doivent être constamment connus. Il faut qu'on sache, dans les evenements, quels sont les postes des gens.
 
-IL A BESOIN de savoir qui est au goal ou qui est sur le terrain  
+### Changements
+- Lors de changements (par exemple 10e minute), on s'en fiche de savoir qui remplace qui lors de changements. Par exemple, je dis que 4 personnes rentrent et 4 personnes sortent, sans dire que X remplace Y. En revanche, une fois que c'est fait, le coach doit pouvoir confirmer la nouvelle compo / nouveaux postes avec un drag & drop. Une fois que c'est bon, il peut confirmer, mais les changements sont actifs pour la minute à laquelle on a cliqué sur le bouton action (donc si je prends 1 mn à noter dans l'application, les changements sont effectués à la 10e et pas à la 11e)
+- Lors de changement en groupe, il faut qu'ils soient tous à la même minute, donc il faut la possibilté d'ajouter plusieurs changements à la fois
 
+### Pour les actions
+- Il faut désormais pouvoir cliquer sur un joueur sur le terrain pour lui faire faire une action. Si je clique sur lui, le panneau d'action s'affiche. L'action sera donc effectuée sur le joueur en question
+- Lorsqu'on fait des changements juste après avoir pris un but, il faut s'assurer que le but encaissé a bien été noté sur l'équipe qui était sur le terrain, pas sur celle qui vient de rentrer. Je propose de les noter à la minute d'après. Si tu as une meilleure manière de faire, fais donc. 
+- Il doit être possible de rajouter des actions à la fin d'un match, comme des changements, mais il faut que ce soit réaliste. Ex : si lucas est déjà sur le terrain, je ne peux pas dire "changement, lucas rentre"
 
+## Notes
+Peuvent noter : tous les titulaires, tous les remplaçants, et tous les supporters. Les joueurs non sélectionnés ne peuvent pas noter.
 
-[remarques sur mon app]
-SEULES actions qu'il faut : but pris / changements / buts mis / passe D
-On s'en fout de savoir qui remplace qui, t'as besoin de savoir qui rentre et qui sort
-Quand on clique sur le mec (sur le terrain) il faut que les quatre autres soient affichées sur le côté
+## Postes de chaque joueur par le coach
+Désormais, c'est les coachs, et uniquement les coachs, qui peuvent indiquer quels sont les postes favoris des joueurs. Ces postes seront utilisés plus tard dans la section statistiques car c'est sur ceux là qu'on se basera pour récupérer les équipes types. Ces postes là ne sont pas important pour les compositions, ou en match. C'est uniquement à titre indicatif (et pour les stats)
 
-Quand on fait des changements de groupe, il faut qu'ils soient tous à la meme minute 
+# Stats
+## Stats générales
+- Il faut qu'on ait les stats suivantes (déduites des matchs) (et donc les classements)
+  - nombre de buts par joueur
+  - nombre de passe décisive par joueur 
+  - les buts encaissés en tant que gardien
+  - les buts encaissés en étant sur le terrain (par joueur) (joueuur de champs est différent de gardien)
+  - qui a pris combien de but
+  - les buts encaissés toutes les X minutes
+  - les buts encaissés toutes les X minutes pour les goals
+  - les minutes d'invincibilité
+  - Minutes jouées au goal
+  - minutes jouées sur le terrain
 
-On s'en fout de qui joue ou, du profil
-On s'en fout d'avoir les préférences de chacun
-Sortir 4 mecs, en rentrer 4 nouveaux, puis après réorganiser léquipe 
+- Il faut qu'on sache, pour chaque poste, qui est le meilleur en terme d'impact pour l'équipe .
 
-POSSIBILITE de cliquer sur le joueur pour faire une action
-Qui a le meilleur ratio à chaque poste, entre but pris but mis
-Pouvoir faire un truc correction, ou tu peux remodifier le poste
-Tu peux aussi rajouter une action que t'as oublié de faire. 
-FAIRE AVEC LES POTES
+## Stats "équipe type"
+- Pour l'équipe type, il faut qu'on respecte les postes indiqués par le coach pour chaque joueur (poste préférés)
+- Il faut équipe type offensive : la meilleure attaque. On priorise les joueurs de champs, par poste, avec le plus grand nombre de buts mis, puis de passe D. Ensuite, parmi ceux qui ont joué au goal, on sélectionne celui avec les meilleures stats de goal (donc le moins de but pris au goal).
+- Il faut une équipe type défensive : la meilleure défense. On priorise, par poste, les joueurs de champs qui ont pris le plus petit nombre de buts. Idem pour le goal
+- Il faut une équipe "7 de légende" (la meilleure équipe possible) : elle combine le meilleur à chaque poste, en commençant par l'attaque, et en terminant par le goal. Il ne faut pour autant ne pas mettre quelqu'un de trop nul au goal, quitte à mettre (parmi les goals), un joueur de terrain qui est un peu meilleur au goal pour éviter d'avoir un goal trop nul
 
-Il veut savoir à chauqe poste, qui est le meilleur en terme d'impact pour l'équipe ->l'équipe qui a le meilleur ratio de but. 
-
+# Bugs détectés
 Il a fait appliquer la compo -> il a fait ignorer la compo -> le terrain a disparu
-
-- in game -> mode match
-
-[COMPOS / MODE MATCH]
-- Il est hyper important de prendre en compte les postes dans les matchs. À chaque action, il faut qu'on sache quels sont les postes de chacun.
-
-[STATS]
-- les meilleurs buteurs
-- les meilleurs passeurs
-- les stats de buts
-- qui a pris combien de but
-- les buts encaissés
-- les buts encaissaés au goal
-- les but encaissés toutes les X minutes
-- les buts encaissés toutes les X minutes au goal
-- invincibilité
-- tous les combiens de temps il prend un but (sur le TERRAIN) et au GOAL (différentier)
-- minutes jouées au goal
-- minutes jouées sur le terrain
-- tous les combien de temps on prend un but
-
-[COMPO]
-Il faut que ça respecte les postes que le coach rentre pour eux
-**Le coach peut faire les profils de chacun à la main** -> il faut une page dans laquelle le coach définit les profils
-- compo type offensive -> meilleure attaque (sélectionne un des gars qui n'est pas dans l'équipe type offenive parmi les goal possibles + toujours prendre les meilleures stats de goal)
-- compo type défensive -> les meilleurs défenseurs (moins de buts), les attaquants qui ont pris le moins de buts (donc c'est pas forcément ceux qui ont mis le pluis de buts, mais au moins ils n'en ont pas pris)
-- compo type 7 de légende > le meilleur à chaque poste, en commencant du haut vers le bas (en terminant par le goal -> d'abord tu prends les meilleures stats du terrain et ensuite tu mets ce qu'il reste au goal)
-
-il faut qu'il estime les stats des gens, et il ne faut pas qu'il mette une saucisse au goal( parmis les 4 goal) -> qu'il regarde les stats de tous le sjoureurs sur le terrain, si il a uniquement la possibilité de mettre au goal le plus nul des goal, il faut qu'il prenne un goal un peu meilleur quitte à l'enlever du terrain.
-
-Les deux postes de défenseur c'est la meme et les deux postes d'aillier c'est la meme
-
-On reste en 1-2-3-1
