@@ -188,35 +188,70 @@ export type PositionImpact = {
   goalsAgainstModel: ShrinkageReport;
 };
 
+/** The two Poisson models of one position: goals for and goals against while a man held it. */
+export type PositionModels = { goalsForModel: ShrinkageReport; goalsAgainstModel: ShrinkageReport };
+
+/** Every position's pair of models, fitted over the players who held it — what the impact is shrunk with. */
+export function fitPositionModels(
+  players: readonly (RankedMember & { positions: readonly PositionSeason[] })[],
+): Record<PositionGroup, PositionModels> {
+  const models = {} as Record<PositionGroup, PositionModels>;
+  for (const group of POSITION_GROUPS) {
+    const samples = (count: (season: PositionSeason) => number): CountSample[] =>
+      players.flatMap((player) => {
+        const season = player.positions.find((position) => position.group === group);
+        return season && season.minutes > 0
+          ? [{ ...memberOf(player), minutes: season.minutes, count: count(season) }]
+          : [];
+      });
+    models[group] = {
+      goalsForModel: fitCountModel(samples((season) => season.goalsFor)),
+      goalsAgainstModel: fitCountModel(samples((season) => season.goalsAgainst)),
+    };
+  }
+  return models;
+}
+
+/**
+ * One man's smoothed impact at one position: shrunk goals for per 60 minus shrunk goals against per 60.
+ *
+ * **A man with no minutes there gets the position's own mean difference** — `shrink` lands exactly on
+ * the squad mean at zero exposure, on both sides — which is the house rule (rule 2 of `best-seven.ts`)
+ * rather than a new one: unknown is neither best nor worst. A side whose model has no mean at all (no
+ * goal ever, either way, at that position) counts as a zero rate: nothing happened, and that was seen.
+ */
+export function impactAt(season: PositionSeason | undefined, models: PositionModels): number {
+  const minutes = season?.minutes ?? 0;
+  const forRate = shrunkPer60(season?.goalsFor ?? 0, minutes, models.goalsForModel);
+  const againstRate = shrunkPer60(season?.goalsAgainst ?? 0, minutes, models.goalsAgainstModel);
+  return (forRate ?? 0) - (againstRate ?? 0);
+}
+
+function memberOf(member: RankedMember): RankedMember {
+  return {
+    teamMemberId: member.teamMemberId,
+    displayName: member.displayName,
+    jerseyNumber: member.jerseyNumber,
+    hasLeft: member.hasLeft,
+  };
+}
+
 /** Every position in `POSITION_GROUPS` order, including the ones nobody has played yet (empty). */
 export function impactByPosition(
   players: readonly (RankedMember & { positions: readonly PositionSeason[] })[],
   size = IMPACT_SIZE,
 ): PositionImpact[] {
+  const models = fitPositionModels(players);
   return POSITION_GROUPS.map((group) => {
     const atGroup = players.flatMap((player) => {
       const season = player.positions.find((position) => position.group === group);
       return season && season.minutes > 0 ? [{ player, season }] : [];
     });
-    const sample = (count: (season: PositionSeason) => number): CountSample[] =>
-      atGroup.map(({ player, season }) => ({
-        teamMemberId: player.teamMemberId,
-        displayName: player.displayName,
-        jerseyNumber: player.jerseyNumber,
-        hasLeft: player.hasLeft,
-        minutes: season.minutes,
-        count: count(season),
-      }));
-    const goalsForModel = fitCountModel(sample((season) => season.goalsFor));
-    const goalsAgainstModel = fitCountModel(sample((season) => season.goalsAgainst));
+    const { goalsForModel, goalsAgainstModel } = models[group];
 
     const entries = atGroup
       .flatMap(({ player, season }): ImpactEntry[] => {
-        const forRate = shrunkPer60(season.goalsFor, season.minutes, goalsForModel);
-        const againstRate = shrunkPer60(season.goalsAgainst, season.minutes, goalsAgainstModel);
-        // A position where the team neither scored nor conceded has no squad mean on one side; the
-        // missing side is a zero rate, not an unknown one — nothing happened, and that was measured.
-        const impact = (forRate ?? 0) - (againstRate ?? 0);
+        const impact = impactAt(season, models[group]);
         return [
           {
             teamMemberId: player.teamMemberId,

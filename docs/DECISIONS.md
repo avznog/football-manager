@@ -6374,3 +6374,122 @@ both « Composition de départ ».
 `pendingLineup` is now null on a finished match: a plan nobody applied was still proposed over a
 frozen match (« Composition prévue à la 10’ … rien ne change avant la confirmation de l’opérateur »),
 which slice S7 found.
+
+## 171 — The équipe type is four sevens, and each slot is scored by its own figure
+
+**2026-10-09** · accepted
+- **Supersedes decision 115** on its criteria (goals / assists / ratings / « sans encaisser »), on the
+  worst seven, and on « the posts are declarations, not measurements ».
+- **Supersedes decision 116** on the direction select.
+- Keeps from 115: the shrinkage with no threshold, the exact assignment, and the positional objective.
+
+The cahier, « Stats "équipe type" », asks for three sevens with stated rules: **offensive**,
+**défensive**, and the **7 de légende**. The owner's Q7 keeps the **notes** seven as a fourth. `?critere=`
+now names one of `offensive | defensive | legende | notes`. Any other value falls back to `offensive`,
+the default:
+- empty;
+- unknown;
+- the old `goals`, `assists`, `ratings`, `cleanSheet`.
+
+**`sens` (« la pire équipe ») is removed.** The cahier asks for best sevens only, and nothing else read
+it: the select, the « Et la pire équipe ? » link and their copy are gone. A `?sens=pire` bookmark is
+ignored. `bestSeven`'s `direction` argument stays in `best-seven.ts`, because its rule-6 tests pin the
+negation property, but no screen passes `"worst"` any more.
+
+**Each slot can be scored by a different figure.** `SquadCell` gains:
+- `keys`: figures compared **lexicographically** after the positional objective;
+- `allowed`: false means the DP never places that man in that slot.
+
+This generalises the one special case the old file had (the GB slot reading the keeper's clean-sheet
+pair). `lib/stats/sevens.ts` builds the cells:
+
+| seven | outfield slots | GB slot |
+|---|---|---|
+| offensive | goals per 60, **then** assists per 60 | fewest conceded per 60 in goal |
+| défensive | fewest conceded per 60 as an outfielder (`concededWhileOn − concededWhileGk` over `minutes − gkMinutes`) | the same as offensive |
+| légende | smoothed impact at that post (decision 172) | decision 172 |
+| notes | the old `ratings` criterion, unchanged | the same |
+
+No second model is fitted:
+- goals and assists are `evaluateSquad`'s own Gamma–Poisson cells;
+- the conceded rates and the impact are S12's (`fitCountModel`, `fitPositionModels`, `impactAt` in
+  `lib/stats/impact.ts`).
+
+**Outfield first, then the goal.** The outfield keys come before the GB key, so the DP picks the best
+outfield six it can and only then the keeper among the men left. This is « on priorise les joueurs de
+champ … ensuite, parmi ceux qui ont joué au goal ». A man who is both the best scorer and the best keeper
+therefore plays outfield. The exception is when the positional objective, or the rule that the goal must
+be filled, says otherwise.
+
+**Goals then assists is lexicographic, at the precision the screen prints.**
+- The goals key is the shrunk rate rounded to a tenth of a goal per hour (`GOALS_KEY_RESOLUTION`).
+- Assists break ties at that resolution.
+- Unrounded, two shrunk rates are never equal, so « puis de passes D » would never decide anything.
+- A combined figure (goals + k × assists) was refused: for any k, enough assists outweigh a goal, which
+  is not « buts, puis passes ».
+- The test pins both halves: assists decide between equal scorers, and twenty assists do not beat a
+  higher goal rate.
+
+**Positions are respected exactly as before.**
+- Slots filled at all.
+- Then filled by a post the coach set for the man (S5).
+- Then by his primary post.
+- A post with no declared candidate is still filled and badged « pas son poste ». The cahier's « il
+  faut qu'on respecte les postes » is read as « place by the declared posts whenever the squad allows
+  it », not « leave a post empty ». An empty disc on a team sheet tells the coach less than a badge.
+
+**Who may keep goal** in offensive, défensive and légende: only somebody with `gkMinutes > 0`, outfield
+players included — « parmi ceux qui ont joué au goal ». A coach-declared keeper who has never played
+there is refused in goal and badged « écarté du goal » in the picker. If nobody has any minutes in goal,
+nobody is refused.
+
+**Team figure.** Only the notes seven has one, a mean of marks. The other three mix units slot by slot
+(goals per hour up front, minutes per goal conceded in goal), and a total of those would be a number in no
+unit. Their pitch shows no team figure, and the swap sheet says what it shows instead.
+
+Every disc prints its ranked figure and the raw record beside it, as S12 does:
+- « 0,48/h · 1 but · 1 p.d. · 87′ »;
+- « 1 but/17′ · 1 pris en 52′ »;
+- « −1,7/h · +1 / −0 en 12′ ».
+
+A one-line French rule of the seven sits under the title (`SEVEN_RULE_FR`). The « postes déclarés »
+sentence now says what is true since S5 and S12: the posts are the coach's, primary first.
+
+## 172 — The 7 de légende fills the attack first and refuses a below-average keeper
+
+**2026-10-09** · accepted · the cahier's « 7 de légende » and the owner's Q8
+
+« Elle combine le meilleur à chaque poste, en commençant par l'attaque, et en terminant par le goal. Il
+ne faut pour autant pas mettre quelqu'un de trop nul au goal. »
+
+**« Le meilleur » at a post is decision 162's impact at that post**: smoothed goal difference per 60 while
+he held it, from `match_player_positions`. **A man with no minutes at a post gets that post's mean**:
+- `shrink` lands exactly on the squad mean at zero exposure, on both the goals-for and goals-against
+  sides;
+- this is the house rule « unknown is neither best nor worst » (rule 2 of `best-seven.ts`), not a new
+  one;
+- the disc says « aucun chiffre : moyenne du poste ».
+
+**The fill order is a key order, not a greedy pass.** The légende has one key per position group, in the
+order AT, AIL, MC, DC, GB, and they are compared lexicographically after the positional objective. The DP
+therefore maximises the striker's impact first, then the wingers', and so on, which is the cahier's fill
+order. It is *not* the greedy fill `best-seven.test.ts` shows losing:
+- the positional objective still comes first, so the attack can never take a man the defence needs for
+  its posts to be declared;
+- a group of two slots (two DC, two AIL) is still chosen exactly;
+- greedy's other defect, losing on the criterion total, does not apply, because « attack first » *is*
+  the objective. A test pins a case where the sum-optimal seven would put the star at the back and the
+  légende puts him up front.
+
+**The keeper (Q8).** Candidates are everybody who has played in goal, outfield players included. Any
+whose smoothed conceded rate per 60 in goal is **worse than the squad's average keeper** is refused. The
+average is the pooled rate of everybody who has kept goal, which is the keepers' model's own
+`squadMean`. Because that average is a weighted mean of the keepers' own rates, at least one keeper is
+always at or below it, so the slot is always filled when anybody has kept goal. Among the rest, the
+lowest smoothed conceded rate wins. The screen says how many were considered and how many refused,
+against which figure: « 3 sont écartés du 7 de légende : ils encaissent plus que la moyenne des gardiens,
+1 but/11′ ».
+
+On `football_wd` this does what the cahier asks. Four men have kept goal. Three are refused: Léo M 3 in
+30′, Nicolas 6 in 30′, Nicodème 1 in 8′, against an average of 1 per 11′. Lucas (1 in 52′), whose primary
+post is DC, is put in goal: « quitte à mettre un joueur de terrain qui est un peu meilleur au goal ».

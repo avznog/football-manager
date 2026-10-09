@@ -4953,3 +4953,42 @@ second « Composition de départ » line « Entre : Clément — Sort : Charles 
 « titulaire » on the bench, not « déjà joué ». After the kick-off the composition is locked (« Elle ne
 se modifie plus ») and `applied_event_id` points at the second automatic event. « Racing du Samedi »
 is now live in `football_wa`.
+
+## 2026-10-09 — S13: the four équipes types (Track D)
+
+Issue #172. Decisions **171** (four sevens, per-slot figures, no « pire ») and **172** (the légende's
+fill order and Q8 keeper).
+
+- `lib/stats/best-seven.ts`:
+  - `SquadCell` gains optional `keys` (lexicographic) and `allowed`, and `solveAssignment` honours both;
+  - `candidateOrder` is exported;
+  - every existing test passes unchanged.
+- `lib/stats/impact.ts`: `fitPositionModels` / `impactAt` split out of `impactByPosition`, so the légende
+  reuses the S12 model.
+- New `lib/stats/sevens.ts` (`solveSeven`, `SEVEN_KINDS`, `SevenCandidate`) and `sevens.test.ts`, covering:
+  - the per-slot criterion;
+  - offensive goals → assists, at the printed tenth;
+  - défensive outfield conceded;
+  - légende attack-first, Q8 refusal and the post-mean fallback;
+  - declared positions in all four sevens;
+  - the notes seven.
+- `lib/stats/best-seven-input.ts` adds conceded and per-position figures to each candidate.
+- `lib/stats/best-seven-copy.ts`:
+  - parsing is `parseSeven` / `DEFAULT_SEVEN`, and the direction copy is removed;
+  - new `SEVEN_OPTION_FR`, `SEVEN_RULE_FR`, `SEVEN_HEADING_FR`, `formatSevenFigure`, `sevenObservedFr`,
+    `keeperRuleFr`, `sevenSmoothingFr` and `KEEPER_REFUSED_BADGE_FR`;
+  - the « postes déclarés » sentence is rewritten for coach-set posts;
+  - the sentences that only the removed criteria needed (invincibilité readings, keeper clean-sheet model,
+    no-basis) are deleted.
+- `/stats/equipe-type`:
+  - one select (`Équipe type`) plus the competition select;
+  - the rule under the title;
+  - per-cell figure formatting on the discs, in the list and in the picker;
+  - « écarté du goal » in the picker;
+  - a team figure on the notes seven only.
+- `/stats`: the link card names the four sevens.
+
+Looked at on `football_wd` at 390 px, light and dark, as `potter` and `benoit` in one pass, all four sevens:
+- the two roles get the same screen;
+- only Lucas has coach-set posts in this restore, so most discs carry « pas son poste »;
+- in the légende, three of four keepers are refused and Lucas is put in goal.

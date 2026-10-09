@@ -14,11 +14,15 @@
  * this repository's definition of done singles out « a screen stating something untrue » as the defect
  * class no test catches. Hence one function per claim:
  *
- * 1. `DECLARED_POSTS_FR` — the posts are declarations, not measurements.
- * 2. `shrinkageSentenceFr` — what the shrinkage did, in the unit it measured (rule 3).
- * 3. `squadMeanStandInFr` — a disc whose number is the squad's average and not that man's (rule 2,
- *    and the part of decision 115 that was overstated).
- * 4. `CLEAN_SHEET_READINGS_FR` — which of decision 011's two invincibilités is being read.
+ * 1. `DECLARED_POSTS_FR` — the posts are the coach's, primary first (decision 171).
+ * 2. `SEVEN_RULE_FR` — what each of the four sevens ranks on, in one line.
+ * 3. `keeperRuleFr` — who may keep goal, and who the légende refused (decision 172, Q8).
+ * 4. `sevenSmoothingFr` / `shrinkageSentenceFr` — what the smoothing did.
+ * 5. `squadMeanStandInFr` — a disc whose number is the squad's (or the post's) average and not that
+ *    man's (rule 2 of `best-seven.ts`).
+ *
+ * The old screen's « invincibilité » sentence and its « la pire équipe » wording went with the
+ * criteria and the direction they explained (decision 171).
  *
  * There used to be a fifth, `viewerRelativeRatingsFr`: « ce sept est bâti d'après les matchs que tu as
  * notés ». Decision 137 makes it false — every reader now reads the same seven — and the sentence that
@@ -32,71 +36,53 @@
 import { positionLabelFr } from "@/db/reference";
 
 import type { BestSevenCriterion, ObservedFigure, ShrinkageReport } from "./best-seven";
-import { BEST_SEVEN_CRITERIA } from "./best-seven";
 import {
   NO_VALUE_FR,
+  concededRecordFr,
   formatDecimal,
   formatMinutes,
-  formatPercent,
+  formatSignedDecimal,
+  impactRecordFr,
   formatRating,
   plural,
 } from "./format";
+import { SEVEN_KINDS, type SevenFigure, type SevenKind, type SevenObserved } from "./sevens";
 
 /* -------------------------------------------------------------------------- */
 /* The query string                                                           */
 /* -------------------------------------------------------------------------- */
 
-/** The keys `/stats/equipe-type` reads, spelled once. French, like every other URL in this app. */
+/**
+ * The key `/stats/equipe-type` reads, spelled once. French, like every other URL in this app. Still
+ * `critere`, so a bookmark from before decision 171 lands on this screen rather than on an error —
+ * and on the default seven, since none of its old values (`goals`, `ratings`…) names one.
+ *
+ * `sens` (« la pire équipe ») is gone with decision 171: the cahier asks for four best sevens, and a
+ * `?sens=pire` bookmark is simply ignored.
+ */
 export const CRITERION_PARAM = "critere";
-export const DIRECTION_PARAM = "sens";
-
-export type BestSevenDirection = "best" | "worst";
 
 /**
- * What `sens` is written as in the URL: a coach's word, not the type's.
- *
- * Exported because the controls are now `<select>`s inside a `method="get"` form: with JavaScript off
- * the browser puts the chosen `<option value>` straight into the query string, so the option values
- * *are* these, and a second spelling of « pire » in the component is a filter that would silently stop
- * working for exactly the reader who has no JavaScript.
+ * The seven the screen opens on: the offensive one, which has a basis from the first final whistle —
+ * goals, assists and minutes in goal are all in the log. Not `notes`, which waits on the coach showing
+ * a match's means (decision 139) and reads as a pitch of squad averages until he does.
  */
-export const DIRECTION_VALUES: Readonly<Record<BestSevenDirection, string>> = {
-  best: "meilleur",
-  worst: "pire",
-};
+export const DEFAULT_SEVEN: SevenKind = "offensive";
 
-/**
- * The criterion the screen opens on.
- *
- * Not `ratings`, deliberately, even though « l'équipe type » most obviously means the best-rated
- * seven: a mean needs every set of notes in, so for the first weeks of a season — and for the whole of
- * one in a team that does not rate — the ratings seven is a pitch of seven squad means and reads as a
- * bug. Goals per hour has a basis from the first final whistle. Decision 137 did not change this: it
- * changed *why* the ratings basis can be missing, not that it can be.
- */
-export const DEFAULT_CRITERION: BestSevenCriterion = "goals";
-export const DEFAULT_DIRECTION: BestSevenDirection = "best";
-
-/** `?critere=goals&critere=ratings` is a forged URL, not an error: the first value wins. */
+/** `?critere=offensive&critere=notes` is a forged URL, not an error: the first value wins. */
 function firstOf(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
 /**
- * A hand-typed or stale query string degrades to the default, never to an error (like `/stats`).
+ * A hand-typed, stale or empty query string degrades to the default, never to an error (like `/stats`).
  *
- * **An empty value is one of those**, and it is not hypothetical any more: the controls are a
- * `method="get"` form, so a browser with no JavaScript submits `?critere=&sens=&competition=` for
- * whatever the reader left at « Toutes » or at the default. `equipeTypeHref` never writes an empty
- * value — it omits the key instead — so all three of these are only ever exercised by the no-JavaScript
- * path, which is precisely why they are pinned in `best-seven-copy.test.ts` rather than trusted.
+ * **An empty value is one of those**: the controls are a `method="get"` form, so a browser with no
+ * JavaScript submits `?critere=&competition=` for whatever the reader left alone. And so is every value
+ * of the old criterion select (`goals`, `assists`, `ratings`, `cleanSheet`): they are not sevens.
  */
-export function parseCriterion(value: string | string[] | undefined): BestSevenCriterion {
-  return BEST_SEVEN_CRITERIA.find((criterion) => criterion === firstOf(value)) ?? DEFAULT_CRITERION;
-}
-
-export function parseDirection(value: string | string[] | undefined): BestSevenDirection {
-  return firstOf(value) === DIRECTION_VALUES.worst ? "worst" : DEFAULT_DIRECTION;
+export function parseSeven(value: string | string[] | undefined): SevenKind {
+  return SEVEN_KINDS.find((kind) => kind === firstOf(value)) ?? DEFAULT_SEVEN;
 }
 
 /**
@@ -139,8 +125,7 @@ export function showsCompetitionSelect({
 export type BestSevenQuery = {
   /** Shared with `/stats`, by id (decision 107). */
   competitionId: string | null;
-  criterion: BestSevenCriterion;
-  direction: BestSevenDirection;
+  seven: SevenKind;
 };
 
 /**
@@ -150,10 +135,7 @@ export type BestSevenQuery = {
 export function equipeTypeHref(query: BestSevenQuery, competitionParam = "competition"): string {
   const params = new URLSearchParams();
   if (query.competitionId !== null) params.set(competitionParam, query.competitionId);
-  if (query.criterion !== DEFAULT_CRITERION) params.set(CRITERION_PARAM, query.criterion);
-  if (query.direction !== DEFAULT_DIRECTION) {
-    params.set(DIRECTION_PARAM, DIRECTION_VALUES[query.direction]);
-  }
+  if (query.seven !== DEFAULT_SEVEN) params.set(CRITERION_PARAM, query.seven);
   const search = params.toString();
   return search === "" ? "/stats/equipe-type" : `/stats/equipe-type?${search}`;
 }
@@ -175,43 +157,55 @@ export function equipeTypeHref(query: BestSevenQuery, competitionParam = "compet
  * reader had picked it himself.
  */
 export function sevenQuestionKey(query: BestSevenQuery): string {
-  return [query.competitionId ?? "all", query.criterion, query.direction].join("|");
+  return [query.competitionId ?? "all", query.seven].join("|");
 }
 
 /* -------------------------------------------------------------------------- */
 /* Naming the criterion                                                       */
 /* -------------------------------------------------------------------------- */
 
-/** The chip label. Short: four of them plus two direction chips share a 390 px row. */
-export const CRITERION_CHIP_FR: Readonly<Record<BestSevenCriterion, string>> = {
-  goals: "Buts",
-  assists: "Passes déc.",
-  ratings: "Notes",
-  // « sans encaisser » and not « clean sheet »: the app has two spellings of this already and
-  // `docs/ROADMAP.md` logs that as an inconsistency, so this screen adds no third one.
-  cleanSheet: "Sans encaisser",
+/** The select's options: the four sevens of the cahier (decision 171). */
+export const SEVEN_OPTION_FR: Readonly<Record<SevenKind, string>> = {
+  offensive: "Offensive",
+  defensive: "Défensive",
+  legende: "7 de légende",
+  notes: "Notes",
 };
 
 /**
- * The three controls, named. Nouns rather than instructions: « Critère » over a select is the whole
- * sentence, and a `<label>` reading « Choisis un critère » says the same thing one word at a time.
- *
- * Here rather than in the component for decision 097's reason — a label is a claim about the control
- * under it — and because « Meilleure ou pire » is the one that keeps the direction select honest: the
- * old chip row's own `aria-label` said « Meilleure ou pire équipe », and a select whose options read
- * « La meilleure » / « La pire » needs the same subject stated once above it.
+ * The rule of each seven in one line, printed under the title — the cahier's own sentence, shortened.
+ * A seven is a claim, and the reader is owed what it is a claim *about* before he reads the names.
+ */
+export const SEVEN_RULE_FR: Readonly<Record<SevenKind, string>> = {
+  offensive:
+    "La meilleure attaque : à chaque poste de champ, le plus de buts par heure, puis de passes " +
+    "décisives ; au goal, celui qui y a joué et y encaisse le moins.",
+  defensive:
+    "La meilleure défense : à chaque poste de champ, le moins de buts encaissés par heure sur le " +
+    "terrain ; au goal, celui qui y a joué et y encaisse le moins.",
+  legende:
+    "Le meilleur à chaque poste, de l’attaque vers la défense, jugé sur la différence de buts quand " +
+    "il y joue ; au goal, jamais quelqu’un en dessous de la moyenne des gardiens.",
+  notes: "La meilleure moyenne des notes reçues, à chaque poste.",
+};
+
+/** The heading over the pitch, per seven — and « Ton équipe » once the reader has swapped anybody. */
+export const SEVEN_HEADING_FR: Readonly<Record<SevenKind, string>> = {
+  offensive: "La meilleure attaque",
+  defensive: "La meilleure défense",
+  legende: "Le 7 de légende",
+  notes: "Le meilleur sept aux notes",
+};
+
+/**
+ * The controls, named. Nouns rather than instructions: « Équipe type » over a select is the whole
+ * sentence. Here rather than in the component for decision 097's reason — a label is a claim about the
+ * control under it.
  */
 export const SEVEN_CONTROL_LABEL_FR = {
-  criterion: "Critère",
-  direction: "Meilleure ou pire",
+  seven: "Équipe type",
   competition: "Compétition",
 } as const;
-
-/** The two direction options, as a reader picks them: « La meilleure », « La pire ». */
-export const DIRECTION_OPTION_FR: Readonly<Record<BestSevenDirection, string>> = {
-  best: "La meilleure",
-  worst: "La pire",
-};
 
 /** « Toutes » — the competition select's first option, and the same word `/stats`'s chip row uses. */
 export const ALL_COMPETITIONS_FR = "Toutes";
@@ -222,14 +216,6 @@ export const ALL_COMPETITIONS_FR = "Toutes";
  */
 export const SEVEN_CONTROLS_SUBMIT_FR = "Voir ce sept";
 
-/** The criterion as a noun phrase, for a sentence: « … classe les buts par heure de jeu ». */
-export const CRITERION_SUBJECT_FR: Readonly<Record<BestSevenCriterion, string>> = {
-  goals: "les buts par heure de jeu",
-  assists: "les passes décisives par heure de jeu",
-  ratings: "la moyenne des notes reçues",
-  cleanSheet: "la part des minutes jouées sans encaisser",
-};
-
 /**
  * What the team figure under the pitch is, so the label never lies about a sum or a mean — **nor about
  * how many figures went into it**. It used to say « des sept » whatever was on the pitch, so a squad of
@@ -239,26 +225,6 @@ export const CRITERION_SUBJECT_FR: Readonly<Record<BestSevenCriterion, string>> 
 export function aggregationLabelFr(aggregation: "sum" | "mean", filledCount: number): string {
   const verb = aggregation === "sum" ? "Total" : "Moyenne";
   return filledCount === 7 ? `${verb} des sept` : `${verb} sur ${plural(filledCount, "poste")}`;
-}
-
-/**
- * One value of the criterion, in its own scale. Goals and assists are rates per hour of football
- * (`MINUTES_PER_RATE_UNIT`), ratings are marks out of ten, invincibility is a share of minutes.
- */
-export function formatCriterionValue(
-  criterion: BestSevenCriterion,
-  value: number | null,
-): string {
-  if (value === null) return NO_VALUE_FR;
-  switch (criterion) {
-    case "goals":
-    case "assists":
-      return `${formatDecimal(value, 2)}/h`;
-    case "ratings":
-      return formatRating(value);
-    case "cleanSheet":
-      return formatPercent(value);
-  }
 }
 
 /**
@@ -284,25 +250,6 @@ export function observedFigureFr(
   }
 }
 
-/**
- * The same figure, short enough for a disc.
- *
- * Measured, not guessed: the closest two posts of the formation leave about 104 px of chip, and
- * « 6 passes décisives sur 360′ » needs 120 px at the size a disc caption is set in — so on `assists`,
- * and only there, the noun takes the abbreviation the criterion chip already uses (« Passes déc. »).
- * Every other criterion is identical to `observedFigureFr`, and the wide list under the pitch always
- * prints the unabbreviated one. Two wordings of one figure is a real cost; a caption reading « 0 passe
- * décisi… » is a worse one.
- */
-export function observedFigureCompactFr(
-  criterion: BestSevenCriterion,
-  observed: ObservedFigure,
-): string | null {
-  if (criterion !== "assists") return observedFigureFr(criterion, observed);
-  if (observed.rate === null || observed.denominator <= 0) return null;
-  return `${plural(observed.numerator, "passe déc.", "passes déc.")} sur ${formatMinutes(observed.denominator)}`;
-}
-
 /* -------------------------------------------------------------------------- */
 /* The heading, which is a claim about every disc under it (decision 087)      */
 /* -------------------------------------------------------------------------- */
@@ -310,29 +257,22 @@ export function observedFigureCompactFr(
 /**
  * The heading over the pitch.
  *
- * `touched` is the whole reason this is a function. « La meilleure équipe » is true of the seven the
+ * `touched` is the whole reason this is a function. « La meilleure attaque » is true of the seven the
  * assignment chose and false of the seven the reader has since edited — decision 087's rule is that a
- * heading is a claim about every row under it, and a pitch still headed « meilleure » after two swaps
- * is that claim gone false. So the heading changes with the first swap, and the optimum's own total
- * stays on screen beside it to compare against.
+ * heading is a claim about every row under it. So the heading changes with the first swap.
  */
-export function sevenHeadingFr(direction: BestSevenDirection, touched: boolean): string {
-  if (touched) return "Ton équipe";
-  return direction === "best" ? "La meilleure équipe" : "La pire équipe";
+export function sevenHeadingFr(seven: SevenKind, touched: boolean): string {
+  return touched ? "Ton équipe" : SEVEN_HEADING_FR[seven];
 }
 
 /** The optimum's figure, kept beside « Ton équipe » so a swap can be judged rather than guessed. */
-export function optimumComparisonFr(
-  direction: BestSevenDirection,
-  formattedValue: string,
-): string {
-  const subject = direction === "best" ? "La meilleure équipe" : "La pire équipe";
-  return `${subject} : ${formattedValue}`;
+export function optimumComparisonFr(seven: SevenKind, formattedValue: string): string {
+  return `${SEVEN_HEADING_FR[seven]} : ${formattedValue}`;
 }
 
-/** The « revenir à la meilleure » control, worded for the direction it returns to. */
-export function resetLabelFr(direction: BestSevenDirection): string {
-  return direction === "best" ? "Revenir à la meilleure" : "Revenir à la pire";
+/** The control that puts the proposed seven back. */
+export function resetLabelFr(): string {
+  return "Revenir au sept proposé";
 }
 
 /**
@@ -368,30 +308,16 @@ export function swapAnnouncementFr(input: {
 /* -------------------------------------------------------------------------- */
 
 /**
- * There is **no per-post minute data in this database**: `match_player_stats.gkMinutes` is the only
- * positional figure that exists anywhere, and the reducer's `positionSpells` are in-memory match
- * state the freeze path never writes down. So « meilleur milieu droit » would imply a measurement
- * this app cannot make, and the screen says which of the two it means instead.
- * `docs/ROADMAP.md`'s `minutes_by_position` item is what would change that.
+ * Where the posts come from, which changed twice since this sentence was first written: the coach
+ * sets each player's posts now (S5), and the app does measure the time spent at each one (decision
+ * 160) — the légende is judged on it. What the seven respects is the coach's list.
  */
 export const DECLARED_POSTS_FR =
-  "Les postes viennent de ce que chacun a déclaré sur son profil, pas de ses minutes : l’appli ne " +
-  "mesure nulle part le temps passé à chaque poste.";
+  "Les postes sont ceux que le coach a indiqués pour chaque joueur : chacun n’est placé qu’à un de " +
+  "ses postes, son poste principal d’abord, tant que l’effectif le permet.";
 
-/**
- * The same sentence, finished by naming which end of the ranking the reader is looking at.
- *
- * The tail has to follow `direction`, because the constant alone used to end « qui est le meilleur sur
- * le critère choisi » and that clause was printed verbatim under « La pire équipe » — a screen saying
- * the opposite of the seven drawn above it, which is exactly the defect class the definition of done
- * singles out. Found by reading the rendered `?sens=pire` screen, not by a test.
- */
-export function declaredPostsFr(direction: BestSevenDirection): string {
-  const end =
-    direction === "best"
-      ? "Ce sept dit donc qui est le meilleur sur le critère choisi, parmi ceux qui se disent à ce poste."
-      : "Ce sept dit donc qui est le moins en avant sur le critère choisi, parmi ceux qui se disent à ce poste.";
-  return `${DECLARED_POSTS_FR} ${end}`;
+export function declaredPostsFr(): string {
+  return DECLARED_POSTS_FR;
 }
 
 /** The badge under a disc whose man never declared that post (`fit === "none"`). */
@@ -518,19 +444,6 @@ export function shrinkageSentenceFr(
   }
 }
 
-/** The keepers' own model (rule 4), in the same words. Null when there is no second model. */
-export function goalkeeperShrinkageSentenceFr(
-  criterion: BestSevenCriterion,
-  report: ShrinkageReport | null,
-): string | null {
-  if (report === null) return null;
-  return shrinkageSentenceFr(
-    criterion,
-    report,
-    "Pour le gardien, les minutes sans encaisser dans les buts sont ramenées",
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /* Honesty sentence 3b — a figure that is the squad's, under one man's name     */
 /* -------------------------------------------------------------------------- */
@@ -553,33 +466,10 @@ export function squadMeanStandInFr(count: number): string | null {
   if (count <= 0) return null;
   const many = count > 1;
   return (
-    `${count} des sept ${many ? "n’ont" : "n’a"} aucun chiffre cette saison sur ce critère : ` +
+    `${count} des sept ${many ? "n’ont" : "n’a"} aucun chiffre cette saison à ce poste : ` +
     `${many ? "ils sont affichés" : "il est affiché"} à la moyenne de l’équipe, donc ` +
-    `${many ? "ni flattés ni punis" : "ni flatté ni puni"} pour ne pas avoir joué — ` +
-    `${many ? "ils peuvent" : "il peut"} donc apparaître dans la meilleure comme dans la pire équipe.`
+    `${many ? "ni flattés ni punis" : "ni flatté ni puni"} pour ne pas avoir joué.`
   );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Honesty sentence 4 — which invincibilité                                   */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Decision 011 kept **two** clean-sheet figures on purpose, because « minutes d'invincibilité » was
- * ambiguous and the owner wanted both. Rule 4 of `best-seven.ts` therefore scores the GB slot on the
- * keeper's own pair and the six others on the all-pitch pair, each against its own fitted prior — and
- * a card headed « invincibilité » that silently picked one of them is exactly the claim decision 087
- * forbids. So the screen names both.
- */
-export const CLEAN_SHEET_READINGS_FR =
-  "Il y a deux façons de compter l’invincibilité, et les deux servent ici : le gardien est jugé sur " +
-  "ses minutes passées dans les buts sans encaisser, les six autres sur leurs minutes sur le " +
-  "terrain sans encaisser. Chaque lecture a son propre étalonnage — les gardiens ne sont comparés " +
-  "qu’entre eux.";
-
-/** Only the one criterion has two readings to disambiguate. */
-export function cleanSheetReadingsFr(criterion: BestSevenCriterion): string | null {
-  return criterion === "cleanSheet" ? CLEAN_SHEET_READINGS_FR : null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -621,10 +511,127 @@ export function emptySlotsFr(count: number): string | null {
   );
 }
 
-/** Not one candidate has any exposure: the seven is posts and tie-breaks, and says so. */
-export function noBasisFr(criterion: BestSevenCriterion): string {
+
+/* -------------------------------------------------------------------------- */
+/* The four sevens' figures (decisions 171–172)                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The ranked figure of one cell, in its own scale. Each slot of a seven can be scored by a different
+ * figure now (decision 171), so the screen formats by the cell's `figure`, never by the seven:
+ *
+ * - goals: shrunk goals per hour, « 0,45/h », the scale the old `goals` criterion printed;
+ * - conceded (in goal or outfield): the shrunk rate turned into « 1 but/24′ », S12's reading of it;
+ * - impact: the shrunk goal difference per hour, signed, « +1,2/h »;
+ * - ratings: a mark out of ten.
+ */
+export function formatSevenFigure(figure: SevenFigure, value: number | null): string {
+  if (value === null) return NO_VALUE_FR;
+  switch (figure) {
+    case "goals":
+      return `${formatDecimal(value, 2)}/h`;
+    case "keeperConceded":
+    case "outfieldConceded":
+      return value <= 0 ? "aucun but" : `1 but/${Math.max(1, Math.round(60 / value))}′`;
+    case "impact":
+      return `${formatSignedDecimal(value)}/h`;
+    case "ratings":
+      return formatRating(value);
+  }
+}
+
+/**
+ * The raw record the ranked figure was smoothed from, printed beside it (decision 072: nothing on
+ * hover). Null when there is no record at all — « 0 but sur 0′ » is arithmetic about nothing.
+ *
+ * `compact` is the disc caption, about 104 px wide: the same facts with shorter nouns.
+ */
+export function sevenObservedFr(
+  figure: SevenFigure,
+  observed: SevenObserved,
+  compact = false,
+): string | null {
+  if (figure === "ratings") return observedFigureFr("ratings", observed);
+  if (observed.denominator <= 0) return null;
+  const minutes = observed.denominator;
+  switch (figure) {
+    case "goals": {
+      const assists = observed.secondary ?? 0;
+      return compact
+        ? `${plural(observed.numerator, "but")} · ${assists} p.d. · ${formatMinutes(minutes)}`
+        : `${plural(observed.numerator, "but")}, ${plural(assists, "passe décisive", "passes décisives")} sur ${formatMinutes(minutes)}`;
+    }
+    case "keeperConceded":
+    case "outfieldConceded":
+      if (!compact) return concededRecordFr(observed.numerator, minutes);
+      return observed.numerator === 0
+        ? `aucun en ${formatMinutes(minutes)}`
+        : `${observed.numerator} pris en ${formatMinutes(minutes)}`;
+    case "impact":
+      return impactRecordFr(observed.numerator, observed.secondary ?? 0, minutes);
+  }
+}
+
+/**
+ * Who may keep goal, and — in the légende — who was refused (Q8). Printed under every new seven,
+ * because « parmi ceux qui ont joué au goal » leaves a coach-declared keeper off the pitch when he
+ * has never actually played there, and the reader is owed why.
+ */
+export function keeperRuleFr(input: {
+  seven: SevenKind;
+  considered: number;
+  refused: number;
+  /** The keepers' pooled conceded rate per 60, for the « moyenne des gardiens » figure. */
+  average: number | null;
+}): string | null {
+  if (input.seven === "notes") return null;
+  if (input.considered === 0) {
+    return (
+      "Personne n’a encore de minutes dans les buts sur cette sélection : le poste de gardien est " +
+      "donc rempli comme les autres, d’après les postes indiqués."
+    );
+  }
+  const many = input.considered > 1;
+  const base =
+    `${plural(input.considered, "joueur")} ${many ? "ont" : "a"} joué au goal sur cette sélection, et ` +
+    `seul${many ? "s" : ""} ${many ? "eux peuvent" : "lui peut"} y être placé${many ? "s" : ""} — ` +
+    "gardien indiqué par le coach ou joueur de champ qui a dépanné.";
+  if (input.seven !== "legende" || input.refused === 0 || input.average === null) return base;
+  const refusedMany = input.refused > 1;
   return (
-    `Personne n’a encore de chiffre sur ce critère : ${CRITERION_SUBJECT_FR[criterion]} ne peut ` +
-    "classer personne, et ce sept n’est qu’un placement par postes déclarés."
+    `${base} ${input.refused} ${refusedMany ? "sont écartés" : "est écarté"} du 7 de légende : ` +
+    `${refusedMany ? "ils encaissent" : "il encaisse"} plus que la moyenne des gardiens, ` +
+    `${formatSevenFigure("keeperConceded", input.average)}.`
   );
+}
+
+/** What the smoothing does to the new sevens, and the one rule of each that a reader would not guess. */
+export function sevenSmoothingFr(seven: SevenKind): string | null {
+  const base =
+    "Chaque chiffre est lissé vers la moyenne de l’équipe : quelques minutes ne suffisent pas pour " +
+    "passer devant une saison entière. Sous chaque joueur, ce qu’il a vraiment fait.";
+  switch (seven) {
+    case "offensive":
+      return `${base} Deux joueurs dont les buts par heure s’affichent pareil sont départagés par leurs passes décisives.`;
+    case "defensive":
+      return `${base} Le temps passé au goal n’est pas compté pour un joueur de champ : il a son propre chiffre.`;
+    case "legende":
+      return (
+        `${base} La différence de buts est celle de l’équipe pendant qu’il occupait ce poste ; un joueur ` +
+        "qui n’y a jamais joué y est compté à la moyenne du poste."
+      );
+    case "notes":
+      return null;
+  }
+}
+
+/** The badge on a man the seven refuses in goal (decision 172): never kept it, or below average. */
+export const KEEPER_REFUSED_BADGE_FR = "écarté du goal";
+
+/**
+ * Whose average a disc with no figure of its own is wearing: the team's, or — in the légende, which is
+ * judged per position — the post's (`impactAt` in `impact.ts`).
+ */
+export function squadMeanStandInShortFr(figure: SevenFigure): string {
+  return figure === "impact" ? "moyenne du poste" : "moyenne de l’équipe";
 }

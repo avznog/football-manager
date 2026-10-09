@@ -650,6 +650,20 @@ export type SquadCell = {
   adjusted: number | null;
   observed: ObservedFigure;
   figureSource: FigureSource;
+  /**
+   * The figures the DP ranks this cell on, compared **lexicographically** after the positional
+   * objective (decision 171). Absent means `[adjusted ?? 0]`, which is every criterion of this file.
+   * `lib/stats/sevens.ts` writes them so that one slot can be scored by a different figure from the
+   * next, and so that one figure can outrank another (goals before assists, attack before goal).
+   * Every cell of one evaluation must carry vectors of the same length.
+   */
+  keys?: readonly number[];
+  /**
+   * False when this candidate may not stand in this slot at all — the keeper the owner refuses
+   * (decision 172, Q8). Absent means allowed. The DP never places a refused cell, so a slot whose
+   * every cell is refused stays empty; the caller is responsible for not refusing everybody.
+   */
+  allowed?: boolean;
 };
 
 export type SquadEvaluation = {
@@ -728,8 +742,11 @@ type Objective = {
   declared: number;
   /** Of those, the ones on his primary post. */
   primary: number;
-  /** The criterion total, already negated when the caller wants the worst seven. */
-  score: number;
+  /**
+   * The criterion totals, key by key (`SquadCell.keys`), already negated when the caller wants the
+   * worst seven. One element for every criterion of this file.
+   */
+  score: number[];
   /** `BEST_SEVEN_TIE_BREAKS[0]`: total minutes, more is better. */
   minutes: number;
   /** `BEST_SEVEN_TIE_BREAKS[1]`: total jersey rank, **less** is better. */
@@ -740,7 +757,7 @@ const EMPTY_OBJECTIVE: Objective = {
   filled: 0,
   declared: 0,
   primary: 0,
-  score: 0,
+  score: [],
   minutes: 0,
   jerseyRank: 0,
 };
@@ -762,7 +779,13 @@ function compareObjectives(a: Objective, b: Objective): number {
   if (a.filled !== b.filled) return a.filled - b.filled;
   if (a.declared !== b.declared) return a.declared - b.declared;
   if (a.primary !== b.primary) return a.primary - b.primary;
-  if (Math.abs(a.score - b.score) > SCORE_EPSILON) return a.score - b.score;
+  // Key by key: the first one that differs by more than ε decides (decision 171). A missing key is 0.
+  const keyCount = Math.max(a.score.length, b.score.length);
+  for (let key = 0; key < keyCount; key += 1) {
+    const left = a.score[key] ?? 0;
+    const right = b.score[key] ?? 0;
+    if (Math.abs(left - right) > SCORE_EPSILON) return left - right;
+  }
   if (a.minutes !== b.minutes) return a.minutes - b.minutes;
   return b.jerseyRank - a.jerseyRank;
 }
@@ -815,6 +838,8 @@ export function solveAssignment(
         const bit = 1 << slot;
         if ((mask & bit) !== 0) continue;
         const cell = cells[candidate][slot];
+        if (cell.allowed === false) continue;
+        const keys = cell.keys ?? [cell.adjusted ?? 0];
         const objective: Objective = {
           filled: from.objective.filled + 1,
           declared: from.objective.declared + FIT_IS_DECLARED[cell.fit],
@@ -823,7 +848,7 @@ export function solveAssignment(
           // the *model* behind the slot, never of the player (rule 1b), so when one cell is null every
           // candidate's cell in that slot is null and they all add the same 0. The slot is then decided
           // by the positional objective and the tie-breaks, which is what `hasBasis` promises.
-          score: from.objective.score + sign * (cell.adjusted ?? 0),
+          score: keys.map((value, key) => (from.objective.score[key] ?? 0) + sign * value),
           minutes: from.objective.minutes + minutes,
           jerseyRank: from.objective.jerseyRank + jerseyRank,
         };
@@ -887,7 +912,7 @@ export function aggregateSeven(
  * freedom the objective leaves is settled by something a reader can predict rather than by the order
  * a query returned rows in (`BEST_SEVEN_TIE_BREAKS`).
  */
-function candidateOrder(a: BestSevenCandidate, b: BestSevenCandidate): number {
+export function candidateOrder(a: BestSevenCandidate, b: BestSevenCandidate): number {
   if (a.minutes !== b.minutes) return b.minutes - a.minutes;
   const left = a.jerseyNumber ?? UNNUMBERED_JERSEY_RANK;
   const right = b.jerseyNumber ?? UNNUMBERED_JERSEY_RANK;

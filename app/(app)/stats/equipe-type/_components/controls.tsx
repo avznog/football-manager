@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * The controls of `/stats/equipe-type` — criterion, direction, competition — and not one of them is
- * state. There used to be a fourth, the shape; there is one formation now (decision 157).
+ * The controls of `/stats/equipe-type` — which seven, and the competition — and neither of them is
+ * state. There used to be a criterion, a direction (« la pire ») and a shape; decision 157 removed the
+ * shape and decision 171 replaced the other two with the cahier's four sevens.
  *
  * ## Why they are selects, and why they are under the pitch
  *
@@ -44,7 +45,7 @@
  * between the tap and the new screen — the two seconds COORDINATION.md is about — the picker would snap
  * back to the option the reader had just abandoned. `defaultValue` leaves the choice on screen while the
  * navigation runs. The `key` is what keeps that honest in the other direction: a URL that changes without
- * this form (the « et la pire équipe ? » link under the notes, the back button) remounts the select so it
+ * this form (the back button) remounts the select so it
  * never shows a choice the pitch above it has stopped obeying.
  */
 
@@ -52,22 +53,18 @@ import { useRouter } from "next/navigation";
 
 import { Field, Select, buttonClassName } from "@/components/ui";
 import type { CompetitionOption } from "@/lib/competition/options";
-import { BEST_SEVEN_CRITERIA } from "@/lib/stats/best-seven";
 import {
   ALL_COMPETITIONS_FR,
-  CRITERION_CHIP_FR,
   CRITERION_PARAM,
-  DIRECTION_OPTION_FR,
-  DIRECTION_PARAM,
-  DIRECTION_VALUES,
   SEVEN_CONTROLS_SUBMIT_FR,
   SEVEN_CONTROL_LABEL_FR,
+  SEVEN_OPTION_FR,
   equipeTypeHref,
-  parseCriterion,
-  parseDirection,
+  parseSeven,
   showsCompetitionSelect,
   type BestSevenQuery,
 } from "@/lib/stats/best-seven-copy";
+import { SEVEN_KINDS } from "@/lib/stats/sevens";
 
 /** `?competition=` means « no filter », and a select says that with `""`. */
 const NONE = "";
@@ -97,42 +94,20 @@ export function SevenControls({
       {/* Two columns at 390 px: the labelled selects two by two, where four chip rows took four.
           `sm:grid-cols-3` only because the labels are short enough to sit on one line on a tablet. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {/* One criterion at a time, on purpose: a seven that mixed goals and notes would be ranked on
-            a scale nobody could name, and rule 1 of `best-seven.ts` is that every criterion is its own
-            rate. */}
-        <Field htmlFor="equipe-type-critere" label={SEVEN_CONTROL_LABEL_FR.criterion}>
+        {/* The cahier's four sevens (decision 171). The option values are the URL's own words, because
+            the no-JavaScript form submits them verbatim. */}
+        <Field htmlFor="equipe-type-critere" label={SEVEN_CONTROL_LABEL_FR.seven}>
           {({ id }) => (
             <Select
               id={id}
               name={CRITERION_PARAM}
-              key={query.criterion}
-              defaultValue={query.criterion}
-              onChange={(event) => go({ ...query, criterion: parseCriterion(event.target.value) })}
+              key={query.seven}
+              defaultValue={query.seven}
+              onChange={(event) => go({ ...query, seven: parseSeven(event.target.value) })}
             >
-              {BEST_SEVEN_CRITERIA.map((criterion) => (
-                <option key={criterion} value={criterion}>
-                  {CRITERION_CHIP_FR[criterion]}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-
-        {/* Rule 6: the worst seven is the best seven of the negated criterion, so it costs one option
-            and it is the half of the truth a « meilleure équipe » screen normally hides. The option
-            values are the URL's own words, because the no-JavaScript form submits them verbatim. */}
-        <Field htmlFor="equipe-type-sens" label={SEVEN_CONTROL_LABEL_FR.direction}>
-          {({ id }) => (
-            <Select
-              id={id}
-              name={DIRECTION_PARAM}
-              key={query.direction}
-              defaultValue={DIRECTION_VALUES[query.direction]}
-              onChange={(event) => go({ ...query, direction: parseDirection(event.target.value) })}
-            >
-              {(["best", "worst"] as const).map((direction) => (
-                <option key={direction} value={DIRECTION_VALUES[direction]}>
-                  {DIRECTION_OPTION_FR[direction]}
+              {SEVEN_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {SEVEN_OPTION_FR[kind]}
                 </option>
               ))}
             </Select>

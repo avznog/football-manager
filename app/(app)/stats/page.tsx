@@ -22,8 +22,7 @@ import { competitionLabelOf, statsFilterOptions } from "@/lib/competition/option
 import { getTeamCompetitions } from "@/lib/competition/queries";
 import { MIN_RATED_MATCHES, isPlayerSortKey, sortPlayers } from "@/lib/stats/aggregate";
 import {
-  DEFAULT_CRITERION,
-  DEFAULT_DIRECTION,
+  DEFAULT_SEVEN,
   equipeTypeHref,
 } from "@/lib/stats/best-seven-copy";
 import {
@@ -155,21 +154,16 @@ function SeasonCards({
       />
 
       {/* The one place the season's figures turn into a claim about next Sunday. Kept as a link
-          rather than a section of this page: it needs its own criterion and direction in the
-          URL, and four more chips here would bury the season under its own controls. The competition
+          rather than a section of this page: it needs its own choice of seven in the URL, and four more chips here would bury the season under its own controls. The competition
           filter travels with it so the two screens agree on what they are talking about. */}
       <Link
-        href={equipeTypeHref({
-          competitionId: query.competitionId,
-          criterion: DEFAULT_CRITERION,
-          direction: DEFAULT_DIRECTION,
-        })}
+        href={equipeTypeHref({ competitionId: query.competitionId, seven: DEFAULT_SEVEN })}
         className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-surface px-4 py-3 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <span className="min-w-0">
           <span className="block font-semibold text-ink">L’équipe type</span>
           <span className="block text-xs text-ink-muted">
-            La meilleure — ou la pire — équipe possible sur un critère
+            Offensive, défensive, le 7 de légende ou aux notes, aux postes indiqués par le coach
           </span>
         </span>
         <span aria-hidden="true" className="shrink-0 text-ink-subtle">

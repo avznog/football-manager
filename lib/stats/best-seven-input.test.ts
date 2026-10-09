@@ -43,6 +43,10 @@ function seasonRow(overrides: Partial<PlayerSeasonStats> = {}): PlayerSeasonStat
     concededWhileGk: 2,
     cleanMinutes: 211,
     concededWhileOn: 5,
+    goalsForWhileOn: 4,
+    outfieldMinutes: 340,
+    concededOutfield: 3,
+    positions: [{ group: "AT", minutes: 340, goalsFor: 4, goalsAgainst: 3 }],
     rating: { average: 7.25, count: 4, variance: 0.5 },
     hasData: true,
     ...overrides,
@@ -80,6 +84,11 @@ describe("toBestSevenSquad", () => {
       ratingCount: 4,
       ratingVariance: 0.5,
       declarations: { AT: "primary" },
+      // Decisions 171–172: what the cahier's sevens read on top.
+      outfieldMinutes: 340,
+      concededOutfield: 3,
+      concededWhileGk: 2,
+      positions: [{ group: "AT", minutes: 340, goalsFor: 4, goalsAgainst: 3 }],
     });
   });
 
