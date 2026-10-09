@@ -6555,3 +6555,27 @@ log's own timeline: « Samuel n’était pas sur le terrain à la 41’ : il ne 
 A change is checked twice: first its own lists against the pitch at its minute (`changeProblemFr` — the
 posted out/in agree with the slots, nobody twice, at most seven, somebody in goal, everybody coming on
 allowed to), then the whole match through the reducer as above.
+
+## 173 — The positions picker draws the seven slots, and the twin posts are one wish
+
+**2026-10-09** · accepted · supersedes the « one disc per position, the winger at the left spot » part of
+decisions **157** and **158** · no schema change, no migration
+
+The owner, on « Ma fiche joueur » (`backlogs/backlog2.md`): « Il faut que sur le terrain on ait bien la
+composition 1 2 3 1, mais les postes AIL droite et gauche sont liés, donc si je sélectionne un je
+sélectionne les deux, et idem pour les postes DC. »
+
+- **The picker on `/joueur/[id]` draws `THE_FORMATION.slots`** — GB, DC × 2, AIL · MC · AIL, AT, at the
+  slots' own coordinates — instead of the five `POSITIONS` spots. The pitch a coach sets wishes on is the
+  shape the team plays, the same seven discs as a composition. The read-only card (a player on his own
+  sheet or a teammate's) is the same picker and shows the same seven.
+- **The wishes stay per code.** `player_positions` and `PositionSelection` are unchanged: both `DC` discs
+  read and write the key `DC`, both `AIL` discs the key `AIL`, so a tap on either cycles both, and saving
+  writes one row. There is no left or right wish — which answers the question left on #178 for the
+  wishes: the owner links the two sides rather than telling them apart.
+- **The side is in the accessible name only**: « Ailier gauche », « Ailier droit », « Défenseur central
+  gauche », « Défenseur central droit » — masculine, like every name in the vocabulary. Two buttons with
+  one name would be ambiguous to a screen reader; the visible caption stays the code.
+- `pickerTargets` (`lib/pitch/preferences.ts`) maps the slots to the discs and is unit-tested;
+  `e2e/positions.spec.ts` taps one winger, sees both change, saves and reloads. `POSITIONS.defaultX/Y`
+  are kept: they are still seeded into `positions`, and nothing in the picker reads them any more.

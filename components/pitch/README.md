@@ -234,8 +234,10 @@ the same.
 
 ### `PositionPicker` — `'use client'`
 
-The player profile picker: the five positions of `POSITIONS` — `GB DC MC AIL AT`, the posts of the
-one formation (decisions 157 and 158) — as tappable targets on the turf.
+The player profile picker: the seven slots of the one formation, the `1-2-3-1` (`THE_FORMATION`,
+decisions 157 and 173), as tappable targets on the turf — GB, DC × 2, AIL · MC · AIL, AT. The wishes
+are still the five codes of `POSITIONS` (decision 158), so the two `DC` discs are one wish and the two
+`AIL` discs another: a tap on either cycles both (`pickerTargets` in `lib/pitch/preferences.ts`).
 Each tap cycles **pas son poste → secondaire → principal → pas son poste**, i.e.
 `player_positions.preference` (no row / `secondary` / `primary`).
 
@@ -265,15 +267,16 @@ printing both said the primary twice, adjacently.
 Fully controlled: no state, no database, no Server Action — the profile page owns the value and
 saves it through its own `actions.ts`. Real `<button>` elements, so Tab/Enter/Space work, with a
 visible focus ring. French `aria-label`s spell out both the current state and what a tap will do
-(« Attaquant, poste secondaire — appuyer pour en faire le poste principal »).
+(« Attaquant, poste secondaire — appuyer pour en faire le poste principal »). The twin discs add
+their side, so no two buttons share a name (« Ailier gauche », « Défenseur central droit »); the
+visible caption is the code alone.
 
 Primary and secondary are distinguishable **without colour**: primary is filled with an inner
 ring, secondary is hollow with a solid outline, unwanted is a dashed outline — plus a visible
 legend. The three shapes read the same for a colour-blind user and in direct sunlight.
 
-The five canonical coordinates in `db/reference.ts` are spaced beyond `MIN_MARKER_DISTANCE`, so the
-picker's 48 px targets never touch on a 320 px pitch. `AIL` is one position with two slots in the
-formation; the picker draws it once, at the left winger's spot.
+The formation's slots in `db/reference.ts` are spaced beyond `MIN_MARKER_DISTANCE` (held by
+`db/reference.test.ts`), so the picker's seven 48 px targets never touch on a 320 px pitch.
 
 ---
 

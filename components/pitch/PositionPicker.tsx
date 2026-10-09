@@ -1,10 +1,15 @@
 "use client";
 
 /**
- * The position picker on a player's profile: the five positions of the one formation
- * (`POSITIONS`, decision 158) as tappable targets on the turf. Each tap cycles
+ * The position picker on a player's profile: the **seven slots** of the one formation, the `1-2-3-1`
+ * (`THE_FORMATION`, decisions 157 and 173), as tappable targets on the turf. Each tap cycles
  * **pas son poste → secondaire → principal → pas son poste**, which is exactly
  * `player_positions.preference` (no row / `secondary` / `primary`).
+ *
+ * The wishes are still stored per **code** — five of them (decision 158) — so the two `DC` discs are
+ * one wish and the two `AIL` discs another: a tap on either cycles both, because both read and write
+ * the same key of the selection (`pickerTargets` in `lib/pitch/preferences.ts`). The pitch shows the
+ * shape the team plays; the side is spoken in the accessible name only.
  *
  * There used to be a row of chips under the turf for wishes on a code the picker no longer offered,
  * so that a player could still remove them. The migration that retired those codes mapped every such
@@ -25,13 +30,14 @@
  * and a phone screen in direct sunlight.
  */
 
-import { POSITIONS } from "@/db/reference";
+import { THE_FORMATION, positionLabelFr } from "@/db/reference";
 import { cn } from "@/components/ui/cn";
 import {
   type PositionPreference,
   type PositionSelection,
   cyclePosition,
   nextPreference,
+  pickerTargets,
   preferenceLabelFr,
   primaryPosition,
   selectedPositions,
@@ -67,6 +73,9 @@ export type PositionPickerProps = {
 
 /** 48 px: above the 44 px minimum tap target, and the size the coordinates are spaced for. */
 const TARGET = DISC_SIZES.md;
+
+/** The seven discs, computed once: the formation is a constant. */
+const TARGETS = pickerTargets(THE_FORMATION.slots, positionLabelFr);
 
 const STATE_STYLE: Record<"none" | PositionPreference, string> = {
   none: "border-2 border-dashed border-line/70 bg-black/20 text-line/90",
@@ -104,19 +113,20 @@ export function PositionPicker({
     <div className={cn("flex flex-col gap-3", className)}>
       <div role="group" aria-label="Postes du joueur sur le terrain">
         <Pitch label="Terrain de football à 7, vu depuis nos buts">
-          {POSITIONS.map((position) => {
-            const preference = value[position.code];
+          {TARGETS.map((target) => {
+            const preference = value[target.code];
             const state = stateOf(preference);
             return (
-              <PitchPoint key={position.code} x={position.defaultX} y={position.defaultY}>
+              <PitchPoint key={target.key} x={target.x} y={target.y}>
                 <button
                   type="button"
                   disabled={inert}
-                  aria-label={`${position.labelFr}, ${preferenceLabelFr(preference)}${
+                  aria-label={`${target.labelFr}, ${preferenceLabelFr(preference)}${
                     readOnly ? "" : ` — ${actionLabelFr(preference)}`
                   }`}
+                  data-position={target.code}
                   data-preference={state}
-                  onClick={() => onChange(cyclePosition(value, position.code, { singlePrimary }))}
+                  onClick={() => onChange(cyclePosition(value, target.code, { singlePrimary }))}
                   className={cn(
                     "relative flex items-center justify-center rounded-full font-bold uppercase shadow-md transition-transform",
                     "focus-visible:ring-4 focus-visible:ring-accent focus-visible:outline-none",
@@ -130,7 +140,7 @@ export function PositionPicker({
                     fontSize: Math.round(TARGET.glyph * 0.72),
                   }}
                 >
-                  {position.code}
+                  {target.code}
                   {state === "primary" ? (
                     <span
                       aria-hidden

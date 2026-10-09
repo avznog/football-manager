@@ -5073,3 +5073,23 @@ of `docs/ROADMAP.md`, now point at the new path. Every other mention of `cahier-
 `cahier-des-charges` is a label, not a path, and stays.
 
 Files: `backlogs/`, `docs/PLAN.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-10-09 — The positions picker draws the 1-2-3-1, with the twin posts linked
+
+The owner, on « Ma fiche joueur »: the pitch must show the `1-2-3-1`, and the two `AIL` (and the two `DC`)
+are linked — selecting one selects both. Decision **173**.
+
+`PositionPicker` now draws `THE_FORMATION.slots` through a new pure helper, `pickerTargets`
+(`lib/pitch/preferences.ts`): seven discs at the slots' coordinates, each reading `value[code]`, so the
+twins share one key and cycle together. No schema, action or query change — storage was already per
+code. The twins' accessible names carry the side (« Ailier gauche », « Défenseur central droit »). The
+comments that described the one-disc rule (`PositionPicker`, `POSITIONS` in `db/reference.ts`,
+`components/pitch/README.md`) were rewritten. New `e2e/positions.spec.ts`: a coach taps the left
+winger on a fixture player's sheet, both wingers read `secondary`, save, reload, still both.
+
+Looked at 390 px wide, light and dark, as a coach (editable) and as a player on his own sheet and on a
+teammate's (read-only): seven discs, none touching, captions legible in both themes.
+
+Files: `components/pitch/PositionPicker.tsx`, `components/pitch/README.md`, `db/reference.ts`,
+`lib/pitch/preferences.ts`, `lib/pitch/preferences.test.ts`, `e2e/positions.spec.ts`,
+`docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.

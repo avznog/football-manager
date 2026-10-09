@@ -79,14 +79,15 @@ export type PositionDefinition = {
 };
 
 /**
- * The canonical spot of each position — one disc each, which is what the preference picker draws.
+ * The five positions, each with a canonical spot. The spot is seeded into `positions.default_x/y` and
+ * is no longer what the preference picker draws: since decision 173 the picker draws the seven slots of
+ * `THE_FORMATION`, and the two `DC` discs (and the two `AIL` discs) are one wish, cycled together.
  *
  * `AIL` is **one** position with **two** slots in the formation, left and right of the midfield line,
  * and the owner was explicit that the two are not to be told apart. Its line is therefore `MIL`, the
  * line those two slots are drawn on (and the line `MG`/`MD` were on before them), which is what keeps
- * `formationLabelOf` reading `1-2-3-1` off the slots. Its one canonical spot is the left one: the
- * picker needs a single target, and a second disc on the right meaning the same thing would read as
- * two different wishes. It sorts after `MC` — the middle first, then the wings either side of it.
+ * `formationLabelOf` reading `1-2-3-1` off the slots. Its canonical spot is the left one. It sorts after
+ * `MC` — the middle first, then the wings either side of it.
  *
  * Spaced so that no two 48 px targets touch on a 320 px wide pitch (`MIN_MARKER_DISTANCE` in
  * `lib/pitch/geometry.ts`, held by `db/reference.test.ts`).
