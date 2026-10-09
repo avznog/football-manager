@@ -26,13 +26,11 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FieldError } from "@/components/ui/field-error";
 import { SegmentedControl, type SegmentOption } from "@/components/ui/segmented-control";
-import type { AvailabilityStatus } from "@/db/schema";
-import { AVAILABILITY_LABELS } from "@/lib/calendar/labels";
 import { setMatchSquad } from "@/lib/composition/actions";
 import { countSquadRoles, squadRoleLabelFr, squadSummaryFr } from "@/lib/composition/plan";
 import type { SquadMark } from "@/lib/composition/validation";
 
-/** A squad member as the sheet needs him. A `CompositionMember` fits, plus his availability. */
+/** A squad member as the sheet needs him. */
 export type SheetMember = {
   membershipId: string;
   name: string;
@@ -42,8 +40,6 @@ export type SheetMember = {
   isPlayer: boolean;
   isInjured: boolean;
   primaryPositionLabelFr: string | null;
-  /** What he answered on the availability screen, if anything. */
-  availability: AvailabilityStatus | null;
 };
 
 export type SquadSheetProps = {
@@ -203,22 +199,9 @@ function MemberIdentity({ member }: { member: SheetMember }) {
         <span className="block truncate text-sm font-semibold text-ink">{member.name}</span>
         <span className="flex flex-wrap items-center gap-1 text-xs text-ink-muted">
           {member.primaryPositionLabelFr ? <span>{member.primaryPositionLabelFr}</span> : null}
-          {member.availability ? (
-            <Badge variant={availabilityVariant(member.availability)}>
-              {AVAILABILITY_LABELS[member.availability]}
-            </Badge>
-          ) : (
-            <Badge variant="neutral">Sans réponse</Badge>
-          )}
           {member.isInjured ? <Badge variant="danger">Blessé</Badge> : null}
         </span>
       </span>
     </div>
   );
-}
-
-function availabilityVariant(status: AvailabilityStatus): "success" | "danger" | "warning" {
-  if (status === "yes") return "success";
-  if (status === "no") return "danger";
-  return "warning";
 }

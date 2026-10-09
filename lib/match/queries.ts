@@ -11,8 +11,8 @@ import "server-only";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { competitions, matchAvailability, matchEvents, matches } from "@/db/schema";
-import type { AvailabilityStatus, EntryMode, MatchStatus } from "@/db/schema";
+import { competitions, matchEvents, matches } from "@/db/schema";
+import type { EntryMode, MatchStatus } from "@/db/schema";
 import type { MatchDeletionHolds } from "@/lib/calendar/deletion";
 
 export type MatchRow = {
@@ -123,50 +123,6 @@ export async function getMatch(teamId: string, matchId: string): Promise<MatchRo
 }
 
 /* -------------------------------------------------------------------------- */
-/* Availability                                                               */
-/* -------------------------------------------------------------------------- */
-
-export type MatchAnswer = {
-  matchId: string;
-  teamMemberId: string;
-  status: AvailabilityStatus;
-  note: string | null;
-};
-
-/**
- * Every answer for every match of the team, in one round trip.
- *
- * Thirteen players times a season of matches is a few hundred rows; aggregating them in
- * JavaScript costs less than the four grouped queries it would otherwise take to get counts,
- * the viewer's own answer, and the names behind them.
- */
-export async function getTeamMatchAnswers(teamId: string): Promise<MatchAnswer[]> {
-  return db
-    .select({
-      matchId: matchAvailability.matchId,
-      teamMemberId: matchAvailability.teamMemberId,
-      status: matchAvailability.status,
-      note: matchAvailability.note,
-    })
-    .from(matchAvailability)
-    .innerJoin(matches, eq(matches.id, matchAvailability.matchId))
-    .where(eq(matches.teamId, teamId));
-}
-
-/** The answers for a single match — what the coach's grid and non-responder list are built on. */
-export async function getMatchAnswers(matchId: string): Promise<MatchAnswer[]> {
-  return db
-    .select({
-      matchId: matchAvailability.matchId,
-      teamMemberId: matchAvailability.teamMemberId,
-      status: matchAvailability.status,
-      note: matchAvailability.note,
-    })
-    .from(matchAvailability)
-    .where(eq(matchAvailability.matchId, matchId));
-}
-
-/* -------------------------------------------------------------------------- */
 /* The derived score                                                          */
 /* -------------------------------------------------------------------------- */
 
@@ -232,14 +188,13 @@ export async function hasMatchEvents(matchId: string): Promise<boolean> {
 /**
  * What would go with this match, for the sentence on the « supprimer » card.
  *
- * Three counts in one round trip, from a match row that is not joined to anything: scalar
- * subqueries, so a match with no answers and no sheet still comes back with zeros rather than no
- * row at all.
+ * Two counts in one round trip, from a match row that is not joined to anything: scalar
+ * subqueries, so a match with no sheet and no composition still comes back with zeros rather than
+ * no row at all.
  */
 export async function getMatchDeletionHolds(matchId: string): Promise<MatchDeletionHolds> {
   const [row] = await db
     .select({
-      answers: sql<string>`(select count(*) from match_availability where match_id = ${matchId})`,
       squad: sql<string>`(select count(*) from match_squad where match_id = ${matchId})`,
       lineups: sql<string>`(select count(*) from lineups where match_id = ${matchId})`,
     })
@@ -248,7 +203,6 @@ export async function getMatchDeletionHolds(matchId: string): Promise<MatchDelet
 
   // `count(*)` is a bigint, which postgres.js hands over as a string.
   return {
-    answers: Number(row?.answers ?? 0),
     squad: Number(row?.squad ?? 0),
     lineups: Number(row?.lineups ?? 0),
   };

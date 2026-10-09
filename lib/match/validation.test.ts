@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  availabilityNoteSchema,
-  availabilityStatusSchema,
   createMatchSchema,
   kickoffSchema,
   matchSideSchema,
@@ -104,32 +102,6 @@ describe("periodsCountSchema and periodMinutesSchema", () => {
     expect(periodsCountSchema.safeParse("2.5").success).toBe(false);
     expect(periodMinutesSchema.safeParse("4").success).toBe(false);
     expect(periodMinutesSchema.safeParse("61").success).toBe(false);
-  });
-});
-
-describe("availabilityStatusSchema", () => {
-  it("accepts exactly the three answers", () => {
-    expect(availabilityStatusSchema.parse("yes")).toBe("yes");
-    expect(availabilityStatusSchema.parse("no")).toBe("no");
-    expect(availabilityStatusSchema.parse("maybe")).toBe("maybe");
-  });
-
-  it("refuses anything else", () => {
-    expect(availabilityStatusSchema.safeParse("oui").success).toBe(false);
-    expect(availabilityStatusSchema.safeParse("").success).toBe(false);
-  });
-});
-
-describe("availabilityNoteSchema", () => {
-  it("keeps a short excuse and drops an empty one", () => {
-    expect(availabilityNoteSchema.parse("Je finis le boulot à 10h")).toBe(
-      "Je finis le boulot à 10h",
-    );
-    expect(availabilityNoteSchema.parse("")).toBeNull();
-  });
-
-  it("refuses an essay", () => {
-    expect(availabilityNoteSchema.safeParse("x".repeat(141)).success).toBe(false);
   });
 });
 

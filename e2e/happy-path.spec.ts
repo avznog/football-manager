@@ -1,7 +1,7 @@
 /**
  * The end-to-end happy path of `docs/PLAN.md` (« Verification »), in one scenario:
  *
- *   seed a team → the coach logs in → creates a match → two players declare their availability →
+ *   seed a team → the coach logs in → creates a match → a player reads it and is asked nothing →
  *   the coach picks the squad and builds a composition plus a planned change at the 30th minute →
  *   starts game mode → logs a goal with an assist, a goal conceded, a missed penalty from behind
  *   « Autre… », two free-text comments, and applies the planned change →
@@ -210,29 +210,19 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   });
 
   /* ---------------------------------------------------------------------- */
-  /* Two players declare their availability                                 */
+  /* A player reads the match, and is asked nothing                         */
   /* ---------------------------------------------------------------------- */
 
-  await test.step("two players declare themselves available", async () => {
-    for (const [rank, player] of [striker, gk].entries()) {
-      await logout(page);
-      await login(page, player.username, fixture.password);
-      await page.goto(matchUrl);
+  await test.step("a player opens the match and is not asked whether he is available", async () => {
+    // Availability was removed (decision 156): the match page used to lead with « Ta réponse » and
+    // its three segments. A player now reads the fixture and nothing asks him to declare anything.
+    await logout(page);
+    await login(page, striker.username, fixture.password);
+    await page.goto(matchUrl);
 
-      // One tap is the whole interaction: the control submits on change once hydrated, and its
-      // « Valider ma réponse » fallback disappears. Waiting for that is also this suite's canary —
-      // if the page never hydrates, every later step would quietly exercise the no-JavaScript
-      // fallbacks instead of the app.
-      await expect(page.getByRole("button", { name: "Valider ma réponse" })).toHaveCount(0);
-      await segment(page, "status-yes").click();
-
-      // The tally is server-derived: it only moves if the answer was actually written, by the
-      // player himself — a coach cannot answer on anybody's behalf (`docs/DATA_MODEL.md`).
-      await expect(
-        page.getByText(`${rank + 1} réponse${rank > 0 ? "s" : ""} sur 8 joueurs`),
-      ).toBeVisible();
-      await expect(availabilityGroup(page, "Dispo")).toContainText(player.displayName);
-    }
+    await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
+    await expect(page.getByText("Ta réponse")).toHaveCount(0);
+    await expect(page.getByRole("radio", { name: "Dispo" })).toHaveCount(0);
   });
 
   /* ---------------------------------------------------------------------- */
@@ -1290,17 +1280,9 @@ function ratingRow(page: Page, player: FixturePlayer): Locator {
 /* -------------------------------------------------------------------------- */
 
 /**
- * `Card` is a `<section>` and so is each group inside the availability grid, so a filter on a
- * heading matches the card *and* the group nested in it. `.last()` is the inner one — the whole
- * point of scoping here is to assert on one group rather than on the card's full text.
+ * `Card` is a `<section>`, and a card can nest sections of its own, so a filter on a heading can
+ * match the outer card too. `.last()` is the innermost one.
  */
-function availabilityGroup(page: Page, label: string): Locator {
-  return page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { level: 3, name: label }) })
-    .last();
-}
-
 function compositionCard(page: Page, title: string): Locator {
   return page
     .locator("section")

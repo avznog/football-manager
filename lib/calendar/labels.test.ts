@@ -4,12 +4,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
-  availabilityCountFr,
-  availabilitySubtitleFr,
   entryModeBadgeFr,
   matchLengthHintFr,
   matchNameFr,
-  matchReminderTitleFr,
   periodsLabel,
   resultLabel,
   resultLetter,
@@ -159,26 +156,6 @@ describe("home and away, in words", () => {
     expect(venueFieldHintFr(true)).toBe("Le terrain où tu reçois.");
     expect(venueFieldHintFr(false)).toBe("Le terrain de l’adversaire.");
   });
-
-  it("tells the WhatsApp group where the match is played", () => {
-    expect(
-      matchReminderTitleFr({
-        opponentName: "Étoile du Parc",
-        competitionFr: "Championnat",
-        isHome: false,
-        venue: "Stade du Parc",
-      }),
-    ).toBe("Étoile du Parc (championnat) · à l’extérieur, Stade du Parc");
-
-    expect(
-      matchReminderTitleFr({
-        opponentName: "CS Morvan",
-        competitionFr: "Coupe",
-        isHome: true,
-        venue: null,
-      }),
-    ).toBe("CS Morvan (coupe) · à domicile");
-  });
 });
 
 describe("matchLengthHintFr", () => {
@@ -212,35 +189,5 @@ describe("matchLengthHintFr", () => {
     expect(matchLengthHintFr(Number.NaN, 30)).toBeNull();
     expect(matchLengthHintFr(2, Number.NaN)).toBeNull();
     expect(matchLengthHintFr(2.5, 30)).toBeNull();
-  });
-});
-
-describe("availabilityCountFr", () => {
-  /** The denominator is the squad the question went to — named, because « 11 sur 13 » alone
-   * leaves the reader guessing what the 13 counts. */
-  it("names what the denominator counts", () => {
-    expect(availabilityCountFr(11, 13)).toBe("11 réponses sur 13 joueurs");
-  });
-
-  it("keeps « réponse » singular at one, and at zero", () => {
-    expect(availabilityCountFr(1, 13)).toBe("1 réponse sur 13 joueurs");
-    expect(availabilityCountFr(0, 13)).toBe("0 réponse sur 13 joueurs");
-    expect(availabilityCountFr(1, 1)).toBe("1 réponse sur 1 joueur");
-  });
-});
-
-describe("availabilitySubtitleFr", () => {
-  it("says nothing about the moment while the event is still to come", () => {
-    expect(availabilitySubtitleFr(11, 13, null)).toBe("11 réponses sur 13 joueurs");
-  });
-
-  /**
-   * The point of the prefix: without it the card reads as a live question about an event that
-   * finished days ago, and « Sans réponse : 2 » looks like two people to chase tonight.
-   */
-  it("dates the list once the match has happened", () => {
-    expect(availabilitySubtitleFr(11, 13, "match")).toBe(
-      "Avant le match · 11 réponses sur 13 joueurs",
-    );
   });
 });

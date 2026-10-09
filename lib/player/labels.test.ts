@@ -39,8 +39,9 @@ describe("removeMemberCardFr", () => {
     const card = removeMemberCardFr("Ali", true);
 
     expect(card.titleFr).toBe("Retirer de l’effectif");
-    expect(card.descriptionFr).toContain("disponibilités");
     expect(card.descriptionFr).toContain("feuille de match");
+    // Availability went with decision 156: a player has no answers left to lose.
+    expect(card.descriptionFr).not.toContain("disponibilités");
   });
 
   it("never uses « convoqué », a word the app has no concept for", () => {

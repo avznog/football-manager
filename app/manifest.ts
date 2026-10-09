@@ -13,7 +13,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Football Manager",
     short_name: "FootManager",
     description:
-      "Gère ton équipe de football à 7 : calendrier, disponibilités, feuille de match, compositions, mode match en direct et statistiques.",
+      "Gère ton équipe de football à 7 : calendrier, feuille de match, compositions, mode match en direct et statistiques.",
     lang: "fr",
     dir: "ltr",
     start_url: "/",

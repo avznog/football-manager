@@ -31,7 +31,6 @@ import { relations, sql } from "drizzle-orm";
 /* -------------------------------------------------------------------------- */
 
 export const teamRole = pgEnum("team_role", ["coach", "player"]);
-export const availabilityStatus = pgEnum("availability_status", ["yes", "no", "maybe"]);
 export const squadRole = pgEnum("squad_role", ["starter", "substitute", "supporter"]);
 export const matchStatus = pgEnum("match_status", ["scheduled", "live", "finished"]);
 export const entryMode = pgEnum("entry_mode", ["live", "retro"]);
@@ -353,23 +352,6 @@ export const matches = pgTable(
   ],
 );
 
-/** Written by the player themselves; a coach may not answer on their behalf. */
-export const matchAvailability = pgTable(
-  "match_availability",
-  {
-    matchId: uuid()
-      .notNull()
-      .references(() => matches.id, { onDelete: "cascade" }),
-    teamMemberId: uuid()
-      .notNull()
-      .references(() => teamMembers.id, { onDelete: "cascade" }),
-    status: availabilityStatus().notNull(),
-    note: text(),
-    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [unique("match_availability_unique").on(t.matchId, t.teamMemberId)],
-);
-
 /** The match sheet. Only members listed here may rate afterwards (decision 007). */
 export const matchSquad = pgTable(
   "match_squad",
@@ -654,20 +636,11 @@ export const matchesRelations = relations(matches, ({ one, many }) => ({
     fields: [matches.competitionId],
     references: [competitions.id],
   }),
-  availability: many(matchAvailability),
   squad: many(matchSquad),
   lineups: many(lineups),
   events: many(matchEvents),
   playerStats: many(matchPlayerStats),
   ratings: many(ratings),
-}));
-
-export const matchAvailabilityRelations = relations(matchAvailability, ({ one }) => ({
-  match: one(matches, { fields: [matchAvailability.matchId], references: [matches.id] }),
-  member: one(teamMembers, {
-    fields: [matchAvailability.teamMemberId],
-    references: [teamMembers.id],
-  }),
 }));
 
 export const matchSquadRelations = relations(matchSquad, ({ one }) => ({
@@ -753,7 +726,6 @@ export type MatchPlayerStats = typeof matchPlayerStats.$inferSelect;
 
 export type TeamRole = (typeof teamRole.enumValues)[number];
 export type SquadRole = (typeof squadRole.enumValues)[number];
-export type AvailabilityStatus = (typeof availabilityStatus.enumValues)[number];
 export type MatchStatus = (typeof matchStatus.enumValues)[number];
 export type EntryMode = (typeof entryMode.enumValues)[number];
 export type MatchEventType = (typeof matchEventType.enumValues)[number];

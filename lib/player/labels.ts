@@ -73,7 +73,7 @@ export function removeMemberCardFr(displayName: string, isPlayer: boolean): Remo
   return {
     titleFr: "Retirer de l’effectif",
     descriptionFr:
-      "Ce joueur ne pourra plus déclarer ses disponibilités ni être mis sur une feuille de match. " +
+      "Ce joueur ne pourra plus être mis sur une feuille de match. " +
       "Les matchs qu’il a joués gardent son nom : rien n’est effacé.",
     buttonFr: `Retirer ${displayName} de l’effectif`,
   };

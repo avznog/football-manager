@@ -1,5 +1,5 @@
 /**
- * The small pieces every calendar surface shares: badges, score pills, answer summaries.
+ * The small pieces every calendar surface shares: badges, score pills, titles.
  *
  * Server Components — pure presentation, no interaction. Keeping them here rather than inlining
  * them in three pages is what makes a match row on `/calendrier` and the header of `/match/[id]`
@@ -7,9 +7,8 @@
  */
 
 import { Badge } from "@/components/ui/badge";
-import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
+import type { MatchStatus } from "@/db/schema";
 import {
-  AVAILABILITY_LABELS,
   matchNameFr,
   NOT_RECORDED_FR,
   resultLabel,
@@ -18,26 +17,7 @@ import {
   venuePhraseFr,
 } from "@/lib/calendar/labels";
 import { capitalizeFirst } from "@/lib/calendar/time";
-import type { AvailabilityCounts, CalendarMatch } from "@/lib/calendar/timeline";
-import { answersLineFr } from "@/lib/calendar/timeline";
-
-const AVAILABILITY_VARIANT = {
-  yes: "success",
-  no: "danger",
-  maybe: "warning",
-} as const;
-
-/** The viewer's own answer. Deliberately loud when it is missing: that is the call to action. */
-export function AvailabilityBadge({ status }: { status: AvailabilityStatus | null }) {
-  if (status === null) {
-    return <Badge variant="neutral">Sans réponse</Badge>;
-  }
-  return (
-    <Badge variant={AVAILABILITY_VARIANT[status]} solid>
-      {AVAILABILITY_LABELS[status]}
-    </Badge>
-  );
-}
+import type { CalendarMatch } from "@/lib/calendar/timeline";
 
 export function MatchStatusBadge({ status }: { status: MatchStatus }) {
   if (status === "live") {
@@ -48,24 +28,6 @@ export function MatchStatusBadge({ status }: { status: MatchStatus }) {
     );
   }
   return null;
-}
-
-/**
- * « 9 dispo · 2 pas dispo · 1 peut-être · 1 sans réponse », dropping whatever is zero.
- *
- * The wording is `answersLineFr`, in `lib/calendar/timeline.ts`, because it was wrong here and
- * untestable here: nothing under `app/` is collected by Vitest (decision NNN).
- */
-export function AnswersLine({
-  answers,
-  squadSize,
-  className,
-}: {
-  answers: AvailabilityCounts;
-  squadSize: number;
-  className?: string;
-}) {
-  return <p className={className}>{answersLineFr(answers, squadSize)}</p>;
 }
 
 /**

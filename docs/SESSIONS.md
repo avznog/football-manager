@@ -4768,3 +4768,22 @@ wishes mapped (Q10).
 Looked at, 390 px, light and dark: the composition editor (edit and new) and list as coach, game mode
 with the proposed seven and the list composer as coach, the équipe type, and `/joueur/[id]` as the
 player himself and as the coach, side by side. Screenshots in `audit/track-c/`.
+
+## 2026-10-09 — S3 of the cahier rework: match availability and the relance removed (decision 156)
+
+Track B again, same worktree and `football_wb`, on top of S2 (#176). Everything decision 156 lists is
+gone, and migration `0012_curvy_kitty_pryde.sql` drops `match_availability` (5 rows on `football_wb`)
+and `availability_status`. Before generating it I checked that `match_availability.status` was the
+enum's only remaining column.
+
+- **The pinned calendar card** had to be redesigned rather than merely emptied: with the control and
+  the tally gone, the footer was a lone « Détails » link. It now ends on one full-width secondary
+  « Voir le match », with the live score above it when there is one. The match page for a player
+  before kick-off is now the header and « Mode match », nothing else.
+- **`getCalendar(teamId)`** — the viewer argument went, since nothing on the calendar depends on him.
+- **Looked at, 390 px, light and dark, coach `potter` and player `raphael` in one pass**: `/calendrier`
+  (identical but for « Nouveau match »), the next match's page (coach: Modifier, Composition, Terminer
+  le match, Mode match; player: Mode match only), and its `/feuille` (coach: rows with no answer badge;
+  player: 404, as before).
+- Gates: typecheck, eslint, Vitest 65 files / 1370 tests, Playwright 6/6 on port 3102.
+- Not done: `npm run db:seed` was not run, for the same reason as S2.

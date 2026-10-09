@@ -70,7 +70,7 @@
  * ## What this function deliberately does not compute
  *
  * Man of the match and average ratings (they come from `ratings`, not from the log), season
- * aggregates (`lib/stats/`), availability, injuries beyond the `INJURY` events in this match,
+ * aggregates (`lib/stats/`), injuries beyond the `INJURY` events in this match,
  * anything about the opponent's players, and `matches.status` — it reports what the *clock* says
  * and leaves writing a column to the caller.
  */

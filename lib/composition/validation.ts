@@ -23,8 +23,8 @@ import { FORMATION_SLOT_COUNT } from "@/db/reference";
  * One line of the match sheet.
  *
  * `"none"` is a real answer, not a missing one: it deletes the `match_squad` row. "Not selected"
- * and "selected as a supporter" are different facts, and the availability screen, the statistics
- * and the composition editor all read the difference.
+ * and "selected as a supporter" are different facts, and the statistics and the composition
+ * editor both read the difference.
  */
 export const squadMarkSchema = z.enum(["starter", "substitute", "supporter", "none"], {
   message: "Choisis titulaire, remplaçant, supporter ou rien.",

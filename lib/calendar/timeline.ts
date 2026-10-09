@@ -1,17 +1,17 @@
 /**
  * The unified calendar, as pure data.
  *
- * `docs/PROJECT.md` describes one chronological list of matches, with the next one pinned at the
- * top and a big availability control on it. (It used to merge trainings in too; they were removed by
- * decision 155.) That merge, and the definition of
- * "next", live here rather than in the page so they can be unit tested without a database or a
- * browser — see `timeline.test.ts`.
+ * `docs/PROJECT.md` describes one chronological list of matches with the next one pinned at the
+ * top. (It used to merge trainings in, and to carry an availability control on the pinned card;
+ * decisions 155 and 156 removed both.) The chronology and the definition of "next" live here rather
+ * than in the page so they can be unit tested without a database or a browser — see
+ * `timeline.test.ts`.
  *
  * Instants cross the RSC boundary as ISO strings (`CLAUDE.md`: no raw `Date` objects), and are
  * rendered through `lib/calendar/time.ts`, which pins Europe/Paris.
  */
 
-import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
+import type { MatchStatus } from "@/db/schema";
 
 /* -------------------------------------------------------------------------- */
 /* Durations                                                                  */
@@ -44,9 +44,6 @@ export function addMinutes(startsAt: Date, minutes: number): string {
 /* The events                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** Counts only — the calendar list shows tallies, never thirteen names. */
-export type AvailabilityCounts = { yes: number; no: number; maybe: number };
-
 export type CalendarMatch = {
   kind: "match";
   id: string;
@@ -64,11 +61,6 @@ export type CalendarMatch = {
   periodMinutes: number;
   /** Derived from `match_events` (decision 003). Null while the match has not been played. */
   score: { goalsFor: number; goalsAgainst: number } | null;
-  /** The viewer's own answer, or null if they have not answered. */
-  myAvailability: AvailabilityStatus | null;
-  answers: AvailabilityCounts;
-  /** Active players in the squad, so "who has not answered" is a subtraction. */
-  squadSize: number;
 };
 
 export type CalendarEvent = CalendarMatch;
@@ -84,7 +76,7 @@ export function isLiveEvent(event: TimelineItem): boolean {
  * The mirror image of `isLiveEvent`, and the reason it exists is decision 121: the coach can now
  * declare a match over at any moment, including before its own kick-off, so `endsAt` on its own is
  * no longer a safe answer to « has this happened ». A match dated next Sunday and typed up today
- * would otherwise sit under « À venir » with a « Je suis dispo » control while its own page says it
+ * would otherwise sit under « À venir » as if still to be played while its own page says it
  * is finished and `/stats` counts it in the season — one screen contradicting another, which is the
  * whole family of defect the screen audits went looking for.
  *
@@ -136,10 +128,10 @@ export function isPast(item: TimelineItem, now: Date): boolean {
 
 export type Timeline<T extends TimelineItem> = {
   /**
-   * The one event pinned at the top of `/calendrier`, with the big « Je suis dispo » control.
+   * The one match pinned at the top of `/calendrier`.
    *
-   * It is the match happening now if there is one, and otherwise the soonest one to come. Null only when the
-   * season is over and nothing is planned.
+   * It is the match happening now if there is one, and otherwise the soonest one to come. Null only
+   * when the season is over and nothing is planned.
    */
   next: T | null;
   /** Everything else still to come, chronological. */
@@ -183,156 +175,3 @@ export function pastSectionTitleFr(past: readonly PastSectionItem[]): string {
 export type PastSectionItem = {
   score: { goalsFor: number; goalsAgainst: number } | null;
 };
-
-/* -------------------------------------------------------------------------- */
-/* Who has answered, and who has not                                          */
-/* -------------------------------------------------------------------------- */
-
-/** How many players still owe an answer. Never negative, even if the squad shrank since. */
-export function pendingCount(squadSize: number, answers: AvailabilityCounts): number {
-  return Math.max(0, squadSize - answers.yes - answers.no - answers.maybe);
-}
-
-/** A player, reduced to what a list of names needs. */
-export type Responder = {
-  membershipId: string;
-  displayName: string;
-};
-
-export type AvailabilityTally = {
-  yes: Responder[];
-  no: Responder[];
-  maybe: Responder[];
-  /** No row in `match_availability` at all. */
-  pending: Responder[];
-  answered: number;
-  total: number;
-};
-
-/**
- * Buckets a squad by its declared availability, preserving the order the players came in
- * (coaches first, then shirt numbers — see `getSquad`).
- *
- * This is the coach's screen: the `pending` bucket is the list he copies into WhatsApp.
- */
-export function tallyAvailability(
-  players: readonly Responder[],
-  answers: readonly { teamMemberId: string; status: AvailabilityStatus }[],
-): AvailabilityTally {
-  const byMember = new Map(answers.map((answer) => [answer.teamMemberId, answer.status]));
-  const tally: AvailabilityTally = {
-    yes: [],
-    no: [],
-    maybe: [],
-    pending: [],
-    answered: 0,
-    total: players.length,
-  };
-
-  for (const player of players) {
-    const status = byMember.get(player.membershipId);
-    if (status === undefined) {
-      tally.pending.push(player);
-      continue;
-    }
-    tally[status].push(player);
-    tally.answered += 1;
-  }
-
-  return tally;
-}
-
-/**
- * Whether the availability list earns its place on the screen.
- *
- * Before the event, always: « 0 réponse sur 13 joueurs » with thirteen names under « Sans réponse »
- * is the list of people to chase, which is the coach's whole reason for looking.
- *
- * Afterwards, only if somebody answered. A past event nobody replied to has no record to keep:
- * thirteen names, a month old, under a question that has already been answered by what happened.
- */
-export function availabilityIsWorthShowing(
-  tally: Pick<AvailabilityTally, "answered">,
-  past: boolean,
-): boolean {
-  return past ? tally.answered > 0 : true;
-}
-
-/** Counts from a tally, for the compact badges on a list row. */
-export function countsOf(tally: AvailabilityTally): AvailabilityCounts {
-  return { yes: tally.yes.length, no: tally.no.length, maybe: tally.maybe.length };
-}
-
-/**
- * The tally under a pinned event: « 7 dispo · 1 pas dispo · 1 peut-être · 4 sans réponse ».
- *
- * It used to count « 1 absent », days before an event nobody had attended yet. Availability is an
- * intention, not a fact: saying « 1 absent » about an answer borrowed the word of an observation about
- * an evening that has happened (decision 076).
- *
- * « pas dispo » is what the player tapped, what his badge says, and what the relance message asks for.
- * Nothing is pluralised: « 2 pas dispo » is the same words as « 1 pas dispo », which is what makes the
- * line scannable.
- */
-export function answersLineFr(answers: AvailabilityCounts, squadSize: number): string {
-  const pending = pendingCount(squadSize, answers);
-  const parts = [
-    answers.yes > 0 ? `${answers.yes} dispo` : null,
-    answers.no > 0 ? `${answers.no} pas dispo` : null,
-    answers.maybe > 0 ? `${answers.maybe} peut-être` : null,
-    pending > 0 ? `${pending} sans réponse` : null,
-  ].filter((part): part is string => part !== null);
-
-  return parts.length === 0 ? "Personne n’a encore répondu." : parts.join(" · ");
-}
-
-/**
- * The relance card's own heading, which said « Relancer les absents » over « 4 joueurs n'ont pas
- * répondu ».
- *
- * Nobody in that list is absent: they have not answered, which is the opposite of having said they
- * would not come, and the card's own description said so one line below its title. Decision 087's rule
- * — a heading is a claim about every row under it — and `answersLineFr`'s, in the same card.
- */
-export function reminderCardFr(pending: number): { titleFr: string; descriptionFr: string } {
-  if (pending === 0) {
-    return {
-      titleFr: "Personne à relancer",
-      descriptionFr: "Tout le monde a répondu. Rien à faire.",
-    };
-  }
-
-  return {
-    titleFr: "Relancer ceux qui n’ont pas répondu",
-    descriptionFr:
-      pending === 1 ? "1 joueur n’a pas répondu." : `${pending} joueurs n’ont pas répondu.`,
-  };
-}
-
-/**
- * The message a coach pastes into the team's WhatsApp group.
- *
- * There are no notifications and no e-mails by design (decision 015): the app's job is to tell
- * the coach exactly who to nag, in a form he can copy in one tap.
- */
-export function buildReminderMessage(input: {
-  /** e.g. « Étoile du Parc (championnat) ». */
-  title: string;
-  /** e.g. « dimanche 27/09/2026 à 10:30 ». */
-  when: string;
-  pending: readonly Responder[];
-}): string {
-  const header = `${input.title} — ${input.when}`;
-
-  if (input.pending.length === 0) {
-    return `${header}\nTout le monde a répondu. Merci !`;
-  }
-
-  const names = input.pending.map((player) => player.displayName).join(", ");
-  const who =
-    input.pending.length === 1
-      ? `Il manque la réponse de : ${names}.`
-      : `Il manque les réponses de : ${names}.`;
-
-  return `${header}\n${who}\nMerci de répondre sur l’appli (dispo / pas dispo / peut-être).`;
-}

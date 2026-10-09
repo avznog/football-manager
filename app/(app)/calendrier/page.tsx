@@ -1,17 +1,16 @@
 /**
  * The calendar: one chronological list of the season's matches.
  *
- * The owner's notes asked for a single « agenda », with the next event at the top and a big
- * availability control on it (`instructions.md`, `docs/PROJECT.md`); trainings used to share the
- * list until decision 155 removed them. So: one pinned card, then what is still to come, then
- * history newest first.
+ * The owner's notes asked for a single « agenda », with the next event at the top
+ * (`instructions.md`, `docs/PROJECT.md`). Trainings used to share the list and the pinned card used
+ * to carry an availability control, until decisions 155 and 156 removed them. So: one pinned card,
+ * then what is still to come, then history newest first.
  *
  * Every instant is rendered through `lib/calendar/time.ts`, which pins Europe/Paris — a 20:30
  * kick-off must read as Sunday 20:30 whether the render happens on a Vercel function in UTC or
  * on a phone in Paris.
  *
- * Reads only. Availability is declared through `setMatchAvailability`, which re-checks `can()`
- * (`CLAUDE.md`, invariant 4).
+ * Reads only, and the same for every reader.
  */
 
 import { ButtonLink } from "@/components/ui/button";
@@ -27,7 +26,7 @@ export const metadata = { title: "Calendrier" };
 
 export default async function CalendarPage() {
   const { team } = await requireTeamContext();
-  const { events } = await getCalendar(team.id, team.membershipId);
+  const { events } = await getCalendar(team.id);
 
   // One `now` for the whole render, so the pinned card and the sections cannot disagree.
   const now = new Date();
@@ -45,7 +44,7 @@ export default async function CalendarPage() {
       </header>
 
       {next ? (
-        <NextEventCard event={next} teamId={team.id} canDeclare={team.isPlayer} now={now} />
+        <NextEventCard event={next} now={now} />
       ) : (
         <EmptyState
           title="Rien de prévu"
