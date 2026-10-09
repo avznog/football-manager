@@ -1989,3 +1989,11 @@ browser could not be told to drop it. Decision **143** has the full account.
       accessible name only (« Ailier gauche », « Défenseur central droit »). Same pitch on the read-only
       card. `pickerTargets` unit-tested, `e2e/positions.spec.ts` taps, saves and reloads. Walked at
       390 px in both themes, as a coach and as a player on his own and a teammate's sheet
+- [x] **The match page reads « Mode match », « Composition », « Terminer le match » before the match is
+      over** (decision **174**). « Terminer le match » has one slot, under the composition, before the
+      kick-off and after it; a finished match keeps its order with « Mode match » last. Pinned by the
+      order of the h2 headings in two e2e tests
+- [x] **« Changement » from a tapped player asks only who comes on** (decision **175**): a single-select
+      « Qui entre ? » titled with who goes out, one tap, then the pre-arranged « Changement » pitch to
+      validate. « Personne n’entre » keeps the uneven change. The group-change e2e now walks 1 for 1
+      from the disc, then 2 out / 1 in and 2 out / 2 in from the menu

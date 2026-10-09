@@ -6579,3 +6579,56 @@ sélectionne les deux, et idem pour les postes DC. »
 - `pickerTargets` (`lib/pitch/preferences.ts`) maps the slots to the discs and is unit-tested;
   `e2e/positions.spec.ts` taps one winger, sees both change, saves and reloads. `POSITIONS.defaultX/Y`
   are kept: they are still seeded into `positions`, and nothing in the picker reads them any more.
+
+## 174 — A match not over yet reads « Mode match », then the composition, then « Terminer le match »
+
+**2026-10-09** · accepted · supersedes the placement of « Terminer le match » in decision **121** ·
+no migration
+
+The owner (`backlogs/backlog2.md`): before a match is played, the page should show « mode match,
+composition, terminer le match », in that order. It did not. « Mode match » was the last card on the
+page whatever the match's state, under the composition; and decision 121 had given « Terminer le
+match » two slots — **leading** the page once the kick-off had passed, on the reasoning that a match
+already played with nothing in its log is on screen only to be typed up, and low on it before.
+
+**Decision.** For every match that is not finished — scheduled before its kick-off, scheduled after
+it, or live — the match page reads, under the header: **« Mode match »**, then **« Composition »**
+(coach only), then **« Terminer le match »** (when decision 121 offers it at all: `match:amend`, not
+finished, nothing in the log). One slot for the last card, with `beforeKickoff={!played}` deciding
+only its extra sentence. A finished match keeps the order it had: composition, « Après le match »,
+« Saisir / Corriger le match », and « Mode match » last (hidden when nothing was recorded), because
+there game mode is consultation and the recap and the corrections are the reasons to be on the page.
+
+What 121 argued for the leading slot is not lost: a coach typing up an old match scrolls past one
+card of game mode and the composition, and « Saisir le match » is still the card's primary button.
+What it cost was a page whose order changed at the kick-off minute, which is the opposite of what the
+owner asked. A player sees « Mode match » alone, as before. `e2e/happy-path.spec.ts` pins the three
+headings in order on the coach's view, before the kick-off and after it.
+
+## 175 — « Changement » from a player's disc asks only who replaces him
+
+**2026-10-09** · accepted · supersedes decision **152** §3's « Changement opens with him ticked as
+going out » · no migration
+
+The owner: « Si je clique sur un joueur, et que je clique ensuite sur changement, il ne faut pas me
+redemander quelle personne sort. Il faut directement avoir la liste des personnes qui peuvent rentrer.
+(Ex : je clique sur Lucas, on m'affiche la liste des remplaçants, je clique sur Hugues) ». Decision 152
+skipped every other « who » question for a tapped player, but « Changement » still opened « Qui sort ? »
+with him ticked, so a 1-for-1 change took a « Suivant » and a « Placer sur le terrain » it did not need.
+
+**Decision.** With a subject, ACTION → « Changement » opens a **single-select** « Qui entre ? »
+(`PlayerPicker`), its subtitle « Lucas sort · 34’ · 2e période ». The list is game mode's `available`,
+the same as the multi-select's: substitutes and members « hors feuille » (decision 087), with their
+reasons to hesitate printed under the name. One tap on a player calls `arrangeChange([subject], [id])`
+and lands on the « Changement » pitch, pre-arranged by `changeArrangement` (the arrival takes the
+vacated slot), where « Valider » confirms. That step is kept: it is where the pitch's rules are
+checked (at most seven, somebody in goal) and where the coach can still move people. A secondary
+button, « Personne n’entre », takes him off with nobody on — the uneven change the two-list flow
+allowed — and with an empty bench it is the one way forward under « Personne sur le banc. ».
+
+**What does not change.** The change is still one `LINEUP_APPLIED`, stamped at the tap that opened
+the flow (decisions 031, 147, 152): every step uses `setFlow`, never `openFlow`. A group change is the
+menu's « Changement » with nobody tapped — « Qui sort ? » multi, « Qui entre ? » multi, the pitch — and
+a row of « Qui peut entrer » still opens that flow with the player ticked as coming in. The tile's hint
+stays « il sort, qui entre ». The post-match « Ajouter un changement » (decision 169) asks for the minute
+first and has no subject, so it is untouched.

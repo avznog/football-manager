@@ -1008,9 +1008,10 @@ test("le banc est une cible : un joueur glissé dessus quitte le terrain", async
  * « Changement » the way the cahier asked for it (decision 147): who goes out, who comes in, unpaired
  * and in any number, then the pitch to confirm — and one line in the log, at the minute of the tap.
  *
- * Two changes, because the fixture has eight players: 2 out / 1 in first, opened from the striker's
- * own disc (decision 152), which leaves six on the pitch; then a real 2 out / 2 in from the ACTION
- * menu. The second is stamped at the tap that opened it, not at the « Valider » a minute later.
+ * Three changes, because the fixture has eight players. First 1 for 1 from the striker's own disc,
+ * which asks only who replaces him (decision 175). Then 2 out / 1 in from the ACTION menu, which
+ * leaves six on the pitch and is stamped at the tap that opened it, not at the « Valider » a minute
+ * later. Then a real 2 out / 2 in, the two who came off going back on.
  */
 test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ page }) => {
   const fixture = provisionFixture();
@@ -1038,6 +1039,13 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
   const at = (minutes: number) => t0 + minutes * MS_PER_MINUTE;
   await page.clock.setFixedTime(t0);
   await page.getByRole("link", { name: `← ${OPPONENT}` }).click();
+  // Before the kick-off the coach's page reads in the order of the afternoon (decision 174): game
+  // mode, the composition, and closing the match last.
+  await expect(page.locator("main").getByRole("heading", { level: 2 })).toHaveText([
+    "Mode match",
+    "Composition",
+    "Terminer le match",
+  ]);
   await page.getByRole("link", { name: "Ouvrir le mode match" }).click();
   // The starting seven are applied by opening game mode (decision 153).
   await expect(pitch(page, "Joueurs sur le terrain")).toBeVisible();
@@ -1045,25 +1053,19 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
   // TERRAIN is gone from the bar: « Changement » with nobody in and nobody out is the same pitch.
   await expect(page.getByRole("button", { name: "TERRAIN" })).toHaveCount(0);
 
-  await test.step("2 out, 1 in, from the striker's own disc", async () => {
+  await test.step("1 for 1, from the striker's own disc", async () => {
     await page.clock.setFixedTime(at(10));
     await page.getByRole("button", { name: `Action : ${striker.displayName}` }).click();
     const first = menu(page);
     await expect(first).toContainText(striker.displayName);
     await first.getByRole("button", { name: /^Changement/ }).click();
 
-    const out = picker(page, "Qui sort ?");
-    // He is already ticked: the tap on his disc said who the change is about.
-    await expect(out.getByRole("button", { name: striker.displayName })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await out.getByRole("button", { name: cm2.displayName }).click();
-    await out.getByRole("button", { name: "Suivant" }).click();
-
+    // The tap on his disc said who goes out, so « Qui sort ? » is not asked: one tap on who replaces
+    // him, and the pitch is laid out.
+    await expect(picker(page, "Qui sort ?")).toHaveCount(0);
     const into = picker(page, "Qui entre ?");
+    await expect(into).toContainText(`${striker.displayName} sort`);
     await into.getByRole("button", { name: sub.displayName }).click();
-    await into.getByRole("button", { name: "Placer sur le terrain" }).click();
 
     const terrain = page.getByRole("dialog", { name: "Changement" });
     await terrain.getByRole("button", { name: /^Valider/ }).click();
@@ -1071,12 +1073,10 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
     const line = timelineLine(page, `Entre : ${sub.displayName}`);
     await expect(line).toContainText("Changement");
     await expect(line).toContainText("10’");
-    await expect(line).toContainText("Sortent : ");
-    await expect(line).toContainText(striker.displayName);
-    await expect(line).toContainText(cm2.displayName);
+    await expect(line).toContainText(`Sort : ${striker.displayName}`);
   });
 
-  await test.step("2 out, 2 in, stamped at the tap that opened it", async () => {
+  await test.step("2 out, 1 in, stamped at the tap that opened it", async () => {
     await page.clock.setFixedTime(at(20));
     await action(page, "Changement");
     const out = picker(page, "Qui sort ?");
@@ -1086,7 +1086,6 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
 
     const into = picker(page, "Qui entre ?");
     await into.getByRole("button", { name: striker.displayName }).click();
-    await into.getByRole("button", { name: cm2.displayName }).click();
     await into.getByRole("button", { name: "Placer sur le terrain" }).click();
 
     // A minute spent on the pitch does not move the change: it belongs to the tap on ACTION.
@@ -1096,8 +1095,31 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
       .getByRole("button", { name: /^Valider/ })
       .click();
 
-    // « Entrent : » is also the starting composition's line, at 0’; this one must be at 20’.
     const line = timelineLine(page, "Sortent : ").filter({ hasText: "20’" });
+    await expect(line).toHaveCount(1);
+    await expect(line).toContainText(`Entre : ${striker.displayName}`);
+    for (const player of [sub, cm1]) await expect(line).toContainText(player.displayName);
+  });
+
+  await test.step("2 out, 2 in", async () => {
+    await page.clock.setFixedTime(at(30));
+    await action(page, "Changement");
+    const out = picker(page, "Qui sort ?");
+    await out.getByRole("button", { name: striker.displayName }).click();
+    await out.getByRole("button", { name: cm2.displayName }).click();
+    await out.getByRole("button", { name: "Suivant" }).click();
+
+    const into = picker(page, "Qui entre ?");
+    await into.getByRole("button", { name: sub.displayName }).click();
+    await into.getByRole("button", { name: cm1.displayName }).click();
+    await into.getByRole("button", { name: "Placer sur le terrain" }).click();
+    await page
+      .getByRole("dialog", { name: "Changement" })
+      .getByRole("button", { name: /^Valider/ })
+      .click();
+
+    // « Entrent : » is also the starting composition's line, at 0’; this one must be at 30’.
+    const line = timelineLine(page, "Sortent : ").filter({ hasText: "30’" });
     await expect(line).toHaveCount(1);
     await expect(line).toContainText("Entrent : ");
     for (const player of [striker, cm2, sub, cm1])
@@ -1128,8 +1150,13 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
   const matchUrl = new URL(page.url()).pathname;
 
-  // Before this existed there was no way past here without starting a live clock.
-  await expect(page.getByRole("heading", { level: 2, name: "Terminer le match" })).toBeVisible();
+  // Before this existed there was no way past here without starting a live clock. It no longer leads
+  // the page once the kick-off has passed: the order is the same as before it (decision 174).
+  await expect(page.locator("main").getByRole("heading", { level: 2 })).toHaveText([
+    "Mode match",
+    "Composition",
+    "Terminer le match",
+  ]);
   await page.getByRole("button", { name: "Marquer comme terminé" }).click();
 
   // The retro card is now reachable, and game mode is not offered for a match with an empty log.
