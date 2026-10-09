@@ -795,7 +795,13 @@ tag during this rework** (decision 146): every item below reaches the preview on
 - [ ] **S4** · #163 · one formation, `1-2-3-1`, positions GB / DC / MC / AIL / AT
 - [ ] **S5** · #164 · preferred positions set by coaches only, gone from `/moi`
 - [ ] **S6** · #165 · the composition page replaces the match sheet
-- [ ] **S7** · #166 · game mode: But, But encaissé, Changement, Autre; « Sifflet » replaces « Fin »
+- [x] **S7** · #166 · game mode: But, But encaissé, Changement, Autre; « Sifflet » replaces « Fin »,
+      decision **151**. « Autre action » holds CSC, the two penalties, Blessure, Remarque and
+      Commentaire; « Changement de poste » left the menu (its flow, `SlotPicker` and its icon are
+      deleted; old `POSITION_CHANGE`s still reduce and render). In the last period the clock button
+      is « Sifflet » straight away, and its confirmation writes `PERIOD_END` + `FINAL_WHISTLE` in one
+      outbox batch (`enqueueAll`, `finalWhistleEvents`) — checked in the database: same stamp,
+      consecutive `seq`, match finished, stats frozen. « Changement » itself is unchanged until S8
 - [ ] **S8** · #167 · unpaired group changes, goal-before-change ordering, tap a player to act
 - [ ] **S9** · #168 · the starting composition applied when game mode opens
 - [ ] **S10** · #169 · add changes after the match, realistically

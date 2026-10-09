@@ -12,6 +12,7 @@ import {
   onPitchOptions,
   pendingCountLabelFr,
   emptyPitchFr,
+  finalWhistleEvents,
   pendingLineupChangesFr,
   pendingLineupView,
   periodsOf,
@@ -849,16 +850,9 @@ describe("what the big button says", () => {
       event: "KICKOFF",
     });
 
+    // The last period running: one tap ends the match (decision 151), no « Fin » before it.
     const secondHalf = [...halfTime, { type: "KICKOFF" as const, min: 30, period: 2 }];
     expect(clockActionFr(at(secondHalf, 50))).toEqual({
-      label: "Fin du match",
-      shortLabel: "Fin",
-      name: "Fin du match",
-      event: "PERIOD_END",
-    });
-
-    const played = [...secondHalf, { type: "PERIOD_END" as const, min: 60, period: 2 }];
-    expect(clockActionFr(at(played, 62))).toEqual({
       label: "Coup de sifflet final",
       // Not « Fin »: it is a word of « final » rather than a word of the label, so voice control
       // could not activate the button that ends the match (WCAG 2.5.3 — see below).
@@ -867,7 +861,11 @@ describe("what the big button says", () => {
       event: "FINAL_WHISTLE",
     });
 
-    const over = [...played, { type: "FINAL_WHISTLE" as const, min: 60, period: 2 }];
+    const over = [
+      ...secondHalf,
+      { type: "PERIOD_END" as const, min: 60, period: 2 },
+      { type: "FINAL_WHISTLE" as const, min: 60, period: 2 },
+    ];
     expect(clockActionFr(at(over, 70))).toEqual({
       label: "Match terminé",
       shortLabel: "Terminé",
@@ -989,6 +987,89 @@ describe("what the big button says", () => {
       expect(containsWords("Coup d’envoi 2e période", "Début")).toBe(false);
       expect(containsWords("Début : coup d’envoi 2e période", "Début")).toBe(true);
       expect(containsWords("Mi-temps", "Mi-temps")).toBe(true);
+    });
+  });
+
+  it("still offers the whistle to a log that closed its last period with the old « Fin »", () => {
+    const closed = [
+      ...KICKED_OFF,
+      { type: "PERIOD_END" as const, min: 30, period: 1 },
+      { type: "KICKOFF" as const, min: 30, period: 2 },
+      { type: "PERIOD_END" as const, min: 60, period: 2 },
+    ];
+    expect(clockActionFr(at(closed, 62))).toMatchObject({
+      shortLabel: "Sifflet",
+      event: "FINAL_WHISTLE",
+    });
+  });
+
+  it("closes a period that is not the last one with « Fin », and the last with « Sifflet »", () => {
+    const match = { ...live([]).match, periodsCount: 3, periodMinutes: 20 };
+    const at3 = (fixtures: Fixture[], nowMin: number) =>
+      reduceLive(live(log(fixtures), { match }), [], T0 + nowMin * MIN);
+    const first: Fixture[] = [
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_SEVEN) },
+    ];
+    expect(clockActionFr(at3(first, 10))).toEqual({
+      label: "Fin de la 1re période",
+      shortLabel: "Fin",
+      name: "Fin de la 1re période",
+      event: "PERIOD_END",
+    });
+    const third: Fixture[] = [
+      ...first,
+      { type: "PERIOD_END", min: 20, period: 1 },
+      { type: "KICKOFF", min: 20, period: 2 },
+      { type: "PERIOD_END", min: 40, period: 2 },
+      { type: "KICKOFF", min: 40, period: 3 },
+    ];
+    expect(clockActionFr(at3(third, 50))).toMatchObject({
+      shortLabel: "Sifflet",
+      event: "FINAL_WHISTLE",
+    });
+  });
+
+  describe("the one-tap whistle", () => {
+    const secondHalf: Fixture[] = [
+      ...KICKED_OFF,
+      { type: "PERIOD_END", min: 30, period: 1 },
+      { type: "KICKOFF", min: 30, period: 2 },
+    ];
+
+    it("writes the period's end, then the whistle, at one stamp, and the match is over", () => {
+      const tapMs = T0 + 58 * MIN;
+      const before = at(secondHalf, 58);
+      const types = finalWhistleEvents(before);
+      expect(types).toEqual(["PERIOD_END", "FINAL_WHISTLE"]);
+
+      // What game mode queues: one stamp for both, in this order — `seq` follows the order.
+      const confirmed = log(secondHalf);
+      const pending: PendingEvent[] = types.map((type, i) => ({
+        clientEventId: `whistle-${i}`,
+        type,
+        ...nextEventStamp(before, type, tapMs),
+        occurredAt: new Date(tapMs).toISOString(),
+        payload: {},
+        voidsEventId: null,
+      }));
+      expect(pending[0].clockMs).toBe(pending[1].clockMs);
+
+      const after = reduceLive(live(mergeEvents(confirmed, pending)), [], tapMs + 5 * MIN);
+      expect(after.phase).toBe("finished");
+      expect(after.finished).toBe(true);
+      expect(after.anomalies).toEqual([]);
+      expect(after.timeline.slice(-2).map((entry) => entry.type)).toEqual([
+        "PERIOD_END",
+        "FINAL_WHISTLE",
+      ]);
+      // The minutes stop at the whistle, not at the moment the screen was read.
+      expect(after.players.find((player) => player.memberId === "julien")?.minutes).toBe(58);
+    });
+
+    it("writes the whistle alone after a break, where the period is already closed", () => {
+      const closed: Fixture[] = [...secondHalf, { type: "PERIOD_END", min: 60, period: 2 }];
+      expect(finalWhistleEvents(at(closed, 62))).toEqual(["FINAL_WHISTLE"]);
     });
   });
 

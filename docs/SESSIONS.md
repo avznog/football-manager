@@ -4701,3 +4701,37 @@ published recap and, with the means hidden for the shot and restored after, « 1
 match ont noté. Pas encore de note de Benjamin, Léo C. » — the two supporters, no unselected name.
 
 Consequence for the owner: a **non-playing coach no longer rates**, because the sheet never offers him.
+
+## 2026-10-09 — S7: the cahier's four tiles, and « Sifflet » ends the match (decision 151)
+
+- `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx` — `CHOICES` is But · But encaissé ·
+  Changement · Autre…; `MORE_CHOICES` is CSC · Penalty marqué · Penalty manqué · Blessure · Remarque ·
+  Commentaire. The `move-*` flow, `slotChoices` and the `POSITION_CHANGE` emission are gone. `emit`
+  became a wrapper over `emitAll`, which queues the actions of one tap together; the whistle sheet's
+  « Terminer le match » emits `finalWhistleEvents(state)`.
+- `components/action-sheet/` — `slot-picker.tsx` deleted, `PositionChangeIcon` deleted (both used
+  only by the removed flow).
+- `lib/match/presenter.ts` — `clockActionFr` returns the whistle while the last period runs;
+  `finalWhistleEvents`; `periodEndLabelFr` lost its « Fin du match » branch, now unreachable.
+- `lib/match/outbox.ts` — `enqueueAll`, with `enqueuedAt` one millisecond apart per record so the
+  queue cannot reorder one tap's actions. `enqueue` keeps its own body: routing it through
+  `enqueueAll` added an `await` and changed when the first flush starts, which an existing outbox test
+  caught.
+- Tests: `presenter.test.ts` (the walk now ends in one tap; the old break still offers the whistle;
+  « Fin de la 1re période » for 3 periods; the one-tap whistle's two events reduce to `finished` with
+  no anomaly and the minutes stopping at the whistle), `outbox.test.ts` (one POST, in order, against
+  descending ids), `e2e/happy-path.spec.ts` (the two tiers by accessible name, no « Changement de
+  poste », Remarque and Commentaire through « Autre… », and the final whistle in one tap with the
+  button reading « Sifflet »).
+
+**Looked at, 390 px, light and dark**, on the local « Bayern Barbecue Club » match: the ACTION menu
+and « Autre action » as coach; the bar in the second half showing « Sifflet » as coach, and the same
+moment as the player `pierre` in the same pass (no bar, the « Tu suis le match en direct » note);
+the confirmation sheet in both themes. Confirming it wrote `PERIOD_END` (`seq` 5) and
+`FINAL_WHISTLE` (`seq` 6) at the same `clock_ms`, the match is `finished` and 13
+`match_player_stats` rows were frozen.
+
+**Seen and not fixed (not this slice):** on a finished match, game mode still shows a planned
+composition that was never applied — « Composition prévue à la 10’ … rien ne change avant la
+confirmation de l’opérateur » — because `pendingLineup` does not look at `finished`. It predates S1
+and S7; S9 (the composition applied on opening) is the slice that touches that prompt.

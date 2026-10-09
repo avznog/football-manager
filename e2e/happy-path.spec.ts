@@ -28,8 +28,8 @@
  *    note counts and every individual note with its author. Half of that assertion is the absence of
  *    something, so it is made twice on the same screen rather than once — the only way a leak of the
  *    kind decision 021 once allowed shows up in a test;
- * 6. **the shape of the ACTION menu** (decision 114): four tiles and an « Autre… », with « Faute »
- *    offered nowhere. `FOUL` deliberately stays in the vocabulary, so nothing else in the repo can
+ * 6. **the shape of the ACTION menu** (decisions 114 and 151): But, But encaissé, Changement and
+ *    an « Autre… », with « Faute » and « Changement de poste » offered nowhere. `FOUL` deliberately stays in the vocabulary, so nothing else in the repo can
  *    tell « no longer offered » from « still there, one tap further » — only the count of 0 below;
  * 7. **the comment round trip**, which is the one flow in the app with a keyboard: what is typed
  *    lands in the timeline at the minute ACTION was tapped, survives a `page.reload()` — so the
@@ -97,10 +97,13 @@ const MAX_NOTE = 280;
 const PENDING_MARKER = "en attente d’envoi";
 
 /** « Autre… », which records nothing and opens the second menu. Spelt once, used three times. */
-const MORE_TILE = "Autre… CSC, penalty, blessure, poste";
+const MORE_TILE = "Autre… CSC, penalty, blessure, remarque, commentaire";
 
-/** « Remarque », the other tile that records nothing on its own tap: it opens the sheet of six. */
+/** « Remarque », behind « Autre… »: it records nothing on its own tap, it opens the sheet of six. */
 const REMARK_TILE = "Remarque bon retour, perte de balle…";
+
+/** « Commentaire », behind « Autre… » too (decision 151). */
+const COMMENT_TILE = "Commentaire une note libre";
 
 /** The six remarks, in the order `REMARK_KINDS` lists them — which is the order the grid draws. */
 const REMARKS: readonly string[] = [
@@ -130,8 +133,6 @@ const FIRST_TIER: readonly string[] = [
   "But buteur, passeur",
   "But encaissé enregistré aussitôt",
   "Changement qui sort, qui entre",
-  "Commentaire une note libre",
-  REMARK_TILE,
   MORE_TILE,
 ];
 
@@ -140,7 +141,8 @@ const SECOND_TIER: readonly string[] = [
   "Penalty marqué tireur",
   "Penalty manqué tireur",
   "Blessure notre joueur",
-  "Changement de poste qui, vers quel poste",
+  REMARK_TILE,
+  COMMENT_TILE,
 ];
 
 /** The starting seven, and the French position name each one is placed on in the 1-3-2-1. */
@@ -389,7 +391,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(score).toHaveText("1 – 1");
   });
 
-  await test.step("the menu is four tiles, « Remarque », an « Autre… », and « Faute » nowhere", async () => {
+  await test.step("the menu is four tiles, the rest behind « Autre… », and « Faute » nowhere", async () => {
     await page.clock.setFixedTime(at(27));
     await expect(clock).toHaveText("27:00");
 
@@ -405,10 +407,9 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     for (const name of FIRST_TIER) {
       await expect(first.getByRole("button", { name, exact: true })).toBeVisible();
     }
-    // The six tiles and « Fermer », and nothing else: nine tiles is what decision 114 removed, and a
-    // seventh tile creeping back into the row a thumb finds without reading is what this catches.
-    // Four of the six record something and are square; « Remarque » and « Autre… » each span a row,
-    // because neither records anything on its own tap.
+    // The four tiles and « Fermer », and nothing else: the cahier des charges asked for exactly these
+    // four (decision 151), and a fifth creeping back into the screen a thumb finds without reading is
+    // what this catches.
     await expect(first.getByRole("button")).toHaveCount(FIRST_TIER.length + 1);
 
     // Decision 114, the half nothing else can pin: `FOUL` stays in `MATCH_EVENT_TYPES` and in the
@@ -427,6 +428,8 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     }
     await expect(more.getByRole("button")).toHaveCount(SECOND_TIER.length + 1);
     await expect(more.getByRole("button", { name: "Faute" })).toHaveCount(0);
+    // Decision 151: moving a player is done on the pitch, and old `POSITION_CHANGE`s still reduce.
+    await expect(more.getByRole("button", { name: /Changement de poste/ })).toHaveCount(0);
 
     // One of the five round-trips, which is what proves the generic `ActionChoice<T>` and the `MORE`
     // key actually reach `pickAction` rather than falling through its `default`. « Penalty manqué »
@@ -446,7 +449,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await page.clock.setFixedTime(at(28));
     await expect(clock).toHaveText("28:00");
 
-    await action(page, "Commentaire");
+    await other(page, COMMENT_TILE);
     const sheet = page.getByRole("dialog", { name: "Commentaire", exact: true });
     const field = sheet.getByRole("textbox", { name: "Ce qui s’est passé" });
 
@@ -495,8 +498,11 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     // and a second period that kicked off and then sat still would pass a `/^Chrono 30’/`.
     await expect(clock).toHaveAttribute("aria-label", "Chrono 30’, en cours");
     await expect(clock).not.toHaveText("00:00");
-    // The last period is running, so the button is now the final whistle rather than another break.
-    await expect(page.getByRole("button", { name: "Fin du match" })).toBeVisible();
+    // The last period is running, so the button is now the final whistle rather than another break,
+    // and it shows « Sifflet » — a word of the name it announces (decision 151, WCAG 2.5.3).
+    const whistle = page.getByRole("button", { name: "Coup de sifflet final" });
+    await expect(whistle).toBeVisible();
+    await expect(whistle).toHaveText("Sifflet");
   });
 
   await test.step("the planned change is applied only once the coach confirms it", async () => {
@@ -526,7 +532,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await page.clock.setFixedTime(at(55));
     await expect(clock).toHaveText("50:00");
 
-    await action(page, "Commentaire");
+    await other(page, COMMENT_TILE);
     const sheet = page.getByRole("dialog", { name: "Commentaire", exact: true });
     await sheet.getByRole("textbox", { name: "Ce qui s’est passé" }).fill(NOTE_ABOUT_PLAYER);
     // A native `<select>` and not a second full-screen picker: a sheet on top of this one would have
@@ -571,7 +577,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await page.clock.setFixedTime(at(58));
     await expect(clock).toHaveText("53:00");
 
-    await action(page, "Remarque");
+    await other(page, REMARK_TILE);
 
     // The sheet of six, which records nothing by itself — the same shape as « Autre… ».
     const six = menu(page, "Remarque");
@@ -627,7 +633,8 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await page.clock.setFixedTime(at(65));
     await expect(clock).toHaveText("60:00");
 
-    await page.getByRole("button", { name: "Fin du match" }).click();
+    // One tap, no « Fin » before it (decision 151): the confirmation writes the period's end and
+    // the whistle in one batch.
     await page.getByRole("button", { name: "Coup de sifflet final" }).click();
 
     const confirm = page.getByRole("dialog", { name: "Coup de sifflet final" });
@@ -1150,6 +1157,13 @@ async function swap(
   await expect(
     page.getByRole("button", { name: `${incoming.displayName}, ${positionFr}` }),
   ).toBeVisible();
+}
+
+/** Opens ACTION, then « Autre… », and picks a tile of the second menu by its whole name. */
+async function other(page: Page, tile: string): Promise<void> {
+  await page.getByRole("button", { name: "ACTION" }).click();
+  await menu(page).getByRole("button", { name: MORE_TILE, exact: true }).click();
+  await menu(page, "Autre action").getByRole("button", { name: tile, exact: true }).click();
 }
 
 /** Opens the ACTION menu and picks a tile by its French label. */

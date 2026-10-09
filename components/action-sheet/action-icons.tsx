@@ -122,16 +122,6 @@ export function InjuryIcon() {
   );
 }
 
-/** An arrow that goes up and then somewhere else: the same player, a different post. */
-export function PositionChangeIcon() {
-  return (
-    <Icon>
-      <path d="M4.5 20V10A4.5 4.5 0 0 1 9 5.5h9" />
-      <path d="M15 2.5 18.5 5.5 15 8.5" />
-    </Icon>
-  );
-}
-
 /** Three dots: more of them, one tap further. */
 export function MoreIcon() {
   return (
@@ -155,10 +145,10 @@ export function RemarkIcon() {
 }
 
 /**
- * The eleven tiles of the ACTION menu, keyed as the menu keys them.
+ * The ten tiles of the two ACTION menus, keyed as the menu keys them.
  *
  * Here so that the game-mode screen wires one icon per tile with `icon: ACTION_ICONS.GOAL_FOR`
- * rather than importing eleven components. The keys are the `MatchEventType`s the menu offers, plus
+ * rather than importing ten components. The keys are the `MatchEventType`s the menu offers, plus
  * `MORE` for « Autre… », which records nothing.
  */
 export const ACTION_ICONS = {
@@ -172,7 +162,6 @@ export const ACTION_ICONS = {
   PENALTY_SCORED: <PenaltyScoredIcon />,
   PENALTY_MISSED: <PenaltyMissedIcon />,
   INJURY: <InjuryIcon />,
-  POSITION_CHANGE: <PositionChangeIcon />,
 } as const satisfies Record<string, ReactNode>;
 
 /* ------------------------------------------------------------------ remarks */

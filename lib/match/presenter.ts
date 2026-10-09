@@ -1009,15 +1009,9 @@ export function clockActionFr(state: MatchState): {
     return { label: "Reprendre", shortLabel: "Reprendre", name: "Reprendre", event: "RESUME" };
   }
   if (phase === "break") {
-    if (state.periodsStarted >= state.periods.periodsCount) {
-      const finalWhistle = "Coup de sifflet final";
-      return {
-        label: finalWhistle,
-        shortLabel: "Sifflet",
-        name: finalWhistle,
-        event: "FINAL_WHISTLE",
-      };
-    }
+    // Only a log written before decision 151 stops here: the last period used to be closed with
+    // « Fin » and the match ended with a second tap. Such a match still needs its whistle.
+    if (state.periodsStarted >= state.periods.periodsCount) return FINAL_WHISTLE_ACTION;
     const nextKickoff = `${KICKOFF_FR} ${ordinalPeriodFr(state.periodsStarted + 1)}`;
     return {
       label: nextKickoff,
@@ -1026,16 +1020,47 @@ export function clockActionFr(state: MatchState): {
       event: "KICKOFF",
     };
   }
-  // Running: the period has to be closed before anything else can happen.
+  // Running in the last period: one tap ends the match (decision 151). The confirmation sheet then
+  // writes `finalWhistleEvents(state)` — the period's end and the whistle, in one batch.
+  if (state.clock.period >= state.periods.periodsCount) return FINAL_WHISTLE_ACTION;
+  // Running in any other period: it has to be closed before the next one can start.
   const periodEnd = periodEndLabelFr(state);
   return {
     label: periodEnd,
-    // « Mi-temps » is already as short as it gets; « Fin du match » and « Fin de la 2e période »
-    // are not, and in a bar where the clock is right there, « Fin » says the same thing.
+    // « Mi-temps » is already as short as it gets; « Fin de la 2e période » is not, and in a bar
+    // where the clock is right there, « Fin » says the same thing.
     shortLabel: periodEnd === HALF_TIME_FR ? periodEnd : "Fin",
     name: periodEnd,
     event: "PERIOD_END",
   };
+}
+
+const FINAL_WHISTLE_FR = "Coup de sifflet final";
+
+/** « Sifflet » is a word of « Coup de sifflet final », so the name can be the label (WCAG 2.5.3). */
+const FINAL_WHISTLE_ACTION = {
+  label: FINAL_WHISTLE_FR,
+  shortLabel: "Sifflet",
+  name: FINAL_WHISTLE_FR,
+  event: "FINAL_WHISTLE",
+} as const;
+
+/**
+ * What confirming « Coup de sifflet final » writes, in this order.
+ *
+ * From a running (or paused) last period it is the period's end **and** the whistle: the two taps
+ * « Fin » then « Sifflet » that the coach used to make, as one (decision 151). Both events are
+ * written, rather than the whistle alone, so the log reads exactly as it did when they were two taps
+ * — every consumer of `PERIOD_END` (the clock, the play intervals, the recap) sees what it always
+ * saw. They carry the same stamp and are queued together, so `seq` keeps them in this order.
+ *
+ * From a break — a log that stopped after the old « Fin » — the period is already closed, and a
+ * second `PERIOD_END` would be an anomaly; only the whistle is written.
+ */
+export function finalWhistleEvents(state: MatchState): readonly ("PERIOD_END" | "FINAL_WHISTLE")[] {
+  return state.phase === "running" || state.phase === "paused"
+    ? ["PERIOD_END", "FINAL_WHISTLE"]
+    : ["FINAL_WHISTLE"];
 }
 
 const KICKOFF_FR = "Coup d’envoi";
@@ -1053,9 +1078,8 @@ function kickoffNameFr(label: string): string {
 
 const HALF_TIME_FR = "Mi-temps";
 
+/** The end of a period that is not the last one: the last one ends with the whistle. */
 function periodEndLabelFr(state: MatchState): string {
-  const isLast = state.clock.period >= state.periods.periodsCount;
-  if (isLast) return "Fin du match";
   return state.periods.periodsCount === 2
     ? HALF_TIME_FR
     : `Fin de la ${ordinalPeriodFr(state.clock.period)}`;

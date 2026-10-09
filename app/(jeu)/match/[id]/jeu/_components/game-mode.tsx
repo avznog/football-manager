@@ -11,15 +11,12 @@ import {
   OptionRow,
   PlayerPicker,
   REMARK_ICONS,
-  SlotPicker,
   TerrainSheet,
   type ActionChoice,
   type ComposerFormation,
-  type SlotChoice,
 } from "@/components/action-sheet";
 import { PitchLayout } from "@/components/pitch/PitchLayout";
 import { Badge, Button, ButtonLink, Card, EmptyState } from "@/components/ui";
-import { positionLabelFr } from "@/db/reference";
 import { entryModeBadgeFr, matchNameFr } from "@/lib/calendar/labels";
 import {
   REMARK_KINDS,
@@ -33,6 +30,7 @@ import {
   clockActionFr,
   enterableCardFr,
   eventLabel,
+  finalWhistleEvents,
   minuteLabelFr,
   nextEventStamp,
   onPitchOptions,
@@ -69,7 +67,7 @@ import { useNowMs } from "./use-now";
  */
 type Flow =
   | { step: "menu" }
-  /** The second menu, behind « Autre… »: what happens once or twice a season. */
+  /** The second menu, behind « Autre… »: the rarer facts, and the two tiles that open a sheet. */
   | { step: "more" }
   /** The one step with a keyboard, so the one step that is a form (`comment-sheet.tsx`). */
   | { step: "comment" }
@@ -86,8 +84,6 @@ type Flow =
   | { step: "actor"; type: "OWN_GOAL" | "PENALTY_SCORED" | "PENALTY_MISSED" | "FOUL" | "INJURY" }
   | { step: "sub-out"; inId?: string }
   | { step: "sub-in"; outId: string }
-  | { step: "move-player" }
-  | { step: "move-slot"; memberId: string }
   /**
    * TERRAIN: several changes arranged on the pitch, one confirmation. `origin` says what the
    * arrangement started from — the pitch, or a planned composition the coach chose to adjust — and
@@ -110,16 +106,16 @@ const MORE = "MORE";
 type MenuKey = MatchEventType | typeof MORE;
 
 /**
- * The ACTION menu: four tiles, two doors, and everything else one tap further.
+ * The ACTION menu: what a Sunday match actually produces, and one door to everything else.
  *
- * Nine tiles was a list wearing a grid's clothes. The four square ones here are what a Sunday match
- * actually produces — and the fourth is « Commentaire », which is the only one of them that is not a
- * fact about the football and the one the owner asked for. Each carries a 16 px glyph, so the thumb
- * finds « But » by its shape and its corner before the word is read.
+ * But · But encaissé on the first row, because they are what the thumb is looking for nine times in
+ * ten and each carries a glyph it learns before the word. « Changement » spans the row under them:
+ * it is the other thing that happens every match, and with « Autre… » underneath it the menu reads
+ * as two facts, then two longer questions. « Autre… » spans its row because a tile that opens another
+ * menu must not be mistakable for a tile that records something (decision 114).
  *
- * « Remarque » and « Autre… » each span the row underneath, because a tile that opens another menu
- * must not be mistakable for a tile that records something (decision 114) — and neither of those two
- * records anything on its own tap.
+ * The cahier des charges asked for exactly these four (decision 151). « Commentaire » and
+ * « Remarque » moved behind « Autre… »; « Changement de poste » left the menu altogether.
  */
 const CHOICES: readonly ActionChoice<MenuKey>[] = [
   {
@@ -141,30 +137,31 @@ const CHOICES: readonly ActionChoice<MenuKey>[] = [
     label: "Changement",
     hint: "qui sort, qui entre",
     icon: ACTION_ICONS.SUBSTITUTION,
-  },
-  { type: "COMMENT", label: "Commentaire", hint: "une note libre", icon: ACTION_ICONS.COMMENT },
-  {
-    type: "REMARK",
-    label: "Remarque",
-    hint: "bon retour, perte de balle…",
-    icon: ACTION_ICONS.REMARK,
     wide: true,
   },
   {
     type: MORE,
     label: "Autre…",
-    hint: "CSC, penalty, blessure, poste",
+    hint: "CSC, penalty, blessure, remarque, commentaire",
     icon: ACTION_ICONS.MORE,
     wide: true,
   },
 ];
 
 /**
- * The second menu. « Faute » is deliberately not here: it was recorded once in the app's life and
- * nothing reads it, so it stops being offered. It is *not* removed from the vocabulary — `FOUL`
- * stays in `MATCH_EVENT_TYPES` and in the retro-entry screen, because `match_events` is append-only
+ * The second menu, « Autre action »: the cahier's « Autre (comprendra ce qu'il y a dans remarque,
+ * autre, et commentaire) ». The four facts are square; « Remarque » and « Commentaire » span a row
+ * each, because neither records anything on its own tap — one opens the grid of six remarks, the
+ * other the one sheet in game mode with a keyboard.
+ *
+ * « Faute » is deliberately not here: it was recorded once in the app's life and nothing reads it,
+ * so it stops being offered. It is *not* removed from the vocabulary — `FOUL` stays in
+ * `MATCH_EVENT_TYPES` and in the retro-entry screen, because `match_events` is append-only
  * (invariant 1) and the fouls already in a log must still render and still be voidable
- * (decision 114). Nothing on the server refuses the type either: this absence is a menu, not a gate.
+ * (decision 114). « Changement de poste » left on the same terms (decision 151): a log's
+ * `POSITION_CHANGE` events still reduce, render and can be annulled, and moving a player is done on
+ * the pitch (TERRAIN). Nothing on the server refuses either type: these absences are a menu, not a
+ * gate.
  */
 const MORE_CHOICES: readonly ActionChoice[] = [
   {
@@ -195,10 +192,17 @@ const MORE_CHOICES: readonly ActionChoice[] = [
     icon: ACTION_ICONS.INJURY,
   },
   {
-    type: "POSITION_CHANGE",
-    label: "Changement de poste",
-    hint: "qui, vers quel poste",
-    icon: ACTION_ICONS.POSITION_CHANGE,
+    type: "REMARK",
+    label: "Remarque",
+    hint: "bon retour, perte de balle…",
+    icon: ACTION_ICONS.REMARK,
+    wide: true,
+  },
+  {
+    type: "COMMENT",
+    label: "Commentaire",
+    hint: "une note libre",
+    icon: ACTION_ICONS.COMMENT,
     wide: true,
   },
 ];
@@ -405,24 +409,6 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     [live.formations],
   );
 
-  const slotChoices = useMemo<SlotChoice[]>(() => {
-    const occupant = new Map(
-      state.onPitch
-        .filter((entry) => entry.slotId)
-        .map((entry) => [entry.slotId as string, players.nameOf(entry.memberId)]),
-    );
-    return live.slots
-      .filter((slot) => slot.formationId === currentFormationId)
-      .slice()
-      .sort((a, b) => a.sort - b.sort)
-      .map((slot) => ({
-        slotId: slot.id,
-        positionCode: slot.positionCode,
-        label: positionLabelFr(slot.positionCode),
-        occupantName: occupant.get(slot.id) ?? null,
-      }));
-  }, [live.slots, currentFormationId, state.onPitch, players]);
-
   const clockAction = clockActionFr(state);
   // `FOUL` stands in for "an action that takes the clock as it reads" — every type but `KICKOFF`
   // is stamped the same way, and this is only here to print the minute on the sheets.
@@ -446,27 +432,32 @@ export function GameMode({ live, canOperate }: GameModeProps) {
   /* Emitting                                                               */
   /* ---------------------------------------------------------------------- */
 
-  const emit = useCallback(
+  /**
+   * Queue the actions of one tap — almost always one; two for the final whistle (decision 151) —
+   * stamped from the same state at the same instant, stored and sent together, in this order.
+   */
+  const emitAll = useCallback(
     async (
-      type: MatchEventType,
-      payload?: unknown,
-      options: { voidsEventId?: string; atMs?: number } = {},
+      actions: readonly { type: MatchEventType; payload?: unknown; voidsEventId?: string }[],
+      options: { atMs?: number } = {},
     ) => {
       const atMs = options.atMs ?? Date.now();
-      const record = await outbox.enqueue({
-        type,
-        stamp: nextEventStamp(state, type, atMs),
-        payload,
-        voidsEventId: options.voidsEventId ?? null,
-        occurredAtMs: atMs,
-      });
+      const records = await outbox.enqueueAll(
+        actions.map(({ type, payload, voidsEventId }) => ({
+          type,
+          stamp: nextEventStamp(state, type, atMs),
+          payload,
+          voidsEventId: voidsEventId ?? null,
+          occurredAtMs: atMs,
+        })),
+      );
       // Optimistic: the reducer sees it immediately, so the score moves on the tap. The local copy
       // of anything the server has meanwhile confirmed is dropped in the same pass, so this list
       // never grows beyond what is actually in flight.
       const confirmed = new Set(live.events.map((event) => event.clientEventId));
       setLocal((current) => [
         ...current.filter((event) => !confirmed.has(event.clientEventId)),
-        toWireEvent(record),
+        ...records.map(toWireEvent),
       ]);
       await outbox.flush();
       // Only when the action actually reached the server. A refresh is a network read: with no
@@ -479,6 +470,15 @@ export function GameMode({ live, canOperate }: GameModeProps) {
       if (outbox.state().online) router.refresh();
     },
     [outbox, state, router, live.events],
+  );
+
+  const emit = useCallback(
+    (
+      type: MatchEventType,
+      payload?: unknown,
+      options: { voidsEventId?: string; atMs?: number } = {},
+    ) => emitAll([{ type, payload, voidsEventId: options.voidsEventId }], { atMs: options.atMs }),
+    [emitAll],
   );
 
   /** Close the sheets and record an action stamped at the tap that opened the flow. */
@@ -515,8 +515,6 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         return finish("GOAL_AGAINST", {});
       case "SUBSTITUTION":
         return setFlow({ step: "sub-out" });
-      case "POSITION_CHANGE":
-        return setFlow({ step: "move-player" });
       case "OWN_GOAL":
       case "PENALTY_SCORED":
       case "PENALTY_MISSED":
@@ -861,40 +859,6 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         />
       ) : null}
 
-      {flow?.step === "move-player" ? (
-        <PlayerPicker
-          open
-          onClose={closeFlow}
-          title="Qui change de poste ?"
-          description={stampLabel}
-          options={onPitch}
-          onPick={(memberId) => setFlow({ step: "move-slot", memberId })}
-        />
-      ) : null}
-
-      {flow?.step === "move-slot" ? (
-        <SlotPicker
-          open
-          onClose={closeFlow}
-          title={`${players.nameOf(flow.memberId)} passe à…`}
-          description={stampLabel}
-          choices={slotChoices.filter(
-            (choice) =>
-              choice.slotId !==
-              state.onPitch.find((entry) => entry.memberId === flow.memberId)?.slotId,
-          )}
-          onPick={(slotId) =>
-            finish("POSITION_CHANGE", {
-              memberId: flow.memberId,
-              fromSlotId:
-                state.onPitch.find((entry) => entry.memberId === flow.memberId)?.slotId ??
-                undefined,
-              toSlotId: slotId,
-            })
-          }
-        />
-      ) : null}
-
       {flow?.step === "terrain" ? (
         <TerrainSheet
           open
@@ -947,7 +911,18 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           description="Le score et les minutes de chacun sont figés."
           confirmLabel="Terminer le match"
           tone="danger"
-          onConfirm={() => finish("FINAL_WHISTLE", {})}
+          // The period's end and the whistle, in one batch (decision 151): the coach's one tap on
+          // « Sifflet » is what used to be « Fin » then « Sifflet ». Stamped at the tap that opened
+          // this sheet, like every other flow (decision 031).
+          onConfirm={() => {
+            const atMs = tappedAtMs ?? Date.now();
+            const types = finalWhistleEvents(state);
+            closeFlow();
+            void emitAll(
+              types.map((type) => ({ type, payload: {} })),
+              { atMs },
+            );
+          }}
         >
           <p className="text-sm text-ink">
             Score final {state.scoreLabel} {matchNameFr(live.match.opponentName, live.match.isHome)}
@@ -1017,11 +992,11 @@ type ActionBarProps = {
  * The clock button is the one place in the app where what is written and what is announced differ, and
  * on purpose: `clockLabel` is `clockActionFr().shortLabel`, because « Coup de sifflet final » does not
  * fit a quarter of 393 px, while `clockName` is `clockActionFr().name`, because « Fin » on its own does
- * not say whether it ends the half or the match. Both come from the same function's return so they
- * cannot drift, and every visible form is contained in the name it announces — « Début » in
- * « Début : coup d’envoi 2e période », « Fin » in « Fin du match » — which is what WCAG 2.5.3 asks of a
- * visible label inside an accessible name, so a voice-control user saying what they can read still hits
- * the button.
+ * not say which period it ends. Both come from the same function's return so they cannot drift, and
+ * every visible form is contained in the name it announces — « Début » in « Début : coup d’envoi 2e
+ * période », « Fin » in « Fin de la 1re période », « Sifflet » in « Coup de sifflet final » — which is
+ * what WCAG 2.5.3 asks of a visible label inside an accessible name, so a voice-control user saying
+ * what they can read still hits the button.
  *
  * Grid, not flex: `Button` is `shrink-0`, so a `fullWidth` button beside another one pushes it off
  * the right edge of a 390 px screen rather than sharing the row.

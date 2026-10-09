@@ -23,7 +23,6 @@ export {
   OwnGoalIcon,
   PenaltyMissedIcon,
   PenaltyScoredIcon,
-  PositionChangeIcon,
   REMARK_ICONS,
   RemarkIcon,
   SubstitutionIcon,
@@ -38,5 +37,4 @@ export {
 } from "./lineup-composer";
 export { OptionRow, type OptionRowProps } from "./option-row";
 export { PlayerPicker, type PlayerPickerProps } from "./player-picker";
-export { SlotPicker, type SlotChoice, type SlotPickerProps } from "./slot-picker";
 export { TerrainSheet, type TerrainSheetProps } from "./terrain-sheet";
