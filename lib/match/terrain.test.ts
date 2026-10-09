@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { describeLineupDiffFr } from "./lineup";
 import { playerIndex, type LivePlayer, type LiveSlot, type PlayerOption } from "./presenter";
 import {
+  changeArrangement,
   nearestTerrainTarget,
   terrainBench,
   terrainDrop,
@@ -481,5 +482,60 @@ describe("terrainPayload", () => {
     const payload = terrainPayload(arranged, { slots: ALL_SLOTS, origin: { kind: "pitch" } });
     expect(payload.slots).toHaveLength(8);
     expect(payload.slots.at(-1)).toEqual({ slotId: "ghost-slot", memberId: "momo" });
+  });
+});
+
+describe("changeArrangement", () => {
+  const SEVEN: SlotAssignment[] = [
+    { slotId: SLOT.gb, memberId: "hugo" },
+    { slotId: SLOT.dg, memberId: "samir" },
+    { slotId: SLOT.dc, memberId: "thomas" },
+    { slotId: SLOT.dd, memberId: "nico" },
+    { slotId: SLOT.mc1, memberId: "leo" },
+    { slotId: SLOT.mc2, memberId: "karim" },
+    { slotId: SLOT.at, memberId: "julien" },
+  ];
+  const slotOf = (assignments: readonly SlotAssignment[], memberId: string) =>
+    assignments.find((assignment) => assignment.memberId === memberId)?.slotId;
+
+  it("puts the arrivals in the vacated slots, in slot order, and keeps everybody else", () => {
+    // Julien (AT) and Léo (MC) go off; Momo is picked first, so he takes the lower slot, Léo's.
+    const { assignments, unplaced } = changeArrangement(
+      SEVEN,
+      ["julien", "leo"],
+      ["momo", "yanis"],
+      SLOTS,
+    );
+    expect(unplaced).toEqual([]);
+    expect(assignments).toHaveLength(7);
+    expect(slotOf(assignments, "momo")).toBe(SLOT.mc1);
+    expect(slotOf(assignments, "yanis")).toBe(SLOT.at);
+    expect(slotOf(assignments, "karim")).toBe(SLOT.mc2);
+    expect(assignments.map((assignment) => assignment.slotId)).toEqual(SLOTS.map((slot) => slot.id));
+  });
+
+  it("leaves a slot empty when fewer come on than go off", () => {
+    const { assignments } = changeArrangement(SEVEN, ["julien", "leo"], ["momo"], SLOTS);
+    expect(assignments).toHaveLength(6);
+    expect(slotOf(assignments, "momo")).toBe(SLOT.mc1);
+    expect(assignments.some((assignment) => assignment.slotId === SLOT.at)).toBe(false);
+  });
+
+  it("fills empty slots with extra arrivals, and returns whoever has no slot left", () => {
+    const six = SEVEN.filter((assignment) => assignment.memberId !== "julien");
+    const one = changeArrangement(six, [], ["momo"], SLOTS);
+    expect(slotOf(one.assignments, "momo")).toBe(SLOT.at);
+
+    const two = changeArrangement(six, [], ["momo", "yanis"], SLOTS);
+    expect(two.assignments).toHaveLength(7);
+    expect(two.unplaced).toEqual(["yanis"]);
+  });
+
+  it("is the pitch unchanged for a 0 / 0 change, ready to be rearranged", () => {
+    expect(changeArrangement(SEVEN, [], [], SLOTS)).toEqual({ assignments: SEVEN, unplaced: [] });
+  });
+
+  it("ignores an « out » who is not on and an « in » who already is", () => {
+    expect(changeArrangement(SEVEN, ["stranger"], ["karim"], SLOTS).assignments).toEqual(SEVEN);
   });
 });

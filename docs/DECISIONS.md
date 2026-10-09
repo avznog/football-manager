@@ -6037,3 +6037,71 @@ What still reads them, on purpose: **the équipe type** (`lib/stats/best-seven-i
 the coach sets them for, and **the squad list on `/equipe`** (`member-row.tsx`), kept as information —
 it is the one place a coach reads his whole squad's positions at a glance, which is exactly « à titre
 indicatif ».
+
+## 152 — How « Changement » reads, what a tap on a player does, and the one exception to 147's order
+
+**2026-10-09** · accepted · implements decision 147 in slice S8 and settles what 147 left open ·
+removes game mode's TERRAIN button · no migration
+
+Decision 147 fixed the design: a change is one `LINEUP_APPLIED` stamped at the ACTION tap, and at an
+identical reading facts come before pitch events. Building it raised four questions 147 did not answer.
+
+### 1. The composition the match starts in is never reordered
+
+Applied literally, the ordering rule broke the retro sheet: `buildRetroLog` writes `KICKOFF`, the
+starting seven's `LINEUP_APPLIED` and a goal typed « 0′ » all at reading 0, in that order. Facts first
+would put the goal before the seven — scored by nobody, `scorer-off-pitch`. `log.test.ts` caught it.
+
+So `orderMatchEvents` leaves alone **the segment that first puts players on the pitch**: before it
+nobody is on, so there is nobody for a fact at that reading to count against, and a goal entered after
+the starting seven is theirs. Every later segment follows 147. It is a rule about the log's shape
+(the first pitch event in replay order), not about clock 0 or about the first kick-off, so it covers a
+composition confirmed before the kick-off, one confirmed just after, and the retro sheet alike.
+
+The production check 147 asks for is the query in `docs/SESSIONS.md` (S8). On the local restore of
+production (`football_wa`) it returns **no row**: no stored log has a pitch event before a fact at the
+same reading, so the rule changes no stored figure there.
+
+### 2. What the timeline calls a `LINEUP_APPLIED`
+
+One helper, `pitchEventFr` in `lib/match/presenter.ts`, used by game mode's timeline **and** the
+recap's Déroulé, so the two cannot disagree. It reads the actors the reducer derived from the diff:
+
+- it filled an empty pitch (`startingLineup`, decision 150) → **« Composition de départ »**, and the
+  players who walked on. S1's line said « Composition appliquée », which is what every
+  `LINEUP_APPLIED` used to be called; once a change is also a `LINEUP_APPLIED` that label says nothing,
+  so the starting one is named for what it is. The recap still hides it at 0′, as before;
+- somebody went on or off → **« Changement »**, « Entrent : Clément, Lucas — Sortent : Pierre,
+  Charles », unpaired because that is how it was entered, then any position moves;
+- only moves → **« Changement de poste »**, « Postes : Karim → AT, Julien → MC ». The reducer now puts
+  `positionCode` on the `in` and `moved` actors of a `LINEUP_APPLIED`, so the line can say where;
+- no actors → **« Changement »** with no detail. That is an annulled change (the reducer derives
+  nothing from a voided event), whose struck-through line must still say what it was.
+
+### 3. A tap on a player
+
+For whoever can act (the operator, match live), every disc on the pitch is a button, « Action :
+Karim ». It is a sibling laid over the disc rather than a wrapper, because a button's children are
+presentational and the disc would lose its own accessible name. The tap opens ACTION with him as the
+subject, stamped at that tap, and every « who » question is skipped: « But » goes straight to the
+assist, « Changement » opens with him ticked as going out, CSC, the penalties and « Blessure » are
+recorded on the spot, « Remarque » still asks which remark, « Commentaire » opens with his name chosen,
+and « But encaissé » ignores him. The hints of those tiles change to say what is left (« passeur »,
+« il sort, qui entre », « enregistré aussitôt »), and the sheet's subtitle starts with his name. For
+everybody else the discs are not interactive.
+
+### 4. « Changement » replaces the paired flow and the TERRAIN button
+
+The flow is « Qui sort ? » then « Qui entre ? », both multi-select with zero allowed, then the
+`TerrainSheet` titled « Changement », pre-arranged by `changeArrangement`: the players staying keep
+their slots, the arrivals take the vacated slots in slot order (the goalkeeper's first) and then any
+empty ones, and an arrival with no slot left waits on the sheet's bench. The sheet's rules are
+unchanged — at most seven, somebody in goal, a short team is a warning — so an uneven change is
+confirmable exactly when it leaves a legal pitch. A row in « Qui peut entrer » opens the same flow with
+that player ticked as coming in. The paired `sub-out` / `sub-in` steps are deleted; the `SUBSTITUTION`
+events already in logs reduce exactly as before.
+
+**The TERRAIN button is removed** from the top bar: « Changement » with nobody out and nobody in opens
+the same pitch from the menu every other action starts from, which is the owner's Q6. The sheet itself
+stays, because « Ajuster » on a planned composition still opens it. While nobody is on the pitch the
+top bar still offers « Composition », the seven dropdowns.

@@ -203,7 +203,7 @@ describe("buildRecap — timeline", () => {
   });
 
   it("does not turn the starting composition into a flurry of substitutions", () => {
-    expect(timeline.some((entry) => entry.label === "Composition appliquée")).toBe(false);
+    expect(timeline.some((entry) => entry.label === "Composition de départ")).toBe(false);
   });
 
   it("names the scorer and the passer, in that order", () => {
@@ -263,11 +263,11 @@ describe("buildRecap — timeline", () => {
       { type: "FINAL_WHISTLE", min: 60, period: 2 },
     ]);
 
-    const applied = recapOf(events).timeline.find(
-      (entry) => entry.label === "Composition appliquée",
-    );
-    expect(applied?.minuteLabel).toBe("30’");
-    expect(applied?.detail).toContain("Momo Diarra entre");
+    // The same title and detail as game mode's timeline: one helper, `pitchEventFr` (decision 152).
+    const applied = recapOf(events).timeline.find((entry) => entry.minuteLabel === "30’");
+    expect(applied).toMatchObject({ label: "Changement", tone: "neutral" });
+    expect(applied?.detail).toContain("Entre : Momo Diarra");
+    expect(applied?.detail).toContain("Sortent : ");
   });
 
   /*

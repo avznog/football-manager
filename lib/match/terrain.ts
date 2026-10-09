@@ -155,6 +155,68 @@ export function terrainRemove(
 }
 
 /* -------------------------------------------------------------------------- */
+/* « Changement »: who goes out, who comes in, then the pitch                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The pitch « Changement » opens on, once the coach has said who goes off and who comes on.
+ *
+ * « On s'en fiche de savoir qui remplace qui » (the cahier, decision 147): the coach names the
+ * players going out and the players coming in, unpaired and in any number, and this lays the
+ * arrival on the pitch for the drag & drop to correct. Pure, and nothing it returns is written until
+ * « Valider ».
+ *
+ * - the players staying keep their slots;
+ * - the players coming in take the **vacated** slots first, in slot order (the goalkeeper's first),
+ *   in the order the coach picked them;
+ * - any extra arrivals then take the formation's **empty** slots, in slot order;
+ * - an arrival with no slot left is returned in `unplaced`, and the sheet keeps him on its bench;
+ * - fewer in than out simply leaves slots empty — a team down to six is a legal pitch (decision 028).
+ *
+ * `formationSlots` is the formation being played; a slot outside it that somebody leaves still counts
+ * as vacated, because that is where the man coming on was meant to stand. Ids that are not on the
+ * pitch are ignored on the « out » side, and ids already on it on the « in » side.
+ */
+export function changeArrangement(
+  onPitch: readonly SlotAssignment[],
+  outIds: readonly string[],
+  inIds: readonly string[],
+  formationSlots: readonly { id: string; sort: number }[],
+): { assignments: SlotAssignment[]; unplaced: string[] } {
+  const sortOf = new Map(formationSlots.map((slot) => [slot.id, slot.sort]));
+  const bySort = (a: string, b: string) =>
+    (sortOf.get(a) ?? Number.MAX_SAFE_INTEGER) - (sortOf.get(b) ?? Number.MAX_SAFE_INTEGER) ||
+    (a < b ? -1 : a > b ? 1 : 0);
+
+  const leaving = new Set(outIds);
+  const staying = onPitch.filter((assignment) => !leaving.has(assignment.memberId));
+  const vacated = onPitch
+    .filter((assignment) => leaving.has(assignment.memberId))
+    .map((assignment) => assignment.slotId)
+    .sort(bySort);
+  const taken = new Set([...staying.map((assignment) => assignment.slotId), ...vacated]);
+  const empty = formationSlots
+    .map((slot) => slot.id)
+    .filter((slotId) => !taken.has(slotId))
+    .sort(bySort);
+
+  const free = [...vacated, ...empty];
+  const alreadyOn = new Set(onPitch.map((assignment) => assignment.memberId));
+  const arriving = [...new Set(inIds)].filter((memberId) => !alreadyOn.has(memberId));
+
+  const assignments: SlotAssignment[] = [...staying];
+  const unplaced: string[] = [];
+  for (const memberId of arriving) {
+    const slotId = free.shift();
+    if (slotId === undefined) unplaced.push(memberId);
+    else assignments.push({ slotId, memberId });
+  }
+
+  assignments.sort((a, b) => bySort(a.slotId, b.slotId));
+  return { assignments, unplaced };
+}
+
+/* -------------------------------------------------------------------------- */
 /* The pitch being arranged                                                   */
 /* -------------------------------------------------------------------------- */
 

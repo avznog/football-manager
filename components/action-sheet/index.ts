@@ -36,5 +36,9 @@ export {
   type LineupComposerProps,
 } from "./lineup-composer";
 export { OptionRow, type OptionRowProps } from "./option-row";
+export {
+  MultiPlayerPicker,
+  type MultiPlayerPickerProps,
+} from "./multi-player-picker";
 export { PlayerPicker, type PlayerPickerProps } from "./player-picker";
 export { TerrainSheet, type TerrainSheetProps } from "./terrain-sheet";

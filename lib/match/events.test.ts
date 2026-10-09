@@ -11,6 +11,8 @@ import {
   REMARK_LABELS_FR,
   canBeVoided,
   compareMatchEvents,
+  orderMatchEvents,
+  type OrderKey,
   eventLabelFr,
   isClockEvent,
   isScoringEvent,
@@ -255,5 +257,64 @@ describe("ordering", () => {
     expect(compareMatchEvents(a, b)).toBeLessThan(0);
     expect(compareMatchEvents(b, a)).toBeGreaterThan(0);
     expect(compareMatchEvents(a, a)).toBe(0);
+  });
+});
+
+describe("orderMatchEvents (decision 147)", () => {
+  const ev = (id: string, type: OrderKey["type"], clockMs: number, seq: number): OrderKey & { id: string } => ({
+    id,
+    type,
+    clockMs,
+    seq,
+  });
+  const ids = (items: readonly { id: string }[]) => items.map((item) => item.id);
+  const order = (items: readonly (OrderKey & { id: string })[]) => orderMatchEvents(items, (item) => item);
+
+  const LOG = [
+    ev("kick", "KICKOFF", 0, 1),
+    ev("start", "LINEUP_APPLIED", 0, 2),
+    ev("change", "LINEUP_APPLIED", 600_000, 3),
+    ev("goal", "GOAL_AGAINST", 600_000, 4),
+    ev("comment", "COMMENT", 600_000, 5),
+    ev("end", "PERIOD_END", 1_800_000, 6),
+    ev("sub", "SUBSTITUTION", 1_800_000, 7),
+    ev("kick2", "KICKOFF", 1_800_000, 8),
+    ev("injury", "INJURY", 1_800_000, 9),
+  ];
+
+  it("puts facts before pitch events at one reading, and leaves clock events where they are", () => {
+    expect(ids(order(LOG))).toEqual([
+      "kick",
+      "start",
+      "goal",
+      "comment",
+      "change",
+      "end",
+      "sub",
+      "kick2",
+      "injury",
+    ]);
+  });
+
+  it("is deterministic whatever order it is given, and a no-op on its own output", () => {
+    const once = order(LOG);
+    expect(ids(order([...LOG].reverse()))).toEqual(ids(once));
+    expect(ids(order(once))).toEqual(ids(once));
+  });
+
+  it("keeps the order of entry inside each group", () => {
+    const chain = [
+      ev("move", "POSITION_CHANGE", 3_300_000, 1),
+      ev("sub", "SUBSTITUTION", 3_300_000, 2),
+      ev("goal", "GOAL_FOR", 3_300_000, 3),
+      ev("void", "VOID", 3_300_000, 4),
+    ];
+    expect(ids(order([ev("start", "LINEUP_APPLIED", 0, 0), ...chain]))).toEqual([
+      "start",
+      "goal",
+      "void",
+      "move",
+      "sub",
+    ]);
   });
 });

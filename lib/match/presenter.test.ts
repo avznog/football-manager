@@ -515,7 +515,7 @@ describe("the timeline", () => {
       timelineLines(state, index).map((line) => [line.clientEventId, line]),
     );
 
-    expect(byClientId.get("c2")).toMatchObject({ title: "Composition appliquée", canVoid: false });
+    expect(byClientId.get("c2")).toMatchObject({ title: "Composition de départ", canVoid: false });
     expect(byClientId.get("c3")?.canVoid).toBe(true);
   });
 
@@ -552,10 +552,49 @@ describe("the timeline", () => {
     ]);
     const state = reduceLive(live(events), [], T0 + 45 * MIN);
 
+    // Unpaired, the way it was entered (decision 147), and the move says where he went.
     expect(timelineLines(state, index)[0]).toMatchObject({
-      title: "Composition appliquée",
-      detail: "Sortent : Léo, Julien · Entrent : Yanis, Momo · Change de poste : Karim",
+      title: "Changement",
+      detail: "Entrent : Yanis, Momo — Sortent : Léo, Julien — Poste : Karim → AT",
     });
+  });
+
+  it("calls a change that only moves players « Changement de poste »", () => {
+    // Karim and Julien swap: nobody in, nobody out — the 0 / 0 « Changement » (decision 152).
+    const swapped = STARTING_SEVEN.map((entry) =>
+      entry.memberId === "karim"
+        ? { ...entry, memberId: "julien" }
+        : entry.memberId === "julien"
+          ? { ...entry, memberId: "karim" }
+          : entry,
+    );
+    const events = log([
+      ...KICKED_OFF,
+      { type: "LINEUP_APPLIED", min: 40, period: 2, payload: lineupPayload(swapped) },
+    ]);
+    const state = reduceLive(live(events), [], T0 + 45 * MIN);
+
+    expect(timelineLines(state, index)[0]).toMatchObject({
+      title: "Changement de poste",
+      detail: "Postes : Julien → MC, Karim → AT",
+    });
+  });
+
+  it("names the starting composition, and an annulled change still reads as one", () => {
+    const later = STARTING_SEVEN.map((entry) =>
+      entry.memberId === "julien" ? { ...entry, memberId: "momo" } : entry,
+    );
+    const events = log([
+      ...KICKED_OFF,
+      { type: "LINEUP_APPLIED", min: 40, period: 2, payload: lineupPayload(later) },
+      { type: "VOID", min: 41, period: 2, voids: 3 },
+    ]);
+    const state = reduceLive(live(events), [], T0 + 45 * MIN);
+    const byClientId = new Map(timelineLines(state, index).map((line) => [line.clientEventId, line]));
+
+    expect(byClientId.get("c2")?.title).toBe("Composition de départ");
+    expect(byClientId.get("c2")?.detail).toMatch(/^Entrent : /);
+    expect(byClientId.get("c3")).toMatchObject({ title: "Changement", voided: true, detail: null });
   });
 
   it("phrases a one-player composition change in the singular", () => {
@@ -571,7 +610,7 @@ describe("the timeline", () => {
     ]);
     const state = reduceLive(live(events), [], T0 + 45 * MIN);
 
-    expect(timelineLines(state, index)[0].detail).toBe("Sort : Julien · Entre : Momo");
+    expect(timelineLines(state, index)[0].detail).toBe("Entre : Momo — Sort : Julien");
   });
 
   it("reads a comment's own words as its detail", () => {

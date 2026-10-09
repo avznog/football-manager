@@ -395,6 +395,82 @@ export function compareMatchEvents(
   return (a.id ?? "").localeCompare(b.id ?? "");
 }
 
+/** The events that change who is on the pitch, or where. */
+export const PITCH_EVENT_TYPES = [
+  "SUBSTITUTION",
+  "POSITION_CHANGE",
+  "LINEUP_APPLIED",
+] as const satisfies readonly MatchEventType[];
+
+export function isPitchEvent(type: MatchEventType): boolean {
+  return (PITCH_EVENT_TYPES as readonly MatchEventType[]).includes(type);
+}
+
+/** What `orderMatchEvents` needs to know about an item. */
+export type OrderKey = {
+  clockMs: number;
+  seq?: number | null;
+  id?: string | null;
+  type: MatchEventType;
+};
+
+/**
+ * The order the reducer replays a log in (decision 147): `compareMatchEvents`, then one rule.
+ *
+ * **At an identical clock reading, facts come before pitch events.** A goal conceded and a change at
+ * the same reading count the goal against the players who were on, whichever was entered first —
+ * moving the change a minute later instead would credit the man going off with a minute he did not
+ * play. The rule applies **segment by segment between clock events** (`KICKOFF`, `PERIOD_END`,
+ * `PAUSE`, `RESUME`, `FINAL_WHISTLE`), which never move: « fin de période → changements → coup
+ * d'envoi » at a break keeps its order, and so does a composition applied before the kick-off at 0′.
+ * Within each group the `compareMatchEvents` order is kept, so the 55′ chain (a position change then
+ * the substitution that completes it) still replays in the order it was tapped.
+ *
+ * Live stamps are millisecond-precise, so it almost never moves anything there; it is for the
+ * minute-granular entries — a change added after the match, a retro sheet — where the order of entry
+ * used to decide. Pure, deterministic and stable; a no-op on a log that is already in this order.
+ */
+export function orderMatchEvents<T>(items: readonly T[], keyOf: (item: T) => OrderKey): T[] {
+  const sorted = [...items].sort((a, b) => compareMatchEvents(keyOf(a), keyOf(b)));
+  const ordered: T[] = [];
+
+  let segment: T[] = [];
+  /** Whether a pitch event has been placed yet: the first one is the composition the match starts in. */
+  let pitchSet = false;
+  const flushSegment = () => {
+    const hasPitch = segment.some((item) => isPitchEvent(keyOf(item).type));
+    if (!pitchSet && hasPitch) {
+      // The segment that puts the first players on the pitch keeps its order (decision 152). Before
+      // it nobody is on, so there is nobody for a fact to count against; a goal at 0′ entered after
+      // the starting seven is theirs. Moving it ahead would score it by nobody.
+      ordered.push(...segment);
+    } else {
+      for (const item of segment) if (!isPitchEvent(keyOf(item).type)) ordered.push(item);
+      for (const item of segment) if (isPitchEvent(keyOf(item).type)) ordered.push(item);
+    }
+    if (hasPitch) pitchSet = true;
+    segment = [];
+  };
+
+  let runClockMs: number | null = null;
+  for (const item of sorted) {
+    const key = keyOf(item);
+    if (key.clockMs !== runClockMs) {
+      flushSegment();
+      runClockMs = key.clockMs;
+    }
+    if (isClockEvent(key.type)) {
+      flushSegment();
+      ordered.push(item);
+    } else {
+      segment.push(item);
+    }
+  }
+  flushSegment();
+
+  return ordered;
+}
+
 /* -------------------------------------------------------------------------- */
 /* French labels                                                              */
 /* -------------------------------------------------------------------------- */

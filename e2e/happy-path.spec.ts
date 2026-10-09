@@ -389,7 +389,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await page.clock.setFixedTime(at(27));
     await expect(clock).toHaveText("27:00");
 
-    await page.getByRole("button", { name: "ACTION" }).click();
+    await page.getByRole("button", { name: "ACTION", exact: true }).click();
     const first = menu(page);
     // The minute the action will carry is printed on the sheet, because it is the minute of *this*
     // tap and not of the answer three taps later (decision 031).
@@ -636,7 +636,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await confirm.getByRole("button", { name: "Terminer le match" }).click();
 
     await expect(page.getByRole("heading", { name: "Match terminé" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "ACTION" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "ACTION", exact: true })).toHaveCount(0);
     // Every action reached the server: the outbox never had to give up on one.
     await expect(page.getByText("Actions refusées")).toHaveCount(0);
 
@@ -996,6 +996,116 @@ test("le banc est une cible : un joueur glissé dessus quitte le terrain", async
 });
 
 /**
+ * « Changement » the way the cahier asked for it (decision 147): who goes out, who comes in, unpaired
+ * and in any number, then the pitch to confirm — and one line in the log, at the minute of the tap.
+ *
+ * Two changes, because the fixture has eight players: 2 out / 1 in first, opened from the striker's
+ * own disc (decision 152), which leaves six on the pitch; then a real 2 out / 2 in from the ACTION
+ * menu. The second is stamped at the tap that opened it, not at the « Valider » a minute later.
+ */
+test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ page }) => {
+  const fixture = provisionFixture();
+  const striker = playerOf(fixture, "st");
+  const cm1 = playerOf(fixture, "cm1");
+  const cm2 = playerOf(fixture, "cm2");
+  const sub = playerOf(fixture, "sub");
+
+  await login(page, fixture.coach.username, fixture.password);
+  await page.getByRole("link", { name: "Nouveau match" }).first().click();
+  await page.getByLabel("Adversaire").fill(OPPONENT);
+  await page.getByLabel("Coup d’envoi").fill(`${parisDate(tomorrow())}T15:00`);
+  await page.getByRole("button", { name: "Créer le match" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
+
+  await page.getByRole("link", { name: "Feuille de match" }).first().click();
+  for (const [key] of STARTERS) {
+    await segment(page, `role:${playerOf(fixture, key).membershipId}-starter`).click();
+  }
+  await segment(page, `role:${sub.membershipId}-substitute`).click();
+  await page.getByRole("button", { name: "Enregistrer la feuille" }).click();
+  await expect(page.getByText("Feuille enregistrée.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Compositions" }).click();
+  await page.getByRole("link", { name: "Composition de départ" }).click();
+  for (const [key, slot] of STARTERS) await place(page, playerOf(fixture, key), slot);
+  await page.getByRole("button", { name: "Créer la composition" }).click();
+  await expect(compositionCard(page, "Composition de départ")).toBeVisible();
+
+  const t0 = Date.now();
+  const at = (minutes: number) => t0 + minutes * MS_PER_MINUTE;
+  await page.clock.setFixedTime(t0);
+  await page.getByRole("link", { name: `← ${OPPONENT}` }).click();
+  await page.getByRole("link", { name: "Ouvrir le mode match" }).click();
+  await promptCard(page, "Composition de départ")
+    .getByRole("button", { name: "Appliquer" })
+    .click();
+  await page.getByRole("button", { name: KICKOFF_NAME, exact: true }).click();
+  // TERRAIN is gone from the bar: « Changement » with nobody in and nobody out is the same pitch.
+  await expect(page.getByRole("button", { name: "TERRAIN" })).toHaveCount(0);
+
+  await test.step("2 out, 1 in, from the striker's own disc", async () => {
+    await page.clock.setFixedTime(at(10));
+    await page.getByRole("button", { name: `Action : ${striker.displayName}` }).click();
+    const first = menu(page);
+    await expect(first).toContainText(striker.displayName);
+    await first.getByRole("button", { name: /^Changement/ }).click();
+
+    const out = picker(page, "Qui sort ?");
+    // He is already ticked: the tap on his disc said who the change is about.
+    await expect(out.getByRole("button", { name: striker.displayName })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await out.getByRole("button", { name: cm2.displayName }).click();
+    await out.getByRole("button", { name: "Suivant" }).click();
+
+    const into = picker(page, "Qui entre ?");
+    await into.getByRole("button", { name: sub.displayName }).click();
+    await into.getByRole("button", { name: "Placer sur le terrain" }).click();
+
+    const terrain = page.getByRole("dialog", { name: "Changement" });
+    await terrain.getByRole("button", { name: /^Valider/ }).click();
+
+    const line = timelineLine(page, `Entre : ${sub.displayName}`);
+    await expect(line).toContainText("Changement");
+    await expect(line).toContainText("10’");
+    await expect(line).toContainText("Sortent : ");
+    await expect(line).toContainText(striker.displayName);
+    await expect(line).toContainText(cm2.displayName);
+  });
+
+  await test.step("2 out, 2 in, stamped at the tap that opened it", async () => {
+    await page.clock.setFixedTime(at(20));
+    await action(page, "Changement");
+    const out = picker(page, "Qui sort ?");
+    await out.getByRole("button", { name: sub.displayName }).click();
+    await out.getByRole("button", { name: cm1.displayName }).click();
+    await out.getByRole("button", { name: "Suivant" }).click();
+
+    const into = picker(page, "Qui entre ?");
+    await into.getByRole("button", { name: striker.displayName }).click();
+    await into.getByRole("button", { name: cm2.displayName }).click();
+    await into.getByRole("button", { name: "Placer sur le terrain" }).click();
+
+    // A minute spent on the pitch does not move the change: it belongs to the tap on ACTION.
+    await page.clock.setFixedTime(at(21));
+    await page
+      .getByRole("dialog", { name: "Changement" })
+      .getByRole("button", { name: /^Valider/ })
+      .click();
+
+    // « Entrent : » is also the starting composition's line, at 0’; this one must be at 20’.
+    const line = timelineLine(page, "Sortent : ").filter({ hasText: "20’" });
+    await expect(line).toHaveCount(1);
+    await expect(line).toContainText("Entrent : ");
+    for (const player of [striker, cm2, sub, cm1])
+      await expect(line).toContainText(player.displayName);
+    await expect(page.getByText(PENDING_MARKER)).toHaveCount(0);
+    await expect(page.getByText("Actions refusées")).toHaveCount(0);
+  });
+});
+
+/**
  * The door decision 121 opened: a match played without the phone, closed and typed up without game
  * mode ever running.
  *
@@ -1078,9 +1188,7 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   // Choosing the type swaps the row's fields: two players instead of a scorer and an assister.
   await expect(page.getByLabel("Joueur sortant")).toHaveCount(1);
   await expect(page.getByLabel("Buteur")).toHaveCount(1); // the goal row's, not this one's
-  await page
-    .getByLabel("Joueur sortant")
-    .selectOption(playerOf(fixture, "cm2").membershipId);
+  await page.getByLabel("Joueur sortant").selectOption(playerOf(fixture, "cm2").membershipId);
   await page.getByLabel("Joueur entrant").selectOption(playerOf(fixture, "sub").membershipId);
   await page.getByLabel("Minute du changement").fill("30");
 
@@ -1156,14 +1264,14 @@ async function swap(
 
 /** Opens ACTION, then « Autre… », and picks a tile of the second menu by its whole name. */
 async function other(page: Page, tile: string): Promise<void> {
-  await page.getByRole("button", { name: "ACTION" }).click();
+  await page.getByRole("button", { name: "ACTION", exact: true }).click();
   await menu(page).getByRole("button", { name: MORE_TILE, exact: true }).click();
   await menu(page, "Autre action").getByRole("button", { name: tile, exact: true }).click();
 }
 
 /** Opens the ACTION menu and picks a tile by its French label. */
 async function action(page: Page, tile: string): Promise<void> {
-  await page.getByRole("button", { name: "ACTION" }).click();
+  await page.getByRole("button", { name: "ACTION", exact: true }).click();
   await page.getByRole("dialog", { name: "Action" }).getByRole("button", { name: tile }).click();
 }
 
