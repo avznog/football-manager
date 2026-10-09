@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { THE_FORMATION, positionLabelFr } from "@/db/reference";
+
 import {
   type PositionSelection,
   cyclePosition,
   nextPreference,
+  pickerTargets,
   preferenceLabelFr,
   primaryPosition,
   selectedPositions,
@@ -72,5 +75,45 @@ describe("preferenceLabelFr", () => {
     expect(preferenceLabelFr("primary")).toBe("poste principal");
     expect(preferenceLabelFr("secondary")).toBe("poste secondaire");
     expect(preferenceLabelFr(undefined)).toBe("pas son poste");
+  });
+});
+
+describe("pickerTargets", () => {
+  const targets = pickerTargets(THE_FORMATION.slots, positionLabelFr);
+
+  it("draws the seven slots of the 1-2-3-1, not the five codes", () => {
+    expect(targets).toHaveLength(7);
+    expect(targets.map((target) => target.code)).toEqual([
+      "GB",
+      "DC",
+      "DC",
+      "AIL",
+      "MC",
+      "AIL",
+      "AT",
+    ]);
+    expect(new Set(targets.map((target) => target.key)).size).toBe(7);
+  });
+
+  it("names the side of a code the formation holds twice, and only then", () => {
+    expect(targets.map((target) => target.labelFr)).toEqual([
+      "Gardien de but",
+      "Défenseur central gauche",
+      "Défenseur central droit",
+      "Ailier gauche",
+      "Milieu central",
+      "Ailier droit",
+      "Attaquant",
+    ]);
+  });
+
+  it("links the twin discs: a tap on either centre-back cycles both", () => {
+    const [, left, right] = targets;
+    let selection: PositionSelection = {};
+    selection = cyclePosition(selection, right.code);
+    expect(selection[left.code]).toBe("secondary");
+    expect(selection[right.code]).toBe("secondary");
+    selection = cyclePosition(selection, left.code);
+    expect(selection).toEqual({ DC: "primary" });
   });
 });

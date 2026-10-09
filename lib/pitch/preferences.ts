@@ -95,3 +95,50 @@ export function selectedPositions(selection: PositionSelection): PositionCode[] 
     return rank(a) - rank(b);
   });
 }
+
+/** One tappable disc of the position picker: a slot of the formation, and the code it stands for. */
+export type PickerTarget = {
+  /** Stable React key: the code, plus the side when the formation holds the code twice (`DC-gauche`). */
+  key: string;
+  code: PositionCode;
+  /** 0..1000, the slot's own coordinates. */
+  x: number;
+  y: number;
+  /**
+   * The position's French name, plus the side when the formation holds the code twice (« Ailier
+   * gauche », « Défenseur central droit »). Every name in the vocabulary is masculine — gardien,
+   * défenseur, milieu, ailier, attaquant — so the side agrees as « droit », never « droite ».
+   */
+  labelFr: string;
+};
+
+/**
+ * The picker's discs: **every slot** of the formation, at the slot's own coordinates (decision 173).
+ *
+ * Storage stays per code (`player_positions`), so the two `DC` discs and the two `AIL` discs read and
+ * write the same key of a `PositionSelection`: tapping either one cycles both — the owner's « si je
+ * sélectionne un je sélectionne les deux ». The side lives only in the accessible name, so a screen
+ * reader does not hear two identical buttons; the visible caption stays the code.
+ *
+ * `labelOf` is passed in rather than imported so this module keeps taking only types from
+ * `db/reference.ts`.
+ */
+export function pickerTargets(
+  slots: readonly { positionCode: PositionCode; x: number; y: number }[],
+  labelOf: (code: PositionCode) => string,
+): PickerTarget[] {
+  const count = new Map<PositionCode, number>();
+  for (const slot of slots) count.set(slot.positionCode, (count.get(slot.positionCode) ?? 0) + 1);
+
+  return slots.map((slot) => {
+    const twin = (count.get(slot.positionCode) ?? 0) > 1;
+    const side = slot.x < 500 ? "gauche" : "droit";
+    return {
+      key: twin ? `${slot.positionCode}-${side}` : slot.positionCode,
+      code: slot.positionCode,
+      x: slot.x,
+      y: slot.y,
+      labelFr: twin ? `${labelOf(slot.positionCode)} ${side}` : labelOf(slot.positionCode),
+    };
+  });
+}

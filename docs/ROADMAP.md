@@ -1980,3 +1980,12 @@ browser could not be told to drop it. Decision **143** has the full account.
       — with a float tolerance, not because the naive `Number.isInteger(score * 10)` is wrong today
       (it holds for all 101 tenths, and the test walks them) but because the half-point version could
       *rely* on `0.5` being exact and this one cannot
+
+## M9 — The owner's second backlog (backlogs/backlog2.md, 2026-10-09)
+
+- [x] **Ma fiche joueur: the positions picker is the `1-2-3-1`, and the twin posts are linked**,
+      decision **173**. Seven discs at the formation's slots instead of five; the two `DC` and the two
+      `AIL` discs are one wish each, so a tap on either cycles both. The side is spoken in the
+      accessible name only (« Ailier gauche », « Défenseur central droit »). Same pitch on the read-only
+      card. `pickerTargets` unit-tested, `e2e/positions.spec.ts` taps, saves and reloads. Walked at
+      390 px in both themes, as a coach and as a player on his own and a teammate's sheet
