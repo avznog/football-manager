@@ -116,15 +116,50 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
       ? notation.progress
       : null;
   /**
-   * Whether the « Terminer le match » card is offered, and which of its two slots it goes in.
+   * Whether the « Terminer le match » card is offered.
    *
    * `!logged` is the line decision 121 draws: a match with a déroulé is `live` or `finished`
    * already, and a `live` one has a correct way to end — game mode's own final whistle, which
    * derives the minute from the reducer instead of inventing one out here.
    */
   const mayFinish = mayAmend && match.status !== "finished" && !logged;
-  /** The kick-off has come round. Only the card's placement and its extra sentence depend on it. */
+  /** The kick-off has come round. Only the card's extra sentence depends on it now (decision 174). */
   const played = kickoff.getTime() <= now.getTime();
+  const finished = match.status === "finished";
+
+  /*
+   * Open to every member, not just the operator: following the score from the touchline is
+   * legitimate, and game mode itself decides who may record an action (`can()`).
+   *
+   * Not offered at all for a match that is over with nothing recorded — `score === null`, the same
+   * signal the « Saisir le match » card uses. « Le déroulé reste consultable » is untrue there:
+   * opening it shows « Rien pour l’instant », and a full-width primary button is a poor way to say
+   * that nothing happened. The retro card is the real next action, and decision 013's whole point is
+   * that the app does not pretend to hold a record of an afternoon nobody recorded.
+   *
+   * Where it goes depends on whether the match is over (decision 174): first while it is still to be
+   * played or being played, because that is what the page is opened for on a Sunday; last once it is
+   * finished, under the recap and the corrections that are then the reasons to be here.
+   */
+  const gameModeCard =
+    finished && score === null ? null : (
+      <Card title="Mode match" as="h2">
+        <div className="space-y-3">
+          <p className="text-sm text-ink-muted">
+            {finished
+              ? "Le match est terminé : le déroulé reste consultable."
+              : "Chronomètre, buts, remplacements et minutes jouées, en direct."}
+          </p>
+          <ButtonLink href={`/match/${match.id}/jeu`} fullWidth>
+            {match.status === "live"
+              ? "Reprendre le mode match"
+              : finished
+                ? "Voir le déroulé"
+                : "Ouvrir le mode match"}
+          </ButtonLink>
+        </div>
+      </Card>
+    );
 
   return (
     <div className="space-y-6">
@@ -186,11 +221,9 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         ) : null}
       </header>
 
-      {/* A match already played, with nothing in its log, is on this page for exactly one reason:
-          the coach is here to type it up (decision 121). So it leads. */}
-      {mayFinish && played ? (
-        <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff={false} />
-      ) : null}
+      {/* A match not over yet reads in the order of the afternoon (decision 174): « Mode match », the
+          composition, then « Terminer le match ». */}
+      {finished ? null : gameModeCard}
 
       {/* The match sheet and the compositions are the coach's job (`docs/PLAN.md`, screen 3): a
           player does not see them here. */}
@@ -205,7 +238,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
           summary it opened stated a man of the match and the minutes played of an afternoon that was
           0–0 in its 12th minute. The recap refuses a live match now too; this is the link that should
           never have offered it (decision 113). */}
-      {match.status === "finished" ? (
+      {finished ? (
         <Card title="Après le match" as="h2">
           <div className="space-y-3">
             {ratingDuty && !ratingDuty.complete ? (
@@ -251,17 +284,17 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         </Card>
       ) : null}
 
-      {/* The second of the two slots `mayFinish` can fill: a fixture still to come. Low on the page,
-          because closing one before its kick-off is a rare deliberate act and must not push the
-          composition down the screen. */}
-      {mayFinish && !played ? (
-        <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff />
+      {/* Under the composition whether or not the kick-off has come round (decision 174, which moved
+          it from the top of the page for a match already played): declaring a match over is the last
+          thing done with it, and it must not push game mode and the composition down the screen. */}
+      {mayFinish ? (
+        <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff={!played} />
       ) : null}
 
       {/* « Saisie rétroactive » (`docs/PLAN.md`, screen 8). A match played without the phone is typed
           up here and becomes an ordinary event log; a match that already has one is corrected action
           by action. `score === null` means not one event was ever recorded. */}
-      {mayAmend && match.status === "finished" ? (
+      {mayAmend && finished ? (
         <Card title={score === null ? "Saisir le match" : "Corriger le match"} as="h2">
           <div className="space-y-3">
             <p className="text-sm text-ink-muted">
@@ -292,33 +325,8 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         </Card>
       ) : null}
 
-      {/* Open to every member, not just the operator: following the score from the touchline is
-          legitimate, and game mode itself decides who may record an action (`can()`).
-
-          Not offered at all for a match that is over with nothing recorded — `score === null`, the
-          same signal the « Saisir le match » card above uses. « Le déroulé reste consultable » is
-          untrue there: opening it shows « Rien pour l’instant », and a full-width primary button is
-          a poor way to say that nothing happened. The card above is the real next action, and
-          decision 013's whole point is that the app does not pretend to hold a record of an
-          afternoon nobody recorded. */}
-      {match.status === "finished" && score === null ? null : (
-        <Card title="Mode match" as="h2">
-          <div className="space-y-3">
-            <p className="text-sm text-ink-muted">
-              {match.status === "finished"
-                ? "Le match est terminé : le déroulé reste consultable."
-                : "Chronomètre, buts, remplacements et minutes jouées, en direct."}
-            </p>
-            <ButtonLink href={`/match/${match.id}/jeu`} fullWidth>
-              {match.status === "live"
-                ? "Reprendre le mode match"
-                : match.status === "finished"
-                  ? "Voir le déroulé"
-                  : "Ouvrir le mode match"}
-            </ButtonLink>
-          </div>
-        </Card>
-      )}
+      {/* A finished match keeps game mode last: the déroulé is consultation now. */}
+      {finished ? gameModeCard : null}
     </div>
   );
 }

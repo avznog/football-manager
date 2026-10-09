@@ -11,10 +11,10 @@
  * later. Plain forms, no confirmation dialog: « Rouvrir le match », in the retro card once the match
  * is closed, is the undo — and a reversible action is a better answer to a mis-tap than a dialog.
  *
- * It is a component rather than inline JSX because the match page renders it in one of two places.
- * For a match already played it is the only reason the coach is on that page, so it leads; for a
- * fixture still to come, closing it is a rare deliberate act that must not push « Ta réponse » and
- * the composition down the screen.
+ * It used to be rendered in one of two places — leading the page once the kick-off had passed, low on
+ * it before. Decision 174 gives it one: under « Mode match » and the composition, before kick-off and
+ * after it alike, because declaring a match over is the last thing done with it. `beforeKickoff` now
+ * only decides the extra sentence.
  */
 
 import { Button } from "@/components/ui/button";

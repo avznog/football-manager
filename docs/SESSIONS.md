@@ -5093,3 +5093,28 @@ teammate's (read-only): seven discs, none touching, captions legible in both the
 Files: `components/pitch/PositionPicker.tsx`, `components/pitch/README.md`, `db/reference.ts`,
 `lib/pitch/preferences.ts`, `lib/pitch/preferences.test.ts`, `e2e/positions.spec.ts`,
 `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-10-09 — Backlog 2: the match page's order, and a one-tap change from a player
+
+Two remarks from `backlogs/backlog2.md`, in a worktree, on port 3101 against `football_bk_t1`.
+
+- **The match page** (`app/(app)/match/[id]/page.tsx`, decision **174**): the « Mode match » card is
+  built once, then rendered first for a match not finished and last for a finished one. « Terminer le
+  match » lost its leading slot (decision 121) and is always under the composition, `beforeKickoff`
+  only choosing its sentence. Comments in the page and in `finish-match-card.tsx` updated.
+- **Game mode** (`game-mode.tsx`, decision **175**): a new flow step `change-for { outId }`, opened by
+  « Changement » when the ACTION menu has a subject, rendered as a `PlayerPicker` « Qui entre ? » over
+  `available`, with « Personne n’entre » as its skip. A pick calls `arrangeChange`, so the pitch and its
+  « Valider » are the same as the group flow's. Stamp unchanged: `setFlow` throughout.
+- **E2E**: `un changement en groupe` now does 1 for 1 from the striker's disc (asserting « Qui sort ? »
+  never opens), then 2 out / 1 in from the menu (the stamp-at-the-tap check), then 2 out / 2 in. The
+  coach's h2 order is pinned in that test (before kick-off) and in `un match joué sans le téléphone`
+  (after it).
+- **Looked at**, 390 px, both themes: the match page before kick-off as Karim and as Hugo, the
+  « Qui entre ? » sheet after tapping Hugo's disc (« Hugo sort · 0’ · 1re période »), and the
+  pre-arranged pitch with Ali in goal. The kick-off tapped for those screenshots was undone with
+  `npm run db:reset` on `football_bk_t1`.
+
+Files: `app/(app)/match/[id]/page.tsx`, `app/(app)/match/[id]/_components/finish-match-card.tsx`,
+`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `e2e/happy-path.spec.ts`, `docs/DECISIONS.md`,
+`docs/ROADMAP.md`, `docs/SESSIONS.md`.

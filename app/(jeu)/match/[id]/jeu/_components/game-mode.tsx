@@ -77,8 +77,9 @@ import { useNowMs } from "./use-now";
 type Flow =
   /**
    * `subject` is the player whose disc was tapped on the pitch (decision 152): the action is about
-   * him, so every « who » question it would have asked is skipped. It travels through « Autre… »
-   * and the remark grid, which are the same flow one tap further.
+   * him, so every « who » question it would have asked is skipped — « Changement » included, which
+   * goes straight to who replaces him (decision 175). It travels through « Autre… » and the remark
+   * grid, which are the same flow one tap further.
    */
   | { step: "menu"; subject?: string }
   /** The second menu, behind « Autre… »: the rarer facts, and the two tiles that open a sheet. */
@@ -103,6 +104,12 @@ type Flow =
    */
   | { step: "change-out"; outIds: readonly string[]; inIds: readonly string[] }
   | { step: "change-in"; outIds: readonly string[]; inIds: readonly string[] }
+  /**
+   * « Changement » from a player's disc (decision 175): who goes out is already answered, so the one
+   * question left is who replaces him — a single tap, which lands on the same pre-arranged pitch.
+   * A group change is still the menu's « Changement », with nobody tapped first.
+   */
+  | { step: "change-for"; outId: string }
   /**
    * TERRAIN: several changes arranged on the pitch, one confirmation. `origin` says what the
    * arrangement started from — the pitch, or a planned composition the coach chose to adjust — and
@@ -575,7 +582,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
 
   /**
    * Where a tile leads. With a `subject` — the player tapped on the pitch — every « who » question is
-   * already answered: « But » goes straight to the assist, « Changement » opens with him going out,
+   * already answered: « But » goes straight to the assist, « Changement » asks only who replaces him,
    * CSC, the penalties and « Blessure » are recorded on the spot, « Remarque » still asks which
    * remark, « Commentaire » opens with his name chosen. « But encaissé » is about nobody either way.
    */
@@ -594,7 +601,11 @@ export function GameMode({ live, canOperate }: GameModeProps) {
       case "GOAL_AGAINST":
         return finish("GOAL_AGAINST", {});
       case "SUBSTITUTION":
-        return setFlow({ step: "change-out", outIds: subject ? [subject] : [], inIds: [] });
+        return setFlow(
+          subject
+            ? { step: "change-for", outId: subject }
+            : { step: "change-out", outIds: [], inIds: [] },
+        );
       case "OWN_GOAL":
       case "PENALTY_SCORED":
       case "PENALTY_MISSED":
@@ -983,6 +994,22 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           onToggle={(memberId) => setFlow({ ...flow, inIds: toggled(flow.inIds, memberId) })}
           confirmLabel="Placer sur le terrain"
           onConfirm={() => arrangeChange(flow.outIds, flow.inIds)}
+          emptyLabel="Personne sur le banc."
+        />
+      ) : null}
+
+      {/* « Changement » from his disc: one tap on whoever replaces him, then the same pitch. The
+          skip keeps what the two-list flow allowed — taking him off with nobody on — and the pitch's
+          own rules still decide whether that is confirmable. */}
+      {flow?.step === "change-for" ? (
+        <PlayerPicker
+          open
+          onClose={closeFlow}
+          title="Qui entre ?"
+          description={`${players.nameOf(flow.outId)} sort · ${stampLabel}`}
+          options={available}
+          onPick={(memberId) => arrangeChange([flow.outId], [memberId])}
+          skip={{ label: "Personne n’entre", onPick: () => arrangeChange([flow.outId], []) }}
           emptyLabel="Personne sur le banc."
         />
       ) : null}
