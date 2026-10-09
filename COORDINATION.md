@@ -16,21 +16,31 @@ appended to and never edited.** Those are the two halves of the protocol, and th
 interchangeable: this section says what is *true now*, the Log says what *happened*. So when you change
 a fact here you still leave a dated line in your own Log lane.
 
-**2026-10-09 — read this block first; the lines under it predate the rework and are stale where they
-disagree.**
+**2026-10-09, evening — read this block first; the lines under it predate the rework and are stale
+where they disagree.**
 
-- **The plan is the top section of `docs/PLAN.md`**, from the owner's `cahier-des-charges.md` (decision
-  145). **The board is the GitHub Project « Football-manager »** (`gh project view 5 --owner avznog`):
-  every merged pull request as *Done*, one issue per slice (#160–#172, label `cahier-des-charges`). Read
-  it before starting anything on another machine (decision 146).
-- **No production tag during the rework** (decision 146). Production stays on `v1.0.0-beta.10`;
-  everything lands on `main` and reaches the preview only. Migrations pile up on preview, so every one is
-  run first on a local restore of production.
-- **Several slices run at once, in separate worktrees under `.claude/worktrees/`**, merged from the
-  owner's machine. Reserved decision numbers so nobody collides: **145–149** the plan, **150–154**
-  game mode (S1, S7–S10), **155–156** removals (S2, S3), **157–158** positions (S4, S5), **159**
-  ratings (S11). Each worktree has its own local database (`football_wa`…`football_wd`, clones of the
-  production restore) and its own port (**3101–3104**); **3000 is the owner's**.
+- **The cahier des charges rework has landed in full.** All thirteen slices, S1–S13 (#174–#186), are
+  merged on `main` and deployed to the **preview**. Every issue #160–#172 is closed, and the Project
+  « Football-manager » (`gh project view 5 --owner avznog`) holds every merged pull request and every
+  slice as *Done*, dated. The plan is the top section of `docs/PLAN.md`; `## M8` in the roadmap is
+  fully ticked.
+- **Production is still `v1.0.0-beta.10` and no tag is cut** (decision 146). The next tag takes four
+  migrations in one go — `0011` (trainings dropped), `0012` (one formation, `AIL`, wishes mapped),
+  `0013` (availability dropped), `0014` (goals while on, per-position minutes) — then `db:refreeze`,
+  which `release.yml` now runs after `db:migrate`. All four were applied in sequence on a fresh clone of
+  the production restore before merging. `package.json` still says `1.0.0-beta.10`; the bump goes with
+  the owner's decision to ship.
+- **Questions put to the owner in the pull requests, unanswered**:
+  - #178: should the two winger rows say left/right?
+  - #180: is « Pas son poste » the right word, and should a player see his own positions?
+  - #186: should supporters be offered in a post-match « Qui entre ? », and should a no-op change be
+    refused?
+  - #185: should the notes seven follow the same goal rule as the other three?
+- **One thing only the owner can do, and the équipe type depends on it**: set each player's positions
+  on `/joueur/[id]`. Only Lucas has them in production, so six of seven discs read « pas son poste »
+  in every seven.
+- **Decision numbers in use**: 145–147 (the plan), 150–153, 155–166, 169–172. 148, 149, 154, 167 and
+  168 were reserved and never used; the next free number is **173**.
 
 Keep it to these labelled lines, and keep them short. The 200 lines this section replaced were a
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
@@ -1002,6 +1012,11 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   all 158 merged pull requests as *Done* and opened one issue per slice, #160–#172. Four slices running
   in parallel worktrees — S1, S2, S4, S11 — each with its own database and port (block at the top of
   `## NOW`). No tag: decision 146.
+
+- **2026-10-09 evening · owner's machine · `docs/rework-landed`** — All thirteen slices merged
+  (#174–#186), preview deployed, board complete and dated. Four agents ran in parallel worktrees, each
+  with its own clone of the production restore and its own port; this machine committed, rebased,
+  renumbered migrations and merged. Worktrees, branches and per-track databases removed. No tag.
 
 ### From the other machine
 

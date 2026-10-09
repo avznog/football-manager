@@ -5017,3 +5017,48 @@ Looked at, 390 px, light and dark, in one pass: the corrections card, the minute
 déjà sur le terrain à la 22’. », the saved timeline and the recap as coach (potter, on the FC Hexagone
 restore in `football_wc`, which now holds two added changes at 57’ and 58’), and `/saisie` as a player:
 404.
+
+## 2026-10-09 — The cahier des charges rework, merged: how thirteen slices landed in one afternoon
+
+All thirteen slices of the plan in decision 145 are on `main` (#174–#186) and deployed to the preview.
+No tag (decision 146).
+
+**How it was run.** The owner asked for subagents in parallel worktrees. Four tracks ran at once, each
+in `.claude/worktrees/agent-*` with its own local database (a clone of the production restore) and its
+own port (3101–3104), grouped so they would not edit the same files:
+- A: S1, S7, S8, S9;
+- B: S2, S3, S6;
+- C: S4, S5, S10;
+- D: S11, S12, S13.
+
+Agents did not run git. This machine committed each slice, rebased it onto `main`, ran the gates
+again, looked at the screenshots, opened the pull request and merged on green CI. Then it handed the
+agent its next slice.
+
+**What parallel work cost, so the next time is cheaper:**
+- **Migration numbers collide.** S2, S4, S3 and S12 each generated `0011` or `0012`. Each later one was
+  regenerated after rebasing, with `drizzle-kit generate` (or `--custom` for S4's data migration), so
+  its snapshot chains from the one before it. Renaming the file would not do: the snapshot's `prevId`
+  would still point at `0010`, and the schema it records would still hold the dropped tables. Every
+  chain was then applied in order on a **fresh** clone of the production restore. A database migrated
+  under the old number has its journal out of step with the files, so it does not prove the chain. The
+  docs went on citing the pre-merge names until #183 swept them.
+- **An e2e written before a removal still walks the removed screen.** S8's and S10's new tests set up
+  their matches through « Feuille de match », which S6 deleted. Git merged them cleanly, CI failed on
+  the first, and the merging session caught the second locally. After any slice that removes a screen,
+  grep `e2e/` for its labels before trusting a clean merge.
+- **A rebase onto a squash replays the old commit** if the local branch still carries the pre-squash
+  one. `git rebase --onto origin/main HEAD~1` replays only the new slice.
+- **Every agent wrote its own roadmap section.** Each one was folded under its `## M8` line at merge.
+  Next time, say in the agent's first message that the section exists.
+- **`.next/dev/types` in a worktree keeps deleted routes**, and typecheck then fails on a page that is
+  gone. `rm -rf .next/dev/types .next/types` fixes it.
+- **`tutoiement.test.ts` counts files** so that a skipped directory cannot make it vacuously green.
+  Four slices of deletions pushed `app/` onto its floor, so the floors were moved in #179, with the
+  check that hiding `(jeu)` or `[id]` still trips them.
+
+**Read against production before merging S8:** the ordering rule of decision 147 changes no stored
+figure. Zero events record a pitch change before a fact at the same reading, out of 75. That was a
+read-only `SELECT`.
+
+Files: `COORDINATION.md`, `docs/SESSIONS.md`.
