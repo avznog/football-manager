@@ -4992,3 +4992,28 @@ Looked at on `football_wd` at 390 px, light and dark, as `potter` and `benoit` i
 - the two roles get the same screen;
 - only Lucas has coach-set posts in this restore, so most discs carry « pas son poste »;
 - in the légende, three of four keepers are refused and Lucas is put in goal.
+
+## 2026-10-09 — S10 `feat/post-match-changes`: changes added after the match, realistically
+
+Track C, on top of S8 (`feat/group-changes`). Decisions 169–170.
+
+- `lib/retro/change.ts` (new, pure): `eventsUpTo`, `stateAtClock`, `changeCandidateIds`,
+  `changeProblemFr`, `changeSeed`. `lib/retro/realism.ts` (new, pure): `introducedAnomalies` by
+  `(code, eventId)` and `realismRefusalFr`.
+- `lib/retro/amend.ts`: `isAmendableEntry`, `AmendChange`, `buildChangeAmendment`.
+  `lib/retro/validation.ts`: `amendChangeSchema`. `lib/retro/actions.ts`: `submitAmendment` dispatches
+  `intent=change` to `submitChange`; the realism check is shared by every amendment and now keyed on the
+  event; a `LINEUP_APPLIED` target may only be annulled, and never the starting composition.
+- `lib/retro/queries.ts`: `RetroView.live` (the game-mode load, for the client flow), change lines
+  labelled by `pitchEventFr`, amendable by `isAmendableEntry`.
+- Screen: `saisie/_components/add-change.tsx` (minute sheet, then `MultiPlayerPicker` ×2 and
+  `TerrainSheet`), wired into `retro-corrections.tsx` with its refusal printed in its own card; the
+  substitution sheet's advice points at « Ajouter un changement ».
+- Tests: `lib/retro/change.test.ts` (28 cases); e2e `un changement ajouté après le match` (a refused
+  change naming the player and minute, then an accepted one seen in the recap).
+
+Looked at, 390 px, light and dark, in one pass: the corrections card, the minute sheet, « Qui sort ? »
+(the pitch at 20’ with minutes played so far), « Qui entre ? », the pitch, the refusal « Nicolas était
+déjà sur le terrain à la 22’. », the saved timeline and the recap as coach (potter, on the FC Hexagone
+restore in `football_wc`, which now holds two added changes at 57’ and 58’), and `/saisie` as a player:
+404.

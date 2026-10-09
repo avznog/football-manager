@@ -56,6 +56,28 @@ export function isAmendableEventType(type: MatchEventType): boolean {
   return isRetroFactType(type) || type === "SUBSTITUTION";
 }
 
+/**
+ * Whether one **line** of the timeline may be corrected — `isAmendableEventType`, plus the changes.
+ *
+ * A change is a `LINEUP_APPLIED` since decision 147, and one added after the match (decision 169) has
+ * to be correctable like any other: annulled, then re-entered. So a `LINEUP_APPLIED` is amendable
+ * **unless it is the starting composition** — the one that filled an empty pitch, which the reducer
+ * marks `startingLineup` and which decision 150 forbids annulling (« a voided composition leaves goals
+ * scored by nobody »). `isAmendableEventType` is left alone on purpose: it says which event *types* a
+ * correction may *produce or replace with a fact*, and `RETRO_FACT_TYPES` must not grow a change.
+ *
+ * Asked of the line rather than of « `clockMs > 0` », because decision 150 settled that the starting
+ * composition is recognised by what it does, not by when: a seven confirmed a second after a kick-off
+ * tapped too early is still the one nobody may annul, and a second composition at 0′ is not.
+ */
+export function isAmendableEntry(entry: {
+  type: MatchEventType;
+  startingLineup?: boolean;
+}): boolean {
+  if (entry.type === "LINEUP_APPLIED") return entry.startingLineup !== true;
+  return isAmendableEventType(entry.type);
+}
+
 /** The logged event a correction is aimed at. */
 export type AmendTarget = {
   /** `match_events.id`. What `voids_event_id` will point at. */
@@ -94,6 +116,52 @@ export type AmendInput = {
 export type Amendment = {
   events: readonly MatchEventInput[];
 };
+
+/** A change added after the match: the whole pitch after it, at a minute (decision 147). */
+export type AmendChange = {
+  minute: number;
+  slots: readonly { slotId: string; memberId: string }[];
+};
+
+/**
+ * The one `LINEUP_APPLIED` « Ajouter un changement » appends.
+ *
+ * Stamped at the minute the coach named, clamped to the final whistle like every other correction —
+ * and on the minute exactly, so it replays after the facts at that minute and before anything later
+ * (decision 147). `lineupId: null`: it is nobody's planned composition. The slots go in store order
+ * as the screen sent them; `retroEventId` keys it on the submission, so a double tap is one change.
+ */
+export function buildChangeAmendment(input: {
+  submissionId: string;
+  periods: { periodsCount?: number | null; periodMinutes?: number | null };
+  kickoffAtMs: number;
+  finalWhistleMs: number;
+  change: AmendChange;
+}): Amendment {
+  const periods = periodsConfig(input.periods);
+  const ceilingMs = input.finalWhistleMs > 0 ? input.finalWhistleMs : regulationMs(periods);
+  const clockMs = Math.max(0, Math.min(minuteToClockMs(input.change.minute), ceilingMs));
+  return {
+    events: [
+      {
+        clientEventId: retroEventId(input.submissionId, 0),
+        type: "LINEUP_APPLIED",
+        period: periodOfClockMs(clockMs, periods),
+        minute: clockMsToMinute(clockMs),
+        clockMs,
+        occurredAt: new Date(input.kickoffAtMs + clockMs),
+        payload: {
+          lineupId: null,
+          slots: input.change.slots.map((assignment) => ({
+            slotId: assignment.slotId,
+            memberId: assignment.memberId,
+          })),
+        },
+        voidsEventId: null,
+      },
+    ],
+  };
+}
 
 /**
  * The one or two events a correction appends.

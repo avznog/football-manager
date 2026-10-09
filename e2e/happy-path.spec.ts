@@ -1208,6 +1208,109 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   await expect(page.getByRole("heading", { level: 2, name: "Terminer le match" })).toHaveCount(0);
 });
 
+/**
+ * « Ajouter un changement » after the final whistle (decision 169), on a match typed up with a change
+ * at 30′: a change that contradicts the log is refused in French, naming who and when, and a
+ * realistic one lands in the recap's Déroulé at its minute.
+ */
+test("un changement ajouté après le match : refusé s’il est impossible, sinon dans le résumé", async ({
+  page,
+}) => {
+  const fixture = provisionFixture();
+  const striker = playerOf(fixture, "st");
+  const cm2 = playerOf(fixture, "cm2");
+  const sub = playerOf(fixture, "sub");
+  await login(page, fixture.coach.username, fixture.password);
+
+  await page.getByRole("link", { name: "Nouveau match" }).first().click();
+  await page.getByLabel("Adversaire").fill(OPPONENT);
+  await page.getByLabel("Coup d’envoi").fill(`${parisDate(threeWeeksAgo())}T15:00`);
+  await page.getByRole("button", { name: "Créer le match" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
+  const matchUrl = new URL(page.url()).pathname;
+
+  // The selection first, so « Qui entre ? » has a substitute to offer: after the match the selection
+  // is what happened, and only its starters, its substitutes and whoever played may come on. The
+  // starting composition is where it is made (decision 165).
+  await page.getByRole("link", { name: "Composition de départ" }).click();
+  for (const [key, slot] of STARTERS) await place(page, playerOf(fixture, key), slot);
+  await segment(page, `role:${sub.membershipId}-substitute`).click();
+  await page.getByRole("button", { name: "Créer la composition" }).click();
+  await expect(compositionCard(page, "Composition de départ")).toBeVisible();
+
+  await page.goto(matchUrl);
+  await page.getByRole("button", { name: "Saisir le match" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Saisie du match" })).toBeVisible();
+  // The sheet is pre-filled from the starting composition just made: every post already holds its
+  // starter, so there is nothing to choose — re-selecting them in another order would only collide.
+  const slots = page.locator('select[name^="starter:"]');
+  await expect(slots).toHaveCount(STARTERS.length);
+  for (const [key] of STARTERS) {
+    await expect(
+      page.locator(`select[name^="starter:"] option[value="${playerOf(fixture, key).membershipId}"]:checked`),
+    ).toHaveCount(1);
+  }
+  await page.getByRole("button", { name: "+ Ajouter une action" }).click();
+  await page.locator('select[name^="action-type:"]').first().selectOption("SUBSTITUTION");
+  await page.getByLabel("Joueur sortant").selectOption(cm2.membershipId);
+  await page.getByLabel("Joueur entrant").selectOption(sub.membershipId);
+  await page.getByLabel("Minute du changement").fill("30");
+  await page.getByRole("button", { name: "Enregistrer le match" }).click();
+  await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap\\?saisie=1$`));
+
+  await page.goto(`${matchUrl}/saisie`);
+  await expect(page.getByRole("heading", { level: 1, name: "Corriger le match" })).toBeVisible();
+  const card = page.locator("section").filter({
+    has: page.getByRole("heading", { level: 2, name: "Ajouter un changement" }),
+  });
+
+  await test.step("a change the log contradicts is refused, by name and minute", async () => {
+    // At 20′ the substitute is still on the bench, so he is offered — but the log brings him on at
+    // 30′, and a man cannot come on twice.
+    await card.getByRole("button", { name: "Ajouter un changement" }).click();
+    await page.getByLabel("Minute du changement").fill("20");
+    await picker(page, "Ajouter un changement").getByRole("button", { name: "Suivant" }).click();
+    const out = picker(page, "Qui sort ?");
+    await out.getByRole("button", { name: striker.displayName }).click();
+    await out.getByRole("button", { name: "Suivant" }).click();
+    const into = picker(page, "Qui entre ?");
+    // Realism is what the list is made of: nobody on the pitch at 20′ is offered as coming on.
+    await expect(into.getByRole("button", { name: cm2.displayName })).toHaveCount(0);
+    await into.getByRole("button", { name: sub.displayName }).click();
+    await into.getByRole("button", { name: "Placer sur le terrain" }).click();
+    await page
+      .getByRole("dialog", { name: "Changement" })
+      .getByRole("button", { name: /^Valider/ })
+      .click();
+    await expect(card.getByText(`${sub.displayName} était déjà sur le terrain à la 30’.`)).toBeVisible();
+  });
+
+  await test.step("a realistic one is appended, and the recap shows it at its minute", async () => {
+    // At 40′ the midfielder who came off at 30′ may come back on: he played, so he is on the list.
+    await card.getByRole("button", { name: "Ajouter un changement" }).click();
+    await page.getByLabel("Minute du changement").fill("40");
+    await picker(page, "Ajouter un changement").getByRole("button", { name: "Suivant" }).click();
+    const out = picker(page, "Qui sort ?");
+    await expect(out.getByRole("button", { name: cm2.displayName })).toHaveCount(0);
+    await out.getByRole("button", { name: striker.displayName }).click();
+    await out.getByRole("button", { name: "Suivant" }).click();
+    const into = picker(page, "Qui entre ?");
+    await into.getByRole("button", { name: cm2.displayName }).click();
+    await into.getByRole("button", { name: "Placer sur le terrain" }).click();
+    await page
+      .getByRole("dialog", { name: "Changement" })
+      .getByRole("button", { name: /^Valider/ })
+      .click();
+    await expect(page.getByText("Correction enregistrée.")).toBeVisible();
+
+    await page.goto(`${matchUrl}/recap`);
+    const line = timelineLine(page, `Entre : ${cm2.displayName}`);
+    await expect(line).toContainText("Changement");
+    await expect(line).toContainText("40’");
+    await expect(line).toContainText(`Sort : ${striker.displayName}`);
+  });
+});
+
 /* -------------------------------------------------------------------------- */
 /* Steps that are worth a name                                               */
 /* -------------------------------------------------------------------------- */

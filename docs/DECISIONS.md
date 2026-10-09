@@ -6493,3 +6493,65 @@ against which figure: « 3 sont écartés du 7 de légende : ils encaissent plus
 On `football_wd` this does what the cahier asks. Four men have kept goal. Three are refused: Léo M 3 in
 30′, Nicolas 6 in 30′, Nicodème 1 in 8′, against an average of 1 per 11′. Lucas (1 in 52′), whose primary
 post is DC, is put in goal: « quitte à mettre un joueur de terrain qui est un peu meilleur au goal ».
+
+## 169 — A change can be added after the match, read off the pitch at its minute
+
+**2026-10-09** · accepted · implements decision **147** for the corrections screen (slice S10) · no
+migration
+
+The cahier: « Il doit être possible de rajouter des actions à la fin d'un match, comme des changements,
+mais il faut que ce soit réaliste. Ex : si Lucas est déjà sur le terrain, je ne peux pas dire
+"changement, Lucas rentre" ».
+
+- **Where:** the corrections screen of a match that has a log, a card « Ajouter un changement » next to
+  « Ajouter une action oubliée ». Coach-only, like the whole screen (`match:amend`).
+- **The flow:** the minute first — from 0 to the last whole minute **before** the final whistle (a change
+  at the whistle would move nobody's minutes) — then game mode's own sheets: `MultiPlayerPicker` for
+  « Qui sort ? » and « Qui entre ? » (zero allowed, so a position swap is a 0/0 change) and `TerrainSheet`
+  titled « Changement », pre-arranged by `changeArrangement`. Nothing is forked; the out/in lists posted
+  are re-derived from the confirmed pitch against the pitch at the minute, so the sheet's own bench and
+  removal buttons stay usable.
+- **The pitch at a minute** is `stateAtClock` (`lib/retro/change.ts`): `reduceMatch` over the events
+  stamped **at or before** that reading plus **every `VOID` whatever its stamp** (a live annulment is
+  stamped when it was tapped, after its target). « At or before » is the reading decision 147's order
+  gives a change appended at that minute: it replays after the facts at that reading and after any
+  change already stored there, so the lists are the pitch just before *this* change.
+- **Who may come on** after the match is narrower than in game mode: off the pitch at that minute, and a
+  starter or a substitute on the sheet, or somebody the log shows playing. A supporter did not play. A
+  match with no sheet offers every player, since there is nothing to narrow by.
+- **The event** is one `LINEUP_APPLIED { lineupId: null, slots }` (`buildChangeAmendment`), stamped on the
+  minute, clamped to the whistle, keyed on a submission id seeded with the match, the minute and the
+  sorted slots (invariant 6), through `amendMatchEvents`, which re-freezes the match's statistics.
+- **Correcting a change:** `isAmendableEntry` makes every `LINEUP_APPLIED` line correctable — annul it,
+  then add the right one — **except the starting composition**, recognised by the reducer's
+  `startingLineup` flag (decision 150) rather than by `clockMs > 0`, for the reason decision 150 gives:
+  the starting seven is defined by what it does, not by when. `RETRO_FACT_TYPES` is unchanged. The
+  substitution sheet's « saisis le bon depuis « Ajouter une action oubliée » », which could not add a
+  change, now points at « Ajouter un changement ».
+- **The labels** of change lines on the corrections screen are `pitchEventFr`'s (« Changement »,
+  « Changement de poste », « Composition de départ »), as in game mode and the recap (decision 152).
+
+Not done: a later change that the new one makes empty (same pitch before and after) is not an anomaly and
+is left in the log as a « Changement » with no detail.
+
+## 170 — A correction may not make the match impossible, judged event by event
+
+**2026-10-09** · accepted · applies to every amendment of a finished match · no migration
+
+`submitAmendment` already reduced the corrected log before writing it, but it compared the anomalies
+**by code alone**: a log that already held one `scorer-off-pitch` accepted any number of new ones. It
+now compares by **`(code, eventId)`** (`introducedAnomalies`, `lib/retro/realism.ts`), and refuses any
+new anomaly among `scorer-off-pitch`, `substitute-in-already-on`, `substitute-out-not-on`,
+`position-change-off-pitch`, `too-many-on-pitch`, `lineup-slot-conflict`, `no-goalkeeper-on-pitch`,
+`event-after-final-whistle` — the ones that mean « this could not have happened ». The frame anomalies
+(a period that ends while stopped, a missing catalogue) are not a correction's doing and do not refuse.
+
+Keyed on the event, the check catches what the old one could not: a change at 20′ that takes off the man
+who scores at 41′ is refused **on that goal**, and so is one that brings on at 20′ a player the log
+brings on at 22′. The refusal is French, tutoie, and names the player and the minute from the corrected
+log's own timeline: « Samuel n’était pas sur le terrain à la 41’ : il ne peut pas y avoir marqué. »,
+« Nicolas était déjà sur le terrain à la 22’. ».
+
+A change is checked twice: first its own lists against the pitch at its minute (`changeProblemFr` — the
+posted out/in agree with the slots, nobody twice, at most seven, somebody in goal, everybody coming on
+allowed to), then the whole match through the reducer as above.

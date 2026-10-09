@@ -218,7 +218,7 @@ export async function amendMatchEvents(actor: Actor, raw: unknown): Promise<Appe
 
   const targetIssue = await checkVoidTargets(matchId, events);
   if (targetIssue) return fail(409, targetIssue);
-  // The retro screens never offer this (`isAmendableEventType`); a crafted POST meets the same rule
+  // The retro screens never offer this (`isAmendableEntry`); a crafted POST meets the same rule
   // game mode does.
   if (await refusesStartingLineupVoid(matchId, events, stored)) {
     return fail(409, INGEST_ERRORS.startingLineup);
