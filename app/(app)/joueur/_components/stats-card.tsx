@@ -22,6 +22,7 @@ import {
   pendingRatingsNoteFr,
   plural,
 } from "@/lib/stats/format";
+import { positionGroupLabelFr } from "@/lib/stats/positions";
 import { getPlayerSeasonStats } from "@/lib/stats/queries";
 
 import { Figure, FigureGrid, Note } from "../../stats/_components/parts";
@@ -84,9 +85,38 @@ export async function PlayerStatsCard({
         />
       </FigureGrid>
 
+      {/* His own record outfield and in goal (decision 162): raw, because this card is about him and
+          the smoothed figure is a ranking device that lives on `/stats`. */}
+      {player.outfieldMinutes > 0 ? (
+        <FigureGrid className="mt-3">
+          <Figure
+            label="Encaissés"
+            value={player.concededOutfield}
+            hint="joueur de champ"
+            tone="muted"
+          />
+          <Figure
+            label="Un but pris"
+            value={everyFr(player.outfieldMinutes, player.concededOutfield)}
+            tone="muted"
+          />
+          <Figure label="Sans encaisser" value={formatMinutes(player.cleanMinutes)} tone="muted" />
+        </FigureGrid>
+      ) : null}
+
       {player.gkMinutes > 0 ? (
         <FigureGrid className="mt-3">
           <Figure label="Minutes gardien" value={formatMinutes(player.gkMinutes)} tone="muted" />
+          <Figure
+            label="Encaissés"
+            value={player.concededWhileGk}
+            hint={
+              player.concededWhileGk > 0
+                ? everyFr(player.gkMinutes, player.concededWhileGk)
+                : undefined
+            }
+            tone="muted"
+          />
           <Figure label="Clean sheets" value={player.gkCleanSheets} tone="muted" />
           <Figure
             label="Sans encaisser"
@@ -95,6 +125,14 @@ export async function PlayerStatsCard({
             tone="muted"
           />
         </FigureGrid>
+      ) : null}
+
+      {player.positions.length > 0 ? (
+        <p className="mt-3 text-xs text-ink-muted">
+          {player.positions
+            .map((position) => `${positionGroupLabelFr(position.group)} ${formatMinutes(position.minutes)}`)
+            .join(" · ")}
+        </p>
       ) : null}
 
       {roles !== null ? <p className="mt-3 text-xs text-ink-muted">{roles}</p> : null}
@@ -106,4 +144,9 @@ export async function PlayerStatsCard({
       {pendingNote !== null ? <Note>{pendingNote}</Note> : null}
     </Card>
   );
+}
+
+/** « toutes les 24′ », or « jamais » for a man who conceded nothing — never ∞ (decision 162). */
+function everyFr(minutes: number, conceded: number): string {
+  return conceded === 0 ? "jamais" : `toutes les ${formatMinutes(Math.round(minutes / conceded))}`;
 }

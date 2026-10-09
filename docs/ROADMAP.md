@@ -495,7 +495,9 @@ Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] The four-up grid at `sm` has never been seen with four selects in it: the demo team has one played
       formation, so the formation select is absent and the row is three. `grid-cols-2 sm:grid-cols-4` is
       asserted in the class list and nowhere in a browser. A fixture with two played shapes would settle it
-- [ ] **Minutes by position, so « meilleur milieu droit » becomes a measurement.** There is exactly
+- [x] *(Done in S12, decision 160: `match_player_positions`, written at the freeze, backfilled by
+      `db:refreeze`. Kept below as it was written.)* **Minutes by position, so « meilleur milieu droit »
+      becomes a measurement.** There is exactly
       one positional figure anywhere in the database — `match_player_stats.gkMinutes` — and the
       reducer's `positionSpells` are in-memory match state that the freeze path never writes down. So
       every screen that talks about a post can only mean what a player has *declared* in
@@ -840,7 +842,21 @@ tag during this rework** (decision 146): every item below reaches the preview on
             match »). A match with no sheet has no raters. Who is **rated** is unchanged (`minutes > 0`)
       - [x] Tests: the predicate and the tally in `progress.test.ts`, the refusal in `actions.test.ts` (I/O
             mocked), the coach on no sheet in the happy path
-- [ ] **S12** · #171 · stats data: goals for while on, minutes per position, rates, impact per position
+- [x] **S12** · #171 · stats data: goals for while on, minutes per position, rates, impact per position
+      - [x] Reducer: `goalsForWhileOn` and per-position minutes / goals for / goals against per player,
+            kept to the goal and concede bookkeeping and `accrue`; minutes apportioned so they add up,
+            `GB` pinned to `gkMinutes` (decision **160**)
+      - [x] `match_player_stats.goals_for_while_on` and the new `match_player_positions`, written by the
+            one writer in one transaction; migration `0012_remarkable_young_avengers.sql`
+      - [x] `npm run db:refreeze` (`scripts/refreeze-stats.mts`), idempotent, refuses a remote URL without
+            `--allow-remote`; run by `ci.yml` `migrate-preview` and `release.yml` `migrate-production`
+            right after `db:migrate` (decision **161**). Run on `football_wd`: 2 matches, 24 + 39 rows,
+            every invariant checked by SQL
+      - [x] `/stats` in five sections — Attaque · Défense · Gardiens · Temps de jeu · Impact par poste —
+            then Notes and the squad list; « 1 but encaissé toutes les X min » outfield and in goal,
+            shrunk with the existing Gamma–Poisson fit, raw record beside it, « aucun but encaissé »
+            instead of ∞; impact per position as two shrunk Poisson rates (decision **162**)
+      - [x] Profile card: conceded outfield and its rate, keeper figures, minutes by position
 - [ ] **S13** · #172 · équipe type: offensive, défensive, 7 de légende, notes
 
 ## Deployment

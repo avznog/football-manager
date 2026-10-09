@@ -16,16 +16,18 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { matchPlayerStats, matches } from "@/db/schema";
+import { matchPlayerPositions, matchPlayerStats, matches } from "@/db/schema";
 import { getLiveMatch, type LiveMatch } from "./live";
 import { reduceLive } from "./presenter";
-import { toMatchPlayerStats } from "./reducer";
+import { toMatchPlayerPositions, toMatchPlayerStats } from "./reducer";
 
 export type FinalizeResult = {
   /** False when the log holds no final whistle: nothing is frozen and the status is untouched. */
   finished: boolean;
   /** How many `match_player_stats` rows the match now has. */
   players: number;
+  /** How many `match_player_positions` rows (decision 160). */
+  positions: number;
 };
 
 /**
@@ -37,12 +39,16 @@ export type FinalizeResult = {
  */
 export async function finalizeMatch(live: LiveMatch): Promise<FinalizeResult> {
   const state = reduceLive(live, [], null);
-  if (!state.finished) return { finished: false, players: 0 };
+  if (!state.finished) return { finished: false, players: 0, positions: 0 };
 
   const rows = toMatchPlayerStats(state).map((row) => ({
     ...row,
     matchId: live.match.id,
     computedAt: new Date(),
+  }));
+  const positionRows = toMatchPlayerPositions(state).map((row) => ({
+    ...row,
+    matchId: live.match.id,
   }));
 
   await db.transaction(async (tx) => {
@@ -50,6 +56,10 @@ export async function finalizeMatch(live: LiveMatch): Promise<FinalizeResult> {
     // appearance was voided) must disappear from the cache too, and an upsert would leave them.
     await tx.delete(matchPlayerStats).where(eq(matchPlayerStats.matchId, live.match.id));
     if (rows.length > 0) await tx.insert(matchPlayerStats).values(rows);
+    // The per-position cache is the same reduction cut finer (decision 160): same writer, same
+    // transaction, same wholesale replace, so the two tables can never describe different logs.
+    await tx.delete(matchPlayerPositions).where(eq(matchPlayerPositions.matchId, live.match.id));
+    if (positionRows.length > 0) await tx.insert(matchPlayerPositions).values(positionRows);
 
     await tx
       .update(matches)
@@ -57,7 +67,7 @@ export async function finalizeMatch(live: LiveMatch): Promise<FinalizeResult> {
       .where(and(eq(matches.id, live.match.id), eq(matches.teamId, live.match.teamId)));
   });
 
-  return { finished: true, players: rows.length };
+  return { finished: true, players: rows.length, positions: positionRows.length };
 }
 
 /**
@@ -69,6 +79,6 @@ export async function finalizeMatch(live: LiveMatch): Promise<FinalizeResult> {
  */
 export async function finalizeMatchById(teamId: string, matchId: string): Promise<FinalizeResult> {
   const live = await getLiveMatch(teamId, matchId);
-  if (!live) return { finished: false, players: 0 };
+  if (!live) return { finished: false, players: 0, positions: 0 };
   return finalizeMatch(live);
 }

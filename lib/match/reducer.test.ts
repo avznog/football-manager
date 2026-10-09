@@ -10,8 +10,10 @@ import {
   type MatchReducerConfig,
   type PlannedLineup,
   playerState,
+  positionStatsOf,
   reduceMatch,
   reverseTimeline,
+  toMatchPlayerPositions,
   toMatchPlayerStats,
 } from "./reducer";
 
@@ -405,6 +407,7 @@ describe("the seeded match, reduced", () => {
       concededWhileOn: 2,
       gkCleanMinutes: 0,
       concededWhileGk: 0,
+      goalsForWhileOn: 3,
       squadRole: "starter",
     });
     // The keeper's two figures are the ones decision 018 added a column for: they are not
@@ -418,6 +421,92 @@ describe("the seeded match, reduced", () => {
 
   it("can hand the timeline back newest first, as game mode shows it", () => {
     expect(reverseTimeline(state)[0].type).toBe("FINAL_WHISTLE");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Goals for while on, and the per-position figures (decision 160)            */
+/* -------------------------------------------------------------------------- */
+
+describe("goals for while on, and per position", () => {
+  const state = reduceMatch(SEED_LOG, [], CONFIG);
+  const of = (id: string) => playerState(state, id)!;
+  const at = (id: string, code: string) => of(id).positions.find((p) => p.positionCode === code);
+
+  it("credits every man on the pitch with the goals scored while he was there", () => {
+    // 11′, 28′ and the 44′ penalty; the 27′ goal was voided and counts for nobody.
+    expect(of("hugo").goalsForWhileOn).toBe(3);
+    expect(of("julien").goalsForWhileOn).toBe(3);
+    // Off at 38′: the 11′ and the 28′ only.
+    expect(of("leo").goalsForWhileOn).toBe(2);
+    // On at 38′: the penalty only.
+    expect(of("yanis").goalsForWhileOn).toBe(1);
+    // On at 55′, after the last goal.
+    expect(of("momo").goalsForWhileOn).toBe(0);
+    // A supporter and an unused substitute were never there for anything.
+    expect(of("gerard").goalsForWhileOn).toBe(0);
+    expect(of("fabien").positions).toEqual([]);
+  });
+
+  it("files goals and minutes under the position held at that moment", () => {
+    // Karim: MC from the kick-off to 55′, every goal of the match; then AT for the last five.
+    expect(at("karim", "MC")).toMatchObject({ minutes: 55, goalsFor: 3, goalsAgainst: 2 });
+    expect(at("karim", "AT")).toMatchObject({ minutes: 5, goalsFor: 0, goalsAgainst: 0 });
+    expect(at("leo", "MC")).toMatchObject({ minutes: 38, goalsFor: 2, goalsAgainst: 1 });
+    expect(at("yanis", "MC")).toMatchObject({ minutes: 22, goalsFor: 1, goalsAgainst: 1 });
+    // The own goal concedes for everybody on the pitch, its author included (reducer rule 4).
+    expect(at("nico", "DD")).toMatchObject({ minutes: 60, goalsFor: 3, goalsAgainst: 2 });
+  });
+
+  it("keeps the goal its own position, equal to the keeping minutes", () => {
+    expect(of("hugo").positions).toHaveLength(1);
+    expect(at("hugo", "GB")).toMatchObject({ minutes: of("hugo").gkMinutes, goalsAgainst: 2 });
+  });
+
+  it("adds up: positions to minutes, and goals to the score times the men on the pitch", () => {
+    for (const player of state.players) {
+      const sum = player.positions.reduce((total, p) => total + p.minutes, 0);
+      expect(sum, player.memberId).toBe(player.minutes);
+      expect(player.positions.reduce((t, p) => t + p.goalsFor, 0)).toBe(player.goalsForWhileOn);
+      expect(player.positions.reduce((t, p) => t + p.goalsAgainst, 0)).toBe(player.concededWhileOn);
+    }
+    const rows = toMatchPlayerPositions(state);
+    expect(rows.reduce((t, r) => t + r.goalsFor, 0)).toBe(3 * 7);
+    expect(rows.reduce((t, r) => t + r.goalsAgainst, 0)).toBe(2 * 7);
+    expect(rows.reduce((t, r) => t + r.minutes, 0)).toBe(60 * 7);
+  });
+
+  it("changes none of the figures that existed before it", () => {
+    expect(of("leo")).toMatchObject({ minutes: 38, concededWhileOn: 1, goals: 0 });
+    expect(of("hugo")).toMatchObject({ gkMinutes: 60, concededWhileGk: 2 });
+  });
+});
+
+describe("positionStatsOf", () => {
+  const bucket = (minutes: number, goalsFor = 0, goalsAgainst = 0) => ({
+    ms: minutes * MIN,
+    goalsFor,
+    goalsAgainst,
+  });
+
+  it("apportions whole minutes so they add up to the rounded total", () => {
+    // Rounded one by one, 29,5′ and 30,5′ would be 30′ + 31′ next to a total of 60′.
+    const rows = positionStatsOf(new Map([["MC", bucket(29.5)], ["AT", bucket(30.5)]]), 60, 0);
+    expect(rows.reduce((t, r) => t + r.minutes, 0)).toBe(60);
+    expect(rows.map((r) => r.positionCode)).toEqual(["AT", "MC"]);
+  });
+
+  it("pins the goal to the keeping minutes and shares the rest", () => {
+    const rows = positionStatsOf(new Map([["GB", bucket(30.4)], ["DC", bucket(29.4)]]), 60, 30);
+    expect(rows.find((r) => r.positionCode === "GB")!.minutes).toBe(30);
+    expect(rows.find((r) => r.positionCode === "DC")!.minutes).toBe(30);
+  });
+
+  it("drops a slot outside the catalogue after it has taken its share", () => {
+    const rows = positionStatsOf(new Map([["MC", bucket(40)], [null, bucket(20)]]), 60, 0);
+    expect(rows).toEqual([
+      { positionCode: "MC", playedMs: 40 * MIN, minutes: 40, goalsFor: 0, goalsAgainst: 0 },
+    ]);
   });
 });
 

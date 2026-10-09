@@ -99,6 +99,13 @@
       "when": 1791559842172,
       "tag": "0013_known_apocalypse",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791560919948,
+      "tag": "0014_ambiguous_vindicator",
+      "breakpoints": true
     }
   ]
 }

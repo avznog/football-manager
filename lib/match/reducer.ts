@@ -184,6 +184,27 @@ export type PositionSpell = {
 };
 
 /**
+ * One player's match at one position: how long he held it, and the goals scored and conceded while he
+ * did (decision 160). The position is the slot's `positionCode`, so the `GB` slot is a position of its
+ * own and the two `DC` slots of a back two are one.
+ *
+ * `minutes` are whole minutes **apportioned** so that a player's positions add up to his `minutes`
+ * exactly, with `GB` pinned to `gkMinutes`: rounding each spell on its own would let 29,6′ + 30,4′ come
+ * out as 30′ + 30′ next to a total of 60′ one time and 61′ another. Time in a slot the catalogue does
+ * not know (`positionCode` null) is apportioned too and then left out, so in that one case the sum
+ * falls short of the total rather than inventing a position.
+ */
+export type PlayerPositionStats = {
+  positionCode: string;
+  playedMs: number;
+  minutes: number;
+  /** Goals our team scored while he held this position. */
+  goalsFor: number;
+  /** Goals our team conceded while he held this position. */
+  goalsAgainst: number;
+};
+
+/**
  * Everything the log says about one player in this match. The integer fields map one-to-one onto
  * `match_player_stats`; see `toMatchPlayerStats`.
  */
@@ -206,6 +227,13 @@ export type PlayerMatchState = {
   concededWhileOn: number;
   /** Goals conceded while this player was the goalkeeper. */
   concededWhileGk: number;
+  /**
+   * Goals our team scored while this player was on the pitch, his own included (decision 160). The
+   * other half of `concededWhileOn`: the two together are his goal difference on the pitch.
+   */
+  goalsForWhileOn: number;
+  /** Per position held, in descending order of time (decision 160). */
+  positions: readonly PlayerPositionStats[];
   /** All goals, penalties included (rule 5). */
   goals: number;
   assists: number;
@@ -433,6 +461,9 @@ type PlayerAcc = {
   gkCleanMs: number;
   concededWhileOn: number;
   concededWhileGk: number;
+  goalsForWhileOn: number;
+  /** Keyed by `positionCode`; `null` for a slot the catalogue does not know. */
+  byPosition: Map<string | null, { ms: number; goalsFor: number; goalsAgainst: number }>;
   goals: number;
   assists: number;
   ownGoals: number;
@@ -671,12 +702,26 @@ export function reduceMatch(
   let goalsAgainst = 0;
   let firstKickoffSeen = false;
 
+  /** His bucket for the position `entry` holds right now (decision 160). */
+  const positionOf = (player: PlayerAcc, entry: PitchEntry) => {
+    const code = slots.positionOf(entry.slotId);
+    const existing = player.byPosition.get(code);
+    if (existing) return existing;
+    const created = { ms: 0, goalsFor: 0, goalsAgainst: 0 };
+    player.byPosition.set(code, created);
+    return created;
+  };
+
   /** Bank everything that has accrued for one player up to `atMs`, and move his cursors there. */
   const accrue = (memberId: string, atMs: number) => {
     const entry = pitch.get(memberId);
     if (!entry) return;
     const player = playerOf(memberId);
-    player.playedMs += playedBetween(entry.sinceClockMs, atMs);
+    const playedMs = playedBetween(entry.sinceClockMs, atMs);
+    player.playedMs += playedMs;
+    // The same time, filed under the position he held for all of it: every slot change calls this
+    // first, so the window never straddles two positions (decision 160).
+    positionOf(player, entry).ms += playedMs;
     entry.sinceClockMs = Math.max(entry.sinceClockMs, atMs);
     if (entry.cleanSince !== null) {
       player.cleanMs += playedBetween(entry.cleanSince, atMs);
@@ -758,11 +803,21 @@ export function reduceMatch(
       accrue(memberId, atMs);
       const player = playerOf(memberId);
       player.concededWhileOn += 1;
+      positionOf(player, entry).goalsAgainst += 1;
       entry.cleanSince = null;
       if (entry.gkSince !== null) {
         player.concededWhileGk += 1;
         entry.gkCleanSince = null;
       }
+    }
+  };
+
+  /** A goal for us: everybody on the pitch was there for it, at the position he held (decision 160). */
+  const scoreFor = () => {
+    for (const [memberId, entry] of pitch) {
+      const player = playerOf(memberId);
+      player.goalsForWhileOn += 1;
+      positionOf(player, entry).goalsFor += 1;
     }
   };
 
@@ -841,6 +896,7 @@ export function reduceMatch(
           }
           goalsFor += 1;
           scoredAt.push(clockMs);
+          scoreFor();
           const scorerId =
             event.type === "GOAL_FOR"
               ? (payload as MatchEventPayloads["GOAL_FOR"] | null)?.scorerId
@@ -1084,6 +1140,8 @@ export function reduceMatch(
         gkCleanMinutes: msToWholeMinutes(player.gkCleanMs),
         concededWhileOn: player.concededWhileOn,
         concededWhileGk: player.concededWhileGk,
+        goalsForWhileOn: player.goalsForWhileOn,
+        positions: positionStatsOf(player.byPosition, msToWholeMinutes(player.playedMs), msToWholeMinutes(player.gkMs)),
         goals: player.goals,
         assists: player.assists,
         ownGoals: player.ownGoals,
@@ -1212,6 +1270,8 @@ function newPlayer(memberId: string, squadRole: SquadRole | null): PlayerAcc {
     gkCleanMs: 0,
     concededWhileOn: 0,
     concededWhileGk: 0,
+    goalsForWhileOn: 0,
+    byPosition: new Map(),
     goals: 0,
     assists: 0,
     ownGoals: 0,
@@ -1223,6 +1283,62 @@ function newPlayer(memberId: string, squadRole: SquadRole | null): PlayerAcc {
     spells: [],
     positionSpells: [],
   };
+}
+
+/**
+ * A player's positions, with whole minutes that add up to his total (decision 160).
+ *
+ * `GB` takes `gkMinutes` exactly — the two figures are the same time measured twice and must never
+ * disagree by a rounding — and the rest of the total is shared out by largest remainder over the
+ * other buckets, ties broken by code so two runs agree. A bucket with no time and no goal is dropped;
+ * the `null` bucket (a slot outside the catalogue) takes its share and is then dropped too.
+ */
+export function positionStatsOf(
+  byPosition: ReadonlyMap<string | null, { ms: number; goalsFor: number; goalsAgainst: number }>,
+  totalMinutes: number,
+  gkMinutes: number,
+): PlayerPositionStats[] {
+  const entries = [...byPosition.entries()].filter(
+    ([, bucket]) => bucket.ms > 0 || bucket.goalsFor > 0 || bucket.goalsAgainst > 0,
+  );
+  const minutesOf = new Map<string | null, number>();
+  const gb = entries.find(([code]) => code === "GB");
+  if (gb) minutesOf.set("GB", gkMinutes);
+
+  const others = entries.filter(([code]) => code !== "GB");
+  const budget = Math.max(0, totalMinutes - (gb ? gkMinutes : 0));
+  const exact = others.map(([code, bucket]) => ({ code, value: bucket.ms / 60_000 }));
+  const exactTotal = exact.reduce((sum, item) => sum + item.value, 0);
+  // Scale to the budget: the exact parts sum to the unrounded outfield time, the budget is its
+  // rounded counterpart, and the two differ by less than a minute.
+  const scaled = exact.map((item) => ({
+    code: item.code,
+    value: exactTotal > 0 ? (item.value * budget) / exactTotal : 0,
+  }));
+  for (const item of scaled) minutesOf.set(item.code, Math.floor(item.value));
+  let left = budget - scaled.reduce((sum, item) => sum + Math.floor(item.value), 0);
+  const byRemainder = [...scaled].sort(
+    (a, b) =>
+      b.value - Math.floor(b.value) - (a.value - Math.floor(a.value)) ||
+      String(a.code).localeCompare(String(b.code)),
+  );
+  for (const item of byRemainder) {
+    if (left <= 0) break;
+    if (item.value <= 0) continue;
+    minutesOf.set(item.code, (minutesOf.get(item.code) ?? 0) + 1);
+    left -= 1;
+  }
+
+  return entries
+    .filter((entry): entry is [string, (typeof entry)[1]] => entry[0] !== null)
+    .map(([code, bucket]) => ({
+      positionCode: code,
+      playedMs: bucket.ms,
+      minutes: minutesOf.get(code) ?? 0,
+      goalsFor: bucket.goalsFor,
+      goalsAgainst: bucket.goalsAgainst,
+    }))
+    .sort((a, b) => b.playedMs - a.playedMs || a.positionCode.localeCompare(b.positionCode));
 }
 
 function closeLast<T extends { toClockMs: number | null }>(list: T[], atMs: number): void {
@@ -1263,6 +1379,7 @@ export function toMatchPlayerStats(state: MatchState): Array<{
   concededWhileOn: number;
   gkCleanMinutes: number;
   concededWhileGk: number;
+  goalsForWhileOn: number;
   squadRole: SquadRole | null;
 }> {
   return state.players.map((player) => ({
@@ -1279,6 +1396,29 @@ export function toMatchPlayerStats(state: MatchState): Array<{
     concededWhileOn: player.concededWhileOn,
     gkCleanMinutes: player.gkCleanMinutes,
     concededWhileGk: player.concededWhileGk,
+    goalsForWhileOn: player.goalsForWhileOn,
     squadRole: player.squadRole,
   }));
+}
+
+/**
+ * Rows for `match_player_positions` (decision 160): one per player per position he held. Written by
+ * the same writer, in the same transaction, as `match_player_stats`. `matchId` is the caller's.
+ */
+export function toMatchPlayerPositions(state: MatchState): Array<{
+  teamMemberId: string;
+  positionCode: string;
+  minutes: number;
+  goalsFor: number;
+  goalsAgainst: number;
+}> {
+  return state.players.flatMap((player) =>
+    player.positions.map((position) => ({
+      teamMemberId: player.memberId,
+      positionCode: position.positionCode,
+      minutes: position.minutes,
+      goalsFor: position.goalsFor,
+      goalsAgainst: position.goalsAgainst,
+    })),
+  );
 }

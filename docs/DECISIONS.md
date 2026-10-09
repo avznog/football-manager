@@ -6105,3 +6105,136 @@ events already in logs reduce exactly as before.
 the same pitch from the menu every other action starts from, which is the owner's Q6. The sheet itself
 stays, because « Ajuster » on a planned composition still opens it. While nobody is on the pitch the
 top bar still offers « Composition », the seven dropdowns.
+
+## 160 — The reducer files goals and minutes by position, and the freeze writes them down
+
+**2026-10-09** · accepted · closes the open ROADMAP item « minutes by position » that decision 115 left
+behind · changes no existing figure
+
+The cahier's « Stats générales » ask for goals conceded on the pitch, outfield and in goal separately, and
+« pour chaque poste, qui est le meilleur en terme d'impact pour l'équipe » — the owner's Q7: goal
+difference while he played that position, per 60′, smoothed. None of that was in the database: there was
+no « goals for while on » at all, and the only positional figure was `gk_minutes`.
+
+**The reducer** (`lib/match/reducer.ts`) gains two outputs per player and keeps every existing one:
+
+- `goalsForWhileOn` — every `GOAL_FOR` / `PENALTY_SCORED` credits everybody on the pitch at that moment,
+  through one `scoreFor()` beside the existing `concede()`;
+- `positions` — per `positionCode`: time held, goals for and goals against while he held it. Time is
+  banked in `accrue()`, which every slot change already calls first, so a window never straddles two
+  positions; goals are filed in `scoreFor()` / `concede()` under the position the pitch entry holds.
+
+The change is deliberately local to `accrue`, the two goal hooks and the output shape, because other
+slices are changing the event sort and the `LINEUP_APPLIED` branch at the same time.
+
+**Whole minutes are apportioned, not rounded one by one** (`positionStatsOf`): `GB` takes `gkMinutes`
+exactly, and the rest of `minutes` is shared over the other positions by largest remainder. Rounding each
+position separately would let 29,5′ + 30,5′ come out as 30′ + 31′ beside a total of 60′. A slot outside the
+catalogue takes its share and is then dropped, so in that one case the sum falls short instead of
+inventing a position.
+
+**Storage.** `match_player_stats.goals_for_while_on`, and a new `match_player_positions (match_id,
+team_member_id, position_code, minutes, goals_for, goals_against)` with its PK on the three ids and the
+same cascading FKs. Written by `lib/match/finalize.ts` in the same transaction as `match_player_stats`,
+deleted and reinserted on every freeze. `position_code` has no FK to `positions`: the cache keeps the code
+the log had, and the catalogue is changing under it (Q4 replaces MG/MD with `AIL`). Migration
+`0012_remarkable_young_avengers.sql`.
+
+The statistics read it through the same two paths as every other line (`lib/stats/match-lines.ts`): the
+cache when the match is frozen, the reducer when it is not, with a test that the two agree.
+
+## 161 — Every deploy re-freezes the finished matches: `npm run db:refreeze`
+
+**2026-10-09** · accepted
+
+A cache that gains a column is wrong for every match frozen before it, and nothing re-freezes a match
+nobody touches. So `scripts/refreeze-stats.mts` (`npm run db:refreeze`) calls `finalizeMatchById` — the one
+writer — for every match whose status is `finished`. It writes no figure of its own (invariant 2). It is
+idempotent because the writer replaces each match's rows wholesale from the log.
+
+**It runs in CI right after `db:migrate`**, in the same step and with the same `DATABASE_URL` secret:
+`migrate-preview` in `ci.yml` (the preview database) and `migrate-production` in `release.yml`
+(production, on a tag). A migration that adds a column and the backfill that fills it therefore ship
+together, and the code that reads the column is deployed only after both (the deploy jobs `need` the
+migrate jobs). No secret is added or printed: the script prints « base distante (--allow-remote) » rather
+than the URL when it is remote.
+
+**The guard is `scripts/import-radarlocal.mts`'s:** a `DATABASE_URL` that is not on `localhost` /
+`127.0.0.1` is refused unless `--allow-remote` is passed. CI passes it, because there the remote is the
+target.
+
+A finished match whose log has no final whistle (closed by « Terminer le match » with nothing typed,
+decision 121) is declined by `finalizeMatch` and left as it is. The script counts it and invents nothing.
+
+Cost: one reduction per finished match per deploy. That is a few dozen matches a season, each a few
+hundred events, and it runs off the request path.
+
+Run on `football_wd` on 2026-10-09: 2 finished matches, 24 player rows, 39 position rows. Checked by SQL,
+for both imported matches:
+- per-position minutes add up to every player's minutes;
+- `GB` minutes equal `gk_minutes`;
+- Σ `goals_for` = 3 × 7 and 3 × 7, and Σ `goals_against` = 2 × 7 and 9 × 7, for scores of 3–2 and 3–9;
+- Σ minutes = 420 for each match.
+
+## 162 — The season's rates and the impact per position are shrunk with the existing Poisson fit
+
+**2026-10-09** · accepted · reuses decision 115's shrinkage rather than adding a model
+
+**What `/stats` shows.** Five sections, in the cahier's order, then the notes and the squad list. Each
+figure has a leaderboard:
+
+- **Attaque:** buteurs, passeurs (unchanged).
+- **Défense:** buts encaissés sur le terrain as an outfield player (total, with the minutes beside it),
+  and « 1 but encaissé toutes les X min » outfield.
+- **Gardiens:** the same rate in goal, the total conceded in goal, and the existing keepers card.
+- **Temps de jeu:** minutes jouées, minutes au goal, minutes d'invincibilité (`clean_minutes`, all-pitch,
+  as before).
+- **Impact par poste.**
+- **Notes:** unchanged.
+
+The competition filter applies to everything, because it is applied once, to the matches.
+
+**Outfield and goal are separate populations.** Outfield is `conceded_while_on − conceded_while_gk` over
+`minutes − gk_minutes`, which is exact. The keeper rate is fitted on the keepers alone, for the same reason
+as rule 4 of `best-seven.ts`.
+
+**The rate is ranked after shrinking, and the raw record is printed beside it.** The rate is shrunk per
+60 towards the squad's pooled rate with `fitShrinkage(…, "goals", …)` and `shrink`: Gamma–Poisson,
+exposure in hours, prior strength measured and clamped to `[1, 6]` h. Only then is it turned into minutes
+per goal. So:
+- five clean minutes land near the squad's rate and cannot head the table;
+- the ranked figure is never infinite while anybody has conceded;
+- the raw record under it reads « 3 encaissés en 72′ » or **« aucun but encaissé en 35′ »** instead of ∞.
+
+The note under each card says what the smoothing weighs, in hours. I chose shrinkage over a minimum-
+minutes gate for the reason decision 115 gives: a gate makes a man appear and vanish as a Sunday passes.
+
+**Impact per position is two shrunk rates, not one.** For each position group, goals for per 60 and goals
+against per 60 are each fitted over the players who held that position and each shrunk. The impact is
+their difference. This lets the existing model be reused: a difference of counts is not Poisson and can
+be negative. It also shrinks the right thing, since ten minutes pull both of a man's rates towards the
+position's own. Each row prints the ranked figure and the record it rests on, « +5 / −2 en 120′ ». Three
+names per position.
+
+**Positions are grouped through one function**, `lib/stats/positions.ts` `positionGroupOf`:
+- GB → Gardien;
+- DC / DG / DD → Défenseur central;
+- MC / MOC → Milieu central;
+- MG / MD / AIL / AG / AD → Ailier;
+- AT → Attaquant.
+
+A code outside these is counted in the total minutes and filed under no position. This is Q10's mapping,
+so a 1-2-3-1 match with an `MG` and a post-S4 match with an `AIL` land in one row.
+
+**Stated plainly: with two matches the smoothing dominates.** The prior strength sits at or near its 6 h
+ceiling, so the ranked impacts are close to each position's mean. On the imported data they are all
+negative, because the team conceded 11 and scored 6. A raw +2,3 in 52′ in goal ranks first at −0,4. That
+is the model refusing to crown anybody on two Sundays, and the raw record beside each figure lets the
+reader see it. It loosens as the season fills.
+
+**The profile card** shows the player's own raw figures, not the smoothed ones:
+- conceded outfield, with « un but pris toutes les X′ » or « jamais »;
+- the keeper's conceded total and rate;
+- one line of minutes by position.
+
+The smoothed figure is a ranking device and lives on `/stats`.

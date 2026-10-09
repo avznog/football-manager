@@ -143,6 +143,9 @@ function PlayerRow({ player, sort }: { player: PlayerSeasonStats; sort: PlayerSo
             {show("assists") ? (
               <Figure label="Passes déc." value={played ? player.assists : null} />
             ) : null}
+            {/* « Qui a pris combien de buts » (the cahier): every goal conceded while he was on the
+                pitch, in goal or not. The split is the Défense and Gardiens sections above. */}
+            <Figure label="Encaissés" value={played ? player.concededWhileOn : null} />
             {show("rating") ? (
               <Figure
                 label="Note"

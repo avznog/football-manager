@@ -226,7 +226,13 @@ Also unique `(lineup_id, team_member_id)` — a player cannot occupy two slots.
 ### `match_player_stats` — a cache, not a source of truth
 `(match_id, team_member_id)` unique, `minutes`, `goals`, `assists`, `own_goals`,
 `penalties_scored`, `penalties_missed`, `fouls`, `gk_minutes`, `clean_minutes`,
-`conceded_while_on`, `gk_clean_minutes`, `conceded_while_gk`, `squad_role`, `computed_at`.
+`conceded_while_on`, `gk_clean_minutes`, `conceded_while_gk`, `goals_for_while_on`, `squad_role`,
+`computed_at`.
+
+`goals_for_while_on` (decision 160) is the other half of `conceded_while_on`: goals our team scored
+while he was on the pitch, his own included. Outfield conceded is `conceded_while_on − conceded_while_gk`
+exactly (both are incremented in the reducer's one `concede()`); outfield *clean* minutes are **not**
+derivable by subtraction, because the keeper's clean clock restarts when he takes the gloves.
 
 `clean_minutes` / `conceded_while_on` cover every player; `gk_clean_minutes` /
 `conceded_while_gk` are the same two figures restricted to time spent in goal, which is what a
@@ -236,6 +242,25 @@ half they kept clean (decision 018).
 
 Written by reducing `match_events` at the final whistle, and recomputed from scratch whenever the
 match is amended. **Never** written incrementally — that would let it drift from the log.
+
+### `match_player_positions` — the same cache, cut by position (decision 160)
+PK `(match_id, team_member_id, position_code)`, `minutes`, `goals_for`, `goals_against`; FKs to
+`matches` and `team_members` with `on delete cascade`, like `match_player_stats`. One row per player per
+position he held in the match. `position_code` is the slot's code **as the log had it** (`GB`, `DC`,
+`MG`, later `AIL`…); there is no FK to `positions`, because a cache keeps what happened while the
+catalogue changes under it, and grouping (MG/MD/AG/AD/AIL → « Ailier », DG/DD/DC → « Défenseur
+central ») happens at read time in `lib/stats/positions.ts`.
+
+Written by `lib/match/finalize.ts` in the **same transaction** as `match_player_stats`, deleted and
+reinserted on every re-freeze. Invariants, per player and match: `Σ minutes = match_player_stats.minutes`
+(minutes are apportioned by largest remainder so rounding cannot break it), the `GB` row's minutes
+`= gk_minutes`, `Σ goals_for = goals_for_while_on`, `Σ goals_against = conceded_while_on`. The one
+exception: time in a slot outside the catalogue has no row, so the sum falls short rather than invent a
+position.
+
+**Backfill.** `npm run db:refreeze` re-runs `finalizeMatchById` for every finished match (decision
+161); CI runs it after `db:migrate` on the preview and on production, so a column a migration adds is
+filled from the log in the same deploy.
 
 ## Ratings
 

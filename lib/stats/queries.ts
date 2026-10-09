@@ -28,6 +28,7 @@ import {
   formationSlots,
   formations,
   matchEvents,
+  matchPlayerPositions,
   matchPlayerStats,
   matchSquad,
   matches,
@@ -49,6 +50,7 @@ import {
 import {
   type CachedStatRow,
   type MatchLogInput,
+  type MatchPositionLine,
   matchesNeedingReduction,
   resolveMatchStatLines,
 } from "./match-lines";
@@ -195,10 +197,27 @@ async function getCachedStatRows(matchIds: readonly string[]): Promise<CachedSta
       concededWhileOn: matchPlayerStats.concededWhileOn,
       gkCleanMinutes: matchPlayerStats.gkCleanMinutes,
       concededWhileGk: matchPlayerStats.concededWhileGk,
+      goalsForWhileOn: matchPlayerStats.goalsForWhileOn,
       squadRole: matchPlayerStats.squadRole,
     })
     .from(matchPlayerStats)
     .where(inArray(matchPlayerStats.matchId, [...matchIds]));
+}
+
+/** The per-position cache, written beside `match_player_stats` by the same writer (decision 160). */
+async function getCachedPositionRows(matchIds: readonly string[]): Promise<MatchPositionLine[]> {
+  if (matchIds.length === 0) return [];
+  return db
+    .select({
+      matchId: matchPlayerPositions.matchId,
+      teamMemberId: matchPlayerPositions.teamMemberId,
+      positionCode: matchPlayerPositions.positionCode,
+      minutes: matchPlayerPositions.minutes,
+      goalsFor: matchPlayerPositions.goalsFor,
+      goalsAgainst: matchPlayerPositions.goalsAgainst,
+    })
+    .from(matchPlayerPositions)
+    .where(inArray(matchPlayerPositions.matchId, [...matchIds]));
 }
 
 /**
@@ -324,9 +343,10 @@ export const getSeasonStats = cache(
 
     const matchIds = matchRows.map((match) => match.id);
 
-    const [scores, cached, squad, ratedMatchIds] = await Promise.all([
+    const [scores, cached, cachedPositions, squad, ratedMatchIds] = await Promise.all([
       getMatchScores(matchIds),
       getCachedStatRows(matchIds),
+      getCachedPositionRows(matchIds),
       getSquadRows(matchIds),
       getRatedMatchIds(matchIds),
     ]);
@@ -390,7 +410,12 @@ export const getSeasonStats = cache(
       }
     }
 
-    const { lines, reducedMatchIds } = resolveMatchStatLines({ matchIds, cached, logs });
+    const { lines, positions, reducedMatchIds } = resolveMatchStatLines({
+      matchIds,
+      cached,
+      cachedPositions,
+      logs,
+    });
 
     const visibleRatingRows = await visibleRatings;
 
@@ -409,6 +434,7 @@ export const getSeasonStats = cache(
       members,
       matches: statsMatches,
       lines,
+      positions,
       squad,
       ratings: visibleRatingRows,
       pendingRatingMatches: publication.pendingMatchIds.length,

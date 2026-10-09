@@ -195,3 +195,33 @@ export function pendingRatingsNoteFr(pendingMatches: number, isSelf: boolean): s
     "elles arrivent quand tout le monde a noté."
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Rates and impact (decision 162)                                            */
+/* -------------------------------------------------------------------------- */
+
+/** « 1 but encaissé toutes les 24 min » — the ranked figure, never infinite (`impact.ts`). */
+export function minutesPerGoalFr(minutesPerGoal: number): string {
+  return `1 but toutes les ${Math.max(1, Math.round(minutesPerGoal))} min`;
+}
+
+/**
+ * The raw record the ranked rate was smoothed from: « 3 encaissés en 72′ », or « aucun but encaissé en
+ * 35′ » — the sentence the cahier asks for in place of ∞.
+ */
+export function concededRecordFr(conceded: number, minutes: number): string {
+  if (conceded === 0) return `aucun but encaissé en ${formatMinutes(minutes)}`;
+  return `${conceded} encaissé${conceded > 1 ? "s" : ""} en ${formatMinutes(minutes)}`;
+}
+
+/** `1.24` → `+1,2`, `-0.04` → `0,0`: a goal difference per 60, signed, one decimal. */
+export function formatSignedDecimal(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  if (rounded === 0) return formatDecimal(0);
+  return rounded > 0 ? `+${formatDecimal(rounded)}` : `−${formatDecimal(-rounded)}`;
+}
+
+/** « +5 / −2 en 120′ » — what a player's impact at a position rests on. */
+export function impactRecordFr(goalsFor: number, goalsAgainst: number, minutes: number): string {
+  return `+${goalsFor} / −${goalsAgainst} en ${formatMinutes(minutes)}`;
+}
