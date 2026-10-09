@@ -5118,3 +5118,35 @@ Two remarks from `backlogs/backlog2.md`, in a worktree, on port 3101 against `fo
 Files: `app/(app)/match/[id]/page.tsx`, `app/(app)/match/[id]/_components/finish-match-card.tsx`,
 `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `e2e/happy-path.spec.ts`, `docs/DECISIONS.md`,
 `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-10-09 — `/stats`: five per list, raw conceded rates, the squad as a table
+
+Three remarks of the owner's second backlog on `/stats`, one slice, decisions **176**, **177**, **178**.
+
+- **« Tout afficher » under every ranked list** (176). `lib/stats/` stopped cutting its rankings
+  (`leaderboard()`, `concededRateBoard`, `impactByPosition`; `RATE_BOARD_SIZE` and `IMPACT_SIZE` removed),
+  and one component, `RankedRows` in `app/(app)/stats/_components/parts.tsx`, shows five and folds the
+  rest in a native `<details>` with a second `<ol start="6">`. Used by `Leaderboard`, `RateBoard` and the
+  impact card.
+- **The two « Le moins de buts encaissés » cards on the real figure** (177). `concededRateBoard` is raw now
+  — fewest goals per minute, more minutes first among equals — and the shrinkage note is gone. The
+  profile card's `everyFr` moved to `lib/stats/format.ts` as `concededEveryFr`, and `concededRateFr` builds
+  the two lines of a row on it; `minutesPerGoalFr` is removed and `concededRecordFr` says « buts
+  encaissés » in full. The impact per position and the équipe type keep their smoothing.
+- **The « Joueurs » card is a `<table>`** (178): Joueur | Min | Buts | Passes | Note, the headers are the
+  `?tri=` links (`SortHeaderLink`, `SORT_COLUMNS` in `filters.tsx`, replacing `SortTabs`), with
+  `aria-sort` and a ↓. The roles and discipline lines are no longer on `/stats`.
+
+**Checked:** typecheck, lint, Vitest (1446), the full e2e (8) on a dedicated dev server and database. A new
+step at the end of the happy path opens « Tout afficher (8) » on « Minutes jouées » and sorts the table by
+« Buts ». Looked at `/stats` at 390 px in light and dark, as the coach (Karim) and as a player (Julien),
+folds closed and open, the table sorted by minutes and by note: no horizontal scroll (`scrollWidth` 390 in
+every case), and the outfield and keeper rates checked against `match_player_stats` (Thomas 8 in 324′ →
+« toutes les 41′ », Hugo 6 in 270′ in goal → « toutes les 45′ »).
+
+**Open for the owner:** with raw rates, Rayan (1 goal in 60′, has left) heads the outfield card. Real, and
+printed beside its record; a minimum of minutes would be one `filter` if he wants one.
+
+Files: `lib/stats/{aggregate,impact,format}.ts` and their tests, `app/(app)/stats/page.tsx`,
+`app/(app)/stats/_components/{parts,leaderboard,rate-board,impact,filters,player-list}.tsx`,
+`app/(app)/joueur/_components/stats-card.tsx`, `e2e/happy-path.spec.ts`, `docs/`.

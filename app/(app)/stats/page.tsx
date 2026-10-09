@@ -207,7 +207,7 @@ function SeasonCards({
           title="Le moins de buts encaissés"
           description="Joueur de champ : 1 but encaissé toutes les X minutes sur le terrain"
           board={stats.outfieldConcededRate}
-          emptyMessage="Aucun but encaissé sur cette sélection : il n’y a pas de rythme à classer."
+          emptyMessage="Personne n’a encore de minutes de joueur de champ sur cette sélection."
         />
       </Section>
 
@@ -216,7 +216,7 @@ function SeasonCards({
           title="Le moins de buts encaissés au goal"
           description="Gardien : 1 but encaissé toutes les X minutes dans les buts"
           board={stats.keeperConcededRate}
-          emptyMessage="Aucun but encaissé dans les buts sur cette sélection, ou personne n’y a joué."
+          emptyMessage="Personne n’a encore joué dans les buts sur cette sélection."
         />
         <Leaderboard
           title="Buts encaissés au goal"

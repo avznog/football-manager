@@ -1997,3 +1997,16 @@ browser could not be told to drop it. Decision **143** has the full account.
       « Qui entre ? » titled with who goes out, one tap, then the pre-arranged « Changement » pitch to
       validate. « Personne n’entre » keeps the uneven change. The group-change e2e now walks 1 for 1
       from the disc, then 2 out / 1 in and 2 out / 2 in from the menu
+- [x] **`/stats`: every ranked list shows five, and « Tout afficher (N) » the rest** (decision **176**).
+      The rankings are no longer cut in `lib/stats/`; `RankedRows` in `_components/parts.tsx` folds them
+      with a native `<details>` (no JavaScript), ranks running on from 6. Leaderboards, the two rate cards
+      and each position of the impact card; the impact shows five, not three
+- [x] **`/stats`: « Le moins de buts encaissés » on the real figure** (decision **177**, supersedes the
+      rate half of 162). Raw `conceded / minutes`, more minutes first among equals; « 1 but toutes les
+      40′ » over « 3 buts encaissés en 120′ », « aucun but encaissé » over « en 35′ »; the smoothing note
+      is gone. `concededEveryFr` / `concededRateFr` in `lib/stats/format.ts`, shared with the profile card
+- [x] **`/stats`: the squad is a table** (decision **178**). `Joueur | Min | Buts | Passes | Note`, the
+      column headers are the `?tri=` links with `aria-sort` and a ↓, fits 390 px; roles and discipline
+      left to the profile. `happy-path.spec.ts` walks the fold and a header sort
+- [ ] **Open for the owner**: whether « Le moins de buts encaissés » should require a minimum of minutes
+      — today a man with 1 goal in 60′ heads the card over 8 in 324′, which is the real figure

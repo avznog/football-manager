@@ -1,29 +1,26 @@
 /**
- * The two kinds of season figure that divide by minutes and so need shrinking before they are ranked
- * (decision 162): « 1 but encaissé toutes les X min », and the impact per position.
+ * The two season figures that divide by minutes: « 1 but encaissé toutes les X min », and the impact per
+ * position. Only the second is shrunk before it is ranked (decision 162); the first is ranked on its raw
+ * value since decision 177.
  *
- * Pure. **No new model**: both reuse the Gamma–Poisson fit of `best-seven.ts` — `fitShrinkage` on the
- * `goals` criterion, whose exposure is 60-minute blocks and whose prior strength is measured from the
- * squad and clamped to `[1, 6]` blocks — and its `shrink`. A goal conceded while a man is on the pitch
+ * Pure. **No new model**: the impact — and the équipe type's conceded rates, in `sevens.ts` — reuse the
+ * Gamma–Poisson fit of `best-seven.ts`: `fitShrinkage` on the `goals` criterion, whose exposure is
+ * 60-minute blocks and whose prior strength is measured from the squad and clamped to `[1, 6]` blocks,
+ * and its `shrink`. A goal conceded while a man is on the pitch
  * is a Poisson count over his minutes exactly as a goal scored is, so the model fits as it stands; the
  * adapter below only feeds it a different count.
  *
  * ## « 1 but encaissé toutes les X min »
  *
- * The rate is shrunk **per 60** (goals per 60 minutes, towards the squad's pooled rate) and only then
- * turned into minutes per goal, `60 / rate`. Two consequences, both wanted:
+ * Raw since decision 177: minutes over goals conceded, ranked as it stands, and « aucun but encaissé »
+ * rather than ∞ for a man who conceded nothing. Decision 162 shrank it per 60 towards the squad's rate so
+ * that five clean minutes could not head the table; the owner preferred the real figure, and the
+ * tie-break on minutes is what keeps a whole clean match above five clean minutes.
  *
- * - **five minutes cannot win.** A man with five clean minutes is pulled almost all the way to the
- *   squad's rate (with `m` ≥ 1 hour, his own five minutes weigh less than a twelfth), so he lands in
- *   the middle of the table rather than on top of it with « ∞ »;
- * - **no infinity is ever printed.** A shrunk rate is never zero while somebody in the squad has
- *   conceded, so the ranked figure is always a number of minutes. The *raw* figure can be « aucun but
- *   encaissé », and the screen prints that sentence beside the ranked one rather than ∞.
- *
- * Outfield and goalkeeper are two populations with two fits: a keeper's minutes in goal are measured
- * against keepers, never pooled with ten outfielders (the same reasoning as rule 4 of `best-seven.ts`).
- * The outfield figure is `concededWhileOn − concededWhileGk` over `minutes − gkMinutes`, which is exact
- * because the reducer increments both counters in the same `concede()`.
+ * Outfield and goalkeeper are two populations: a keeper's minutes in goal are measured against keepers,
+ * never pooled with ten outfielders. The outfield figure is `concededWhileOn − concededWhileGk` over
+ * `minutes − gkMinutes`, which is exact because the reducer increments both counters in the same
+ * `concede()`.
  *
  * ## Impact per position (the owner's Q7)
  *
@@ -44,12 +41,6 @@ import {
 import { POSITION_GROUPS, type PositionGroup } from "./positions";
 
 const MINUTES_PER_BLOCK = 60;
-
-/** How many names each position's impact table lists. Five positions, three each: one phone screen. */
-export const IMPACT_SIZE = 3;
-
-/** How many names a rate table lists — the same as every other leaderboard on `/stats`. */
-export const RATE_BOARD_SIZE = 5;
 
 export type RankedMember = {
   teamMemberId: string;
@@ -102,58 +93,48 @@ export function shrunkPer60(
 export type ConcededRateEntry = RankedMember & {
   /** The minutes the rate is over: outfield minutes, or minutes in goal. */
   minutes: number;
-  /** Goals conceded in those minutes, raw. */
+  /** Goals conceded in those minutes. */
   conceded: number;
-  /** The ranked figure: minutes per goal conceded, after shrinking. Higher is better. */
-  minutesPerGoal: number;
-  /** The raw figure, `minutes / conceded` — null when he conceded nothing (« aucun but encaissé »). */
-  rawMinutesPerGoal: number | null;
+  /**
+   * `minutes / conceded`, unrounded — null when he conceded nothing (« aucun but encaissé »), which is
+   * the best record there is rather than an infinity to print.
+   */
+  minutesPerGoal: number | null;
 };
 
 export type ConcededRateBoard = {
+  /** Every player with minutes in this population, best first. The screen shows five, then the rest. */
   entries: ConcededRateEntry[];
-  /** What the shrinkage did, so the screen can say « ramené vers l'équipe à hauteur de N h ». */
-  model: ShrinkageReport;
-  /** Players with minutes in this population, ranked or not. */
-  considered: number;
 };
 
 /**
- * Best first: the most minutes per goal conceded, shrunk. Nobody without minutes is listed. Empty when
- * the squad has conceded nothing at all in this population — every rate would be the squad's zero, and
- * minutes per goal would be infinite for everyone; the screen says « aucun but encaissé » instead.
+ * Best first: the fewest goals conceded per minute on the pitch, **raw** (decision 177). Nobody without
+ * minutes is listed.
+ *
+ * No smoothing: the owner wants « uniquement les vraies valeurs », so a man is ranked on exactly the
+ * figure printed beside his name. Among equal rates the longer record ranks first — so among the men who
+ * conceded nothing, the most clean minutes lead, and five clean minutes sit below a whole clean match.
+ * The comparison is `conceded × other's minutes`, integers both, so two equal rates compare equal
+ * without a division rounding them apart.
  */
-export function concededRateBoard(
-  rows: readonly CountSample[],
-  size = RATE_BOARD_SIZE,
-): ConcededRateBoard {
-  const samples = rows.filter((row) => row.minutes > 0);
-  const model = fitCountModel(samples);
-  const entries = samples
-    .flatMap((row): ConcededRateEntry[] => {
-      const rate = shrunkPer60(row.count, row.minutes, model);
-      if (rate === null || rate <= 0) return [];
-      return [
-        {
-          teamMemberId: row.teamMemberId,
-          displayName: row.displayName,
-          jerseyNumber: row.jerseyNumber,
-          hasLeft: row.hasLeft,
-          minutes: row.minutes,
-          conceded: row.count,
-          minutesPerGoal: MINUTES_PER_BLOCK / rate,
-          rawMinutesPerGoal: row.count > 0 ? row.minutes / row.count : null,
-        },
-      ];
-    })
+export function concededRateBoard(rows: readonly CountSample[]): ConcededRateBoard {
+  const entries = rows
+    .filter((row) => row.minutes > 0)
+    .map(
+      (row): ConcededRateEntry => ({
+        ...memberOf(row),
+        minutes: row.minutes,
+        conceded: row.count,
+        minutesPerGoal: row.count > 0 ? row.minutes / row.count : null,
+      }),
+    )
     .sort(
       (a, b) =>
-        b.minutesPerGoal - a.minutesPerGoal ||
+        a.conceded * b.minutes - b.conceded * a.minutes ||
         b.minutes - a.minutes ||
         a.displayName.localeCompare(b.displayName, "fr"),
-    )
-    .slice(0, size);
-  return { entries, model, considered: samples.length };
+    );
+  return { entries };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -180,10 +161,8 @@ export type ImpactEntry = RankedMember & {
 
 export type PositionImpact = {
   group: PositionGroup;
-  /** Best first, at most `IMPACT_SIZE`. */
+  /** Everybody with minutes at this position, best first. The screen shows five, then the rest. */
   entries: ImpactEntry[];
-  /** Everybody with minutes at this position, ranked or not. */
-  considered: number;
   goalsForModel: ShrinkageReport;
   goalsAgainstModel: ShrinkageReport;
 };
@@ -239,7 +218,6 @@ function memberOf(member: RankedMember): RankedMember {
 /** Every position in `POSITION_GROUPS` order, including the ones nobody has played yet (empty). */
 export function impactByPosition(
   players: readonly (RankedMember & { positions: readonly PositionSeason[] })[],
-  size = IMPACT_SIZE,
 ): PositionImpact[] {
   const models = fitPositionModels(players);
   return POSITION_GROUPS.map((group) => {
@@ -275,8 +253,7 @@ export function impactByPosition(
 
     return {
       group,
-      entries: entries.slice(0, size),
-      considered: atGroup.length,
+      entries,
       goalsForModel,
       goalsAgainstModel,
     };

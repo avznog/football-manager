@@ -197,21 +197,41 @@ export function pendingRatingsNoteFr(pendingMatches: number, isSelf: boolean): s
 }
 
 /* -------------------------------------------------------------------------- */
-/* Rates and impact (decision 162)                                            */
+/* Rates and impact (decisions 162 and 177)                                   */
 /* -------------------------------------------------------------------------- */
 
-/** « 1 but encaissé toutes les 24 min » — the ranked figure, never infinite (`impact.ts`). */
-export function minutesPerGoalFr(minutesPerGoal: number): string {
-  return `1 but toutes les ${Math.max(1, Math.round(minutesPerGoal))} min`;
+/**
+ * « toutes les 24′ », or « jamais » for a man who conceded nothing — never ∞. His **raw** rate, minutes
+ * over goals, rounded to the minute and never below one.
+ *
+ * Shared by the profile card (« Un but pris : toutes les 24′ ») and `/stats`'s « Le moins de buts
+ * encaissés » (decision 177), so a player reads the same figure about himself on both screens.
+ */
+export function concededEveryFr(minutes: number, conceded: number): string {
+  if (conceded === 0) return "jamais";
+  return `toutes les ${formatMinutes(Math.max(1, Math.round(minutes / conceded)))}`;
 }
 
 /**
- * The raw record the ranked rate was smoothed from: « 3 encaissés en 72′ », or « aucun but encaissé en
- * 35′ » — the sentence the cahier asks for in place of ∞.
+ * The two lines of a « Le moins de buts encaissés » row: the rate it is ranked on, and the record that
+ * rate is — « 1 but toutes les 40′ » over « 3 buts encaissés en 120′ ». A man who conceded nothing reads
+ * « aucun but encaissé » over « en 35′ »: the sentence the cahier asks for in place of ∞, said once.
  */
+export function concededRateFr(
+  conceded: number,
+  minutes: number,
+): { rate: string; record: string } {
+  if (conceded === 0) return { rate: "aucun but encaissé", record: `en ${formatMinutes(minutes)}` };
+  return {
+    rate: `1 but ${concededEveryFr(minutes, conceded)}`,
+    record: concededRecordFr(conceded, minutes),
+  };
+}
+
+/** « 3 buts encaissés en 72′ », « 1 but encaissé en 20′ », or « aucun but encaissé en 35′ ». */
 export function concededRecordFr(conceded: number, minutes: number): string {
   if (conceded === 0) return `aucun but encaissé en ${formatMinutes(minutes)}`;
-  return `${conceded} encaissé${conceded > 1 ? "s" : ""} en ${formatMinutes(minutes)}`;
+  return `${plural(conceded, "but encaissé", "buts encaissés")} en ${formatMinutes(minutes)}`;
 }
 
 /** `1.24` → `+1,2`, `-0.04` → `0,0`: a goal difference per 60, signed, one decimal. */

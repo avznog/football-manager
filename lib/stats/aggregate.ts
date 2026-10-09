@@ -281,9 +281,9 @@ export type SeasonStats = {
   topConcededOutfield: LeaderboardEntry[];
   /** Most goals conceded in goal, with the minutes in goal beside it. */
   topConcededGk: LeaderboardEntry[];
-  /** « 1 but encaissé toutes les X min », outfield, shrunk (decision 162). */
+  /** « 1 but encaissé toutes les X min », outfield, raw (decision 177). */
   outfieldConcededRate: ConcededRateBoard;
-  /** The same for time in goal, fitted on the keepers alone. */
+  /** The same for time in goal, over the minutes in goal alone. */
   keeperConcededRate: ConcededRateBoard;
   /** Minutes on the pitch, in goal, and with the sheet unbroken. */
   topMinutes: LeaderboardEntry[];
@@ -316,7 +316,10 @@ export const FORM_LENGTH = 5;
  */
 export const MIN_RATED_MATCHES = 3;
 
-/** How many rows a leaderboard shows. */
+/**
+ * How many rows a ranked list on `/stats` shows before « Tout afficher » (decision 176). The rankings
+ * themselves are never cut: every list below carries everybody eligible, and the screen folds the rest.
+ */
 export const LEADERBOARD_SIZE = 5;
 
 /* -------------------------------------------------------------------------- */
@@ -795,7 +798,6 @@ function leaderboard(
         tieBreak(b) - tieBreak(a) ||
         a.displayName.localeCompare(b.displayName, "fr"),
     )
-    .slice(0, LEADERBOARD_SIZE)
     .map((player) => ({
       teamMemberId: player.teamMemberId,
       displayName: player.displayName,

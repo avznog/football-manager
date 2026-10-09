@@ -1,12 +1,12 @@
 /**
- * The competition filter and the sort control — both plain links.
+ * The competition filter and the squad table's sortable column headers — both plain links.
  *
  * Deliberately not a client component. The filter is a *view of the URL*, so `?competition=<id>` is
  * shareable, survives a reload, and works with no JavaScript at all: the same reasoning as the
  * coach's forms on `/equipe`. `SegmentedControl` would have needed a client parent and an
  * `onChange` handler to do less.
  *
- * Both carry `scroll={false}`: a chip only ever replaces the numbers already under the reader's
+ * Both carry `scroll={false}`: a chip or a header only ever replaces the numbers already under the reader's
  * thumb, and Next scrolls to the top of the document on every navigation unless told not to. Sorting
  * the player list from halfway down the page sent the reader back to the title — the one thing he
  * was not looking at.
@@ -115,51 +115,54 @@ export function CompetitionFilter({
   );
 }
 
-const SORT_LABELS: Record<PlayerSortKey, string> = {
-  minutes: "Minutes",
-  goals: "Buts",
-  assists: "Passes déc.",
-  rating: "Note",
+/** One sortable column of the squad table. */
+export type SortColumn = {
+  key: PlayerSortKey;
+  /** The header as printed. */
+  label: string;
+  /** The same header in full, for a screen reader: « Min » alone is not a word. */
+  spoken: string;
 };
 
-export const SORT_OPTIONS: readonly PlayerSortKey[] = [
-  "minutes",
-  "goals",
-  "assists",
-  "rating",
+/**
+ * The squad table's sortable columns, in the order they are printed (decision 178). « Passes », never
+ * the two-letter abbreviation (`minutes-table.tsx` says why), and « Min » because the column holds
+ * three digits and a 390 px row has no room for the word.
+ */
+export const SORT_COLUMNS: readonly SortColumn[] = [
+  { key: "minutes", label: "Min", spoken: "minutes" },
+  { key: "goals", label: "Buts", spoken: "buts" },
+  { key: "assists", label: "Passes", spoken: "passes décisives" },
+  { key: "rating", label: "Note", spoken: "note" },
 ];
 
-/** How the player list is ordered. Same link-based approach, scoped to the list it sorts. */
-export function SortTabs({ query }: { query: StatsQuery }) {
+/**
+ * A column header of the squad table that sorts by its column — the same plain link as the chips, so
+ * `?tri=` keeps working with no JavaScript and survives a reload. Every sort is descending, best
+ * first; the active column says so with `aria-sort` on its `<th>` (set by the table) and a visible ↓,
+ * and the others are coloured as the links they are, since nothing is explained on hover (072).
+ */
+export function SortHeaderLink({ query, column }: { query: StatsQuery; column: SortColumn }) {
+  const active = query.sort === column.key;
   return (
-    <nav aria-label="Trier les joueurs" className="-mx-4 overflow-x-auto px-4">
-      <div className="flex w-max gap-1.5">
-        {SORT_OPTIONS.map((sort) => {
-          const active = query.sort === sort;
-          return (
-            <Link
-              key={sort}
-              href={statsHref({ ...query, sort })}
-              scroll={false}
-              aria-current={active ? "true" : undefined}
-              className={cn(
-                "inline-flex min-h-9 items-center rounded-lg px-2.5 text-xs font-semibold whitespace-nowrap",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                active
-                  ? "bg-surface-2 text-ink ring-1 ring-border/60 ring-inset"
-                  : "text-ink-muted hover:text-ink",
-              )}
-            >
-              {SORT_LABELS[sort]}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+    <Link
+      href={statsHref({ ...query, sort: column.key })}
+      scroll={false}
+      className={cn(
+        "inline-flex min-h-11 items-center justify-end whitespace-nowrap",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        active ? "font-semibold text-ink" : "font-medium text-accent hover:text-ink",
+      )}
+    >
+      {/* Always laid out, visible only on the active column, so a column does not change width when
+          the sort moves to it. On the left of the word, so the word's right edge lines up with the
+          right-aligned figures under it. */}
+      <span aria-hidden="true" className={cn("mr-0.5 w-2.5 text-right", !active && "invisible")}>
+        ↓
+      </span>
+      <span className="sr-only">{active ? "Trié par " : "Trier par "}</span>
+      <span aria-hidden="true">{column.label}</span>
+      <span className="sr-only">{column.spoken}</span>
+    </Link>
   );
-}
-
-/** The label of a sort key, for the emphasised column of the player list. */
-export function sortLabel(sort: PlayerSortKey): string {
-  return SORT_LABELS[sort];
 }

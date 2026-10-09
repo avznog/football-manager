@@ -1,28 +1,33 @@
 /**
- * Every player's season, one row each.
+ * Every player's season, one row each — a real `<table>` (decision 178).
  *
- * Not a table. Fourteen figures per player against a 320 px viewport leaves two honest options —
- * scroll sideways, or make each player a small block — and a block wins: no hidden columns, no
- * horizontal scroll inside a vertically scrolling page, and the sorted figure can be promoted to
- * the right of the name where the eye already is.
+ * It used to be a list of blocks, because fourteen figures per player do not fit a 320 px viewport.
+ * The owner asked for the opposite trade: « il faudrait faire un tableau, de sorte que l'on puisse
+ * comparer très rapidement ». A comparison is read down a column, so the table keeps the four figures
+ * people compare — minutes, buts, passes, note — in four narrow right-aligned columns that fit 390 px
+ * with no horizontal scroll, and leaves the rest where it already lives: the roles and the discipline
+ * on the player's profile, the conceded figures in the Défense and Gardiens sections above.
  *
- * A player with nothing recorded is still listed, saying so, because a squad list that quietly
- * omits whoever has not been selected yet reads as a bug (`aggregate.ts`).
+ * The column headers are the sort: plain links to `?tri=`, so it works with no JavaScript, with
+ * `aria-sort` and a visible ↓ on the active one. Modelled on the recap's `minutes-table.tsx`.
+ *
+ * A player with nothing recorded is still listed, with dashes, because a squad list that quietly omits
+ * whoever has not been selected yet reads as a bug (`aggregate.ts`).
  */
 
 import { Card } from "@/components/ui/card";
+import { cn } from "@/components/ui/cn";
 import type { PlayerSeasonStats, PlayerSortKey } from "@/lib/stats/aggregate";
 import {
   NO_DATA_FR,
-  appearancesLineFr,
-  formatMinutes,
+  NO_VALUE_FR,
   formatRating,
   pendingRatingMatchesNoteFr,
   plural,
 } from "@/lib/stats/format";
 
-import { SortTabs, type StatsQuery, sortLabel } from "./filters";
-import { CardEmpty, Figure, FigureGrid, Note, PlayerIdentity } from "./parts";
+import { SORT_COLUMNS, SortHeaderLink, type StatsQuery } from "./filters";
+import { CardEmpty, Note, PlayerIdentity } from "./parts";
 
 export function PlayerList({
   players,
@@ -40,24 +45,45 @@ export function PlayerList({
   return (
     <Card
       title="Joueurs"
-      description="Buts, minutes et notes, par joueur."
+      description="Minutes, buts, passes décisives et note, par joueur. Touche une colonne pour trier."
       as="h2"
       flush
     >
-      <div className="border-b border-border/60 pb-2">
-        <SortTabs query={query} />
-      </div>
-
       {players.length === 0 ? (
-        <div className="p-4">
+        <div className="px-4 pb-4">
           <CardEmpty>Aucun joueur dans l’effectif pour le moment.</CardEmpty>
         </div>
       ) : (
-        <ul className="divide-y divide-border/60">
-          {players.map((player) => (
-            <PlayerRow key={player.teamMemberId} player={player} sort={query.sort} />
-          ))}
-        </ul>
+        <table className="w-full text-sm">
+          <caption className="sr-only">
+            Minutes, buts, passes décisives et note de chaque joueur
+          </caption>
+          <thead>
+            <tr className="border-y border-border/60 text-left text-xs text-ink-subtle">
+              <th scope="col" className="py-0 pl-4 font-medium">
+                Joueur
+              </th>
+              {SORT_COLUMNS.map((column, index) => (
+                <th
+                  key={column.key}
+                  scope="col"
+                  aria-sort={query.sort === column.key ? "descending" : undefined}
+                  className={cn(
+                    "py-0 text-right",
+                    index === SORT_COLUMNS.length - 1 ? "pr-4 pl-1" : "px-1",
+                  )}
+                >
+                  <SortHeaderLink query={query} column={column} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/60">
+            {players.map((player) => (
+              <PlayerRow key={player.teamMemberId} player={player} query={query} />
+            ))}
+          </tbody>
+        </table>
       )}
 
       {pendingRatingMatches > 0 ? (
@@ -76,126 +102,68 @@ export function PlayerList({
  * Whether this player has any match record at all.
  *
  * A player nobody has ever put on a sheet has not "scored 0 goals" — he has no match to have scored
- * in. So his football figures are `null`, not `0`, while his ratings keep their real values (`aggregate.ts`, rule 1). A substitute who was named and stayed on the bench *does*
- * have a record: 0 goals in 0 minutes is a fact about him.
+ * in. So his football figures are a dash, not `0`, while his ratings keep their real values
+ * (`aggregate.ts`, rule 1). A substitute who was named and stayed on the bench *does* have a record:
+ * 0 goals in 0 minutes is a fact about him.
  */
 function hasMatchRecord(player: PlayerSeasonStats): boolean {
   return player.appearances.selected > 0 || player.minutes > 0;
 }
 
-/**
- * The figure promoted next to the name: whatever the list is sorted by. It replaces the grid
- * column, so it has to carry everything that column carried — the rating's count included.
- */
-function promoted(
-  player: PlayerSeasonStats,
-  sort: PlayerSortKey,
-): { value: string | null; hint?: string } {
+function PlayerRow({ player, query }: { player: PlayerSeasonStats; query: StatsQuery }) {
   const played = hasMatchRecord(player);
-  switch (sort) {
-    case "minutes":
-      return { value: played ? formatMinutes(player.minutes) : null };
-    case "goals":
-      return { value: played ? `${player.goals}` : null };
-    case "assists":
-      return { value: played ? `${player.assists}` : null };
-    case "rating":
-      return player.rating.count > 0
-        ? {
-            value: formatRating(player.rating.average),
-            hint: `sur ${plural(player.rating.count, "note")}`,
-          }
-        : { value: null };
-  }
-}
-
-function PlayerRow({ player, sort }: { player: PlayerSeasonStats; sort: PlayerSortKey }) {
-  const played = hasMatchRecord(player);
-  const headline = promoted(player, sort);
-  // The sorted figure is already promoted next to the name; repeating it in the grid would show the
-  // same number twice on a 320 px row.
-  const show = (key: PlayerSortKey) => key !== sort;
+  const rated = player.rating.count > 0;
+  // The sorted column reads a shade stronger, so the eye finds the figure the order comes from.
+  const cell = (key: PlayerSortKey, last = false) =>
+    cn(
+      "py-2 text-right align-top font-mono tabular-nums",
+      last ? "pr-4 pl-1" : "px-1",
+      query.sort === key ? "font-semibold text-ink" : "text-ink-muted",
+    );
 
   return (
-    <li className="px-4 py-3">
-      <PlayerIdentity
-        displayName={player.displayName}
-        jerseyNumber={player.jerseyNumber}
-        hasLeft={player.hasLeft}
-        trailing={
-          <dl className="text-right">
-            <Figure label={sortLabel(sort)} tone="strong" className="text-right" {...headline} />
-          </dl>
-        }
-      />
-
-      {player.hasData ? (
-        <>
-          <FigureGrid className="mt-2">
-            {/* The sheet total that reconciles this with « 7 fois titulaire » is on the appearances
-                line below, in full width: « 7 matchs sur la feuille » does not fit a 110 px column,
-                and it used to be a `title` nobody on a phone could read (decision 072). */}
-            <Figure label="Matchs" value={played ? player.matchesPlayed : null} />
-            {show("minutes") ? (
-              <Figure label="Minutes" value={played ? formatMinutes(player.minutes) : null} />
-            ) : null}
-            {show("goals") ? <Figure label="Buts" value={played ? player.goals : null} /> : null}
-            {show("assists") ? (
-              <Figure label="Passes déc." value={played ? player.assists : null} />
-            ) : null}
-            {/* « Qui a pris combien de buts » (the cahier): every goal conceded while he was on the
-                pitch, in goal or not. The split is the Défense and Gardiens sections above. */}
-            <Figure label="Encaissés" value={played ? player.concededWhileOn : null} />
-            {show("rating") ? (
-              <Figure
-                label="Note"
-                value={player.rating.count > 0 ? formatRating(player.rating.average) : null}
-                hint={
-                  player.rating.count > 0 ? `sur ${plural(player.rating.count, "note")}` : undefined
-                }
-              />
-            ) : null}
-          </FigureGrid>
-
-          <Roles player={player} />
-          <Discipline player={player} />
-        </>
-      ) : (
-        <p className="mt-1 text-xs text-ink-subtle">{NO_DATA_FR} sur cette sélection.</p>
-      )}
-    </li>
+    <tr>
+      {/* `max-w-0 w-full`: the name column takes what the four numbers leave and truncates in it,
+          rather than pushing the table wider than the phone. */}
+      <th scope="row" className="w-full max-w-0 py-2 pl-4 text-left align-top font-normal">
+        <PlayerIdentity
+          displayName={player.displayName}
+          jerseyNumber={player.jerseyNumber}
+          hasLeft={player.hasLeft}
+        />
+      </th>
+      <td className={cell("minutes")}>{played ? player.minutes : <Missing />}</td>
+      <td className={cell("goals")}>{played ? <Count value={player.goals} /> : <Missing />}</td>
+      <td className={cell("assists")}>{played ? <Count value={player.assists} /> : <Missing />}</td>
+      <td className={cell("rating", true)}>
+        {rated ? (
+          <>
+            {formatRating(player.rating.average)}
+            {/* The denominator, printed (decision 072): « 4 notés » is four matches whose mean he
+                received (decision 137), so a 9,0 on one match does not read like a season. */}
+            <span className="block font-sans text-[0.625rem] leading-tight font-normal text-ink-subtle">
+              {plural(player.rating.count, "noté", "notés")}
+            </span>
+          </>
+        ) : (
+          <Missing />
+        )}
+      </td>
+    </tr>
   );
 }
 
-/**
- * « 6 matchs sur la feuille · 1 fois titulaire · 5 fois remplaçant ».
- *
- * Titulaire / remplaçant / supporter come from the match sheet; gardien comes from the minutes
- * actually spent in goal, because it is not a sheet role (`aggregate.ts`, rule 4). The sheet total
- * leads the line here — it is what explains « MATCHS 6 » standing above « 7 fois titulaire », and it
- * has nowhere else to go on this card (decision 072).
- *
- * The wording is `appearancesLineFr`'s, shared with the profile card so the two screens cannot
- * disagree, and testable: this component is under `app/`, where Vitest does not look.
- */
-function Roles({ player }: { player: PlayerSeasonStats }) {
-  const line = appearancesLineFr(player.appearances, { withSheetTotal: true });
-  if (line === null) return null;
-
-  return <p className="mt-2 text-xs text-ink-muted">{line}</p>;
+/** A zero is a fact and is printed — only lighter, so the figures that are not zero stand out. */
+function Count({ value }: { value: number }) {
+  return value === 0 ? <span className="text-ink-subtle">0</span> : <>{value}</>;
 }
 
-/** Only shown when there is something to show: a row of zeros is noise. */
-function Discipline({ player }: { player: PlayerSeasonStats }) {
-  const parts: string[] = [];
-  if (player.penaltiesScored > 0 || player.penaltiesMissed > 0) {
-    // The scored penalty is already inside « Buts » — spelled out so nobody adds them twice.
-    parts.push(`pénos ${player.penaltiesScored}/${player.penaltiesScored + player.penaltiesMissed}`);
-  }
-  if (player.ownGoals > 0) parts.push(plural(player.ownGoals, "csc", "csc"));
-  if (player.fouls > 0) parts.push(plural(player.fouls, "faute"));
-  if (player.cleanMinutes > 0) parts.push(`${formatMinutes(player.cleanMinutes)} sans encaisser`);
-  if (parts.length === 0) return null;
-
-  return <p className="mt-1 text-xs text-ink-subtle">{parts.join(" · ")}</p>;
+/** Nobody has this number: a dash, announced as such (`parts.tsx`, rule 2). */
+function Missing() {
+  return (
+    <span className="text-ink-subtle">
+      <span aria-hidden="true">{NO_VALUE_FR}</span>
+      <span className="sr-only">{NO_DATA_FR}</span>
+    </span>
+  );
 }
