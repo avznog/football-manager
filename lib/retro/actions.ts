@@ -25,9 +25,13 @@ import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
 import { amendMatchEvents } from "@/lib/match/append";
 import { getLiveMatch } from "@/lib/match/live";
-import { reduceLive } from "@/lib/match/presenter";
+import { type LiveMatch, type PendingEvent, minuteLabelFr, reduceLive } from "@/lib/match/presenter";
+import type { MatchState } from "@/lib/match/reducer";
+import type { Actor } from "@/lib/auth/can";
 
-import { buildAmendment, isAmendableEventType } from "./amend";
+import { type Amendment, buildAmendment, buildChangeAmendment, isAmendableEntry } from "./amend";
+import { changeCandidateIds, changeProblemFr, changeSeed, stateAtClock } from "./change";
+import { introducedAnomalies, realismRefusalFr } from "./realism";
 import {
   buildRetroLog,
   retroEntrySeed,
@@ -37,6 +41,7 @@ import {
   type RetroEntry,
 } from "./log";
 import {
+  amendChangeSchema,
   amendSubmitSchema,
   blockingRetroIssues,
   findRetroIssues,
@@ -222,6 +227,9 @@ async function upsertSquadFromEntry(matchId: string, entry: RetroEntry): Promise
 export async function submitAmendment(_prev: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireActor();
 
+  // « Ajouter un changement » (decision 169): a shape of its own, the same path afterwards.
+  if (formData.get("intent") === "change") return submitChange(actor, formData);
+
   const factType = formData.get("fact-type");
   const parsed = amendSubmitSchema.safeParse({
     teamId: formData.get("teamId"),
@@ -263,11 +271,17 @@ export async function submitAmendment(_prev: FormState, formData: FormData): Pro
   }
   // The same rule as the one that decides whether the screen shows « Corriger » — here too, so a
   // crafted POST cannot annul a kick-off and leave a log whose minutes mean nothing.
-  if (target && !isAmendableEventType(target.type)) {
+  if (target && !isAmendableEntry(target)) {
     return {
       error:
-        "Cette ligne fait partie du déroulement du match : seules les actions et les changements se corrigent ici.",
+        target.type === "LINEUP_APPLIED"
+          ? "La composition de départ ne s’annule pas : pour changer l’équipe sur le terrain, ajoute un changement."
+          : "Cette ligne fait partie du déroulement du match : seules les actions et les changements se corrigent ici.",
     };
+  }
+  // A change is annulled and re-entered, never replaced by a fact.
+  if (target && target.type === "LINEUP_APPLIED" && intent !== "void") {
+    return { error: "Un changement ne se corrige pas en place : annule-le, puis ajoute le bon." };
   }
 
   const fact = intent === "void" ? null : (parsed.data.fact ?? null);
@@ -325,34 +339,129 @@ export async function submitAmendment(_prev: FormState, formData: FormData): Pro
 
   if (amendment.events.length === 0) return { error: "Il n’y a rien à corriger." };
 
-  /*
-   * The corrected log, read by the reducer before it is written. A correction that would produce a
-   * goal by somebody who had already been substituted is the coach misremembering, and the right
-   * answer is to say so rather than to store a timeline with a warning on it.
-   */
-  const preview = reduceLive(
-    live,
-    amendment.events.map((event) => ({
-      clientEventId: event.clientEventId,
-      type: event.type,
-      period: event.period,
-      minute: event.minute,
-      clockMs: event.clockMs,
-      occurredAt: event.occurredAt.toISOString(),
-      payload: event.payload ?? {},
-      voidsEventId: event.voidsEventId ?? null,
-    })),
-    null,
-  );
-  const introduced = preview.anomalies.filter(
-    (anomaly) => !state.anomalies.some((before) => before.code === anomaly.code),
-  );
-  if (introduced.some((anomaly) => anomaly.code === "scorer-off-pitch")) {
-    return { error: "Ce joueur n’était pas sur le terrain à cette minute." };
+  const refusal = realismOf(live, state, amendment);
+  if (refusal) return { error: refusal };
+
+  const result = await amendMatchEvents(actor, { matchId, events: amendment.events });
+  if (!result.ok) return { error: result.body.error };
+
+  redirect(`/match/${matchId}/saisie?corrige=1`);
+}
+
+/**
+ * The corrected log, read by the reducer before it is written (decision 170). A correction that would
+ * produce a goal by somebody who had already been substituted, or a change that strands a later goal,
+ * is the coach misremembering, and the right answer is to say so — naming who and when — rather than
+ * to store a timeline with a warning on it. New anomalies are those not already in the log, compared
+ * by `(code, eventId)`: a second goal by somebody off the pitch is new even if the log had one.
+ */
+function realismOf(live: LiveMatch, state: MatchState, amendment: Amendment): string | null {
+  const preview = reduceLive(live, amendment.events.map(toPending), null);
+  const introduced = introducedAnomalies(state.anomalies, preview.anomalies);
+  return realismRefusalFr(introduced, preview, nameIn(live));
+}
+
+function toPending(event: Amendment["events"][number]): PendingEvent {
+  return {
+    clientEventId: event.clientEventId,
+    type: event.type,
+    period: event.period,
+    minute: event.minute,
+    clockMs: event.clockMs,
+    occurredAt: event.occurredAt.toISOString(),
+    payload: event.payload ?? {},
+    voidsEventId: event.voidsEventId ?? null,
+  };
+}
+
+function nameIn(live: LiveMatch): (memberId: string) => string {
+  return (memberId) =>
+    live.players.find((player) => player.memberId === memberId)?.displayName ?? "Ce joueur";
+}
+
+/* -------------------------------------------------------------------------- */
+/* Adding a change after the match                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * « Ajouter un changement » — one `LINEUP_APPLIED` at the minute the coach named (decisions 147, 169).
+ *
+ * The screen only offered players who could go out or come in at that minute; this asks again,
+ * against the pitch recomputed here from the log (`stateAtClock`), then asks the reducer whether the
+ * whole match still holds once the change is in it — a change at 20′ that takes off the man who
+ * scores at 41′ is refused on that goal. Then the same `amendMatchEvents` every correction uses, which
+ * re-freezes `match_player_stats`.
+ */
+async function submitChange(actor: Actor, formData: FormData): Promise<FormState> {
+  const minuteRaw = typeof formData.get("change-minute") === "string" ? String(formData.get("change-minute")).trim() : "";
+  const parsed = amendChangeSchema.safeParse({
+    teamId: formData.get("teamId"),
+    matchId: formData.get("matchId"),
+    intent: formData.get("intent"),
+    minute: minuteRaw === "" ? undefined : Number(minuteRaw),
+    outIds: formData.getAll("change-out").map(String),
+    inIds: formData.getAll("change-in").map(String),
+    slots: formData
+      .getAll("change-slot")
+      .map(String)
+      .map((value) => {
+        const [slotId, memberId] = value.split(":");
+        return { slotId: slotId ?? "", memberId: memberId ?? "" };
+      }),
+  });
+  if (!parsed.success) return toFormState(parsed.error);
+  const { teamId, matchId, minute, outIds, inIds, slots } = parsed.data;
+
+  assertCan(actor, "match:amend", { teamId });
+
+  const live = await getLiveMatch(teamId, matchId);
+  if (!live) return { error: "Ce match n’existe pas dans cette équipe." };
+  const kickoffAtMs = new Date(live.match.kickoffAt).getTime();
+  if (Number.isNaN(kickoffAtMs)) return { error: "Ce match n’a pas de date exploitable." };
+
+  const state = reduceLive(live, [], null);
+  const finalWhistleMs =
+    state.timeline.find((line) => line.type === "FINAL_WHISTLE" && !line.voided)?.clockMs ?? 0;
+
+  const submissionId = retroSubmissionId(changeSeed(matchId, minute, slots));
+  if (live.events.some((event) => event.clientEventId === retroEventId(submissionId, 0))) {
+    redirect(`/match/${matchId}/saisie?corrige=1`);
   }
-  if (introduced.some((anomaly) => anomaly.code === "event-after-final-whistle")) {
-    return { error: "Cette minute est postérieure à la fin du match." };
+
+  const amendment = buildChangeAmendment({
+    submissionId,
+    periods: { periodsCount: live.match.periodsCount, periodMinutes: live.match.periodMinutes },
+    kickoffAtMs,
+    finalWhistleMs,
+    change: { minute, slots },
+  });
+  const stamped = amendment.events[0];
+  if (finalWhistleMs > 0 && stamped.clockMs >= finalWhistleMs) {
+    return { error: "Le match était déjà terminé à cette minute : un changement se fait avant." };
   }
+
+  const atClock = stateAtClock(live, stamped.clockMs);
+  const problem = changeProblemFr(
+    { outIds, inIds, slots },
+    {
+      atClock,
+      candidateIds: changeCandidateIds(live, atClock, state),
+      slots: live.slots,
+      nameOf: nameIn(live),
+      minuteLabel: minuteLabelFr(stamped.clockMs, stamped.period, atClock.periods),
+    },
+  );
+  if (problem) return { error: problem };
+  if (outIds.length === 0 && inIds.length === 0) {
+    const same =
+      atClock.onPitch.every((entry) =>
+        slots.some((slot) => slot.memberId === entry.memberId && slot.slotId === entry.slotId),
+      ) && slots.length === atClock.onPitch.length;
+    if (same) return { error: "Personne n’entre, personne ne sort et personne ne change de poste." };
+  }
+
+  const refusal = realismOf(live, state, amendment);
+  if (refusal) return { error: refusal };
 
   const result = await amendMatchEvents(actor, { matchId, events: amendment.events });
   if (!result.ok) return { error: result.body.error };

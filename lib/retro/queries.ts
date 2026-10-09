@@ -17,10 +17,10 @@ import "server-only";
 
 import { type EntryMode } from "@/db/schema";
 import { getLiveMatch, type LiveMatch } from "@/lib/match/live";
-import { reduceLive } from "@/lib/match/presenter";
+import { pitchEventFr, reduceLive } from "@/lib/match/presenter";
 import type { TimelineEntry } from "@/lib/match/reducer";
 
-import { isAmendableEventType } from "./amend";
+import { isAmendableEntry } from "./amend";
 import { RETRO_FACT_TYPES, type RetroFactType } from "./log";
 
 export type { EntryMode };
@@ -55,7 +55,7 @@ export type RetroTimelineLine = {
   labelFr: string;
   voided: boolean;
   actors: TimelineEntry["actors"];
-  /** True when this line is one of the football facts a coach may correct from this screen. */
+  /** True when this line may be corrected from this screen: a fact, a substitution, a change. */
   amendable: boolean;
   /** The fact type to pre-select in the correction sheet, when it is one. */
   factType: RetroFactType | null;
@@ -63,6 +63,13 @@ export type RetroTimelineLine = {
 
 export type RetroView = {
   match: LiveMatch["match"];
+  /**
+   * The whole game-mode load, for « Ajouter un changement » (decision 169): the screen reduces the log
+   * up to the minute the coach names, in the browser, with the same `reduceLive` game mode uses — and
+   * draws the same `TerrainSheet`, which needs the slots, the kit and the players. Plain and
+   * serialisable, exactly what game mode already sends to its client component.
+   */
+  live: LiveMatch;
   /** False when `match_events` is empty: the screen is an entry form rather than a corrections list. */
   hasLog: boolean;
   /** Milliseconds of the final whistle in the existing log, 0 when there is none. */
@@ -120,6 +127,7 @@ export async function getRetroView(teamId: string, matchId: string): Promise<Ret
 
   return {
     match: live.match,
+    live,
     hasLog: live.events.length > 0,
     // The whistle as the log stamped it, not as regulation would have it: a match that ran three
     // minutes over ended at 63′, and a correction may not be stamped after that.
@@ -172,12 +180,15 @@ function toTimelineLine(entry: TimelineEntry): RetroTimelineLine {
     clockMs: entry.clockMs,
     minute: entry.minute,
     minuteLabel: entry.minuteLabel,
-    labelFr: entry.labelFr,
+    // « Changement », « Changement de poste », « Composition de départ » — the same words game mode
+    // and the recap use (`pitchEventFr`, decision 152), rather than « Composition appliquée ».
+    labelFr: pitchEventFr(entry, () => "")?.title ?? entry.labelFr,
     voided: entry.voided,
     actors: entry.actors,
-    // A correction may touch what happened, never the frame of the match — `isAmendableEventType`
-    // says which is which, and `lib/retro/actions.ts` asks it the same question of a posted target.
-    amendable: !entry.voided && isAmendableEventType(entry.type),
+    // A correction may touch what happened, never the frame of the match — `isAmendableEntry` says
+    // which is which (a change is, the starting composition is not), and `lib/retro/actions.ts` asks
+    // it the same question of a posted target.
+    amendable: !entry.voided && isAmendableEntry(entry),
     factType,
   };
 }

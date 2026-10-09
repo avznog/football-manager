@@ -254,6 +254,27 @@ export const amendSubmitSchema = z
     message: "Il faut dire ce qui s’est réellement passé.",
   });
 
+/**
+ * « Ajouter un changement » on a finished match (decision 169): the minute, the coach's two answers,
+ * and the pitch he confirmed. The shape only — whether it could have happened is `changeProblemFr`
+ * and the reducer's, asked of the pitch at that minute.
+ */
+export const amendChangeSchema = z.object({
+  teamId: z.uuid(),
+  matchId: z.uuid(),
+  intent: z.literal("change"),
+  minute: z
+    .number({ message: "Indique la minute du changement." })
+    .int("Une minute s’écrit en nombre entier.")
+    .min(0, "La minute ne peut pas être négative.")
+    .max(MAX_MINUTE, "Cette minute est impossible."),
+  outIds: z.array(idSchema).max(FORMATION_SLOT_COUNT, "Trop de joueurs sortent."),
+  inIds: z.array(idSchema).max(FORMATION_SLOT_COUNT * 2, "Trop de joueurs entrent."),
+  slots: z
+    .array(z.object({ slotId: z.uuid("Ce poste n’est pas valide."), memberId: idSchema }))
+    .max(FORMATION_SLOT_COUNT, `Il n’y a que ${FORMATION_SLOT_COUNT} postes sur le terrain.`),
+});
+
 /* -------------------------------------------------------------------------- */
 /* Judging the content                                                        */
 /* -------------------------------------------------------------------------- */

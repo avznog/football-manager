@@ -8,7 +8,8 @@
  * corrected event carries the annulled one's minute unless the coach says otherwise, and the wrong
  * line stays visible, struck through, exactly as a paper scoresheet is corrected (decision 003).
  *
- * Only the football facts and the substitutions are amendable. Kick-offs, period ends and the final
+ * Only the football facts, the substitutions and the changes are amendable — a change, since decision
+ * 169, is also something a coach can **add** (`AddChange`), at a minute, against the pitch as it stood. Kick-offs, period ends and the final
  * whistle are the frame of the match: annulling one would leave every minute in the log meaning
  * something else, and changing the length of a match is what « Modifier » on the match page is for.
  * The copy says so rather than leaving the coach hunting for a button that is not there.
@@ -39,6 +40,8 @@ import {
 } from "@/lib/retro/log";
 import type { RetroTimelineLine, RetroView } from "@/lib/retro/queries";
 
+import { AddChange } from "./add-change";
+
 export type RetroCorrectionsProps = {
   teamId: string;
   view: RetroView;
@@ -60,6 +63,17 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
   const [state, action, pending] = useActionState(submitAmendment, undefined);
   const [openLine, setOpenLine] = useState<RetroTimelineLine | null>(null);
   const [adding, setAdding] = useState(false);
+  const [addingChange, setAddingChange] = useState(false);
+  /**
+   * Which card the last submission came from, so its refusal is printed **there**. A change refused
+   * at the bottom of the page with its sentence at the top is a refusal the coach never reads: the
+   * sheets close on submit and leave him looking at the card he started from.
+   */
+  const [lastFrom, setLastFrom] = useState<"line" | "change">("line");
+  const dispatch = (from: "line" | "change") => (payload: FormData) => {
+    setLastFrom(from);
+    action(payload);
+  };
 
   const nameOf = (memberId: string) =>
     view.players.find((player) => player.memberId === memberId)?.displayName ?? "Joueur retiré";
@@ -71,7 +85,9 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
 
   return (
     <div className="space-y-4">
-      {state?.error ? <FieldError className="px-1">{state.error}</FieldError> : null}
+      {state?.error && lastFrom === "line" ? (
+        <FieldError className="px-1">{state.error}</FieldError>
+      ) : null}
 
       <Card>
         <p className="text-sm text-ink-muted">
@@ -132,6 +148,26 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
         </ul>
       </Card>
 
+      <Card title="Ajouter un changement" as="h2">
+        <div className="space-y-3">
+          <p className="text-sm text-ink-muted">
+            Des joueurs entrés ou sortis sans que ce soit noté, ou des postes échangés. Tu choisis la
+            minute, puis qui sort et qui entre&nbsp;: les listes montrent le terrain tel qu’il était à
+            ce moment-là.
+          </p>
+          {state?.error && lastFrom === "change" ? <FieldError>{state.error}</FieldError> : null}
+          <Button
+            type="button"
+            variant="secondary"
+            fullWidth
+            onClick={() => setAddingChange(true)}
+            disabled={pending}
+          >
+            Ajouter un changement
+          </Button>
+        </div>
+      </Card>
+
       <Card title="Ajouter une action oubliée" as="h2">
         <div className="space-y-3">
           <p className="text-sm text-ink-muted">
@@ -149,7 +185,7 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
         line={openLine}
         regulation={regulation}
         pending={pending}
-        action={action}
+        action={dispatch("line")}
         onClose={() => setOpenLine(null)}
       />
 
@@ -159,8 +195,17 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
         open={adding}
         regulation={regulation}
         pending={pending}
-        action={action}
+        action={dispatch("line")}
         onClose={() => setAdding(false)}
+      />
+
+      <AddChange
+        teamId={teamId}
+        view={view}
+        regulation={regulation}
+        open={addingChange}
+        onClose={() => setAddingChange(false)}
+        action={dispatch("change")}
       />
     </div>
   );
@@ -295,9 +340,9 @@ function AmendFields({
   );
   const [minute, setMinute] = useState(String(line.minute));
 
-  // A substitution is not editable field by field — the players and the minute are one fact. The
-  // honest correction is to annul it and add the right one, which is what the sheet offers.
-  const substitution = line.type === "SUBSTITUTION";
+  // A substitution or a change is not editable field by field — the players and the minute are one
+  // fact. The honest correction is to annul it and add the right one, which is what the sheet offers.
+  const substitution = line.type === "SUBSTITUTION" || line.type === "LINEUP_APPLIED";
 
   /*
    * What the coach came for is first: the fields, then « Enregistrer la correction ». Annulling is
@@ -309,7 +354,7 @@ function AmendFields({
       {substitution ? (
         <p className="text-sm text-ink-muted">
           Un changement se corrige en deux temps&nbsp;: annule celui-ci, puis saisis le bon depuis
-          « Ajouter une action oubliée ». Les minutes des deux joueurs suivront.
+          « Ajouter un changement ». Les minutes des joueurs suivront.
         </p>
       ) : (
         <form action={action} className="space-y-3">

@@ -857,7 +857,18 @@ tag during this rework** (decision 146): every item below reaches the preview on
       is re-applied; the kick-off freezes it (`autoLineupToLock`). A coach's own arrangement stops it
       for good. The reducer drops zero-length spells and posts (no phantom starter), and a finished
       match proposes no plan any more
-- [ ] **S10** · #169 · add changes after the match, realistically
+- [x] **S10** · #169 · add changes after the match, realistically (decisions **169**, **170**). The
+      corrections screen (`/match/[id]/saisie` on a match with a log) has « Ajouter un changement »:
+      a minute (0 to the last minute before the whistle), then game mode's « Qui sort ? » / « Qui
+      entre ? » and `TerrainSheet` pre-arranged by `changeArrangement`, all read off the pitch **at that
+      minute** (`stateAtClock`: the log up to it, `VOID`s whatever their stamp). « Qui entre ? » offers
+      the players off the pitch then who were starters or substitutes on the sheet or played. One
+      `LINEUP_APPLIED { lineupId: null }` through `amendMatchEvents`. The server re-checks the lists
+      (`changeProblemFr`) and then refuses any **new** reducer anomaly compared by `(code, eventId)` —
+      for every amendment, which closes the code-only comparison that let a second `scorer-off-pitch`
+      through — with French refusals naming who and when (« Nicolas était déjà sur le terrain à la
+      22’. »). A change line is correctable (annul, then re-add) except the starting composition
+      (`isAmendableEntry`); the substitution sheet's advice now points at « Ajouter un changement »
 - [x] **S11** · #170 · only starters, substitutes and supporters may rate
       - [x] **Only the match sheet rates** — starters, substitutes and supporters of that match, plus anybody
             the log has playing; an unselected member is refused (decision **159**, superseding rule 1 of 139).
