@@ -122,6 +122,32 @@ describe("the outbox", () => {
     expect(outbox.state().pending).toHaveLength(0);
   });
 
+  it("sends the actions of one tap in one POST, in the order they were given (decision 151)", async () => {
+    // Same wall clock, same stamp: only the order of the array says the period ends first. The ids
+    // here *descend*, because the tie-break after `enqueuedAt` is the `clientEventId` — random in
+    // the browser — and an ascending fixture would pass by luck.
+    const time = clock();
+    const post = recorder();
+    let next = 99;
+    const outbox = createOutbox({
+      matchId: MATCH_ID,
+      storage: createMemoryStorage(),
+      transport: post.transport,
+      now: time.now,
+      newId: () => `00000000-0000-4000-8000-${String(next--).padStart(12, "0")}`,
+    });
+
+    await outbox.enqueueAll([
+      { type: "PERIOD_END", stamp: stamp(60) },
+      { type: "FINAL_WHISTLE", stamp: stamp(60) },
+    ]);
+    await outbox.flush();
+
+    expect(post.sent).toHaveLength(1);
+    expect(post.sent[0].events.map((event) => event.type)).toEqual(["PERIOD_END", "FINAL_WHISTLE"]);
+    expect(new Set(post.sent[0].events.map((event) => event.occurredAt)).size).toBe(1);
+  });
+
   it("notifies subscribers so the badge can count", async () => {
     const { outbox } = harness([offline]);
     const counts: number[] = [];

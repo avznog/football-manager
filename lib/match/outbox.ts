@@ -318,6 +318,11 @@ export type Outbox = {
   /** Read the store back after a reload, then try to catch up. */
   hydrate: () => Promise<void>;
   enqueue: (input: EnqueueInput) => Promise<OutboxRecord>;
+  /**
+   * Several actions that are one tap — the whistle's `PERIOD_END` + `FINAL_WHISTLE` (decision 151).
+   * Stored together and sent together, in this order, so `seq` keeps it.
+   */
+  enqueueAll: (inputs: readonly EnqueueInput[]) => Promise<OutboxRecord[]>;
   /** Send everything due. Safe to call at any time: concurrent calls collapse into one. */
   flush: () => Promise<void>;
   /** Give a refused action one more chance, on the coach's say-so. */
@@ -376,9 +381,10 @@ export function createOutbox(options: OutboxOptions): Outbox {
     await flush();
   }
 
-  async function enqueue(input: EnqueueInput): Promise<OutboxRecord> {
+  /** `offset` is the record's place in a tap that queues several (see `enqueueAll`). */
+  function newRecord(input: EnqueueInput, offset = 0): OutboxRecord {
     const at = input.occurredAtMs ?? now();
-    const record: OutboxRecord = {
+    return {
       clientEventId: newId(),
       matchId,
       type: input.type,
@@ -388,12 +394,16 @@ export function createOutbox(options: OutboxOptions): Outbox {
       occurredAt: new Date(at).toISOString(),
       payload: input.payload ?? {},
       voidsEventId: input.voidsEventId ?? null,
-      enqueuedAt: at,
+      enqueuedAt: at + offset,
       attempts: 0,
       nextAttemptAt: 0,
       lastError: null,
       rejectedReason: null,
     };
+  }
+
+  async function enqueue(input: EnqueueInput): Promise<OutboxRecord> {
+    const record = newRecord(input);
 
     // Stored before anything else happens: from here on the action survives a crash.
     await storage.put([record]);
@@ -402,6 +412,23 @@ export function createOutbox(options: OutboxOptions): Outbox {
 
     void flush();
     return record;
+  }
+
+  async function enqueueAll(inputs: readonly EnqueueInput[]): Promise<OutboxRecord[]> {
+    // `enqueuedAt` is the queue's own order and nothing else reads it. Two actions of one tap share
+    // a wall clock, and the tie-break after it is the random `clientEventId` — which would send the
+    // whistle before the period's end half the time. One millisecond apart keeps them in order;
+    // `occurredAt`, which the server stores, is untouched.
+    const fresh = inputs.map((input, index) => newRecord(input, index));
+    if (fresh.length === 0) return fresh;
+
+    // Stored together before anything is sent, so the first flush carries all of them.
+    await storage.put(fresh);
+    upsert(fresh);
+    notify();
+
+    void flush();
+    return fresh;
   }
 
   /**
@@ -553,6 +580,7 @@ export function createOutbox(options: OutboxOptions): Outbox {
     },
     hydrate,
     enqueue,
+    enqueueAll,
     flush,
     retry,
     dismiss,

@@ -5807,3 +5807,63 @@ rows each, and every note already on file in them came from a starter or a subst
 Files: `lib/rating/progress.ts`, `lib/rating/actions.ts`, `lib/rating/queries.ts`, `lib/auth/can.ts`
 (comments), `app/(app)/match/[id]/page.tsx`, `app/(app)/match/[id]/notation/page.tsx`,
 `app/(app)/match/[id]/recap/page.tsx`, `app/(app)/match/[id]/recap/_components/ratings-panel.tsx`.
+
+## 151 — Game mode's menu is the cahier's four tiles, and the last period ends in one tap
+
+**2026-10-09** · accepted · **supersedes the menu of decision 114** (« four tiles and an
+« Autre… » ») and **the two-tap end of the match** that decisions 117 and 121 describe · « Faute »
+stays unoffered exactly as 114 left it · no migration
+
+The cahier des charges, on game mode: « Il faut seulement : But (puis passe décisive), but encaissé,
+changement, autre (comprendra ce qu'il y a dans remarque, autre, et commentaire) », and « au lieu de
+fin, mettre sifflet, et que ça finisse le match ».
+
+### The menu
+
+**ACTION** is four tiles: **But** (scorer, then « passe décisive » — the existing two steps),
+**But encaissé**, **Changement** and **Autre…**. **« Autre action »** is CSC, Penalty marqué, Penalty
+manqué, Blessure, Remarque and Commentaire.
+
+- **Layout.** But and But encaissé share the first row; Changement and Autre… span a row each. In
+  « Autre action » the four facts are square and Remarque and Commentaire span a row each. Decision
+  114's rule is kept and widened: a tile that does not record anything on its own tap — Autre…
+  opens a menu, Remarque opens the grid of six, Commentaire opens the one sheet with a keyboard — is
+  wide, so it cannot be mistaken for a tile that records. Changement is wide so the first menu is two
+  rows of facts and two rows of longer questions rather than three squares and an orphan.
+- **Hints** stay short and true: « Autre… » now reads « CSC, penalty, blessure, remarque,
+  commentaire », which is what is behind it; every other hint is unchanged because the tile did not
+  change, only where it sits. No new icons: every tile kept its glyph.
+- **« Changement de poste » is gone from game mode**, on the same terms decision 114 removed
+  « Faute »: a menu, not a gate. `POSITION_CHANGE` stays in `MATCH_EVENT_TYPES`, the reducer still
+  reduces it, the timeline still renders and annuls it, and nothing on the server refuses it. Moving
+  a player is done on the pitch (TERRAIN), and slice S8 folds it into « Changement ». What was only
+  there for it is deleted rather than left unused: the `move-player` / `move-slot` flow, the
+  `slotChoices` it computed, `SlotPicker` (nothing else used it) and `PositionChangeIcon`.
+
+### « Sifflet » ends the match
+
+Before, the last period ended in two taps: « Fin » (a `PERIOD_END`, no confirmation), then
+« Sifflet » on the break that followed, then « Terminer le match ». Now, **while the last period is
+running, the clock button is already the whistle**: `clockActionFr` returns « Coup de sifflet
+final » / « Sifflet » / `FINAL_WHISTLE`. « Mi-temps » and « Fin de la Ne période » are unchanged for
+every period that is not the last. A paused last period still shows « Reprendre » first.
+
+**Its confirmation writes two events, not one**: `PERIOD_END` then `FINAL_WHISTLE`
+(`finalWhistleEvents`), stamped from the same state at the same instant. The whistle alone would
+reduce to the same score and the same minutes, but a log whose last period never ended is a shape no
+consumer of `PERIOD_END` has seen — the play intervals, the recap, the retro corrections — and
+writing both keeps every log reading exactly as the two-tap version did. A match already in a break
+after its last period, which only a log written before this decision can be in, still gets
+« Sifflet » there and writes the whistle alone, since a second `PERIOD_END` would be an anomaly.
+
+**One batch, and the order is guaranteed, not lucky.** `outbox.enqueueAll` stores both records before
+anything is sent, so the first flush carries both and `seq` follows their order. The queue sorts by
+`enqueuedAt` and then by `clientEventId`; two actions of one tap share a wall clock and their ids are
+random, so the whistle would have gone first half the time. `enqueueAll` spaces them one millisecond
+apart in `enqueuedAt` — the queue's own bookkeeping, which nothing else reads — and `occurredAt`,
+which the server stores, stays identical. `outbox.test.ts` pins this with ids that *descend*. On the
+local database the whistle landed as `seq` 5 `PERIOD_END` and 6 `FINAL_WHISTLE` at the same
+`clock_ms`, the match went to `finished` and `match_player_stats` was frozen.
+
+**WCAG 2.5.3** still holds: « Sifflet » is a whole word of « Coup de sifflet final », which the
+existing sweep over every clock state checks against the accessible name.
