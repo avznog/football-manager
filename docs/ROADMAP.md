@@ -770,7 +770,7 @@ it stands.
 
 ## M8 — Rework from the cahier des charges (2026-10-09)
 
-The owner's review after two real matches, `cahier-des-charges.md`. Plan: the top section of
+The owner's review after two real matches, `backlogs/backlog-1.md` (once `cahier-des-charges.md`). Plan: the top section of
 `docs/PLAN.md`. Tracked on the GitHub Project « Football-manager », one issue per slice. **No production
 tag during this rework** (decision 146): every item below reaches the preview only.
 

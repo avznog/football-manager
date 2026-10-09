@@ -6,8 +6,8 @@
 explains why the app is shaped the way it is.** Where the two disagree, this section wins, and each
 point it changes is recorded as a decision (145 onwards) rather than edited out of the text below.
 
-After two real matches the owner wrote **[`cahier-des-charges.md`](../cahier-des-charges.md)** (repo
-root, French): a review of the whole product. It asks for a GitHub Project holding all the work, then a
+After two real matches the owner wrote **[`backlogs/backlog-1.md`](../backlogs/backlog-1.md)** (French;
+it was `cahier-des-charges.md` at the repo root until the owner moved it): a review of the whole product. It asks for a GitHub Project holding all the work, then a
 rework that **removes** what the team does not use — trainings, availability, the reminder message, the
 separate match sheet, every formation but one, position changes, preferred positions on the profile —
 and **rebuilds** game mode around unpaired group changes and tap-a-player actions, restricts who may
