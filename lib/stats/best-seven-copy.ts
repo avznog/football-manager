@@ -39,7 +39,6 @@ import {
   formatMinutes,
   formatPercent,
   formatRating,
-  matchCount,
   plural,
 } from "./format";
 
@@ -50,7 +49,6 @@ import {
 /** The keys `/stats/equipe-type` reads, spelled once. French, like every other URL in this app. */
 export const CRITERION_PARAM = "critere";
 export const DIRECTION_PARAM = "sens";
-export const FORMATION_PARAM = "formation";
 
 export type BestSevenDirection = "best" | "worst";
 
@@ -88,9 +86,9 @@ function firstOf(value: string | string[] | undefined): string | undefined {
  * A hand-typed or stale query string degrades to the default, never to an error (like `/stats`).
  *
  * **An empty value is one of those**, and it is not hypothetical any more: the controls are a
- * `method="get"` form, so a browser with no JavaScript submits `?critere=&sens=&formation=&competition=`
- * for whatever the reader left at « Toutes » or at the default. `equipeTypeHref` never writes an empty
- * value — it omits the key instead — so all four of these are only ever exercised by the no-JavaScript
+ * `method="get"` form, so a browser with no JavaScript submits `?critere=&sens=&competition=` for
+ * whatever the reader left at « Toutes » or at the default. `equipeTypeHref` never writes an empty
+ * value — it omits the key instead — so all three of these are only ever exercised by the no-JavaScript
  * path, which is precisely why they are pinned in `best-seven-copy.test.ts` rather than trusted.
  */
 export function parseCriterion(value: string | string[] | undefined): BestSevenCriterion {
@@ -125,8 +123,8 @@ export function parseCompetitionId(
  * filter writes it, and `parseCompetitionId` keeps it because the id is real. The screen then read
  * « Aucun match terminé en championnat … Choisis « Toutes » pour voir la saison entière » with no
  * select anywhere under it: an instruction to use a control the reader does not have, which is exactly
- * the failure `NO_FORMATION_FR` is tested against. A reader who arrived filtered must be able to get
- * back out, however he arrived.
+ * the failure the old « choisis une forme toi-même ci-dessus » sentence was removed for. A reader who
+ * arrived filtered must be able to get back out, however he arrived.
  */
 export function showsCompetitionSelect({
   competitionCount,
@@ -138,42 +136,11 @@ export function showsCompetitionSelect({
   return competitionCount > 1 || competitionId !== null;
 }
 
-/**
- * The shape the reader chose himself, or null for « la plus jouée » — and **naming the most-played
- * shape is not overriding it.**
- *
- * `formationOverrideFr` ends « Ce n'est pas la forme que l'équipe a le plus jouée », which was once
- * printed about the very shape the control had just labelled « (la plus jouée) »: two entries, identical
- * layout, contradictory captions. The select no longer offers it twice, but a bookmark or a hand-typed
- * `?formation=` can still carry that id, so it is resolved to null here — one place, rather than a
- * special case in the sentence, in the select's `defaultValue` and in `equipeTypeHref` separately. The
- * shape drawn is identical either way: `override ?? usage.mostUsed`.
- *
- * Generic over the usage row so the page keeps the label and the match count it has to print.
- */
-export function resolveFormationOverride<T extends { formationId: string; matches: number }>(
-  value: string | string[] | undefined,
-  formations: readonly T[],
-  mostUsedFormationId: string | null,
-): T | null {
-  const first = firstOf(value);
-  return (
-    formations.find(
-      (formation) =>
-        formation.formationId === first &&
-        formation.matches > 0 &&
-        formation.formationId !== mostUsedFormationId,
-    ) ?? null
-  );
-}
-
 export type BestSevenQuery = {
   /** Shared with `/stats`, by id (decision 107). */
   competitionId: string | null;
   criterion: BestSevenCriterion;
   direction: BestSevenDirection;
-  /** `formations.id` when the reader overrode the shape, null for « la plus jouée ». */
-  formationId: string | null;
 };
 
 /**
@@ -187,7 +154,6 @@ export function equipeTypeHref(query: BestSevenQuery, competitionParam = "compet
   if (query.direction !== DEFAULT_DIRECTION) {
     params.set(DIRECTION_PARAM, DIRECTION_VALUES[query.direction]);
   }
-  if (query.formationId !== null) params.set(FORMATION_PARAM, query.formationId);
   const search = params.toString();
   return search === "" ? "/stats/equipe-type" : `/stats/equipe-type?${search}`;
 }
@@ -207,20 +173,9 @@ export function equipeTypeHref(query: BestSevenQuery, competitionParam = "compet
  * Without it, a soft navigation reused the instance and `useState(() => ({ ...optimumBySlot }))` never
  * re-ran: choosing « La pire » relabelled the pitch « Ton équipe » over the *best* seven, as though the
  * reader had picked it himself.
- *
- * The **resolved** formation is what goes in, not `query.formationId`: that one is null for « la plus
- * jouée », whose identity changes with the competition.
  */
-export function sevenQuestionKey(
-  query: BestSevenQuery,
-  resolvedFormationId: string | null,
-): string {
-  return [
-    query.competitionId ?? "all",
-    query.criterion,
-    query.direction,
-    resolvedFormationId ?? "none",
-  ].join("|");
+export function sevenQuestionKey(query: BestSevenQuery): string {
+  return [query.competitionId ?? "all", query.criterion, query.direction].join("|");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -238,7 +193,7 @@ export const CRITERION_CHIP_FR: Readonly<Record<BestSevenCriterion, string>> = {
 };
 
 /**
- * The four controls, named. Nouns rather than instructions: « Critère » over a select is the whole
+ * The three controls, named. Nouns rather than instructions: « Critère » over a select is the whole
  * sentence, and a `<label>` reading « Choisis un critère » says the same thing one word at a time.
  *
  * Here rather than in the component for decision 097's reason — a label is a claim about the control
@@ -249,7 +204,6 @@ export const CRITERION_CHIP_FR: Readonly<Record<BestSevenCriterion, string>> = {
 export const SEVEN_CONTROL_LABEL_FR = {
   criterion: "Critère",
   direction: "Meilleure ou pire",
-  formation: "Forme de jeu",
   competition: "Compétition",
 } as const;
 
@@ -263,18 +217,8 @@ export const DIRECTION_OPTION_FR: Readonly<Record<BestSevenDirection, string>> =
 export const ALL_COMPETITIONS_FR = "Toutes";
 
 /**
- * The formation select's first option: the shape chosen when nothing overrides it.
- *
- * It names the shape *and* says why it is the default, because a bare « 1-3-2-1 » beside another bare
- * « 2-3-1 » gives the reader no way to tell which one the app would have picked for him.
- */
-export function mostUsedFormationOptionFr(label: string | null): string {
-  return label === null ? "La plus jouée" : `${label} (la plus jouée)`;
-}
-
-/**
  * The button only a reader with no JavaScript ever sees: the form is a `method="get"`, so submitting it
- * is what applies the four selects. « Voir ce sept » rather than « Valider » — nothing is saved.
+ * is what applies the selects. « Voir ce sept » rather than « Valider » — nothing is saved.
  */
 export const SEVEN_CONTROLS_SUBMIT_FR = "Voir ce sept";
 
@@ -343,7 +287,7 @@ export function observedFigureFr(
 /**
  * The same figure, short enough for a disc.
  *
- * Measured, not guessed: the closest two posts of a built-in formation leave about 104 px of chip, and
+ * Measured, not guessed: the closest two posts of the formation leave about 104 px of chip, and
  * « 6 passes décisives sur 360′ » needs 120 px at the size a disc caption is set in — so on `assists`,
  * and only there, the noun takes the abbreviation the criterion chip already uses (« Passes déc. »).
  * Every other criterion is identical to `observedFigureFr`, and the wide list under the pitch always
@@ -639,63 +583,8 @@ export function cleanSheetReadingsFr(criterion: BestSevenCriterion): string | nu
 }
 
 /* -------------------------------------------------------------------------- */
-/* The shape, and who was left out of the squad                               */
+/* Who was left out of the squad                                             */
 /* -------------------------------------------------------------------------- */
-
-/**
- * « 1-3-2-1, utilisée dans 7 matchs sur les 8 terminés de cette sélection. »
- *
- * A shape without its count is a tactical opinion dressed as a fact, which is why
- * `formation-usage.ts` never returns one without the other.
- *
- * Two French defects lived in the two branches. The noun was repeated — « dans 6 matchs sur les 7
- * matchs terminés » — where French says the number alone after « sur les ». And the « all of them »
- * branch read « utilisée dans 1 match — tous ceux de cette sélection », a plural about a single match.
- */
-export function formationUsageFr(input: {
-  label: string;
-  matches: number;
-  matchesConsidered: number;
-}): string {
-  if (input.matches >= input.matchesConsidered) {
-    const all = input.matches > 1 ? "tous ceux de cette sélection" : "le seul de cette sélection";
-    return `${input.label}, utilisée dans ${matchCount(input.matches)} — ${all}.`;
-  }
-  return `${input.label}, utilisée dans ${matchCount(input.matches)} sur les ${input.matchesConsidered} terminés de cette sélection.`;
-}
-
-/** The shape the reader chose himself: no count to quote, and it must not pretend to one. */
-export function formationOverrideFr(label: string): string {
-  return `${label}, choisie par toi. Ce n’est pas la forme que l’équipe a le plus jouée.`;
-}
-
-/**
- * Finished matches with no composition at all — retro-entered, or played before anybody drew one
- * (decision 013). The winning shape is then a majority of what was *recorded*, not of what was
- * played, and the difference is the reader's to judge.
- */
-export function matchesWithoutCompositionFr(count: number): string | null {
-  if (count <= 0) return null;
-  return (
-    `${matchCount(count)} terminé${count > 1 ? "s" : ""} ${count > 1 ? "n’ont" : "n’a"} aucune ` +
-    "composition enregistrée : la forme retenue est majoritaire parmi les matchs dessinés, pas " +
-    "parmi les matchs joués."
-  );
-}
-
-/**
- * Nobody ever drew a composition: the pitch cannot be drawn, so the screen says why.
- *
- * It used to end « ou choisis une forme toi-même ci-dessus », and that was an instruction to use a
- * control that is never on screen at the same time as this sentence: the formation select only lists
- * shapes the team has played, and `mostUsed` is null exactly when none has, so reaching this state means
- * there is nothing to choose from. Pointing at it « ci-dessous » after the controls moved under the
- * pitch would have kept the defect and only changed the direction it pointed in.
- */
-export const NO_FORMATION_FR =
-  "Aucune composition n’a encore été enregistrée sur un match terminé, donc l’appli ne sait pas " +
-  "quelle forme tu joues — et sept postes inventés seraient un avis déguisé en mesure. Dessine une " +
-  "composition sur un match, et ce sept apparaîtra.";
 
 /**
  * Who the seven could not be chosen from, and why. Both halves are exclusions the reader would

@@ -70,8 +70,7 @@ export function usePitchDrag<S>({
    * turf: a screen with a drop target beside the pitch has to be able to light it up, and a `point`
    * of `null` is the only news a finger that has left the turf carries.
    *
-   * The editor uses it twice over — to make a formation slot follow the finger so the « 1-3-2-1 »
-   * label updates live, and to ring its docked bench while a player is carried over it.
+   * The composition editor uses it to ring its docked bench while a player is carried over it.
    */
   onMove?: (subject: S, point: PitchPoint | null, client: ClientPoint) => void;
 }) {

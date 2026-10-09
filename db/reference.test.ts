@@ -13,9 +13,7 @@ import {
   POSITIONS,
   POSITION_BY_CODE,
   POSITION_CODES,
-  PREFERRED_POSITIONS,
-  PREFERRED_POSITION_CODES,
-  type FormationTemplate,
+  THE_FORMATION,
   type PositionCode,
   type PositionDefinition,
   DEFAULT_FORMATION_LABEL,
@@ -23,7 +21,6 @@ import {
   formationDistribution,
   formationLabelOf,
   isPositionCode,
-  isPreferredPositionCode,
   atPositionFr,
   positionLabelFr,
   positionRankOf,
@@ -46,31 +43,15 @@ function definitionOf(code: PositionCode): PositionDefinition {
 }
 
 describe("positions", () => {
-  it("is exactly the seven-a-side vocabulary, and nothing more", () => {
-    expect(POSITIONS.map((position) => position.code)).toEqual([
-      "GB",
-      "DG",
-      "DC",
-      "DD",
-      "MG",
-      "MC",
-      "MD",
-      "MOC",
-      "AG",
-      "AT",
-      "AD",
-    ]);
+  it("is exactly the five posts the owner named, and nothing more (decision 157)", () => {
+    // Typed out on purpose: this list is the specification, not a mirror of it.
+    expect(POSITIONS.map((position) => position.code)).toEqual(["GB", "DC", "MC", "AIL", "AT"]);
     expect(POSITIONS).toHaveLength(POSITION_CODES.length);
   });
 
   it("has unique codes", () => {
     const codes = POSITIONS.map((position) => position.code);
     expect(new Set(codes).size).toBe(codes.length);
-  });
-
-  it("has unique sort values", () => {
-    const sorts = POSITIONS.map((position) => position.sort);
-    expect(new Set(sorts).size).toBe(sorts.length);
   });
 
   it("orders the sort values from the goalkeeper forwards", () => {
@@ -110,21 +91,12 @@ describe("positions", () => {
     expect(meanY("MIL")).toBeLessThan(meanY("ATT"));
   });
 
-  it("puts the left-sided positions on the left and mirrors them on the right", () => {
-    const pairs: [PositionCode, PositionCode][] = [
-      ["DG", "DD"],
-      ["MG", "MD"],
-      ["AG", "AD"],
-    ];
-    for (const [left, right] of pairs) {
-      const l = definitionOf(left);
-      const r = definitionOf(right);
-      expect(l.defaultX).toBeLessThan(500);
-      expect(r.defaultX).toBeGreaterThan(500);
-      expect(l.defaultY).toBe(r.defaultY);
-      // Mirrored about the centre line, to within a unit of rounding.
-      expect(Math.abs(1000 - l.defaultX - r.defaultX)).toBeLessThanOrEqual(10);
-    }
+  it("puts the winger on the midfield line, beside the centre midfielder", () => {
+    // `MIL` and not `ATT`: the formation draws its two `AIL` slots on the midfield line, and the line
+    // is what makes its label read `1-2-3-1` (three in midfield) rather than `1-2-1-3`.
+    expect(definitionOf("AIL").line).toBe("MIL");
+    expect(definitionOf("AIL").defaultX).toBeLessThan(500);
+    expect(Math.abs(definitionOf("AIL").defaultY - definitionOf("MC").defaultY)).toBeLessThan(100);
   });
 
   it("has a properly accented French label for every position", () => {
@@ -132,12 +104,11 @@ describe("positions", () => {
       expect(position.labelFr.length).toBeGreaterThan(4);
       expect(position.labelFr[0]).toBe(position.labelFr[0].toUpperCase());
     }
-    expect(positionLabelFr("MOC")).toBe("Milieu offensif central");
-    expect(positionLabelFr("DG")).toBe("Défenseur gauche");
+    expect(positionLabelFr("AIL")).toBe("Ailier");
     expect(positionLabelFr("DC")).toBe("Défenseur central");
   });
 
-  it("never lets two canonical positions overlap — the eleven are one layout", () => {
+  it("never lets two canonical positions overlap — the five are one layout", () => {
     for (let i = 0; i < POSITIONS.length; i += 1) {
       for (let j = i + 1; j < POSITIONS.length; j += 1) {
         const a = POSITIONS[i];
@@ -154,10 +125,15 @@ describe("positions", () => {
     }
   });
 
-  it("narrows unknown codes", () => {
-    expect(isPositionCode("MOC")).toBe(true);
+  it("narrows unknown codes, the retired ones included", () => {
+    expect(isPositionCode("AIL")).toBe(true);
     expect(isPositionCode("CF")).toBe(false);
     expect(positionLabelFr("CF")).toBe("CF");
+    // Retired by decision 157: `positions` keeps their rows, the vocabulary does not.
+    for (const retired of ["DG", "DD", "MG", "MD", "MOC", "AG", "AD"]) {
+      expect(isPositionCode(retired), retired).toBe(false);
+      expect(positionLabelFr(retired)).toBe(retired);
+    }
   });
 
   it("has a definition for every code in the vocabulary", () => {
@@ -168,115 +144,20 @@ describe("positions", () => {
     }
     expect(Object.keys(POSITION_BY_CODE)).toHaveLength(POSITION_CODES.length);
   });
-});
 
-/**
- * The narrower list the preference picker offers: **the seven codes the owner named**, and no longer
- * anything derived from a formation (decision 142). That matters to how this block is written. While
- * the rule was arithmetic — the union of two shapes' slots, then the distinct codes of `1-3-2-1`
- * alone — the set could be *recomputed* from `BUILTIN_FORMATIONS` and compared, and no hand-typed
- * list could drift away from the rule it claimed to follow. A free list cannot be checked that way,
- * so the literal below is the specification and the derivation is replaced by the invariant a free
- * list can really break: **every wish must be fieldable in some shape this app ships.**
- */
-describe("preferred positions", () => {
-  /** The owner's seven, in his words: keeper, left and right at the back, the middle, the two wings,
-   *  the striker. Typed out here on purpose — this test is the specification, not a mirror of it. */
-  const OWNERS_SEVEN = ["GB", "DG", "DD", "MC", "AG", "AT", "AD"] as const;
-
-  function slotCodesOf(label: string): PositionCode[] {
-    const formation = formationByLabel(label);
-    expect(formation, `${label} is not a built-in formation`).toBeDefined();
-    return (formation as FormationTemplate).slots.map((slot) => slot.positionCode);
-  }
-
-  it("is exactly the seven codes the owner named", () => {
-    expect(PREFERRED_POSITION_CODES).toEqual(OWNERS_SEVEN);
-    // Seven wishes for a seven-a-side team, which is what he asked for. It is a coincidence of
-    // counting rather than a derivation: the shapes have seven *slots*, and this has seven *codes*.
-    expect(PREFERRED_POSITION_CODES).toHaveLength(FORMATION_SLOT_COUNT);
-  });
-
-  it("has no duplicate, and is a subset of the wide vocabulary", () => {
-    expect(new Set(PREFERRED_POSITION_CODES).size).toBe(PREFERRED_POSITION_CODES.length);
-    for (const code of PREFERRED_POSITION_CODES) {
-      expect(POSITION_CODES).toContain(code);
-    }
-  });
-
-  it("offers no wish that no built-in formation can field", () => {
-    // The invariant that replaces the lost derivation: asking a player where he would like to play
-    // and offering a position no shape this app ships has a slot for is a question with no possible
-    // answer. **Be honest about its strength** — all eleven codes are currently fielded somewhere,
-    // so this passes for *any* subset of the vocabulary and cannot fail on a change to the picker
-    // alone. What it really guards is the formations: delete `1-2-1-3`, or move its wingers to
-    // `MG`/`MD`, and `AG`/`AD` become unreachable wishes and this turns red. That is a real way for
-    // the picker to rot, and it is not one anybody editing a formation would think to check.
-    const fieldable = new Set(
-      BUILTIN_FORMATIONS.flatMap((formation) => slotCodesOf(formation.label)),
-    );
-    expect(fieldable.size).toBe(POSITION_CODES.length);
-    for (const code of PREFERRED_POSITION_CODES) {
-      expect(fieldable, `${code} is wishable but no built-in formation fields it`).toContain(code);
-    }
-  });
-
-  it("excludes exactly DC, MG, MD and MOC", () => {
-    const excluded = POSITION_CODES.filter((code) => !isPreferredPositionCode(code));
-    expect(excluded).toEqual(["DC", "MG", "MD", "MOC"]);
-  });
-
-  it("does not match the default shape, in both directions, on purpose", () => {
-    // Pinned because it looks like a bug and is not. A wish is a preference, not a promise. The
-    // owner reads his two centre-backs as « left » and « right », so he chose `DG`/`DD` and `DC`
-    // fell out of the picker even though `1-3-2-1` fields one; and he wanted the wings wishable
-    // even though `1-3-2-1` has no winger at all (owner's decisions, 2026-10-06).
-    const usual = slotCodesOf(DEFAULT_FORMATION_LABEL);
-    expect(usual).toContain("DC");
-    expect(isPreferredPositionCode("DC")).toBe(false);
-    expect(usual).not.toContain("AG");
-    expect(usual).not.toContain("AD");
-    expect(isPreferredPositionCode("AG")).toBe(true);
-    expect(isPreferredPositionCode("AD")).toBe(true);
-  });
-
-  it("keeps the wide vocabulary at eleven: the composition editor is not narrowed with it", () => {
-    // Deliberate, not an oversight. All seven built-in formations stay shippable, so the four
-    // excluded codes are still fieldable — which is why the picker never says they do not exist.
-    expect(POSITION_CODES).toHaveLength(11);
-    expect(slotCodesOf("1-3-2-1")).toContain("DC");
-    expect(slotCodesOf("1-2-3-1")).toContain("MG");
-    expect(slotCodesOf("1-2-3-1")).toContain("MD");
-    expect(slotCodesOf("1-3-3-0")).toContain("MOC");
-  });
-
-  it("carries the matching definitions, in canonical sort order", () => {
-    expect(PREFERRED_POSITIONS.map((position) => position.code)).toEqual([
-      ...PREFERRED_POSITION_CODES,
-    ]);
-    const sorts = PREFERRED_POSITIONS.map((position) => position.sort);
-    expect([...sorts]).toEqual([...sorts].sort((a, b) => a - b));
-    for (const position of PREFERRED_POSITIONS) {
-      expect(position).toBe(POSITION_BY_CODE[position.code]);
-    }
-  });
-
-  it("agrees with its own narrowing function", () => {
-    for (const code of POSITION_CODES) {
-      expect(isPreferredPositionCode(code)).toBe(
-        (PREFERRED_POSITION_CODES as readonly string[]).includes(code),
-      );
-    }
-    expect(isPreferredPositionCode("GB")).toBe(true);
-    expect(isPreferredPositionCode("MOC")).toBe(false);
-    expect(isPreferredPositionCode("LIBERO")).toBe(false);
+  it("offers every position as a wish, because the formation fields every one of them", () => {
+    // Decision 158: there is no narrower « preferred » list any more. What made a narrower list
+    // necessary was a vocabulary larger than any one shape; with five codes, every one is a slot of
+    // the one formation, so asking a player for any of them is a question with an answer.
+    const fielded = new Set(THE_FORMATION.slots.map((slot) => slot.positionCode));
+    expect([...fielded].sort()).toEqual([...POSITION_CODES].sort());
   });
 });
 
 describe("positionRankOf", () => {
   it("returns the display rank of a known code", () => {
     expect(positionRankOf("GB")).toBe(1);
-    expect(positionRankOf("AD")).toBe(POSITION_CODES.length);
+    expect(positionRankOf("AT")).toBe(POSITION_CODES.length);
   });
 
   it("sorts an unknown code after every known one", () => {
@@ -293,35 +174,44 @@ describe("positionRankOf", () => {
   });
 });
 
-describe("built-in formations", () => {
-  it("covers the shapes a seven-a-side coach expects", () => {
-    const labels = BUILTIN_FORMATIONS.map((formation) => formation.label);
-    for (const expected of [
-      "1-3-2-1",
-      "1-2-3-1",
-      "1-3-1-2",
-      "1-2-2-2",
-      "1-1-3-2",
-      "1-3-3-0",
-    ]) {
-      expect(labels).toContain(expected);
-    }
-  });
-
-  it("has a unique label and a unique French name per template", () => {
-    const labels = BUILTIN_FORMATIONS.map((formation) => formation.label);
-    const names = BUILTIN_FORMATIONS.map((formation) => formation.name);
-    expect(new Set(labels).size).toBe(labels.length);
-    expect(new Set(names).size).toBe(names.length);
-  });
-
-  it("exposes a default template", () => {
-    expect(formationByLabel(DEFAULT_FORMATION_LABEL)).toBeDefined();
+describe("the formation", () => {
+  it("is one, the 1-2-3-1, and it is the default (decision 157)", () => {
+    expect(BUILTIN_FORMATIONS).toHaveLength(1);
+    expect(DEFAULT_FORMATION_LABEL).toBe("1-2-3-1");
+    expect(THE_FORMATION.label).toBe(DEFAULT_FORMATION_LABEL);
+    expect(formationByLabel(DEFAULT_FORMATION_LABEL)).toBe(THE_FORMATION);
+    // The retired shapes are rows in the database, not templates here.
+    expect(formationByLabel("1-3-2-1")).toBeUndefined();
     expect(formationByLabel("4-4-2")).toBeUndefined();
   });
 
+  it("is the owner's shape: a keeper, two centre-backs, a winger either side of the centre, a striker", () => {
+    const ordered = [...THE_FORMATION.slots].sort((a, b) => a.sort - b.sort);
+    expect(ordered.map((slot) => slot.positionCode)).toEqual([
+      "GB",
+      "DC",
+      "DC",
+      "AIL",
+      "MC",
+      "AIL",
+      "AT",
+    ]);
+  });
+
+  it("keeps the four coordinates `scripts/import-radarlocal.mts` finds slots by", () => {
+    // The import resolves the two centre-backs and the two wingers by `x`, because their codes are
+    // shared. Moving one of these breaks it, so moving one has to be done here on purpose.
+    const xOf = (code: PositionCode) =>
+      THE_FORMATION.slots
+        .filter((slot) => slot.positionCode === code)
+        .map((slot) => slot.x)
+        .sort((a, b) => a - b);
+    expect(xOf("DC")).toEqual([330, 670]);
+    expect(xOf("AIL")).toEqual([160, 840]);
+  });
+
   it.each(BUILTIN_FORMATIONS.map((formation) => [formation.label, formation] as const))(
-    "%s",
+    "%s holds every invariant",
     (label, formation) => {
       // Exactly seven slots.
       expect(formation.slots).toHaveLength(FORMATION_SLOT_COUNT);
@@ -404,18 +294,24 @@ describe("built-in formations", () => {
 });
 
 describe("formationLabelOf", () => {
-  it("counts the goalkeeper as the leading 1 and prints empty lines as 0", () => {
+  it("counts the goalkeeper as the leading 1 and the wingers in midfield", () => {
     expect(
       formationLabelOf([
         { positionCode: "GB" },
-        { positionCode: "DG" },
         { positionCode: "DC" },
-        { positionCode: "DD" },
-        { positionCode: "MG" },
-        { positionCode: "MOC" },
-        { positionCode: "MD" },
+        { positionCode: "DC" },
+        { positionCode: "AIL" },
+        { positionCode: "MC" },
+        { positionCode: "AIL" },
+        { positionCode: "AT" },
       ]),
-    ).toBe("1-3-3-0");
+    ).toBe("1-2-3-1");
+  });
+
+  it("prints an empty line as 0", () => {
+    expect(
+      formationLabelOf([{ positionCode: "GB" }, { positionCode: "DC" }, { positionCode: "MC" }]),
+    ).toBe("1-1-1-0");
   });
 
   it("returns 0-0-0-0 for an empty formation", () => {
@@ -424,16 +320,15 @@ describe("formationLabelOf", () => {
 });
 
 describe("atPositionFr", () => {
-  it("elides « de » before the three positions that start with a vowel", () => {
+  it("elides « de » before the two positions that start with a vowel", () => {
     expect(atPositionFr("AT")).toBe("au poste d’attaquant");
-    expect(atPositionFr("AG")).toBe("au poste d’ailier gauche");
-    expect(atPositionFr("AD")).toBe("au poste d’ailier droit");
+    expect(atPositionFr("AIL")).toBe("au poste d’ailier");
   });
 
   it("keeps « de » everywhere else, in lower case", () => {
     expect(atPositionFr("GB")).toBe("au poste de gardien de but");
     expect(atPositionFr("DC")).toBe("au poste de défenseur central");
-    expect(atPositionFr("MOC")).toBe("au poste de milieu offensif central");
+    expect(atPositionFr("MC")).toBe("au poste de milieu central");
   });
 
   it("falls back to an unknown code rather than inventing a name", () => {

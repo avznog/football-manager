@@ -57,15 +57,24 @@ refuse when `uses >= max_uses` or the invite has expired.
 ### `positions` — reference data, never edited by users
 `code` (pk), `label_fr`, `line` (`GB` | `DEF` | `MIL` | `ATT`), `default_x`, `default_y`, `sort`.
 
-The fixed 7-a-side vocabulary: `GB`, `DG`, `DC`, `DD`, `MG`, `MC`, `MD`, `MOC`, `AG`, `AT`, `AD`.
-Coordinates are normalised `0..1` on a vertically-oriented pitch, `y = 0` at our own goal line.
+The 7-a-side vocabulary is **five codes**: `GB`, `DC`, `MC`, `AIL` (« Ailier », line `MIL`), `AT` —
+the posts of the one formation (decision 157). The table also still holds the seven retired codes
+(`DG`, `DD`, `MG`, `MD`, `MOC`, `AG`, `AD`), because the retired formations' slots reference them; the
+app's vocabulary (`db/reference.ts`) no longer contains them and nothing offers them.
+Coordinates are integers `0..1000` on a vertically-oriented pitch, `y = 0` at our own goal line.
 
 This table is the reason position preferences are meaningful: a player says "I want to play AT",
 and any formation containing an `AT` slot matches.
 
 ### `formations`
 `id`, `team_id` (**null = built-in template, shared by every team**), `name`, `label`
-(e.g. `1-3-2-1`), `created_by`, `created_at`.
+(e.g. `1-2-3-1`), `created_by`, `created_at`.
+
+**One formation is offered: the built-in `1-2-3-1`** — GB, DC, DC, AIL, MC, AIL, AT (decision 157). Every
+composition is saved on it; the editor and game mode offer no choice and no way to draw a shape. The six
+other built-ins and any team-drawn rows stay in the table, unoffered, because an old `lineups.formation_id`
+or an old event's slot id may reference them — which is also why game mode and the stats still load
+every formation's slots.
 
 ### `formation_slots`
 `id`, `formation_id`, `position_code`, `x`, `y`, `sort`.
@@ -78,11 +87,15 @@ positions, 7 formations with `team_id is null` and 49 slots, and the composition
 run it, so `/match/<id>/composition` and `/match/<id>/saisie` both said « Les formations types n'ont
 pas été chargées dans la base » and no composition could be made at all. Both seed migrations are
 idempotent and insert-only: `db/reference.ts` stays the single source of truth and `seedReference()`
-still owns every later change to a label or a coordinate (decision 141).
+still owns every later change to a label or a coordinate (decision 141). `0011_single_formation.sql`
+adds `AIL` and rewrites the built-in `1-2-3-1`'s `MG`/`MD` slots to `AIL` in place (same ids), since the
+seeder will not touch slots a composition uses.
 
 ### `player_positions`
 `team_member_id`, `position_code`, `preference` (`primary` | `secondary`).
-At most one `primary` per member. Set by the player on their profile by tapping a pitch diagram.
+At most one `primary` per member. Set by the player on their profile by tapping a pitch diagram; any of
+the five codes may be wished for (decision 158). `0011` mapped older rows onto them — DG/DD → DC,
+AG/AD/MG/MD → AIL, MOC → MC — collapsing duplicates per member and keeping `primary` over `secondary`.
 
 ## Calendar
 

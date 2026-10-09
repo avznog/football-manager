@@ -6,8 +6,7 @@
  * Same contract as the other action modules: `assertCan()` before anything else (invariant 4), the
  * `teamId` taken from the submitted form and *then* verified, Zod for every field, `revalidatePath`
  * at the end. Permissions come from the two coach actions that already exist —
- * `match:selectSquad` for the sheet, `match:manageLineups` for the compositions and for the
- * formations a composition creates.
+ * `match:selectSquad` for the sheet, `match:manageLineups` for the compositions.
  *
  * **Nothing here applies a composition.** `lineups.applied_event_id` is never written: a plan is a
  * proposal until the coach confirms it in game mode (invariant 3), and a composition that has been
@@ -24,9 +23,7 @@ import type { SquadRole } from "@/db/schema";
 import { assertCan } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
-import { insertTeamFormation } from "@/lib/formation/persist";
-import { getFormations } from "@/lib/formation/queries";
-import { mapShapeToSlots, orderShape, shapeProblemsFr, type ShapeSlot } from "@/lib/formation/shape";
+import { getTheFormation } from "@/lib/formation/queries";
 
 import {
   appliedNoticeFr,
@@ -39,7 +36,6 @@ import {
 import { getCompositionMembers, getFieldedMemberIds, getMatchLineups } from "./queries";
 import {
   lineupTargetSchema,
-  readShapeFields,
   readSlotFields,
   readSquadMarks,
   saveLineupSchema,
@@ -190,8 +186,8 @@ export async function setMatchSquad(_prev: FormState, formData: FormData): Promi
  * Creates or updates a composition — the starting seven, or a plan « à partir de la 30ᵉ minute ».
  *
  * Everything happens in one transaction, because a half-written composition is worse than none: the
- * formation is resolved (reused, or created from the shape the coach drew), the `lineups` row is
- * written, and its slots are replaced. `lineup_slots` is a plain projection of the editor's state, so
+ * `lineups` row is written — always on the one formation, which also moves an old plan drawn on a
+ * retired one onto it — and its slots are replaced. `lineup_slots` is a plain projection of the editor's state, so
  * it is deleted and rewritten rather than diffed — it carries no history, unlike `match_events`.
  */
 export async function saveLineup(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -201,15 +197,12 @@ export async function saveLineup(_prev: FormState, formData: FormData): Promise<
     teamId: formData.get("teamId"),
     matchId: formData.get("matchId"),
     lineupId: formData.get("lineupId") || undefined,
-    formationId: formData.get("formationId"),
     fromMinute: formData.get("fromMinute"),
-    shapeMode: formData.get("shapeMode") ?? "existing",
-    shape: readShapeFields(formData.getAll("shape")),
     assignments: readSlotFields(formData.getAll("slot")),
   });
   if (!parsed.success) return toFormState(parsed.error);
 
-  const { teamId, matchId, lineupId, fromMinute, shapeMode } = parsed.data;
+  const { teamId, matchId, lineupId, fromMinute } = parsed.data;
 
   assertCan(actor, "match:manageLineups", { teamId });
 
@@ -239,56 +232,19 @@ export async function saveLineup(_prev: FormState, formData: FormData): Promise<
   }
 
   /*
-   * Which formation the composition points at, and what each key the editor submitted means.
-   *
-   * In `existing` mode the keys already are `formation_slots.id`s. In `custom` mode they are local
-   * keys of a shape that is first matched against the formations the team can already use — a shape
-   * is only inserted when it is genuinely new, so saving the same one twice does not litter the
-   * picker with duplicates.
+   * The one formation every composition stands on (decision 157). Read here rather than taken from the
+   * form: there is nothing to choose, so a submitted formation id could only be a stale tab or a forged
+   * one. The keys the editor submitted are its `formation_slots.id`s; a key that is not one of them
+   * places nobody.
    */
-  const available = await getFormations(teamId);
-  let shape: ShapeSlot[] = [];
-  let planSlots: PlanSlot[] = [];
-  let reuse: { formationId: string; slotIdByKey: Map<string, string> } | null = null;
-
-  if (shapeMode === "custom") {
-    shape = orderShape(
-      parsed.data.shape.map((slot) => ({
-        key: slot.key,
-        positionCode: slot.positionCode,
-        x: slot.x,
-        y: slot.y,
-      })),
-    );
-    const problems = shapeProblemsFr(shape);
-    if (problems.length > 0) return { error: problems[0] };
-
-    planSlots = shape.map((slot, index) => ({
-      id: slot.key,
-      positionCode: slot.positionCode,
-      sort: index + 1,
-    }));
-
-    for (const candidate of available) {
-      const mapping = mapShapeToSlots(shape, candidate.slots);
-      if (mapping) {
-        reuse = { formationId: candidate.id, slotIdByKey: mapping };
-        break;
-      }
-    }
-  } else {
-    const formation = available.find((candidate) => candidate.id === parsed.data.formationId);
-    if (!formation) return { error: "Cette formation n’est pas disponible pour cette équipe." };
-    planSlots = formation.slots.map((slot) => ({
-      id: slot.id,
-      positionCode: slot.positionCode,
-      sort: slot.sort,
-    }));
-    reuse = {
-      formationId: formation.id,
-      slotIdByKey: new Map(formation.slots.map((slot) => [slot.id, slot.id])),
-    };
-  }
+  const formation = await getTheFormation();
+  if (!formation) return { error: "La formation n’a pas été chargée dans la base." };
+  const planSlots: PlanSlot[] = formation.slots.map((slot) => ({
+    id: slot.id,
+    positionCode: slot.positionCode,
+    sort: slot.sort,
+  }));
+  const slotIds = new Set(formation.slots.map((slot) => slot.id));
 
   // Only players on the match sheet may be placed (`docs/DATA_MODEL.md`). Checked here as well as in
   // the editor, so a tab left open cannot save somebody who has since been dropped.
@@ -304,34 +260,15 @@ export async function saveLineup(_prev: FormState, formData: FormData): Promise<
     };
   }
 
-  const assignments = parsed.data.assignments.map((pair) => ({
-    slotId: pair.slotKey,
-    memberId: pair.memberId,
-  }));
+  const assignments = parsed.data.assignments
+    .filter((pair) => slotIds.has(pair.slotKey))
+    .map((pair) => ({ slotId: pair.slotKey, memberId: pair.memberId }));
   const blocking = blockingIssues(findPlanIssues({ assignments, slots: planSlots, members }));
   if (blocking.length > 0) return { error: blocking[0].messageFr };
 
+  const formationId = formation.id;
+
   const savedId = await db.transaction(async (tx) => {
-    let slotIdByKey = reuse?.slotIdByKey ?? new Map<string, string>();
-    let formationId = reuse?.formationId ?? parsed.data.formationId;
-
-    if (!reuse) {
-      const inserted = await insertTeamFormation(tx, {
-        teamId,
-        createdBy: actor.userId,
-        shape,
-      });
-      formationId = inserted.formationId;
-      slotIdByKey = inserted.slotIdByKey;
-    }
-
-    const rows = assignments
-      .map((assignment) => ({
-        slotId: slotIdByKey.get(assignment.slotId),
-        memberId: assignment.memberId,
-      }))
-      .filter((row): row is { slotId: string; memberId: string } => row.slotId !== undefined);
-
     let id: string;
     if (target) {
       id = target.id;
@@ -354,9 +291,9 @@ export async function saveLineup(_prev: FormState, formData: FormData): Promise<
       id = row.id;
     }
 
-    if (rows.length > 0) {
+    if (assignments.length > 0) {
       await tx.insert(lineupSlots).values(
-        rows.map((row) => ({
+        assignments.map((row) => ({
           lineupId: id,
           formationSlotId: row.slotId,
           teamMemberId: row.memberId,

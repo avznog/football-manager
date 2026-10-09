@@ -107,38 +107,6 @@ export function restrictToMembers(
   return assignments.filter((assignment) => known.has(assignment.memberId));
 }
 
-/**
- * Carries a composition over to another formation, slot by slot in store order (goalkeeper first,
- * then back to front).
- *
- * Switching from a 1-3-2-1 to a 1-2-3-1 half way through picking a team should not throw the work
- * away: the keeper stays the keeper, the defenders stay at the back, and the coach only fixes what
- * actually changed. Slots that have no counterpart in the new shape lose their player to the
- * bench — which is honest, since the position no longer exists.
- */
-export function remapToShape(
-  assignments: readonly SlotAssignment[],
-  fromSlots: readonly ShapeSlot[],
-  toSlots: readonly ShapeSlot[],
-): SlotAssignment[] {
-  const source = orderShape(fromSlots);
-  const target = orderShape(toSlots);
-
-  const result: SlotAssignment[] = [];
-  const taken = new Set<string>();
-
-  target.forEach((slot, index) => {
-    const from = source[index];
-    if (!from) return;
-    const memberId = memberInSlot(assignments, from.key);
-    if (memberId === null || taken.has(memberId)) return;
-    taken.add(memberId);
-    result.push({ slotId: slot.key, memberId });
-  });
-
-  return result;
-}
-
 /** Store order, so what is saved and what is compared do not depend on the order of the gestures. */
 export function sortAssignments(
   assignments: readonly SlotAssignment[],

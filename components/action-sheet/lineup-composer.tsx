@@ -23,9 +23,8 @@ export type LineupComposerProps = {
   /** « Composition de départ ». */
   title: string;
   description?: string;
-  formations: readonly ComposerFormation[];
-  /** Which formation the sheet opens on. */
-  initialFormationId: string | null;
+  /** The one formation (decision 157); `null` on a database that never loaded it. */
+  formation: ComposerFormation | null;
   /** Everyone who may be placed, in the order the picker recommends them. */
   options: readonly PlayerOption[];
   /** Pre-filled assignments, e.g. the players already on the pitch. */
@@ -45,27 +44,24 @@ export type LineupComposerProps = {
  * It is deliberately **not** a drag-and-drop pitch: that editor is the composition screen's job
  * (M3), where the coach is sitting down before the match. At kick-off, with eleven people talking,
  * a list of seven dropdowns is quicker and cannot drop a player on the touchline.
+ *
+ * There is no formation to choose (decision 157): the seven rows are the `1-2-3-1`'s posts.
  */
 export function LineupComposer({
   open,
   onClose,
   title,
   description,
-  formations,
-  initialFormationId,
+  formation,
   options,
   initialAssignments = [],
   confirmLabel,
   onConfirm,
 }: LineupComposerProps) {
-  const [formationId, setFormationId] = useState(
-    () => initialFormationId ?? formations[0]?.id ?? "",
-  );
   const [bySlot, setBySlot] = useState<Record<string, string>>(() =>
     Object.fromEntries(initialAssignments.map((entry) => [entry.slotId, entry.memberId])),
   );
 
-  const formation = formations.find((item) => item.id === formationId) ?? formations[0] ?? null;
   const slots = useMemo(
     () => (formation ? [...formation.slots].sort((a, b) => a.sort - b.sort) : []),
     [formation],
@@ -81,21 +77,6 @@ export function LineupComposer({
 
   const nameOf = (memberId: string) =>
     options.find((option) => option.memberId === memberId)?.name ?? "Joueur inconnu";
-
-  /**
-   * Changing formation keeps the players, by position order: a coach switching from 1-3-2-1 to
-   * 1-2-3-1 has the same seven people in front of them and should not have to re-enter all of them.
-   */
-  function changeFormation(nextId: string) {
-    const next = formations.find((item) => item.id === nextId);
-    if (!next) return;
-    const nextSlots = [...next.slots].sort((a, b) => a.sort - b.sort);
-    const current = slots.map((slot) => bySlot[slot.id] ?? "");
-    setFormationId(nextId);
-    setBySlot(
-      Object.fromEntries(nextSlots.map((slot, index) => [slot.id, current[index] ?? ""])),
-    );
-  }
 
   const problem =
     assignments.length === 0
@@ -134,19 +115,6 @@ export function LineupComposer({
       }
     >
       <div className="space-y-4">
-        {formations.length > 1 ? (
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-ink">Formation</span>
-            <Select value={formationId} onChange={(event) => changeFormation(event.target.value)}>
-              {formations.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
-          </label>
-        ) : null}
-
         <ul className="space-y-3">
           {slots.map((slot) => {
             const memberId = bySlot[slot.id] ?? "";

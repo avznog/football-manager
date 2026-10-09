@@ -16,6 +16,9 @@
  * `lib/formation/shape.ts`, both pure and unit-tested. This file owns pixels and React state; it
  * decides nothing about football.
  *
+ * There is one formation (decision 157), so there is nothing to pick and no slot to drag: the seven
+ * posts of the `1-2-3-1` are fixed, and the only thing a gesture moves is a player.
+ *
  * ## Three ways to do the same thing
  *
  * 1. **Drag** a player from the bench onto a slot. Dropping on an occupied slot swaps the two;
@@ -23,8 +26,7 @@
  *    dock is a real drop target and says so while a finger is over it — see `DOCK_TARGET_CLASS`.
  * 2. **Tap** a player, then tap a slot. Same result, and the only thing that works reliably in a
  *    wool glove in February. It is also the keyboard path: every disc, slot and bench entry is a
- *    real `<button>`, so `Tab` + `Entrée` does the whole job, and in `postes` mode the arrow keys
- *    nudge a slot around the pitch.
+ *    real `<button>`, so `Tab` + `Entrée` does the whole job.
  * 3. **Nothing** — the whole state also travels in hidden fields, so a submit works even if the
  *    JavaScript that handles gestures has failed.
  *
@@ -58,10 +60,9 @@
  *
  * ## Why the state is what it is
  *
- * `shape` is the seven slots being edited and `assignments` the `(slot, player)` pairs. "The coach
- * drew their own formation" is *derived* (`sameShape` against the formation picked in the select),
- * not a flag to keep in sync; likewise the bench, the label, the deduced changes and every warning.
- * The only stored state is what a gesture actually changes.
+ * `assignments` is the `(slot, player)` pairs, over the formation's fixed seven slots. The bench, the
+ * deduced changes and every warning are derived from it, never kept in sync beside it. The only
+ * stored state is what a gesture actually changes.
  */
 
 import { useActionState, useId, useMemo, useRef, useState } from "react";
@@ -77,22 +78,18 @@ import {
   type PitchDragHandle,
   type PitchSlot,
 } from "@/components/pitch";
-import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Select } from "@/components/ui/select";
 import { saveLineup } from "@/lib/composition/actions";
 import {
   assignmentsSignature,
   benchOf,
   memberInSlot,
   placeInSlot,
-  remapToShape,
   removeMember,
   slotOfMember,
   sortAssignments,
@@ -118,17 +115,7 @@ import {
   type PlannedLineup,
 } from "@/lib/composition/plan";
 import { abbreviateName } from "@/lib/pitch/names";
-import {
-  customFormationNameFr,
-  moveShapeSlot,
-  nearestSlot,
-  orderShape,
-  sameShape,
-  shapeFromRows,
-  shapeLabel,
-  shapeProblemsFr,
-  type ShapeSlot,
-} from "@/lib/formation/shape";
+import { nearestSlot, orderShape, shapeFromRows, shapeLabel } from "@/lib/formation/shape";
 
 import { PlanChanges } from "./plan-changes";
 
@@ -147,12 +134,10 @@ export type EditorMember = {
   primaryPositionCode: string | null;
 };
 
-/** A formation the coach can pick, with its slots. */
+/** The one formation (decision 157), with its slots. */
 export type EditorFormation = {
   id: string;
-  name: string;
   label: string;
-  isBuiltin: boolean;
   slots: readonly { id: string; positionCode: string; x: number; y: number; sort: number }[];
 };
 
@@ -165,10 +150,8 @@ export type CompositionEditorProps = {
   kit: KitColors;
   /** Everyone who could play, in squad order. */
   members: readonly EditorMember[];
-  /** Built-in formations first, then the team's own. */
-  formations: readonly EditorFormation[];
-  /** Which formation to start from. */
-  formationId: string;
+  /** The formation every composition stands on. */
+  formation: EditorFormation;
   /**
    * What the pitch opens with, keyed on `formation_slots.id`: the saved assignments when modifying,
    * and — for a new composition — the team in force at that minute, copied by
@@ -197,19 +180,12 @@ export type CompositionEditorProps = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * What a gesture is carrying: a player being placed, or — in `postes` mode — one of the seven slots
- * being moved around the pitch. `id` is a `team_members.id` for a player and a shape key for a slot.
+ * What a gesture is carrying: a player being placed, or an empty slot being tapped. `id` is a
+ * `team_members.id` for a player and a `formation_slots.id` for a slot.
  */
 type Carried = { kind: "player" | "slot"; id: string };
 
-type Selection =
-  | { kind: "member"; id: string }
-  | { kind: "slot"; key: string }
-  | null;
-
-/** Pitch units one arrow key moves a slot. Shift multiplies it. */
-const NUDGE = 20;
-const NUDGE_FAST = 100;
+type Selection = { kind: "member"; id: string } | null;
 
 /**
  * Widest the pitch box may be — see the header comment for the two arithmetics it satisfies. It caps
@@ -252,12 +228,11 @@ const DOCK_TARGET_CLASS = "ring-2 ring-accent";
 /* -------------------------------------------------------------------------- */
 
 export function CompositionEditor(props: CompositionEditorProps) {
-  const { formations, members, kit } = props;
+  const { formation, members, kit } = props;
 
   const [state, action, pending] = useActionState(saveLineup, undefined);
 
-  const [formationId, setFormationId] = useState(props.formationId);
-  const [shape, setShape] = useState<ShapeSlot[]>(() => shapeOfFormation(formations, props.formationId));
+  const shape = useMemo(() => shapeFromRows(formation.slots), [formation.slots]);
   const [assignments, setAssignments] = useState<SlotAssignment[]>(() => [...props.assignments]);
   /**
    * The minute field holds **the string the coach typed**, not a number, and that is the whole fix
@@ -268,7 +243,6 @@ export function CompositionEditor(props: CompositionEditorProps) {
    * every other number field in the app (`MinuteInput` in the retro form, and the score fields).
    */
   const [fromMinute, setFromMinute] = useState(() => String(props.fromMinute));
-  const [mode, setMode] = useState<"players" | "shape">("players");
   const [selection, setSelection] = useState<Selection>(null);
   const [announcement, setAnnouncement] = useState("");
   /** True while a player lifted off the turf is held over the dock: the bench is the drop target. */
@@ -293,10 +267,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
   /* --- what the state means ------------------------------------------------ */
 
-  const source = formations.find((formation) => formation.id === formationId);
-  const isCustom = source ? !sameShape(shape, shapeFromRows(source.slots)) : true;
   const label = shapeLabel(shape);
-  const shapeProblems = isCustom ? shapeProblemsFr(shape) : [];
 
   const planSlots = useMemo(
     () =>
@@ -345,14 +316,11 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
   const dirty =
     assignmentsSignature(assignments) !== assignmentsSignature(props.assignments) ||
-    fromMinute !== String(props.fromMinute) ||
-    formationId !== props.formationId ||
-    isCustom;
+    fromMinute !== String(props.fromMinute);
 
   const canSave =
     !pending &&
     blocking.length === 0 &&
-    shapeProblems.length === 0 &&
     !minuteClash &&
     minuteError === null;
 
@@ -360,18 +328,10 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
   const gesture = usePitchDrag<Carried>({
     pitchRef,
-    // A slot follows the finger as it goes, so the label and the position code update live: the
-    // coach sees « 1-2-3-1 » appear the moment the defender he is dragging crosses the halfway line.
-    onMove: (carried, point, client) => {
-      if (carried.kind === "player") {
-        // The one containment test, driving the ring on the dock. `onDrop` asks the same question of
-        // the same rectangle, so what the coach is shown and what the release does cannot disagree.
-        setOverDock(isInside(dockRef.current, client));
-        return;
-      }
-      if (point && mode === "shape") {
-        setShape((current) => moveShapeSlot(current, carried.id, point));
-      }
+    onMove: (carried, _point, client) => {
+      // The one containment test, driving the ring on the dock. `onDrop` asks the same question of
+      // the same rectangle, so what the coach is shown and what the release does cannot disagree.
+      if (carried.kind === "player") setOverDock(isInside(dockRef.current, client));
     },
     // A pointer sequence that went nowhere is a tap.
     onTap: (carried) => (carried.kind === "player" ? tapPlayer(carried.id) : tapSlot(carried.id)),
@@ -397,15 +357,6 @@ export function CompositionEditor(props: CompositionEditorProps) {
           sendToBench(carried.id);
         }
         setSelection(null);
-        return;
-      }
-      if (mode !== "shape") return;
-      // The slot has already followed the finger; this only says where it ended up.
-      const moved = shape.find((slot) => slot.key === carried.id);
-      if (moved) {
-        setAnnouncement(
-          `Poste déplacé : ${positionNameFr(moved.positionCode)}. Formation ${shapeLabel(shape)}.`,
-        );
       }
     },
   });
@@ -478,17 +429,6 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
   /** Tapping a slot fills it with the selection, or picks up whoever is standing there. */
   function tapSlot(slotKey: string) {
-    if (mode === "shape") {
-      setSelection({ kind: "slot", key: slotKey });
-      const slot = shape.find((candidate) => candidate.key === slotKey);
-      setAnnouncement(
-        slot
-          ? `Poste ${positionNameFr(slot.positionCode)} sélectionné. Utilise les flèches pour le déplacer.`
-          : "",
-      );
-      return;
-    }
-
     if (selection?.kind === "member") {
       place(slotKey, selection.id);
       return;
@@ -498,37 +438,10 @@ export function CompositionEditor(props: CompositionEditorProps) {
     if (occupant) tapPlayer(occupant);
   }
 
-  /** Arrow keys in `postes` mode: the keyboard equivalent of dragging a slot. */
-  function nudge(slotKey: string, dx: number, dy: number) {
-    const slot = shape.find((candidate) => candidate.key === slotKey);
-    if (!slot) return;
-    const next = moveShapeSlot(shape, slotKey, { x: slot.x + dx, y: slot.y + dy });
-    setShape(next);
-    const moved = next.find((candidate) => candidate.key === slotKey);
-    setAnnouncement(
-      moved ? `${positionNameFr(moved.positionCode)}. Formation ${shapeLabel(next)}.` : "",
-    );
-  }
-
   function onSlotKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, slotKey: string) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      tapSlot(slotKey);
-      return;
-    }
-    if (mode !== "shape") return;
-    const step = event.shiftKey ? NUDGE_FAST : NUDGE;
-    const moves: Record<string, [number, number]> = {
-      ArrowLeft: [-step, 0],
-      ArrowRight: [step, 0],
-      // Pitch y grows towards the opponent's goal, which is *up* the screen.
-      ArrowUp: [0, step],
-      ArrowDown: [0, -step],
-    };
-    const move = moves[event.key];
-    if (!move) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    nudge(slotKey, move[0], move[1]);
+    tapSlot(slotKey);
   }
 
   function onPlayerKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, memberId: string) {
@@ -537,23 +450,9 @@ export function CompositionEditor(props: CompositionEditorProps) {
     tapPlayer(memberId);
   }
 
-  /* --- changing formation -------------------------------------------------- */
-
-  function chooseFormation(nextId: string) {
-    const next = formations.find((formation) => formation.id === nextId);
-    if (!next) return;
-    const nextShape = shapeFromRows(next.slots);
-    // The work already done is carried over slot by slot rather than thrown away.
-    setAssignments((current) => remapToShape(current, shape, nextShape));
-    setShape(nextShape);
-    setFormationId(nextId);
-    setSelection(null);
-    setAnnouncement(`Formation ${next.label}.`);
-  }
+  /* --- undoing ------------------------------------------------------------ */
 
   function resetEverything() {
-    setFormationId(props.formationId);
-    setShape(shapeOfFormation(formations, props.formationId));
     setAssignments([...props.assignments]);
     setFromMinute(String(props.fromMinute));
     setSelection(null);
@@ -599,9 +498,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
     const memberId = memberInSlot(visible, slot.key);
     const member = memberId ? byId.get(memberId) : undefined;
     const isTarget = hoveredSlot === slot.key;
-    const isSelected =
-      (selection?.kind === "member" && selection.id === memberId) ||
-      (selection?.kind === "slot" && selection.key === slot.key);
+    const isSelected = selection?.kind === "member" && selection.id === memberId;
 
     return {
       id: slot.key,
@@ -630,18 +527,6 @@ export function CompositionEditor(props: CompositionEditorProps) {
       <input type="hidden" name="teamId" value={props.teamId} />
       <input type="hidden" name="matchId" value={props.matchId} />
       {props.lineupId ? <input type="hidden" name="lineupId" value={props.lineupId} /> : null}
-      <input type="hidden" name="formationId" value={formationId} />
-      <input type="hidden" name="shapeMode" value={isCustom ? "custom" : "existing"} />
-      {isCustom
-        ? orderShape(shape).map((slot) => (
-            <input
-              key={slot.key}
-              type="hidden"
-              name="shape"
-              value={`${slot.key}|${slot.positionCode}|${slot.x}|${slot.y}`}
-            />
-          ))
-        : null}
       {sortAssignments(assignments, shape).map((assignment) => (
         <input
           key={assignment.slotId}
@@ -665,58 +550,15 @@ export function CompositionEditor(props: CompositionEditorProps) {
         </div>
       ) : null}
 
-      {/* --- formation and minute --- */}
-      <Card
-        title={planTitleFr({ fromMinute: titleMinute, isInitial: titleMinute === 0 })}
-        description={
-          isCustom
-            ? `Formation dessinée : ${customFormationNameFr(label)}`
-            : `${source?.name ?? label}`
-        }
-        action={
-          <Badge variant={isCustom ? "warning" : "neutral"}>{label}</Badge>
-        }
-      >
-        {/* Two columns from 390 px, not from `sm`: stacked, these two fields plus their hint were
-            220 px of screen above a pitch that has none to spare. At 390 px the card interior is
-            326 px, so each column is (326 − 12) / 2 = 157 px — room for « 1-3-2-1 » and for a
-            two-digit minute. */}
+      {/* --- the minute ---
+          No formation here any more: there is one (decision 157), and the pitch below is it. */}
+      <Card title={planTitleFr({ fromMinute: titleMinute, isInitial: titleMinute === 0 })}>
+        {/* Half the card's width, as it was beside the old formation select: a minute needs no more,
+            and a 326 px number field reads as a text box. */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="formation">Formation</Label>
-            <Select
-              id="formation"
-              value={formationId}
-              onChange={(event) => chooseFormation(event.target.value)}
-              disabled={pending}
-            >
-              <optgroup label="Formations types">
-                {formations
-                  .filter((formation) => formation.isBuiltin)
-                  .map((formation) => (
-                    <option key={formation.id} value={formation.id}>
-                      {formation.name}
-                    </option>
-                  ))}
-              </optgroup>
-              {formations.some((formation) => !formation.isBuiltin) ? (
-                <optgroup label="Formations de l’équipe">
-                  {formations
-                    .filter((formation) => !formation.isBuiltin)
-                    .map((formation) => (
-                      <option key={formation.id} value={formation.id}>
-                        {formation.name}
-                      </option>
-                    ))}
-                </optgroup>
-              ) : null}
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            {/* « À partir de la minute » wrapped onto three lines in a 157 px column and pushed the
-                select out of line with it. The card's own title says « À partir de la 30e minute »,
-                and the hint below says what 0 means, so the field itself only needs its unit. */}
+            {/* The card's own title says « À partir de la 30e minute », and the hint below says what 0
+                means, so the field itself only needs its unit. */}
             <Label htmlFor="fromMinute">Minute</Label>
             <Input
               id="fromMinute"
@@ -758,31 +600,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
       </Card>
 
       {/* --- the pitch --- */}
-      <Card
-        title="Terrain"
-        /* The mode switch lives in the header rather than on a row of its own: the control is 54 px
-           tall with its track, and next to the title it costs nothing. Its legend goes back to
-           `sr-only`, which is what the two visible labels already say. */
-        action={
-          <SegmentedControl
-            name="editor-mode"
-            legend="Que veux-tu déplacer ?"
-            /* 160 px: the track's padding and border take 10, leaving 75 per segment for « Joueurs »
-               at 14 px — and 154 px of the 326 px header for the title, which needs 60. */
-            className="w-[10rem]"
-            value={mode}
-            onChange={(next) => {
-              setMode(next);
-              setSelection(null);
-            }}
-            options={[
-              { value: "players", label: "Joueurs" },
-              { value: "shape", label: "Postes" },
-            ]}
-            disabled={pending}
-          />
-        }
-      >
+      <Card title="Terrain">
         <div className="space-y-2">
           {/* The wrapper has the pitch's exact box (`Pitch` is `w-full` with a fixed aspect ratio),
               which is what `fromClientPoint` needs to convert a finger into a point — so the cap
@@ -801,16 +619,15 @@ export function CompositionEditor(props: CompositionEditorProps) {
                   type="button"
                   // `touch-none`: the pitch must not scroll away under a drag.
                   className="touch-none rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  aria-label={slotButtonLabelFr(slot, mode)}
+                  aria-label={slotButtonLabelFr(slot)}
                   onPointerDown={(event) =>
                     gesture.begin(
                       event,
-                      // In `postes` mode the slot itself is what moves. Otherwise the gesture carries
-                      // whoever is standing in it, and an empty slot carries the slot so that a tap
-                      // on it still goes through `tapSlot`.
-                      mode === "shape" || !slot.player
-                        ? { kind: "slot", id: slot.id }
-                        : { kind: "player", id: slot.player.id },
+                      // The gesture carries whoever is standing in the slot, and an empty slot carries
+                      // the slot so that a tap on it still goes through `tapSlot`.
+                      slot.player
+                        ? { kind: "player", id: slot.player.id }
+                        : { kind: "slot", id: slot.id },
                     )
                   }
                   {...gesture.handlers}
@@ -837,8 +654,6 @@ export function CompositionEditor(props: CompositionEditorProps) {
               }
             />
           </div>
-
-          {shapeProblems.length > 0 ? <FieldError>{shapeProblems}</FieldError> : null}
 
           {/* The two undo-shaped actions, next to what they undo rather than in the dock, where they
               would push the confirm button onto a second row. */}
@@ -921,7 +736,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
             the list rather than living inside it, so a reader moving through the discs is not told
             the total between two of them. */}
         <p id={benchHintId} className="sr-only">
-          {benchHintFr({ mode, benchCount: bench.length, freeSlots })}
+          {benchHintFr({ benchCount: bench.length, freeSlots })}
         </p>
 
         {/* The bench itself: one strip, titulaires then remplaçants, scrolling sideways when there
@@ -939,7 +754,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
                 member={member}
                 kit={kit}
                 selected={selection?.kind === "member" && selection.id === member.membershipId}
-                disabled={pending || mode === "shape"}
+                disabled={pending}
                 gesture={gesture}
                 onKeyDown={onPlayerKeyDown}
               />
@@ -953,7 +768,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
                 member={member}
                 kit={kit}
                 selected={selection?.kind === "member" && selection.id === member.membershipId}
-                disabled={pending || mode === "shape"}
+                disabled={pending}
                 gesture={gesture}
                 onKeyDown={onPlayerKeyDown}
               />
@@ -1076,14 +891,6 @@ function BenchDisc({ member, kit, selected, disabled, gesture, onKeyDown }: Benc
 /* Small helpers                                                              */
 /* -------------------------------------------------------------------------- */
 
-function shapeOfFormation(
-  formations: readonly EditorFormation[],
-  formationId: string,
-): ShapeSlot[] {
-  const formation = formations.find((candidate) => candidate.id === formationId) ?? formations[0];
-  return formation ? shapeFromRows(formation.slots) : [];
-}
-
 function offSheet(member: EditorMember | undefined): boolean {
   return member === undefined || member.squadRole === null || member.squadRole === "supporter";
 }
@@ -1122,9 +929,8 @@ function positionNameFr(code: string): string {
   return POSITION_NAMES[code] ?? code;
 }
 
-function slotButtonLabelFr(slot: PitchSlot, mode: "players" | "shape"): string {
+function slotButtonLabelFr(slot: PitchSlot): string {
   const position = positionNameFr(slot.positionCode);
-  if (mode === "shape") return `Déplacer le poste de ${position}`;
   if (slot.player) return `${slot.player.name}, ${position}`;
   return `Poste libre : ${position}`;
 }

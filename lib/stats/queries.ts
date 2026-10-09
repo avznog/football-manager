@@ -202,10 +202,11 @@ async function getCachedStatRows(matchIds: readonly string[]): Promise<CachedSta
 }
 
 /**
- * The slot catalogue: the built-in formations plus this team's own. Without it the reducer cannot
- * know which slot is the goal, so goalkeeping minutes would silently stay at zero.
+ * The slot catalogue: the built-in formations — the one offered and the retired ones an old log may
+ * still mention (decision 157) — plus this team's own. Without it the reducer cannot know which slot
+ * is the goal, so goalkeeping minutes would silently stay at zero.
  *
- * Eleven positions over a handful of formations is a tiny table, and it is only read when something
+ * A handful of formations of seven slots is a tiny table, and it is only read when something
  * actually has to be reduced.
  */
 async function getSlotCatalogue(teamId: string): Promise<SlotInfo[]> {

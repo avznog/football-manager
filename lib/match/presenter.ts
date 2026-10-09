@@ -140,8 +140,12 @@ export type LiveMatch = {
   lineups: readonly LiveLineup[];
   /** Every slot of every formation the match could refer to, so the reducer can find the goal. */
   slots: readonly LiveSlot[];
+  /**
+   * What the composer offers: the one formation (decision 157), or nothing on a database that never
+   * loaded it. `slots` above stays the whole catalogue, for the log's sake.
+   */
   formations: readonly LiveFormation[];
-  /** The formation the ad-hoc composer opens on. */
+  /** The one formation's id — what the ad-hoc composer and an empty pitch are drawn on. */
   defaultFormationId: string | null;
   players: readonly LivePlayer[];
   /** True when `match_squad` has rows. Without one, game mode works off the whole roster. */

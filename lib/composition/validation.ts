@@ -4,17 +4,16 @@
  * Pure — no server imports — so it is unit tested directly and the editor can use the same parsers
  * to check itself before submitting. Every message is French: the coach reads them (decision 012).
  *
- * The editor is a client component holding a graph of state (a shape, an assignment per slot) that
- * has to reach a Server Action through a plain `<form>`, because the whole screen must keep working
- * when a gesture fails or JavaScript never loads. It is carried in **repeated hidden fields**, the
- * same trick the position picker uses (`app/(app)/joueur/_components/positions-editor.tsx`), and
- * the two readers below are the only place that knows their encoding.
+ * The editor is a client component holding a graph of state (an assignment per slot) that has to
+ * reach a Server Action through a plain `<form>`, because the whole screen must keep working when a
+ * gesture fails or JavaScript never loads. It is carried in **repeated hidden fields**, the same
+ * trick the position picker uses (`app/(app)/joueur/_components/positions-editor.tsx`), and the
+ * reader below is the only place that knows their encoding.
  */
 
 import { z } from "zod";
 
-import { FORMATION_SLOT_COUNT, POSITION_CODES } from "@/db/reference";
-import { PITCH_MAX, PITCH_MIN } from "@/lib/pitch/geometry";
+import { FORMATION_SLOT_COUNT } from "@/db/reference";
 
 /* -------------------------------------------------------------------------- */
 /* The match sheet                                                            */
@@ -80,14 +79,6 @@ export const fromMinuteSchema = z.coerce
   .min(0, "La minute ne peut pas être négative.")
   .max(200, "Cette minute est en dehors du match.");
 
-export const pitchCoordinateSchema = z.coerce
-  .number({ message: "Coordonnée invalide." })
-  .int()
-  .min(PITCH_MIN)
-  .max(PITCH_MAX);
-
-export const positionCodeSchema = z.enum(POSITION_CODES, { message: "Poste inconnu." });
-
 /** One `(slot, player)` pair as the form carries it: `slot=<slotKey>:<membershipId>`. */
 export function readSlotFields(
   values: readonly FormDataEntryValue[],
@@ -110,50 +101,17 @@ export function readSlotFields(
   return pairs;
 }
 
-/** One slot of a hand-drawn shape: `shape=<slotKey>|<positionCode>|<x>|<y>`. */
-export function readShapeFields(
-  values: readonly FormDataEntryValue[],
-): Array<{ key: string; positionCode: string; x: number; y: number }> {
-  const slots: Array<{ key: string; positionCode: string; x: number; y: number }> = [];
-
-  for (const value of values) {
-    if (typeof value !== "string") continue;
-    const parts = value.split("|");
-    if (parts.length !== 4) continue;
-    const [key, positionCode, rawX, rawY] = parts.map((part) => part.trim());
-    const x = Number(rawX);
-    const y = Number(rawY);
-    if (key.length === 0 || !Number.isFinite(x) || !Number.isFinite(y)) continue;
-    slots.push({ key, positionCode, x: Math.round(x), y: Math.round(y) });
-  }
-
-  return slots;
-}
-
 /**
- * Either the composition keeps the formation it was given, or the coach dragged the slots and a
- * new team formation has to be created from the shape that comes with it (decision 005).
+ * The composition, as the editor submits it. There is no formation in it: every composition stands
+ * on the one formation (decision 157), which `saveLineup` reads itself rather than trusting a form to
+ * name it. The slot keys are that formation's `formation_slots.id`s.
  */
-export const shapeModeSchema = z.enum(["existing", "custom"]);
-
 export const saveLineupSchema = z.object({
   teamId: z.uuid(),
   matchId: z.uuid(),
   /** Absent when the coach is creating a composition rather than editing one. */
   lineupId: z.uuid().optional(),
-  formationId: z.uuid({ message: "Choisis une formation." }),
   fromMinute: fromMinuteSchema,
-  shapeMode: shapeModeSchema,
-  shape: z
-    .array(
-      z.object({
-        key: z.string().min(1),
-        positionCode: positionCodeSchema,
-        x: pitchCoordinateSchema,
-        y: pitchCoordinateSchema,
-      }),
-    )
-    .max(FORMATION_SLOT_COUNT, "Une formation à 7 compte 7 postes."),
   assignments: z
     .array(z.object({ slotKey: z.string().min(1), memberId: z.uuid() }))
     .max(FORMATION_SLOT_COUNT, "Il n’y a que 7 postes sur le terrain."),

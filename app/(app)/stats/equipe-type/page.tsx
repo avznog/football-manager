@@ -21,10 +21,16 @@
  *
  * ## The order of the screen
  *
- * Title, then the pitch, then the four controls, then the caveats, then the « et la pire équipe ? »
+ * Title, then the pitch, then the controls, then the caveats, then the « et la pire équipe ? »
  * link. The controls used to be four chip rows in the `<header>` — about 216 px of ways to ask the
- * question above any answer to it — and they are `SevenControls`' four `<select>`s under the pitch now,
+ * question above any answer to it — and they are `SevenControls`' `<select>`s under the pitch now,
  * which is what the owner asked for and what `_components/controls.tsx` argues at length.
+ *
+ * ## The shape
+ *
+ * The seven posts are the one formation's (decision 157). They used to be the formation the team had
+ * played most, with a select to override it; with one formation there is nothing to count and nothing
+ * to choose, so neither the « forme de jeu » select nor the sentences about it exist any more.
  *
  * ## Why so little happens here
  *
@@ -46,23 +52,17 @@ import {
   CRITERION_CHIP_FR,
   CRITERION_PARAM,
   DIRECTION_PARAM,
-  FORMATION_PARAM,
-  NO_FORMATION_FR,
   cleanSheetReadingsFr,
   declaredPostsFr,
   emptySlotsFr,
   equipeTypeHref,
   excludedFromSquadFr,
-  formationOverrideFr,
-  formationUsageFr,
   goalkeeperShrinkageSentenceFr,
-  matchesWithoutCompositionFr,
   noBasisFr,
   outOfPositionNoteFr,
   parseCompetitionId,
   parseCriterion,
   parseDirection,
-  resolveFormationOverride,
   sevenQuestionKey,
   shrinkageSentenceFr,
   squadMeanStandInFr,
@@ -70,7 +70,7 @@ import {
 } from "@/lib/stats/best-seven-copy";
 import { toBestSevenSlots, toBestSevenSquad } from "@/lib/stats/best-seven-input";
 import { matchCount, pendingRatingMatchesNoteFr } from "@/lib/stats/format";
-import { getFormationUsage } from "@/lib/stats/formation-usage";
+import { getTheFormation } from "@/lib/formation/queries";
 import { getSeasonStats } from "@/lib/stats/queries";
 import { getSquad } from "@/lib/team/queries";
 
@@ -86,32 +86,23 @@ export default async function EquipeTypePage({
   const [{ team }, params] = await Promise.all([requireTeamContext(), searchParams]);
 
   const competitions = statsFilterOptions(await getTeamCompetitions(team.id));
-  // Every one of the four reads below tolerates a **missing, forged or empty** value: the controls are a
+  // Every one of the reads below tolerates a **missing, forged or empty** value: the controls are a
   // `method="get"` form now, and a browser with no JavaScript submits `?critere=&competition=` for
   // whatever the reader left alone. All four are pinned in `best-seven-copy.test.ts`.
   const competitionId = parseCompetitionId(params[COMPETITION_PARAM], competitions);
 
-  const [stats, usage, squad] = await Promise.all([
+  const [stats, formation, squad] = await Promise.all([
     getSeasonStats(team.id, { competitionId }),
-    getFormationUsage(team.id, { competitionId }),
+    getTheFormation(),
     // Declared posts come from the **current** squad, which is what `getSquad` returns; the reason a
     // departed player cannot be a candidate at all is argued in `best-seven-input.ts`.
     getSquad(team.id),
   ]);
 
-  // The override is only honoured if it names a shape this team has actually played, and never the
-  // most-played one: both rules, and why, are in `resolveFormationOverride`.
-  const override = resolveFormationOverride(
-    params[FORMATION_PARAM],
-    usage.formations,
-    usage.mostUsed?.formationId ?? null,
-  );
-
   const query: BestSevenQuery = {
     competitionId,
     criterion: parseCriterion(params[CRITERION_PARAM]),
     direction: parseDirection(params[DIRECTION_PARAM]),
-    formationId: override?.formationId ?? null,
   };
 
   const filterLabel = competitionLabelOf(competitions, competitionId);
@@ -133,8 +124,6 @@ export default async function EquipeTypePage({
     <SevenControls
       query={query}
       competitions={competitions}
-      formations={usage.formations.filter((formation) => formation.matches > 0)}
-      mostUsed={usage.mostUsed}
       competitionParam={COMPETITION_PARAM}
     />
   );
@@ -165,9 +154,8 @@ export default async function EquipeTypePage({
         controls={controls}
         query={query}
         stats={stats}
-        usage={usage}
+        formation={formation}
         squad={squad}
-        override={override}
         kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
         filterLabel={filterLabel}
         scopeLabel={scopeLabel}
@@ -184,9 +172,8 @@ function Body({
   controls,
   query,
   stats,
-  usage,
+  formation,
   squad,
-  override,
   kit,
   filterLabel,
   scopeLabel,
@@ -195,9 +182,8 @@ function Body({
   controls: React.ReactNode;
   query: BestSevenQuery;
   stats: Awaited<ReturnType<typeof getSeasonStats>>;
-  usage: Awaited<ReturnType<typeof getFormationUsage>>;
+  formation: Awaited<ReturnType<typeof getTheFormation>>;
   squad: Awaited<ReturnType<typeof getSquad>>;
-  override: Awaited<ReturnType<typeof getFormationUsage>>["formations"][number] | null;
   kit: { primaryColor: string; secondaryColor: string };
   filterLabel: string | null;
   scopeLabel: string;
@@ -247,14 +233,15 @@ function Body({
     );
   }
 
-  const formation = override ?? usage.mostUsed;
-
-  // Nobody ever drew a composition on a finished match. Seven invented posts would be an opinion
-  // dressed as a measurement, so the screen draws nothing and says what to do about it.
+  // Only on a database that never loaded the formation (`0009_seed_formations.sql` makes that
+  // impossible after `db:migrate`). Seven invented posts would be worse than saying so.
   if (formation === null) {
     return (
       <>
-        <EmptyState title="Aucune forme de jeu connue" description={NO_FORMATION_FR} />
+        <EmptyState
+          title="Aucune formation disponible"
+          description="La formation n’a pas été chargée dans la base."
+        />
         {controls}
       </>
     );
@@ -318,15 +305,7 @@ function Body({
     squadMeanStandInFr(squadMeanStandIns),
     // 4 — which invincibilité. `cleanSheetReadingsFr` is null on the other three criteria.
     cleanSheetReadingsFr(query.criterion),
-    // And the facts about the shape and the squad the seven was drawn from.
-    override === null
-      ? formationUsageFr({
-          label: formation.label,
-          matches: formation.matches,
-          matchesConsidered: usage.matchesConsidered,
-        })
-      : formationOverrideFr(formation.label),
-    matchesWithoutCompositionFr(usage.matchesWithoutComposition),
+    // And the facts about the squad the seven was drawn from.
     excludedFromSquadFr({ departedWithData, nonPlayers }),
     emptySlotsFr(emptySlots),
     /**
@@ -351,7 +330,7 @@ function Body({
       {/* Keyed to the question, because the answer is state: `sevenQuestionKey` says why a `key` and not
           an effect, and what a soft navigation printed without it. */}
       <SevenPitch
-        key={sevenQuestionKey(query, formation.formationId)}
+        key={sevenQuestionKey(query)}
         criterion={query.criterion}
         direction={query.direction}
         aggregation={result.aggregation}
@@ -373,7 +352,7 @@ function Body({
         kit={kit}
       />
 
-      {/* The four selects sit here, between the seven and the paragraphs about it: the reader meets the
+      {/* The selects sit here, between the seven and the paragraphs about it: the reader meets the
           answer first, then the ways of asking a different question. Four chip rows above the pitch put
           about 216 px of controls before anything they control. */}
       {controls}

@@ -1894,3 +1894,15 @@ browser could not be told to drop it. Decision **143** has the full account.
       — with a float tolerance, not because the naive `Number.isInteger(score * 10)` is wrong today
       (it holds for all 101 tenths, and the test walks them) but because the half-point version could
       *rely* on `0.5` being exact and this one cannot
+
+## Rework from the cahier des charges — 2026-10-09
+
+- [x] **S4 `feat/single-formation` — one formation, five positions** (decisions **157**, **158**). The
+      `1-2-3-1` is the only formation: GB, DC × 2, AIL × 2 either side of MC, AT. New position `AIL`
+      « Ailier » replaces `MG`/`MD`; the vocabulary is exactly GB, DC, MC, AIL, AT. Migration
+      `0011_single_formation.sql` inserts `AIL`, rewrites the built-in's two side slots in place, and maps
+      `player_positions` (DG/DD → DC, AG/AD/MG/MD → AIL, MOC → MC). The formation select and the
+      « Postes » mode are gone from the composition editor, the formation select from the game-mode
+      composer, and the « Forme de jeu » select and `?formation=` from the équipe type. The wish picker
+      offers the five codes; its retired-wish chips are gone. The radarlocal importer resolves the two
+      wingers by `x` (160 / 840), dry run verified

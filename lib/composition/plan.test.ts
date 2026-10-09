@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { formationByLabel } from "@/db/reference";
 import type { SlotAssignment } from "@/lib/match/lineup";
 
 import {
@@ -28,14 +27,28 @@ import {
   type PlannedLineup,
 } from "./plan";
 
-/** The slots of a built-in formation, keyed like `formation_slots` rows would be. */
+/**
+ * Two of the **retired** built-in shapes, as their `formation_slots` rows still read (decision 157 keeps
+ * the rows; `0009_seed_formations.sql` is where they come from). Typed out here rather than read from
+ * `db/reference.ts`, which only holds the one formation now.
+ *
+ * Why these and not the 1-2-3-1: the planner is formation-agnostic — a slot is an id and a code — and
+ * what these cases need is a shape with **two slots on one code** in midfield (the double pivot, `MC`
+ * twice) and a second shape to change to, which is exactly the history an old plan can still carry.
+ */
+const RETIRED_SHAPES: Record<string, readonly string[]> = {
+  "1-3-2-1": ["GB", "DG", "DC", "DD", "MC", "MC", "AT"],
+  "1-3-1-2": ["GB", "DG", "DC", "DD", "MC", "AT", "AT"],
+};
+
+/** The slots of a shape, keyed like `formation_slots` rows would be. */
 function slotsOf(label: string): PlanSlot[] {
-  const template = formationByLabel(label);
-  if (!template) throw new Error(`unknown formation ${label}`);
-  return template.slots.map((slot) => ({
-    id: `${label}/${slot.sort}`,
-    positionCode: slot.positionCode,
-    sort: slot.sort,
+  const codes = RETIRED_SHAPES[label];
+  if (!codes) throw new Error(`unknown formation ${label}`);
+  return codes.map((positionCode, index) => ({
+    id: `${label}/${index + 1}`,
+    positionCode,
+    sort: index + 1,
   }));
 }
 

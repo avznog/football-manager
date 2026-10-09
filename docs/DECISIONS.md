@@ -5867,3 +5867,85 @@ local database the whistle landed as `seq` 5 `PERIOD_END` and 6 `FINAL_WHISTLE` 
 
 **WCAG 2.5.3** still holds: « Sifflet » is a whole word of « Coup de sifflet final », which the
 existing sweep over every clock state checks against the accessible name.
+
+## 157 — One formation, the 1-2-3-1, and five positions: GB, DC, MC, AIL, AT
+
+**2026-10-09** · accepted · supersedes the « a coach can pick or draw any formation » half of decision
+**005** · migration `0011_single_formation.sql` (orchestrator: renumber at merge if needed)
+
+The owner's brief (`cahier-des-charges.md`): « il n'y a à partir de maintenant qu'une seule formation →
+1 (GK), 2 (DC × 2), 3 (MC, et les deux ailiers, sans faire de différence), 1 (BU) », and his answer to Q4:
+the positions are **exactly** `GB`, `DC`, `MC`, `AIL`, `AT`.
+
+### What it is
+
+- **`AIL` « Ailier »** is a new position on the **`MIL`** line. One position, two slots: the formation draws
+  it left and right of the midfield line, exactly where `MG` and `MD` were, and `MIL` is what keeps
+  `formationLabelOf` reading `1-2-3-1` off the slots. Its canonical spot (the one disc the wish picker
+  draws) is the left winger's.
+- **`BUILTIN_FORMATIONS` holds one template**, the `1-2-3-1`: GB, DC (x 330), DC (x 670), AIL (x 160), MC,
+  AIL (x 840), AT. `DEFAULT_FORMATION_LABEL` is `1-2-3-1` (it said `1-3-2-1` while the editor opened on
+  `BUILTIN_FORMATIONS[0]`). `THE_FORMATION` names it.
+- **`POSITION_CODES` is those five.** The seven retired codes (`DG DD MG MD MOC AG AD`) keep their
+  `positions` rows, because the six retired built-ins keep their slots and an old `lineups.formation_id`
+  may point at one — but they are no longer the app's vocabulary: `POSITION_BY_CODE` answers `undefined`,
+  which every reader already handled (it is typed `Partial` for that), and `positionCodeSchema` refuses
+  them.
+
+### The migration, and why it rewrites slots in place
+
+1. inserts `AIL` (`ON CONFLICT DO NOTHING`, like `0006`);
+2. rewrites the built-in `1-2-3-1`'s `MG`/`MD` slots to `AIL` **in place** — same ids, same coordinates.
+   `seedReference()` cannot do it (it leaves a built-in's slots alone once a composition uses them, and
+   eight on production do), and in place is the point: compositions and the event log reference slot
+   *ids*, so every match already played on those two slots now reads « Ailier », which is what the owner
+   asked for. Team-drawn formations and the other six built-ins are untouched;
+3. maps `player_positions` per Q10 — DG/DD → DC; AG/AD/MG/MD → AIL; **MOC → MC** (not in the owner's list,
+   which did not mention it; an attacking midfielder is the central midfielder in a shape with one; no
+   `MOC` row exists on the production restore); GB/MC/AT unchanged. Two old codes can land on one new
+   code for one player, so mapped rows are collapsed with `GROUP BY` (primary wins) and merged with
+   `ON CONFLICT` into a row the player may already hold at that code (primary wins again); the old rows
+   are deleted last. Tested on a rollback transaction with four constructed players before it ran.
+
+### What was removed rather than left dead
+
+The formation `<select>` and the « Postes » shape mode of the composition editor; `lib/formation/persist.ts`
+(`insertTeamFormation`); `moveShapeSlot`, `nearestOutfieldPositionCode`, `sameShape`, `mapShapeToSlots`,
+`shapeProblemsFr`, `customFormationNameFr` in `lib/formation/shape.ts`; `readShapeFields`, `shapeModeSchema`
+and `formationId` in `saveLineupSchema`; `remapToShape`; the formation `<select>` of the game-mode composer
+(`LineupComposer` takes one `formation`); `pickDefaultFormationId`; `getFormations`/`getFormation` (replaced
+by `getTheFormation()`); and on the équipe type, `lib/stats/formation-usage*.ts`, the `?formation=`
+parameter, the « Forme de jeu » select and the four sentences about the most-played shape.
+
+`saveLineup` no longer takes a formation from the form: it reads the one formation itself, so a stale tab
+or a forged id cannot point a composition anywhere else, and editing an old plan drawn on a retired shape
+moves it onto the `1-2-3-1` (the editor carries its players over post by post in `sort` order).
+
+### What deliberately stays
+
+- **Game mode and the stats still load every formation's slots**, retired ones included: the reducer needs
+  the slots of whatever the log mentions. Only what is *offered* narrowed.
+- **The équipe type is otherwise unchanged** — same criteria, same shrinkage, same notes — and is rebuilt
+  later (S13). With one formation it no longer needs a recorded composition before it can draw: the seven
+  posts are always known.
+- The retro form's own short labels (`lib/retro/queries.ts`) now read Gardien, Défenseur central, Milieu,
+  Ailier, Attaquant; the two `AIL` rows read alike, as the owner wants.
+
+## 158 — Every position is a wish: the « preferred » list is the vocabulary
+
+**2026-10-09** · accepted · supersedes decisions **141** and **142** (the wish-picker rules) · no schema
+change; the data mapping is `0011`'s (decision 157)
+
+Decisions 130, 141 and 142 each chose a **narrower** list of wishable codes out of an eleven-code
+vocabulary, because the vocabulary was larger than any one formation and a wish nobody could field was a
+question with no answer. Decision 157 makes the vocabulary the five posts of the one formation. There is
+nothing left to narrow: **`PREFERRED_POSITION_CODES` was GB, DC, MC, AIL, AT — exactly `POSITION_CODES` —
+so it, `PREFERRED_POSITIONS`, `PreferredPositionCode` and `isPreferredPositionCode` are deleted** and the
+picker draws `POSITIONS`. `db/reference.test.ts` holds the invariant that replaces 142's: every code is a
+slot of the one formation.
+
+The picker's row of removable « Ces postes ne sont plus proposés » chips goes too. It existed so a player
+could clear a stored wish on a code the picker no longer offered; the migration mapped every such row onto
+the five codes, and the readers drop any code outside the vocabulary, so the row could never render.
+
+Who may edit the wishes is **unchanged here** (still the player himself); it moves to the coach in S5.

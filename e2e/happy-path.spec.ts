@@ -145,13 +145,17 @@ const SECOND_TIER: readonly string[] = [
   COMMENT_TILE,
 ];
 
-/** The starting seven, and the French position name each one is placed on in the 1-3-2-1. */
+/**
+ * The starting seven, and the French position name each one is placed on in the 1-2-3-1 — the one
+ * formation (decision 157): two « défenseur central », two « ailier », one of everything else. The
+ * fixture keys predate it and are only keys.
+ */
 const STARTERS: readonly (readonly [FixturePlayerKey, string])[] = [
   ["gk", "gardien de but"],
-  ["lb", "défenseur gauche"],
+  ["lb", "défenseur central"],
   ["cb", "défenseur central"],
-  ["rb", "défenseur droit"],
-  ["cm1", "milieu central"],
+  ["rb", "ailier"],
+  ["cm1", "ailier"],
   ["cm2", "milieu central"],
   ["st", "attaquant"],
 ];
@@ -1052,9 +1056,9 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
 
   // Typing it up derives the score, so the row stops saying « Rien saisi » — and the fact that this
   // works at all is the whole point: nothing downstream knows the match never had a live clock.
-  // Positionally and by value: the 1-3-2-1 has two slots both captioned « Milieu », and the options
-  // are labelled « 8. Nom » rather than by name alone. Which post each player took is not what this
-  // test is about — that one distinct player lands in each slot is.
+  // Positionally and by value: the 1-2-3-1 has two slots captioned « Ailier » and two « Défenseur
+  // central », and the options are labelled « 8. Nom » rather than by name alone. Which post each
+  // player took is not what this test is about — that one distinct player lands in each slot is.
   //
   // Scoped to the starter fields by name rather than « every `<select>` on the page ». A bare
   // `locator("select")` was correct only because nothing happened to render a `<select>` above the
@@ -1124,7 +1128,8 @@ async function place(page: Page, player: FixturePlayer, positionFr: string): Pro
     })
     .first()
     .click();
-  // The 1-3-2-1 has two « milieu central » slots; the first free one is the earlier of the two.
+  // The 1-2-3-1 has two « défenseur central » and two « ailier » slots; the first free one is the
+  // earlier of the two.
   const slot = page.getByRole("button", { name: `Poste libre : ${positionFr}` }).first();
   // Centred explicitly, not left to Playwright's scroll-if-needed: the bench and the confirm button
   // are a sticky dock over the bottom ~270 px of a 390 × 844 viewport, and « if needed » counts an

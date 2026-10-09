@@ -1,11 +1,12 @@
 /**
- * Reference data: the seven-a-side position vocabulary and the built-in formation templates.
+ * Reference data: the seven-a-side position vocabulary and the one formation the team plays.
  *
  * This is the typed source of truth that `db/seed.ts` inserts into `positions`, `formations`
  * (with `teamId = null`, i.e. shared by every team) and `formation_slots`. It is deliberately a
  * plain module with no database import, so the UI can read it directly — the position picker on
  * a player's profile needs the French labels and the canonical coordinates without a round
- * trip. See decision 005 and the "Positions and formations" section of `docs/DATA_MODEL.md`.
+ * trip. See decisions 005 and 157, and the "Positions and formations" section of
+ * `docs/DATA_MODEL.md`.
  *
  * ## Coordinate system
  *
@@ -25,15 +26,14 @@
  *
  * ## How a formation `label` is built
  *
- * `label` counts players from the back, and **the leading `1` is the goalkeeper**: `1-3-2-1` is
- * GB + 3 defenders + 2 midfielders + 1 forward = 7 players. The four groups are exactly the
+ * `label` counts players from the back, and **the leading `1` is the goalkeeper**: `1-2-3-1` is
+ * GB + 2 defenders + 3 midfielders + 1 forward = 7 players. The four groups are exactly the
  * four `line` values, in the order `GB`, `DEF`, `MIL`, `ATT`, so the label is derivable from
- * the slots — `formationLabelOf()` does it, and `db/reference.test.ts` asserts that every
- * template's declared label matches its slots. A line with nobody in it is still printed, hence
- * `1-3-3-0`: three at the back, three in midfield, no out-and-out striker.
+ * the slots — `formationLabelOf()` does it, and `db/reference.test.ts` asserts that the
+ * template's declared label matches its slots.
  *
- * Note that a `positionCode` may legitimately appear twice in one formation — two centre-backs
- * are both `DC`, a double pivot is two `MC` — exactly as in eleven-a-side notation.
+ * Note that a `positionCode` appears twice in the formation — the two centre-backs are both `DC`,
+ * the two wingers are both `AIL` — exactly as in eleven-a-side notation.
  */
 
 import type { PositionLine } from "@/db/schema";
@@ -43,70 +43,60 @@ import type { PositionLine } from "@/db/schema";
 /* -------------------------------------------------------------------------- */
 
 /**
- * The whole seven-a-side vocabulary, and nothing else. This list is closed: a player's
- * preferences reference these codes, which is what makes "Julien wants to play AT" meaningful
- * across every formation (decision 005).
+ * The whole seven-a-side vocabulary, and nothing else: **the five posts of the one formation the
+ * team plays** (decision 157). This list is closed: a player's preferences reference these codes,
+ * which is what makes "Julien wants to play AT" meaningful (decision 005).
+ *
+ * It used to be eleven codes — left and right defenders, left and right midfielders, a `MOC`, two
+ * wingers on the attacking line — because the editor let a coach draw any shape and every shape
+ * needed a word for every spot. There is one shape now, `1-2-3-1`, and it needs exactly five words:
+ * the owner's « 1 (GK), 2 (DC × 2), 3 (MC, et les deux ailiers sans faire de différence), 1 (BU) ».
+ *
+ * The retired codes (`DG`, `DD`, `MG`, `MD`, `MOC`, `AG`, `AD`) keep their rows in `positions`,
+ * because the retired built-in formations keep their slots (an old `lineups.formation_id` may point
+ * at one) and those slots reference `positions.code`. They are simply not this app's vocabulary any
+ * more: nothing offers them, and `POSITION_BY_CODE` answers `undefined` for them, which every reader
+ * already handles — it is typed `Partial` for exactly that reason.
+ *
+ * It is also the list a player's wishes are picked from. That used to be a second, narrower list
+ * (`PREFERRED_POSITION_CODES`, decisions 141 and 142); with five codes there is nothing left to narrow,
+ * so every position is a wish and the two lists are one (decision 158).
  */
-export const POSITION_CODES = [
-  "GB",
-  "DG",
-  "DC",
-  "DD",
-  "MG",
-  "MC",
-  "MD",
-  "MOC",
-  "AG",
-  "AT",
-  "AD",
-] as const;
+export const POSITION_CODES = ["GB", "DC", "MC", "AIL", "AT"] as const;
 
 export type PositionCode = (typeof POSITION_CODES)[number];
 
 export type PositionDefinition = {
   code: PositionCode;
-  /** Full French name, properly accented. Shown in tooltips and accessible labels. */
+  /** Full French name, properly accented. Shown in accessible labels and summaries. */
   labelFr: string;
   line: PositionLine;
-  /** Canonical spot on the pitch, 0..1000. Used by the position picker and as a slot default. */
+  /** Canonical spot on the pitch, 0..1000. Where the position picker draws it. */
   defaultX: number;
   defaultY: number;
-  /** Display order: goalkeeper first, then back to front, left to right. Unique. */
+  /** Display order: goalkeeper first, then back to front. Unique. */
   sort: number;
 };
 
 /**
- * The canonical spot of each position. The eleven are spaced so that the **whole** list can be
- * drawn as one layout without two 48 px targets touching on a 320 px wide pitch: the closest pair
- * (`MC` and `MOC`) is 240 units apart once corrected for the pitch's aspect ratio, which is about
- * 71 px there — see `MIN_MARKER_DISTANCE` in `lib/pitch/geometry.ts`, and the test in
- * `db/reference.test.ts` that holds the whole list to it.
+ * The canonical spot of each position — one disc each, which is what the preference picker draws.
  *
- * The preference picker draws only `PREFERRED_POSITIONS` — the seven codes the owner named — so
- * `MOC` is no longer tapped next to `MC` there. The spacing rule is kept for the eleven all the
- * same, and it is what makes the picker's own layout safe for free: the editor places a slot
- * anywhere on this list, and any subset of a list whose every pair clears `MIN_MARKER_DISTANCE`
- * clears it too, so narrowing the picker can never crowd it.
+ * `AIL` is **one** position with **two** slots in the formation, left and right of the midfield line,
+ * and the owner was explicit that the two are not to be told apart. Its line is therefore `MIL`, the
+ * line those two slots are drawn on (and the line `MG`/`MD` were on before them), which is what keeps
+ * `formationLabelOf` reading `1-2-3-1` off the slots. Its one canonical spot is the left one: the
+ * picker needs a single target, and a second disc on the right meaning the same thing would read as
+ * two different wishes. It sorts after `MC` — the middle first, then the wings either side of it.
+ *
+ * Spaced so that no two 48 px targets touch on a 320 px wide pitch (`MIN_MARKER_DISTANCE` in
+ * `lib/pitch/geometry.ts`, held by `db/reference.test.ts`).
  */
 export const POSITIONS: readonly PositionDefinition[] = [
   { code: "GB", labelFr: "Gardien de but", line: "GB", defaultX: 500, defaultY: 60, sort: 1 },
-  { code: "DG", labelFr: "Défenseur gauche", line: "DEF", defaultX: 190, defaultY: 250, sort: 2 },
-  { code: "DC", labelFr: "Défenseur central", line: "DEF", defaultX: 500, defaultY: 250, sort: 3 },
-  { code: "DD", labelFr: "Défenseur droit", line: "DEF", defaultX: 810, defaultY: 250, sort: 4 },
-  { code: "MG", labelFr: "Milieu gauche", line: "MIL", defaultX: 190, defaultY: 500, sort: 5 },
-  { code: "MC", labelFr: "Milieu central", line: "MIL", defaultX: 500, defaultY: 500, sort: 6 },
-  { code: "MD", labelFr: "Milieu droit", line: "MIL", defaultX: 810, defaultY: 500, sort: 7 },
-  {
-    code: "MOC",
-    labelFr: "Milieu offensif central",
-    line: "MIL",
-    defaultX: 500,
-    defaultY: 660,
-    sort: 8,
-  },
-  { code: "AG", labelFr: "Ailier gauche", line: "ATT", defaultX: 200, defaultY: 850, sort: 9 },
-  { code: "AT", labelFr: "Attaquant", line: "ATT", defaultX: 500, defaultY: 880, sort: 10 },
-  { code: "AD", labelFr: "Ailier droit", line: "ATT", defaultX: 800, defaultY: 850, sort: 11 },
+  { code: "DC", labelFr: "Défenseur central", line: "DEF", defaultX: 500, defaultY: 250, sort: 2 },
+  { code: "MC", labelFr: "Milieu central", line: "MIL", defaultX: 500, defaultY: 500, sort: 3 },
+  { code: "AIL", labelFr: "Ailier", line: "MIL", defaultX: 180, defaultY: 520, sort: 4 },
+  { code: "AT", labelFr: "Attaquant", line: "ATT", defaultX: 500, defaultY: 850, sort: 5 },
 ];
 
 /**
@@ -116,9 +106,10 @@ export const POSITIONS: readonly PositionDefinition[] = [
  * object is built from an `Object.fromEntries` whose key type the compiler cannot verify, and the
  * codes that reach this lookup come from `player_positions.code` and `formation_slots.position_code`,
  * `text` columns that reference `positions.code` rather than this closed list. A row holding a code
- * this module does not know is therefore possible, and the old cast turned it into
- * `TypeError: Cannot read properties of undefined` at the first `.sort` or `.labelFr` — which could
- * 500 a player's profile, `/moi`, `/equipe` and the composition editor from a single bad row.
+ * this module does not know is therefore possible — every slot of a retired formation is one — and
+ * the old cast turned it into `TypeError: Cannot read properties of undefined` at the first `.sort`
+ * or `.labelFr` — which could 500 a player's profile, `/moi`, `/equipe` and the composition editor
+ * from a single bad row.
  *
  * Not `Record<string, PositionDefinition | undefined>`, which would make the values honest but let
  * `POSITION_BY_CODE["LIBERO"]` type-check and lose key checking entirely — one unsoundness traded
@@ -145,72 +136,6 @@ export function isPositionCode(value: string): value is PositionCode {
   return (POSITION_CODES as readonly string[]).includes(value);
 }
 
-/* -------------------------------------------------------------------------- */
-/* The narrower vocabulary a player picks their wishes from                    */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The codes a player may wish for: **the seven the owner named**, in the words he used — keeper,
- * the two defenders on the left and the right, the middle, the two wings, and the striker:
- *
- * ```
- *   GB   gardien              DG   défenseur gauche     DD   défenseur droit
- *   MC   milieu central       AG   ailier gauche        AD   ailier droit
- *   AT   attaquant
- * ```
- *
- * **This list is deliberately not derived from a formation, and that is the change to understand.**
- * The rule was twice an arithmetic one — first the union of the slots of two shapes (`1-3-2-1` and
- * `1-2-3-1`, eight codes, decision 130), then the distinct codes of `1-3-2-1` alone (six codes,
- * decision 141) — and it is now neither. `GB DG DD MC AG AT AD` is the code set of **no** built-in
- * formation: `1-3-2-1` has a `DC` and no winger, `1-2-1-3` has the two wingers and no `DG`/`DD`.
- * So the derivation that `db/reference.test.ts` used to perform is gone, and with it the property
- * that the list could not drift from the shape it was drawn from (decision 142).
- *
- * What replaces it, because a hand-chosen list needs *something* holding it:
- *
- * - **every code here is fieldable in at least one built-in formation** — `AG` and `AD` through
- *   `1-2-1-3`, `DG` and `DD` through `1-3-2-1`. Offering a wish no shipped shape can satisfy would
- *   be asking a player a question with no answer. The test says plainly that this bites on the
- *   *formations* rather than on this list: all eleven codes are fielded somewhere today, so it holds
- *   for any subset and only turns red if a formation is deleted or re-slotted;
- * - **the mismatch with the default shape is deliberate and is stated out loud.** A wish is a
- *   preference, not a promise: `DEFAULT_FORMATION_LABEL` is still `1-3-2-1`, so a player who wishes
- *   for `AG` is asking for something the team's usual shape has no slot for, and a player who plays
- *   centre-back in it cannot wish for `DC` at all, because the owner reads his two centre-backs as
- *   « left » and « right » and picked `DG`/`DD` for them. Both are his call, made with the French
- *   labels in front of him.
- *
- * A strict subset of `POSITION_CODES`, which deliberately does **not** change: all seven built-in
- * formations stay shippable and the composition editor keeps the whole eleven, so `DC`, `MG`, `MD`
- * and `MOC` still exist in this app. They are simply not wishes. `satisfies` is what keeps the
- * subset honest rather than a comment.
- */
-export const PREFERRED_POSITION_CODES = [
-  "GB",
-  "DG",
-  "DD",
-  "MC",
-  "AG",
-  "AT",
-  "AD",
-] as const satisfies readonly PositionCode[];
-
-export type PreferredPositionCode = (typeof PREFERRED_POSITION_CODES)[number];
-
-/**
- * Their definitions, in the same canonical `sort` order as `POSITIONS` — filtered from it rather
- * than retyped, so a coordinate is edited in exactly one place.
- */
-export const PREFERRED_POSITIONS: readonly PositionDefinition[] = POSITIONS.filter((position) =>
-  isPreferredPositionCode(position.code),
-);
-
-/** Narrow an arbitrary string to a code the picker still offers. */
-export function isPreferredPositionCode(value: string): value is PreferredPositionCode {
-  return (PREFERRED_POSITION_CODES as readonly string[]).includes(value);
-}
-
 /** The full French name of a position, or the raw code if it is unknown. */
 export function positionLabelFr(code: string): string {
   return POSITION_BY_CODE[code as PositionCode]?.labelFr ?? code;
@@ -232,9 +157,9 @@ export function positionRankOf(code: string): number {
 /**
  * « au poste de gardien de but », but « au poste d’attaquant ».
  *
- * French elides `de` before a vowel, and three of the eleven positions start with one — attaquant
- * and the two ailiers. Screen readers speak these announcements out loud, so the app either gets
- * the elision right or sounds like a robot every time a winger is placed.
+ * French elides `de` before a vowel, and two of the five positions start with one — attaquant and
+ * ailier. Screen readers speak these announcements out loud, so the app either gets the elision
+ * right or sounds like a robot every time a winger is placed.
  */
 export function atPositionFr(code: string): string {
   const name = positionLabelFr(code).toLocaleLowerCase("fr-FR");
@@ -242,7 +167,7 @@ export function atPositionFr(code: string): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Formation templates                                                        */
+/* The formation                                                              */
 /* -------------------------------------------------------------------------- */
 
 export type FormationSlotTemplate = {
@@ -256,125 +181,47 @@ export type FormationSlotTemplate = {
 };
 
 export type FormationTemplate = {
-  /** French human name, e.g. « Classique 1-3-2-1 ». */
+  /** French human name, e.g. « Milieu à trois 1-2-3-1 ». */
   name: string;
-  /** e.g. `1-3-2-1`. Unique among the built-ins, so the seed can be idempotent on it. */
+  /** e.g. `1-2-3-1`. Unique among the built-ins, so the seed can be idempotent on it. */
   label: string;
-  /** One line of French explaining when a coach would pick this shape. */
+  /** One line of French describing the shape. */
   descriptionFr: string;
   /** Exactly 7, exactly one of them `GB`. */
   slots: readonly FormationSlotTemplate[];
 };
 
 /**
- * The built-in templates (`formations.team_id = null`, shared by every team). A coach can still
- * create a team-specific formation by dragging the slots — decision 005.
+ * The built-in templates (`formations.team_id = null`, shared by every team) — **one of them**, and
+ * that is the rule rather than a starting point (decision 157). The coach no longer picks a shape nor
+ * draws one: every composition, every game-mode pitch and the équipe type stand on this `1-2-3-1`.
  *
- * Coordinates follow four bands: goalkeeper ≈ 60, defence ≈ 240, midfield ≈ 500, attack ≈ 840,
- * with the left/centre/right columns at ≈ 180 / 500 / 820. Every shape is symmetric about
- * `x = 500` and every pair of slots is comfortably beyond `MIN_MARKER_DISTANCE`, so seven 48 px
- * discs never collide on a 320 px screen. Both invariants are enforced by
- * `db/reference.test.ts`.
+ * The six other templates the app used to ship (`1-3-2-1`, `1-3-1-2`, `1-2-2-2`, `1-1-3-2`, `1-3-3-0`,
+ * `1-2-1-3`) still exist as rows — `0009_seed_formations.sql` writes them on a fresh database, and an
+ * old `lineups.formation_id` may point at one — but they are not listed here, so the seeder no longer
+ * maintains them and nothing in the app offers them.
+ *
+ * The two side slots of the midfield line were `MG` and `MD`; they are both `AIL` now, at the same
+ * coordinates, rewritten in place by the migration that introduced the code so that every match
+ * already played on them reads « Ailier » too. Symmetric about `x = 500`, and every pair of slots is
+ * comfortably beyond `MIN_MARKER_DISTANCE`, so seven 48 px discs never collide on a 320 px screen.
+ * Both invariants are enforced by `db/reference.test.ts`. `scripts/import-radarlocal.mts` finds the
+ * two wingers and the two centre-backs by their `x`, so those four numbers are load-bearing.
  */
 export const BUILTIN_FORMATIONS: readonly FormationTemplate[] = [
-  {
-    name: "Classique 1-3-2-1",
-    label: "1-3-2-1",
-    descriptionFr: "La valeur sûre du football à 7 : une défense à trois et un double pivot.",
-    slots: [
-      { positionCode: "GB", x: 500, y: 60, sort: 1 },
-      { positionCode: "DG", x: 170, y: 250, sort: 2 },
-      { positionCode: "DC", x: 500, y: 240, sort: 3 },
-      { positionCode: "DD", x: 830, y: 250, sort: 4 },
-      { positionCode: "MC", x: 330, y: 520, sort: 5 },
-      { positionCode: "MC", x: 670, y: 520, sort: 6 },
-      { positionCode: "AT", x: 500, y: 830, sort: 7 },
-    ],
-  },
   {
     name: "Milieu à trois 1-2-3-1",
     label: "1-2-3-1",
     descriptionFr:
-      "Deux défenseurs centraux et un milieu à trois : la meilleure occupation du terrain.",
+      "Deux défenseurs centraux, un milieu axial entre deux ailiers, et un attaquant.",
     slots: [
       { positionCode: "GB", x: 500, y: 60, sort: 1 },
       { positionCode: "DC", x: 330, y: 240, sort: 2 },
       { positionCode: "DC", x: 670, y: 240, sort: 3 },
-      { positionCode: "MG", x: 160, y: 520, sort: 4 },
+      { positionCode: "AIL", x: 160, y: 520, sort: 4 },
       { positionCode: "MC", x: 500, y: 500, sort: 5 },
-      { positionCode: "MD", x: 840, y: 520, sort: 6 },
+      { positionCode: "AIL", x: 840, y: 520, sort: 6 },
       { positionCode: "AT", x: 500, y: 830, sort: 7 },
-    ],
-  },
-  {
-    name: "Deux attaquants 1-3-1-2",
-    label: "1-3-1-2",
-    descriptionFr: "Défense à trois, un seul relayeur, deux attaquants pour presser haut.",
-    slots: [
-      { positionCode: "GB", x: 500, y: 60, sort: 1 },
-      { positionCode: "DG", x: 170, y: 250, sort: 2 },
-      { positionCode: "DC", x: 500, y: 240, sort: 3 },
-      { positionCode: "DD", x: 830, y: 250, sort: 4 },
-      { positionCode: "MC", x: 500, y: 510, sort: 5 },
-      { positionCode: "AT", x: 330, y: 840, sort: 6 },
-      { positionCode: "AT", x: 670, y: 840, sort: 7 },
-    ],
-  },
-  {
-    name: "Carré 1-2-2-2",
-    label: "1-2-2-2",
-    descriptionFr: "Deux par ligne : simple à expliquer, très lisible pour une équipe qui débute.",
-    slots: [
-      { positionCode: "GB", x: 500, y: 60, sort: 1 },
-      { positionCode: "DC", x: 320, y: 240, sort: 2 },
-      { positionCode: "DC", x: 680, y: 240, sort: 3 },
-      { positionCode: "MG", x: 250, y: 510, sort: 4 },
-      { positionCode: "MD", x: 750, y: 510, sort: 5 },
-      { positionCode: "AT", x: 330, y: 840, sort: 6 },
-      { positionCode: "AT", x: 670, y: 840, sort: 7 },
-    ],
-  },
-  {
-    name: "Libéro 1-1-3-2",
-    label: "1-1-3-2",
-    descriptionFr: "Un seul défenseur axial derrière un milieu à trois : offensif et exigeant.",
-    slots: [
-      { positionCode: "GB", x: 500, y: 60, sort: 1 },
-      { positionCode: "DC", x: 500, y: 220, sort: 2 },
-      { positionCode: "MG", x: 170, y: 480, sort: 3 },
-      { positionCode: "MC", x: 500, y: 470, sort: 4 },
-      { positionCode: "MD", x: 830, y: 480, sort: 5 },
-      { positionCode: "AT", x: 330, y: 830, sort: 6 },
-      { positionCode: "AT", x: 670, y: 830, sort: 7 },
-    ],
-  },
-  {
-    name: "Sans avant-centre 1-3-3-0",
-    label: "1-3-3-0",
-    descriptionFr:
-      "Trois derrière, trois devant dont un meneur : on conserve le ballon sans pointe fixe.",
-    slots: [
-      { positionCode: "GB", x: 500, y: 60, sort: 1 },
-      { positionCode: "DG", x: 170, y: 250, sort: 2 },
-      { positionCode: "DC", x: 500, y: 240, sort: 3 },
-      { positionCode: "DD", x: 830, y: 250, sort: 4 },
-      { positionCode: "MG", x: 200, y: 560, sort: 5 },
-      { positionCode: "MOC", x: 500, y: 640, sort: 6 },
-      { positionCode: "MD", x: 800, y: 560, sort: 7 },
-    ],
-  },
-  {
-    name: "Offensif 1-2-1-3",
-    label: "1-2-1-3",
-    descriptionFr: "Trois devant avec deux ailiers : pour aller chercher un but en fin de match.",
-    slots: [
-      { positionCode: "GB", x: 500, y: 60, sort: 1 },
-      { positionCode: "DC", x: 320, y: 240, sort: 2 },
-      { positionCode: "DC", x: 680, y: 240, sort: 3 },
-      { positionCode: "MC", x: 500, y: 500, sort: 4 },
-      { positionCode: "AG", x: 180, y: 800, sort: 5 },
-      { positionCode: "AT", x: 500, y: 860, sort: 6 },
-      { positionCode: "AD", x: 820, y: 800, sort: 7 },
     ],
   },
 ];
@@ -394,7 +241,7 @@ export function formationDistribution(
   return counts;
 }
 
-/** Rebuild the `1-3-2-1` style label from the slots themselves. */
+/** Rebuild the `1-2-3-1` style label from the slots themselves. */
 export function formationLabelOf(
   slots: readonly Pick<FormationSlotTemplate, "positionCode">[],
 ): string {
@@ -402,10 +249,13 @@ export function formationLabelOf(
   return LINE_ORDER.map((line) => counts[line]).join("-");
 }
 
-/** A built-in template by label, e.g. `"1-3-2-1"`. */
+/** A built-in template by label, e.g. `"1-2-3-1"`. */
 export function formationByLabel(label: string): FormationTemplate | undefined {
   return BUILTIN_FORMATIONS.find((formation) => formation.label === label);
 }
 
-/** The template a coach gets by default when planning a composition. */
-export const DEFAULT_FORMATION_LABEL = "1-3-2-1";
+/** The label of the one formation every composition stands on (decision 157). */
+export const DEFAULT_FORMATION_LABEL = "1-2-3-1";
+
+/** The one formation's template. `BUILTIN_FORMATIONS` holds exactly it. */
+export const THE_FORMATION: FormationTemplate = BUILTIN_FORMATIONS[0];

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   fromMinuteSchema,
-  readShapeFields,
   readSlotFields,
   readSquadMarks,
   saveLineupSchema,
@@ -12,7 +11,6 @@ const HUGO = "11111111-1111-4111-8111-111111111111";
 const KARIM = "22222222-2222-4222-8222-222222222222";
 const TEAM = "33333333-3333-4333-8333-333333333333";
 const MATCH = "44444444-4444-4444-8444-444444444444";
-const FORMATION = "55555555-5555-4555-8555-555555555555";
 
 describe("readSquadMarks", () => {
   it("reads the whole sheet in one pass", () => {
@@ -59,23 +57,6 @@ describe("readSlotFields", () => {
   });
 });
 
-describe("readShapeFields", () => {
-  it("reads a hand-drawn shape", () => {
-    expect(readShapeFields(["new-1|GB|500|60", "new-2|DC|500|240"])).toEqual([
-      { key: "new-1", positionCode: "GB", x: 500, y: 60 },
-      { key: "new-2", positionCode: "DC", x: 500, y: 240 },
-    ]);
-  });
-
-  it("rounds a coordinate a pointer produced", () => {
-    expect(readShapeFields(["new-1|MC|499.6|520.4"])[0]).toMatchObject({ x: 500, y: 520 });
-  });
-
-  it("ignores a malformed slot", () => {
-    expect(readShapeFields(["new-1|MC|500", "new-1|MC|500|abc", "|MC|500|500"])).toEqual([]);
-  });
-});
-
 describe("fromMinuteSchema", () => {
   it("accepts what a number input submits", () => {
     expect(fromMinuteSchema.parse("30")).toBe(30);
@@ -94,10 +75,7 @@ describe("saveLineupSchema", () => {
   const valid = {
     teamId: TEAM,
     matchId: MATCH,
-    formationId: FORMATION,
     fromMinute: "30",
-    shapeMode: "existing",
-    shape: [],
     assignments: [{ slotKey: "slot-1", memberId: HUGO }],
   };
 
@@ -122,15 +100,6 @@ describe("saveLineupSchema", () => {
         slotKey: `slot-${index}`,
         memberId: HUGO,
       })),
-    });
-    expect(parsed.success).toBe(false);
-  });
-
-  it("refuses a shape slot off the pitch", () => {
-    const parsed = saveLineupSchema.safeParse({
-      ...valid,
-      shapeMode: "custom",
-      shape: [{ key: "new-1", positionCode: "GB", x: 500, y: 1200 }],
     });
     expect(parsed.success).toBe(false);
   });

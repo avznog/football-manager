@@ -4735,3 +4735,36 @@ the confirmation sheet in both themes. Confirming it wrote `PERIOD_END` (`seq` 5
 composition that was never applied — « Composition prévue à la 10’ … rien ne change avant la
 confirmation de l’opérateur » — because `pendingLineup` does not look at `finished`. It predates S1
 and S7; S9 (the composition applied on opening) is the slice that touches that prompt.
+
+## 2026-10-09 — S4 `feat/single-formation`: one formation, five positions
+
+Track C of the cahier-des-charges rework. The owner's brief: one formation, the `1-2-3-1`, with the two
+wide midfielders as one position « Ailier » (Q4: positions are exactly GB, DC, MC, AIL, AT), and existing
+wishes mapped (Q10).
+
+- **Reference data** (`db/reference.ts`): `POSITION_CODES` = the five; `AIL` on the `MIL` line;
+  `BUILTIN_FORMATIONS` = the `1-2-3-1` alone, its side slots `AIL` at x 160 / 840; `DEFAULT_FORMATION_LABEL`
+  = `1-2-3-1`; new `THE_FORMATION`. `PREFERRED_*` deleted — every position is a wish (decision 158).
+- **Migration `0011_single_formation.sql`** (custom SQL): insert `AIL`; rewrite the built-in `1-2-3-1`'s
+  `MG`/`MD` slots to `AIL` in place; map and collapse `player_positions`. MOC → MC is mine, not the owner's
+  (no MOC row on the production restore). Checked on a rolled-back transaction with constructed players
+  (DG primary + DD + DC secondary → one DC primary, etc.), then applied to `football_wc`: the restore had
+  three player rows (DC, GB, MC), none on a retired code.
+- **Removed**: the editor's formation select and « Postes » mode, `lib/formation/persist.ts`, the
+  shape-drawing half of `lib/formation/shape.ts`, `readShapeFields`/`shapeModeSchema`/`formationId` in the
+  composition schema, `remapToShape`, the composer's formation select, `pickDefaultFormationId`,
+  `getFormations`, `lib/stats/formation-usage*.ts` and the équipe type's formation parameter, select and
+  sentences; the picker's retired-wish chips; the « Postes » step of `scripts/probe-composition.mjs`.
+  `saveLineup` reads the one formation itself (`getTheFormation()`).
+- **Kept**: game mode and stats still load every formation's slots for the log's sake; the retired
+  formations' rows; the équipe type's criteria and notes.
+- **Seeds and tests**: demo players' wishes mapped by hand onto the five codes and the demo slots
+  renamed to the `1-2-3-1`; e2e fixture uses `THE_FORMATION`; the happy path places its seven on
+  « défenseur central » ×2, « ailier » ×2, « milieu central ». `plan.test.ts` keeps two retired shapes
+  as inline fixtures (it needs a double `MC` and a change of shape, which old plans can still carry).
+- **Importer**: `MID_L`/`MID_R` → the `AIL` at x 160 / 840; dry run against `football_wc` resolves all
+  seven slots.
+
+Looked at, 390 px, light and dark: the composition editor (edit and new) and list as coach, game mode
+with the proposed seven and the list composer as coach, the équipe type, and `/joueur/[id]` as the
+player himself and as the coach, side by side. Screenshots in `audit/track-c/`.

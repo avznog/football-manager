@@ -86,9 +86,10 @@ export async function getLiveMatch(teamId: string, matchId: string): Promise<Liv
       .innerJoin(formations, eq(formations.id, lineups.formationId))
       .where(eq(lineups.matchId, matchId))
       .orderBy(asc(lineups.fromMinute)),
-    // Built-in templates plus the team's own: the whole catalogue is a handful of rows, and game
-    // mode needs it all — the composer offers it, and the reducer needs the slots of whatever
-    // formation the log happens to mention.
+    // The one formation the composer offers (decision 157). The slots below are still the whole
+    // catalogue's — built-ins, retired ones included, and the team's own — because the reducer needs
+    // the slots of whatever formation the log happens to mention, and an old match may mention one
+    // nobody can pick any more.
     db
       .select({
         id: formations.id,
@@ -97,8 +98,9 @@ export async function getLiveMatch(teamId: string, matchId: string): Promise<Liv
         teamId: formations.teamId,
       })
       .from(formations)
-      .where(or(isNull(formations.teamId), eq(formations.teamId, teamId)))
-      .orderBy(asc(formations.label)),
+      .where(and(isNull(formations.teamId), eq(formations.label, DEFAULT_FORMATION_LABEL)))
+      .orderBy(asc(formations.createdAt))
+      .limit(1),
     db
       .select({
         id: formationSlots.id,
@@ -159,7 +161,7 @@ export async function getLiveMatch(teamId: string, matchId: string): Promise<Liv
     })),
     slots: slotRows,
     formations: formationsOut,
-    defaultFormationId: pickDefaultFormationId(formationsOut, lineupRows),
+    defaultFormationId: formationsOut[0]?.id ?? null,
     // The current squad in `getSquad`'s order, then whoever has left: they belong to this match's
     // sheet and to no other screen in the app, so this is the only bench they appear on.
     players: [
@@ -285,25 +287,4 @@ function toDepartedLivePlayer(
     positionCodes: [],
     isPlayer: member.isPlayer,
   };
-}
-
-/**
- * Which formation the ad-hoc composer opens on.
- *
- * The last composition planned for this match is the best guess at what the coach has in mind; if
- * nothing was planned, the default 1-3-2-1 template (decision 005), preferring the team’s own
- * version of it if they drew one.
- */
-function pickDefaultFormationId(
-  available: readonly LiveFormation[],
-  lineupRows: readonly { formationId: string; fromMinute: number }[],
-): string | null {
-  const planned = [...lineupRows].sort((a, b) => b.fromMinute - a.fromMinute)[0];
-  if (planned && available.some((formation) => formation.id === planned.formationId)) {
-    return planned.formationId;
-  }
-
-  const byLabel = available.filter((formation) => formation.label === DEFAULT_FORMATION_LABEL);
-  const own = byLabel.find((formation) => !formation.isBuiltin);
-  return own?.id ?? byLabel[0]?.id ?? available[0]?.id ?? null;
 }

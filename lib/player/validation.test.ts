@@ -32,13 +32,13 @@ describe("updatePositionsSchema", () => {
       teamId: TEAM,
       memberId: MEMBER,
       primary: "MC",
-      secondary: ["MOC", "AT"],
+      secondary: ["AIL", "AT"],
     });
     expect(result).toEqual({
       teamId: TEAM,
       memberId: MEMBER,
       primary: "MC",
-      secondary: ["MOC", "AT"],
+      secondary: ["AIL", "AT"],
     });
   });
 
