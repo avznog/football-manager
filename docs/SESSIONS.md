@@ -5062,3 +5062,14 @@ figure. Zero events record a pitch change before a fact at the same reading, out
 read-only `SELECT`.
 
 Files: `COORDINATION.md`, `docs/SESSIONS.md`.
+
+## 2026-10-09 — The cahier des charges moves to `backlogs/`
+
+The owner moved `cahier-des-charges.md` from the repo root to `backlogs/backlog-1.md`, unchanged, and
+started an empty `backlogs/backlog2.md` beside it. The two live links, `docs/PLAN.md` and the M8 header
+of `docs/ROADMAP.md`, now point at the new path. Every other mention of `cahier-des-charges.md` — in
+`docs/DECISIONS.md`, this log, the `COORDINATION.md` Log and the comments of migrations `0011` and
+`0013` — is history and keeps the name the file had when it was written. The GitHub label
+`cahier-des-charges` is a label, not a path, and stays.
+
+Files: `backlogs/`, `docs/PLAN.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.
