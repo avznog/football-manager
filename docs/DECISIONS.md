@@ -5707,3 +5707,47 @@ composition from being edited or deleted) and `lib/stats/formation-usage.ts` rea
 log in game mode. A later plan whose application was annulled is therefore proposed again in game
 mode while its composition screen still shows it as applied; reconciling those is not this decision's
 job, and nobody can reach that state for the starting composition any more.
+
+---
+
+## 155 — Trainings are removed from the app, tables and all
+
+**2026-10-09** · accepted · owner decision Q5 of the cahier des charges · **supersedes decisions 020,
+069, 076, 099, 120 and 140**, the training half of **088** and **090**, and the trainings in the scope
+of `docs/PLAN.md` (§ Context, the three `training*` tables, screen 12 « Entraînements », M2's
+« trainings CRUD » and « training attendance marking », M5's « training attendance rate ») · migration
+`0011_calm_giant_girl.sql`
+
+The owner's review of the product after two real matches (`cahier-des-charges.md`): « Entraînements.
+Plus besoin de gérer ça. » Asked what to do with the data, he chose to **drop the tables** rather than
+hide the feature: production holds no training at all, so there is nothing to keep, and a feature that
+is merely hidden still costs a permission set, a calendar branch, a stats column and an e2e spec on
+every change that touches them.
+
+What goes:
+
+- the screens — `/entrainements`, `/entrainements/nouveau`, `/entrainements/[id]`,
+  `/entrainements/[id]/modifier`, the pointage list and the training form — and `lib/training/`
+  (actions, queries, the client-state pointage of decision 140, the validation);
+- the calendar's second kind of event. `CalendarEvent` is a match now, `TimelineItem` has one shape,
+  and the training window, the pointage window (`attendanceIsOpen`, decisions 099 and 120) and the
+  attendance line on a row (decisions 069 and 076) are deleted with their tests. The « Entraînements »
+  button leaves the calendar header, and the empty state asks the coach for a match only. The pinned
+  card loses its « Match » / « Entraînement » badge: it existed to tell two kinds apart on a mixed list,
+  and there is no longer a second kind;
+- the four `training:*` actions in `can()`;
+- attendance in the statistics (decision 020's `présent / marqué`): the rate on every player row, the
+  « Présence » sort key (`?tri=attendance` now degrades to the default like any unknown key), the
+  « Présence aux entraînements » card, the séance notes under the player list and the profile card, and
+  `markedSessions` on the season result. `aggregate.ts` keeps its rule numbers — rule 2 is marked
+  retired rather than renumbering 3 to 9, which other modules cite by number;
+- the demo season's four sessions, and `e2e/attendance.spec.ts`.
+
+What stays, deliberately: **match availability**, its control and its tallies, and the
+`availability_status` enum the dropped `training_availability` shared with `match_availability`. The
+next slice of the rework removes availability as well, and the enum goes with its last table there.
+« Déjà passé » (decision 088) stays too — its other half, a match nobody recorded, is still true.
+
+**Consequences.** Nothing in the database refers to a training any more; a dump taken before the
+migration is the only record. Re-introducing trainings would be a new feature, not a revert: the
+migration has no way back, by design of `db:migrate`.

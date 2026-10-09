@@ -38,12 +38,12 @@ export type AvailabilityGridProps = {
   /** Highlights the viewer's own line, so they can see their answer landed. */
   selfMembershipId?: string | null;
   /**
-   * The event has kicked off — and which kind of event it was, because the card names the moment it
-   * describes. The list is then a record of what people answered beforehand and not a question
-   * anybody can still act on, so it says so, and the page moves the card below the things that can
-   * still be done. Leave it out for an event that has yet to happen.
+   * The match has kicked off, and the card names the moment it describes. The list is then a record
+   * of what people answered beforehand and not a question anybody can still act on, so it says so,
+   * and the page moves the card below the things that can still be done. Leave it out for a match
+   * that has yet to happen.
    */
-  past?: "match" | "training";
+  past?: "match";
 };
 
 export function AvailabilityGrid({

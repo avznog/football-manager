@@ -119,7 +119,7 @@ export function PlayerIdentity({
         <span className="truncate">{displayName}</span>
         {hasLeft ? (
           // Their goals stay in the season (`aggregate.ts`, rule 8), but the reader deserves to know
-          // why a name they no longer see at training is in the table.
+          // why a name they no longer see on Sundays is in the table.
           <Badge variant="neutral" className="shrink-0">
             parti
           </Badge>

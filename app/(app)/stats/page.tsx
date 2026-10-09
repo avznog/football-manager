@@ -2,7 +2,7 @@
  * Statistiques — screen 11 of `docs/PLAN.md`.
  *
  * Everything on this page is derived: the score of a match comes from its event log, a player's
- * minutes from the reducer, a rate from `présent / pointé`. Nothing is a stored total that could
+ * minutes from the reducer. Nothing is a stored total that could
  * drift away from the log (invariant 2 in `CLAUDE.md`), and nothing is invented: a number nobody has
  * yet reads « pas encore de données » rather than `0`.
  *
@@ -33,7 +33,6 @@ import {
 } from "@/lib/stats/format";
 import { getSeasonStats } from "@/lib/stats/queries";
 
-import { Attendance } from "./_components/attendance";
 import {
   COMPETITION_PARAM,
   CompetitionFilter,
@@ -99,7 +98,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
           title="Pas encore de statistiques"
           description={
             filterLabel === null
-              ? "Dès qu’un match sera terminé ou qu’une séance sera pointée, les buts, les minutes et les présences apparaîtront ici."
+              ? "Dès qu’un match sera terminé, les buts, les minutes et les notes apparaîtront ici."
               : `Aucun match terminé en ${scopeLabel}, et aucune note à afficher. Choisis « Toutes » pour voir la saison entière.`
           }
         />
@@ -119,9 +118,8 @@ function SeasonCards({
   stats: Awaited<ReturnType<typeof getSeasonStats>>;
 }) {
   /**
-   * A filter that excludes every match leaves nothing but the trainings, which carry no competition
-   * (decision 020). Saying that once beats stacking a bilan, three leaderboards and a table of
-   * dashes that all mean the same thing.
+   * A filter that excludes every match leaves nothing to show. Saying that once beats stacking a
+   * bilan, three leaderboards and a table of dashes that all mean the same thing.
    */
   if (stats.matchesConsidered === 0) {
     return (
@@ -140,11 +138,6 @@ function SeasonCards({
             {stats.liveMatches > 1 ? "sont exclus" : "est exclu"} : ses minutes bougent encore.
           </p>
         ) : null}
-        <Attendance
-          players={stats.players}
-          markedSessions={stats.markedSessions}
-          filtered={query.competitionId !== null}
-        />
       </>
     );
   }
@@ -226,18 +219,12 @@ function SeasonCards({
       <PlayerList
         players={sortPlayers(stats.players, query.sort)}
         query={query}
-        markedSessions={stats.markedSessions}
         pendingRatingMatches={stats.pendingRatingMatches}
       />
 
       <div className="space-y-4">
         <h2 className="text-base font-semibold text-ink">Détail</h2>
         <Keepers keepers={stats.keepers} />
-        <Attendance
-          players={stats.players}
-          markedSessions={stats.markedSessions}
-          filtered={query.competitionId !== null}
-        />
       </div>
     </>
   );

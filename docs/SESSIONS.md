@@ -4639,3 +4639,36 @@ a private clone, left as it is.
 
 Files: `lib/match/{reducer,presenter,ingest,append}.ts`, `lib/match/{reducer,presenter,ingest}.test.ts`,
 `docs/{DECISIONS,ROADMAP,SESSIONS}.md`.
+
+## 2026-10-09 — S2 of the cahier rework: trainings removed (decision 155)
+
+Track B of the parallel rework, in its own worktree, on a private clone of the production restore
+(`football_wb`). The owner's brief says « Entraînements. Plus besoin de gérer ça. » and Q5 says drop
+the tables, so this slice deletes the feature end to end rather than hiding it — see decision 155 for
+the full list and for what deliberately stays (match availability, the `availability_status` enum).
+
+- **Migration `0011_calm_giant_girl.sql`** — three `DROP TABLE`, children first. Applied to
+  `football_wb`, which held 0 trainings, 0 marks and 0 answers before it ran.
+- **Calendar** — matches only. `CalendarEvent = CalendarMatch`; `TimelineItem` keeps a `kind: "match"`
+  discriminant so the S3 slice can reshape it without this one guessing. `AvailabilityControl` lost its
+  `kind` prop and takes a `matchId`; `AvailabilityGrid`'s `past` is `"match"` only. Both are deleted by
+  S3 anyway.
+- **Stats** — no attendance anywhere; the player list has four sort tabs; the profile card has five
+  figures, so its second row has an empty third cell at 390 px, which reads fine.
+- **Looked at, 390 px, light and dark, coach `potter` and player `raphael` in one pass**: `/calendrier`
+  (no « Entraînements » button, no kind badge, identical apart from the coach's « Nouveau match »),
+  `/stats` (player list, sort by note, the Détail section), `/joueur/<Samuel>` stats card (identical in
+  both roles), and `/entrainements` (404 for both).
+- Gates: typecheck, eslint, Vitest 65 files / 1398 tests, Playwright 6/6 on port 3102.
+- **Not done**: `npm run db:seed` was not run — `football_wb` is a production clone and the demo half
+  would add a second team and an `admin` user to it; the seed is covered by typecheck and lint only.
+  Noticed in passing, not touched: a player reading another player's profile sees « Aucune blessure en
+  cours. » twice in the Blessures card.
+
+Files: `db/schema.ts`, `db/migrations/0011_*` and `meta/`, `db/seed.ts`, `lib/calendar/*`,
+`lib/stats/{aggregate,format,queries,formation-usage}.ts` and tests, `lib/auth/can{,.test}.ts`,
+`app/(app)/calendrier/**`, `app/(app)/stats/**`, `app/(app)/joueur/_components/stats-card.tsx`,
+`app/(app)/match/[id]/page.tsx`, `e2e/first-run.spec.ts`, `scripts/{audit-screens.ts,probe-iphone16.mjs}`,
+small comment fixes, `docs/{DECISIONS,DATA_MODEL,PLAN,ROADMAP,SESSIONS}.md`; deleted
+`app/(app)/entrainements/`, `lib/training/`, `app/(app)/stats/_components/attendance.tsx`,
+`e2e/attendance.spec.ts`.

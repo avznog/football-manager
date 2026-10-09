@@ -6,7 +6,7 @@
  *     production, and is idempotent. It lives in `db/seed-reference.ts` because `db/bootstrap.ts`
  *     needs it too and must never pull in the half below.
  *  2. **A demo season** — a fake team of fourteen, seven played matches with real event logs,
- *     four trainings, an injury and some ratings. Development only.
+ *     an injury and some ratings. Development only.
  *
  * Usage:
  *   npm run db:seed                 # reference + demo
@@ -63,9 +63,6 @@ import {
   ratings,
   teamMembers,
   teams,
-  trainingAttendance,
-  trainingAvailability,
-  trainings,
   users,
   type MatchEventType,
 } from "./schema";
@@ -176,11 +173,6 @@ function pastSunday(weeksAgo: number): number {
   const today = new Date().getDay();
   const lastSunday = today === 0 ? -7 : -today;
   return lastSunday - 7 * weeksAgo;
-}
-
-/** Whether a fixture player was still a member `offsetDays` from today (negative = in the past). */
-function wasMemberAt(player: PlayerFixture, offsetDays: number): boolean {
-  return player.leftDaysAgo === undefined || offsetDays < -player.leftDaysAgo;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -324,80 +316,6 @@ async function seedDemo(): Promise<void> {
     note: "Entorse de la cheville.",
     declaredBy: admin.id,
   });
-
-  /* ---- trainings ------------------------------------------------------- */
-
-  /**
-   * Four sessions, and the three states of decision 020 are all reachable:
-   *
-   * - **T1** — marked, a normal mix. Three absent; Rayan was still a member and was present.
-   * - **T2** — marked, and **everybody absent**: the pitch was unplayable and the session was
-   *   called off on the spot. 13 rows, all `present = false`.
-   * - **T3** — **never marked**: not one row in `training_attendance`. This is *not* the same fact
-   *   as T2, and the attendance rate must treat it as such — « présent / pointé », never
-   *   « présent / effectif ». The two used to look identical on a list row, and T3's own page was
-   *   blank for a player; the list says « Présences pas encore pointées » now and the page says why
-   *   it counts nowhere (decision 076). Which is what this fixture is for.
-   * - **T4** — still to come: declared availability, nothing marked, two non-responders.
-   */
-  const createdTrainings = await db
-    .insert(trainings)
-    .values([
-      { teamId: team.id, startsAt: at(-25, 19), venue: "Stade municipal", createdBy: admin.id },
-      {
-        teamId: team.id,
-        startsAt: at(-11, 19),
-        venue: "Stade municipal",
-        // T2's note has to agree with T2's thirteen absences: « écourtée » says the squad turned up
-        // and trained for twenty minutes, which is not what the rows underneath say.
-        note: "Terrain impraticable, séance annulée sur place.",
-        createdBy: admin.id,
-      },
-      { teamId: team.id, startsAt: at(-4, 19), venue: "Gymnase des Peupliers", createdBy: admin.id },
-      {
-        teamId: team.id,
-        startsAt: at(3, 19),
-        venue: "Stade municipal",
-        note: "Travail sur les sorties de balle.",
-        createdBy: admin.id,
-      },
-    ])
-    .returning({ id: trainings.id, startsAt: trainings.startsAt });
-
-  // The third session is deliberately not bound to a name: nothing is ever written about it.
-  const [trainingMixed, trainingAllAbsent, , nextTraining] = createdTrainings;
-
-  const absentFromMixed = new Set(["mehdi", "fabien", "brice"]);
-  await db.insert(trainingAttendance).values(
-    PLAYERS.filter((p) => wasMemberAt(p, -25)).map((p) => ({
-      trainingId: trainingMixed.id,
-      teamMemberId: m(p.username),
-      present: !absentFromMixed.has(p.username),
-      markedBy: admin.id,
-    })),
-  );
-
-  await db.insert(trainingAttendance).values(
-    PLAYERS.filter((p) => wasMemberAt(p, -11)).map((p) => ({
-      trainingId: trainingAllAbsent.id,
-      teamMemberId: m(p.username),
-      present: false,
-      markedBy: admin.id,
-    })),
-  );
-
-  // The third session gets nothing at all, on purpose: `markedSessions` must therefore be 2.
-
-  // Declared availability for the one to come — not everybody has answered, which is the
-  // whole point of the coach's "qui n'a pas répondu" list.
-  const availableForNext = PLAYERS.filter((p) => wasMemberAt(p, 3)).slice(0, 9);
-  await db.insert(trainingAvailability).values(
-    availableForNext.map((p, index) => ({
-      trainingId: nextTraining.id,
-      teamMemberId: m(p.username),
-      status: index === 7 ? ("no" as const) : index === 5 ? ("maybe" as const) : ("yes" as const),
-    })),
-  );
 
   /* ---- formations ------------------------------------------------------ */
 
@@ -1048,7 +966,7 @@ async function seedDemo(): Promise<void> {
   /* The season, in one line, so a screen can be checked against it       */
   /* -------------------------------------------------------------------- */
 
-  console.log(`  équipe « ${TEAM_NAME} » · ${PLAYERS.length} joueurs (dont 1 parti) · 9 matchs · 4 entraînements`);
+  console.log(`  équipe « ${TEAM_NAME} » · ${PLAYERS.length} joueurs (dont 1 parti) · 9 matchs`);
   console.log("  saison : 4 V · 1 N · 1 D · 1 match non enregistré · 13 buts pour, 10 contre");
   console.log("           1 but sans buteur · 1 but annulé · 1 but encaissé annulé");
   console.log("           Hugo 2 clean sheets (dont une mi-temps, J5) · Mehdi 0 sur 2 matchs");

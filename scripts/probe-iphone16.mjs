@@ -297,16 +297,15 @@ async function main() {
     findings.push(...(await coveredByBar(page, name + " (scrolled to the bottom)")));
   }
 
-  // The deep screens no tab reaches, taken from whatever the calendar and the trainings list link
-  // to. `/entrainements` is not a tab — it hangs off a button on the calendar — so it is walked here.
+  // The deep screens no tab reaches, taken from whatever the calendar links to.
   const deep = new Set();
-  for (const listing of ["/calendrier", "/entrainements"]) {
+  for (const listing of ["/calendrier"]) {
     await page.goto(BASE + listing, { waitUntil: "networkidle" });
     const found = await page
       .locator("main a[href]")
       .evaluateAll((els) => els.map((el) => el.getAttribute("href")).filter(Boolean));
     for (const href of found) {
-      if (/\/(match|entrainements|compositions)\/[^/]+$/.test(href)) deep.add(href);
+      if (/\/(match|compositions)\/[^/]+$/.test(href)) deep.add(href);
     }
   }
   const hrefs = [...deep].slice(0, 8);

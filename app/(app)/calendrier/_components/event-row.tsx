@@ -13,10 +13,8 @@ import type { CalendarEvent } from "@/lib/calendar/timeline";
 import {
   AvailabilityBadge,
   PastMatchResult,
-  attendanceSummary,
   matchSubtitle,
   matchTitle,
-  trainingSubtitle,
 } from "./event-parts";
 
 export type EventRowProps = {
@@ -27,20 +25,12 @@ export type EventRowProps = {
 
 export function EventRow({ event, variant }: EventRowProps) {
   const startsAt = new Date(event.startsAt);
-  const isMatch = event.kind === "match";
   // A match already played is opened to be *read*, not organised: the score is right there on the
   // row, so the thing the tap is asking for is the recap — who scored, who played, the notes. The
   // recap links back to the match page for anyone who came for the availability grid instead.
-  const href = isMatch
-    ? variant === "past"
-      ? `/match/${event.id}/recap`
-      : `/match/${event.id}`
-    : `/entrainements/${event.id}`;
-  const title = isMatch ? matchTitle(event) : "Entraînement";
-  const subtitle = isMatch ? matchSubtitle(event) : trainingSubtitle(event);
-  // The variant is what tells a session with nothing pointed apart from a session nobody has pointed
-  // *yet*: before the evening there is nothing to report, afterwards the silence is the report.
-  const attendance = !isMatch ? attendanceSummary(event, variant) : null;
+  const href = variant === "past" ? `/match/${event.id}/recap` : `/match/${event.id}`;
+  const title = matchTitle(event);
+  const subtitle = matchSubtitle(event);
 
   return (
     <li>
@@ -60,24 +50,13 @@ export function EventRow({ event, variant }: EventRowProps) {
         </span>
 
         <span className="min-w-0 flex-1">
-          <span
-            className={
-              isMatch
-                ? "block truncate font-semibold text-ink"
-                : "block truncate font-medium text-ink"
-            }
-          >
-            {title}
-          </span>
+          <span className="block truncate font-semibold text-ink">{title}</span>
           {subtitle ? (
             <span className="block truncate text-xs text-ink-subtle">{subtitle}</span>
           ) : null}
-          {attendance ? (
-            <span className="block truncate text-xs text-ink-subtle">{attendance}</span>
-          ) : null}
         </span>
 
-        {variant === "past" && isMatch ? (
+        {variant === "past" ? (
           <PastMatchResult match={event} />
         ) : variant === "upcoming" ? (
           <AvailabilityBadge status={event.myAvailability} />

@@ -1,11 +1,10 @@
 import "server-only";
 
 /**
- * The one read behind `/calendrier`: matches and trainings merged into a single chronological
- * list of `CalendarEvent`s.
+ * The one read behind `/calendrier`: the season's matches as a list of `CalendarEvent`s.
  *
  * Everything is loaded in parallel and stitched together in memory. A season is a few dozen
- * matches, a few dozen trainings and a few hundred availability rows — small enough that one
+ * matches and a few hundred availability rows — small enough that one
  * round trip per table beats a clever join, and clear enough to read.
  *
  * The *shape* of the result and the chronology live in `timeline.ts`, which is pure and tested.
@@ -18,18 +17,11 @@ import {
   getTeamMatches,
   type MatchAnswer,
 } from "@/lib/match/queries";
-import {
-  getTeamAttendanceCounts,
-  getTeamTrainingAnswers,
-  getTeamTrainings,
-  type TrainingAnswer,
-} from "@/lib/training/queries";
 import { getSquad } from "@/lib/team/queries";
 import type { AvailabilityStatus } from "@/db/schema";
 import {
   addMinutes,
   matchWindowMinutes,
-  trainingWindowMinutes,
   type AvailabilityCounts,
   type CalendarEvent,
 } from "./timeline";
@@ -79,15 +71,11 @@ export async function getCalendar(
   teamId: string,
   membershipId: string | null,
 ): Promise<CalendarData> {
-  const [matchRows, trainingRows, matchAnswers, trainingAnswers, attendance, squad] =
-    await Promise.all([
-      getTeamMatches(teamId),
-      getTeamTrainings(teamId),
-      getTeamMatchAnswers(teamId),
-      getTeamTrainingAnswers(teamId),
-      getTeamAttendanceCounts(teamId),
-      getSquad(teamId),
-    ]);
+  const [matchRows, matchAnswers, squad] = await Promise.all([
+    getTeamMatches(teamId),
+    getTeamMatchAnswers(teamId),
+    getSquad(teamId),
+  ]);
 
   // Only a match that has been played, or is being played, can have a score.
   const playedIds = matchRows
@@ -102,49 +90,27 @@ export async function getCalendar(
     (answer) => answer.matchId,
     membershipId,
   );
-  const trainingAnswerIndex = foldAnswers<TrainingAnswer>(
-    trainingAnswers,
-    (answer) => answer.trainingId,
-    membershipId,
-  );
 
-  const events: CalendarEvent[] = [
-    ...matchRows.map((match): CalendarEvent => {
-      const startsAt = new Date(match.kickoffAt);
-      return {
-        kind: "match",
-        id: match.id,
-        startsAt: match.kickoffAt,
-        endsAt: addMinutes(startsAt, matchWindowMinutes(match.periodsCount, match.periodMinutes)),
-        opponentName: match.opponentName,
-        isHome: match.isHome,
-        venue: match.venue,
-        competitionLabel: match.competitionLabel,
-        status: match.status,
-        periodsCount: match.periodsCount,
-        periodMinutes: match.periodMinutes,
-        score: scores.get(match.id) ?? null,
-        myAvailability: matchAnswerIndex.mine.get(match.id) ?? null,
-        answers: matchAnswerIndex.counts.get(match.id) ?? NO_ANSWERS,
-        squadSize,
-      };
-    }),
-    ...trainingRows.map((training): CalendarEvent => {
-      const startsAt = new Date(training.startsAt);
-      return {
-        kind: "training",
-        id: training.id,
-        startsAt: training.startsAt,
-        endsAt: addMinutes(startsAt, trainingWindowMinutes()),
-        venue: training.venue,
-        note: training.note,
-        myAvailability: trainingAnswerIndex.mine.get(training.id) ?? null,
-        answers: trainingAnswerIndex.counts.get(training.id) ?? NO_ANSWERS,
-        squadSize,
-        attendance: attendance.get(training.id) ?? { present: 0, marked: 0 },
-      };
-    }),
-  ];
+  const events: CalendarEvent[] = matchRows.map((match): CalendarEvent => {
+    const startsAt = new Date(match.kickoffAt);
+    return {
+      kind: "match",
+      id: match.id,
+      startsAt: match.kickoffAt,
+      endsAt: addMinutes(startsAt, matchWindowMinutes(match.periodsCount, match.periodMinutes)),
+      opponentName: match.opponentName,
+      isHome: match.isHome,
+      venue: match.venue,
+      competitionLabel: match.competitionLabel,
+      status: match.status,
+      periodsCount: match.periodsCount,
+      periodMinutes: match.periodMinutes,
+      score: scores.get(match.id) ?? null,
+      myAvailability: matchAnswerIndex.mine.get(match.id) ?? null,
+      answers: matchAnswerIndex.counts.get(match.id) ?? NO_ANSWERS,
+      squadSize,
+    };
+  });
 
   return { events, squadSize };
 }

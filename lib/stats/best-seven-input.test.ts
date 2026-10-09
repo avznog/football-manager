@@ -44,7 +44,6 @@ function seasonRow(overrides: Partial<PlayerSeasonStats> = {}): PlayerSeasonStat
     cleanMinutes: 211,
     concededWhileOn: 5,
     rating: { average: 7.25, count: 4, variance: 0.5 },
-    attendance: { present: 3, marked: 5, rate: 0.6 },
     hasData: true,
     ...overrides,
   } as PlayerSeasonStats;

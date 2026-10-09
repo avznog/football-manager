@@ -16,7 +16,6 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   appearancesLineFr,
-  formatAttendance,
   formatMinutes,
   formatRating,
   matchCount,
@@ -49,14 +48,13 @@ export async function PlayerStatsCard({
     return (
       <Card title="Statistiques personnelles">
         <p className="text-sm text-ink-muted">
-          Pas encore de données : aucun match joué, aucune note reçue et aucune séance pointée pour
-          ce joueur.
+          Pas encore de données : aucun match joué et aucune note reçue pour ce joueur.
         </p>
       </Card>
     );
   }
 
-  const { appearances, attendance, rating } = player;
+  const { appearances, rating } = player;
   // The card header already prints « 7 matchs sur la feuille » in full width, so the roles line does
   // not repeat it. Same wording as `/stats`, from the same function.
   const roles = appearancesLineFr(appearances);
@@ -84,15 +82,6 @@ export async function PlayerStatsCard({
              mean of one figure per match, and the old wording would read as six opinions. */
           hint={rating.count > 0 ? `sur ${plural(rating.count, "match noté", "matchs notés")}` : undefined}
         />
-        <Figure
-          label="Présence"
-          value={
-            attendance.marked > 0
-              ? formatAttendance(attendance.present, attendance.marked, attendance.rate)
-              : null
-          }
-          hint="séances pointées"
-        />
       </FigureGrid>
 
       {player.gkMinutes > 0 ? (
@@ -109,16 +98,6 @@ export async function PlayerStatsCard({
       ) : null}
 
       {roles !== null ? <p className="mt-3 text-xs text-ink-muted">{roles}</p> : null}
-
-      {attendance.marked > 0 ? (
-        <Note>
-          Présence calculée sur les séances où ce joueur a été pointé
-          {season.markedSessions > attendance.marked
-            ? ` (${attendance.marked} sur ${plural(season.markedSessions, "séance")} pointée${season.markedSessions > 1 ? "s" : ""})`
-            : ""}
-          , pas sur toutes les séances de la saison.
-        </Note>
-      ) : null}
 
       {/* How many of the season's matches are still waiting for notes — a fact about the team's
           calendar, identical on every profile. It used to be a per-reader count of matches *he* had

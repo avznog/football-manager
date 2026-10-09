@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { matchDeletionWarningFr, trainingDeletionWarningFr } from "./deletion";
+import { matchDeletionWarningFr } from "./deletion";
 
 describe("matchDeletionWarningFr", () => {
   it("names the sheet and the compositions, not just the availability answers", () => {
@@ -58,38 +58,11 @@ describe("matchDeletionWarningFr", () => {
   });
 });
 
-describe("trainingDeletionWarningFr", () => {
-  it("names the attendance marks, which a coach can make before the séance", () => {
-    // `AttendanceList` renders for a coach whether or not the session is over, and the delete button
-    // only appears while it is *not* over — so marks on a deletable séance are reachable.
-    expect(trainingDeletionWarningFr({ answers: 9, attendance: 13 })).toBe(
-      "La séance disparaît du calendrier, et avec elle 9 réponses " +
-        "et le pointage de 13 joueurs. C’est définitif.",
-    );
-  });
-
-  it("says « avec elle », not « avec lui »", () => {
-    const warning = trainingDeletionWarningFr({ answers: 2, attendance: 0 });
-    expect(warning).toContain("avec elle");
-    expect(warning).not.toContain("avec lui");
-  });
-
-  it("writes « d’un joueur » rather than « de 1 joueur »", () => {
-    expect(trainingDeletionWarningFr({ answers: 0, attendance: 1 })).toBe(
-      "La séance disparaît du calendrier, et avec elle le pointage d’un joueur. C’est définitif.",
-    );
-  });
-
-  it("says a fresh séance holds nothing", () => {
-    expect(trainingDeletionWarningFr({ answers: 0, attendance: 0 })).toBe(
-      "La séance disparaît du calendrier. Rien d’autre n’y est encore rattaché.",
-    );
-  });
-
+describe("matchDeletionWarningFr's last word", () => {
   it("ends every non-empty warning on the word that makes a coach stop", () => {
     const warnings = [
       matchDeletionWarningFr({ answers: 1, squad: 0, lineups: 0 }),
-      trainingDeletionWarningFr({ answers: 1, attendance: 0 }),
+      matchDeletionWarningFr({ answers: 0, squad: 9, lineups: 2 }),
     ];
 
     for (const warning of warnings) expect(warning.endsWith("C’est définitif.")).toBe(true);

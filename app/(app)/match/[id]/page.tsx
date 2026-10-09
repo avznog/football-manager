@@ -226,9 +226,8 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
       {declarable ? (
         <Card title="Ta réponse" description="Un seul appui. Tu peux changer d’avis jusqu’au coup d’envoi.">
           <AvailabilityControl
-            kind="match"
             teamId={team.id}
-            eventId={match.id}
+            matchId={match.id}
             value={myAnswer}
             legend={`Ta disponibilité pour le match ${matchNameFr(match.opponentName, match.isHome)}`}
           />

@@ -10,7 +10,6 @@ import {
   type StatsMatch,
   type StatsMember,
   aggregateSeason,
-  attendanceRate,
   average,
   comparePlayers,
   resultOf,
@@ -73,7 +72,6 @@ function season(input: Partial<SeasonInput> = {}) {
     matches: [],
     lines: [],
     squad: [],
-    attendance: [],
     ratings: [],
     ...input,
   });
@@ -85,19 +83,6 @@ const playerNamed = (players: PlayerSeasonStats[], id: string) =>
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
-
-describe("attendanceRate", () => {
-  it("is présent / marqué", () => {
-    expect(attendanceRate(8, 10)).toBe(0.8);
-    expect(attendanceRate(0, 3)).toBe(0);
-  });
-
-  it("is null rather than NaN when nothing was marked (decision 020)", () => {
-    expect(attendanceRate(0, 0)).toBeNull();
-    // Defensive: a negative denominator can only be a bug, and must not become an Infinity.
-    expect(attendanceRate(1, -1)).toBeNull();
-  });
-});
 
 describe("average", () => {
   it("is null for an empty set, not zero", () => {
@@ -155,7 +140,6 @@ describe("an empty season", () => {
     const hugo = playerNamed(stats.players, "hugo");
     expect(hugo.hasData).toBe(false);
     expect(hugo.rating).toEqual({ average: null, count: 0, variance: null });
-    expect(hugo.attendance).toEqual({ present: 0, marked: 0, rate: null });
   });
 
   it("leaves out a non-playing coach with nothing recorded", () => {
@@ -282,44 +266,6 @@ describe("goalkeepers", () => {
       lines: [line("m1", "julien", { minutes: 60 })],
     });
     expect(outfield.keepers).toEqual([]);
-  });
-});
-
-/* -------------------------------------------------------------------------- */
-/* Attendance                                                                 */
-/* -------------------------------------------------------------------------- */
-
-describe("attendance with unmarked sessions", () => {
-  // Three sessions happened. Hugo was judged at all three, Momo at two, Yanis at none — the coach
-  // simply never pointed him. Decision 020: that is not three absences.
-  const stats = season({
-    members: [member("hugo", "Hugo"), member("momo", "Momo"), member("yanis", "Yanis")],
-    attendance: [
-      { teamMemberId: "hugo", present: true },
-      { teamMemberId: "hugo", present: true },
-      { teamMemberId: "hugo", present: false },
-      { teamMemberId: "momo", present: true },
-      { teamMemberId: "momo", present: false },
-    ],
-  });
-
-  it("divides by what was marked, not by the number of sessions", () => {
-    const hugo = playerNamed(stats.players, "hugo");
-    expect(hugo.attendance).toEqual({ present: 2, marked: 3, rate: 2 / 3 });
-
-    const momo = playerNamed(stats.players, "momo");
-    expect(momo.attendance).toEqual({ present: 1, marked: 2, rate: 0.5 });
-  });
-
-  it("gives an unmarked player a null rate, never 0 %", () => {
-    const yanis = playerNamed(stats.players, "yanis");
-    expect(yanis.attendance).toEqual({ present: 0, marked: 0, rate: null });
-  });
-
-  it("is not an empty season: marks are data even with no match played", () => {
-    expect(stats.isEmpty).toBe(false);
-    expect(playerNamed(stats.players, "hugo").hasData).toBe(true);
-    expect(playerNamed(stats.players, "yanis").hasData).toBe(false);
   });
 });
 
@@ -680,7 +626,6 @@ describe("sorting the table", () => {
       { matchId: "m1", ratedMemberId: "b", score: 8 },
       { matchId: "m1", ratedMemberId: "b", score: 8 },
     ],
-    attendance: [{ teamMemberId: "c", present: true }],
   });
 
   it("defaults to minutes, descending", () => {
@@ -696,9 +641,8 @@ describe("sorting the table", () => {
   });
 
   it("puts players with no value for the key last, not first", () => {
-    // Only Bruno has a rating and only Chloé has a marked session: the others sort behind them.
+    // Only Bruno has a rating: the others sort behind him.
     expect(sortPlayers(stats.players, "rating")[0]?.teamMemberId).toBe("b");
-    expect(sortPlayers(stats.players, "attendance")[0]?.teamMemberId).toBe("c");
   });
 
   it("breaks a full tie on the name, so two renders never disagree", () => {
@@ -711,7 +655,7 @@ describe("sorting the table", () => {
   });
 
   it("is a total order for every key", () => {
-    for (const key of ["minutes", "goals", "assists", "rating", "attendance"] as const) {
+    for (const key of ["minutes", "goals", "assists", "rating"] as const) {
       const sorted = sortPlayers(stats.players, key);
       expect(sorted).toHaveLength(stats.players.length);
       expect(comparePlayers(key)(sorted[0]!, sorted[0]!)).toBe(0);

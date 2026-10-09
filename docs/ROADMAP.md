@@ -781,7 +781,16 @@ tag during this rework** (decision 146): every item below reaches the preview on
       composition keeps « Annuler ». The reducer decides « applied » from the log alone, so a plan
       whose application was voided is proposed again; `lineups.applied_event_id` is kept for the
       composition screen and the formation stats
-- [ ] **S2** · #161 · remove trainings (tables dropped)
+- [x] **S2** · #161 · remove trainings (tables dropped)
+      - [x] **S2 `feat/remove-trainings` — trainings are gone, tables and all** (decision 155, owner decision
+            Q5). `/entrainements` and everything under it, `lib/training/`, the « Entraînements » button and
+            every training branch of the calendar (`CalendarTraining`, the training window, the pointage
+            window, the attendance line on a row, the « Match » / « Entraînement » kind badge on the pinned
+            card), the four `training:*` permissions, the attendance rate on `/stats` and on a player's
+            profile (the « Présence » sort tab, the « Présence aux entraînements » card, the séance notes), the
+            demo season's four sessions and `e2e/attendance.spec.ts`. Migration `0011_calm_giant_girl.sql`
+            drops `training_attendance`, `training_availability` and `trainings`; `availability_status` stays
+            for `match_availability` until S3. Match availability is untouched
 - [ ] **S3** · #162 · remove match availability and the reminder message (table and enum dropped)
 - [ ] **S4** · #163 · one formation, `1-2-3-1`, positions GB / DC / MC / AIL / AT
 - [ ] **S5** · #164 · preferred positions set by coaches only, gone from `/moi`
@@ -1021,7 +1030,7 @@ the reachable-turf finding below an **under**-statement on device rather than an
       notes » on the coach's `/stats` (« 3 fois remplaçant »). This item offered two fixes and decision
       137 took the first: the notation screen does not offer a 0-minute substitute, and the Server Action
       refuses one even if the form is crafted. A man with no minutes now has no note to average
-- [ ] « Présence aux entraînements » has no minimum denominator, so Rayan — who has left the club —
+- [x] *(Moot since decision 155: trainings were removed on 2026-10-09.)* « Présence aux entraînements » has no minimum denominator, so Rayan — who has left the club —
       tops it at 1/1 · 100 %, above ten players on 1/2. `app/(app)/stats/_components/attendance.tsx:31`
       sorts on the rate and uses `marked` only as a tie-break, while « Meilleures notes » enforces
       `MIN_RATED_MATCHES = 3` for precisely this reason (`MIN_RATINGS` when this was written; renamed by
@@ -1199,7 +1208,7 @@ the reachable-turf finding below an **under**-statement on device rather than an
       at `app/(app)/calendrier/_components/reminder-card.tsx:51` while the message grows with the
       squad, and thirteen names need five lines at 393 px. Half a line of text reads as a broken
       render, not as an invitation to scroll — and this card exists to be read and copied
-- [ ] The `/stats` competition filter is hard-clipped at the viewport edge with no affordance:
+- [ ] *(« Présence » is no longer a sort tab since decision 155.)* The `/stats` competition filter is hard-clipped at the viewport edge with no affordance:
       « Amical (arch… » is sliced mid-word and a fifth chip (« Tournoi ») is entirely invisible. The
       comment at `app/(app)/stats/_components/filters.tsx:83` knows the row "scrolls sideways rather
       than wrapping" and ships no fade, no partial chip, no hint — so a coach cannot discover that
@@ -1241,18 +1250,18 @@ the reachable-turf finding below an **under**-statement on device rather than an
       mono, where the gap between two matches is no wider than the gap inside one score
       (`team-summary.tsx:141`). The same 10 px floor shows up across `/moi`'s stat captions; 11 px for
       a tab-bar label is iOS convention and is not the complaint
-- [ ] Two copy asymmetries between the roles, both showing someone a remedy they cannot apply: the
+- [ ] *(The séance half is moot since decision 155.)* Two copy asymmetries between the roles, both showing someone a remedy they cannot apply: the
       player is told « Une saisie rétroactive les ferait apparaître » (`team-summary.tsx:93`), and only
       the player — not the coach who can act — is told that an unmarked séance counts in no attendance
       rate (`lib/calendar/labels.ts:237` against `attendance-list.tsx:91`). Also `/feuille`'s
       « Enregistrer la feuille » is the one non-full-width primary submit in the app, left ragged after
       2 000 px of scrolling, and a player is offered « Ouvrir le mode match » for a screen that then
       tells him he may only watch
-- [ ] A player's page for a past session is 450 px of blank that never answers his own question: it
+- [x] *(Moot since decision 155: trainings were removed on 2026-10-09.)* A player's page for a past session is 450 px of blank that never answers his own question: it
       says « 11 présents sur 14 pointés » and never « Tu étais là »
       (`app/(app)/entrainements/[id]/page.tsx:163`), because the availability grid is empty on an old
       séance. Whether that is a defect or a choice is the owner's call, but the emptiness is not
-- [ ] The « pas encore pointé » state is the loudest thing on the coach's screen in light mode
+- [x] *(Moot since decision 155: trainings were removed on 2026-10-09.)* The « pas encore pointé » state is the loudest thing on the coach's screen in light mode
       (thirteen filled dark-slate pills) and the quietest in dark, for a state that means *nothing
       decided yet*. `attendance-list.tsx:53` paints it `peer-checked:bg-ink-muted`, where
       `components/ui/segmented-control.tsx` documents a `neutral` tone built for this exact case
@@ -1334,7 +1343,7 @@ Evidence and reasoning: `docs/UX_AUDIT_2026-10-01.md`. Slices and ranking:
 
 Ordered by harm, which is not the order they are cheapest to fix.
 
-- [~] **Slice 1 — attendance stops losing data.** `D1` is **fixed** and has the regression test the audit
+- [x] *(What was still open here — the offline pointage — is moot since decision 155: trainings were removed on 2026-10-09.)* **Slice 1 — attendance stops losing data.** `D1` is **fixed** and has the regression test the audit
       asked for: `AttendanceList` is one `<form>` with two submit buttons, holding its marks in client
       state (`lib/training/attendance.ts`), so the card and the radios are counted from the same value
       and no submit can carry a mark the coach cannot see. Proved both ways — the new

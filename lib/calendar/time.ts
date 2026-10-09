@@ -203,7 +203,7 @@ const RELATIVE_FORMAT = new Intl.RelativeTimeFormat("fr-FR", { numeric: "auto" }
  * `"dimanche 27/09/2026"` — the weekday in words, the date in digits, always with the year.
  *
  * The two halves earn their place separately. The **weekday** is the half a footballer reads: a
- * Sunday is a match and a Tuesday is training, and no digit says that. The **date** is digits
+ * Sunday is match day and a Wednesday is not, and no digit says that. The **date** is digits
  * because that is what a date looks like in French (decision 101), and it carries the year
  * unconditionally — a season crosses 1 January, and « 27 septembre » in a heading is a day the
  * reader cannot place without knowing which season he is looking at. Nothing here spells a month

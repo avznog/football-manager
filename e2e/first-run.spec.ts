@@ -98,7 +98,6 @@ test("le premier lancement : un compte sans équipe en crée une et entre dans l
     for (const [path, heading] of [
       ["/calendrier", "Calendrier"],
       ["/stats", "Statistiques"],
-      ["/entrainements", "Entraînements"],
     ] as const) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();

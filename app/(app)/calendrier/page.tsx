@@ -1,16 +1,17 @@
 /**
- * The calendar: one chronological list of matches **and** trainings.
+ * The calendar: one chronological list of the season's matches.
  *
- * The owner's notes ask for a single « agenda » rather than two tabs, with the next event at the
- * top and a big availability control on it (`instructions.md`, `docs/PROJECT.md`). So: one pinned
- * card, then what is still to come, then history newest first.
+ * The owner's notes asked for a single « agenda », with the next event at the top and a big
+ * availability control on it (`instructions.md`, `docs/PROJECT.md`); trainings used to share the
+ * list until decision 155 removed them. So: one pinned card, then what is still to come, then
+ * history newest first.
  *
  * Every instant is rendered through `lib/calendar/time.ts`, which pins Europe/Paris — a 20:30
  * kick-off must read as Sunday 20:30 whether the render happens on a Vercel function in UTC or
  * on a phone in Paris.
  *
- * Reads only. Availability is declared through `setMatchAvailability` / `setTrainingAvailability`,
- * both of which re-check `can()` (`CLAUDE.md`, invariant 4).
+ * Reads only. Availability is declared through `setMatchAvailability`, which re-checks `can()`
+ * (`CLAUDE.md`, invariant 4).
  */
 
 import { ButtonLink } from "@/components/ui/button";
@@ -36,16 +37,11 @@ export default async function CalendarPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight text-ink">Calendrier</h1>
-        <div className="flex items-center gap-2">
-          <ButtonLink href="/entrainements" variant="secondary" size="sm">
-            Entraînements
+        {team.isCoach ? (
+          <ButtonLink href="/match/nouveau" size="sm">
+            Nouveau match
           </ButtonLink>
-          {team.isCoach ? (
-            <ButtonLink href="/match/nouveau" size="sm">
-              Nouveau match
-            </ButtonLink>
-          ) : null}
-        </div>
+        ) : null}
       </header>
 
       {next ? (
@@ -55,7 +51,7 @@ export default async function CalendarPage() {
           title="Rien de prévu"
           description={
             team.isCoach
-              ? "Ajoute un match ou un entraînement pour lancer la saison."
+              ? "Ajoute un match pour lancer la saison."
               : "Le coach n’a pas encore programmé la suite."
           }
           action={
@@ -68,7 +64,7 @@ export default async function CalendarPage() {
         <Card title="À venir" flush as="h2">
           <ul className="divide-y divide-border/60">
             {upcoming.map((event) => (
-              <EventRow key={`${event.kind}-${event.id}`} event={event} variant="upcoming" />
+              <EventRow key={event.id} event={event} variant="upcoming" />
             ))}
           </ul>
         </Card>
@@ -83,7 +79,7 @@ export default async function CalendarPage() {
         >
           <ul className="divide-y divide-border/60">
             {past.map((event) => (
-              <EventRow key={`${event.kind}-${event.id}`} event={event} variant="past" />
+              <EventRow key={event.id} event={event} variant="past" />
             ))}
           </ul>
         </Card>

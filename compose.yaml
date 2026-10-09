@@ -81,7 +81,7 @@ services:
     command: ["npm", "run", "db:bootstrap"]
 
   # The demo season — the other way out of a stack you cannot log into. It creates `admin` /
-  # `change-me` and a squad on `motdepasse`, plus a season of matches, trainings and events, so a
+  # `change-me` and a squad on `motdepasse`, plus a season of matches and events, so a
   # local stack can be clicked through end to end instead of merely being reachable.
   #
   # Built from `tools`, which sets no `NODE_ENV`: `db/seed.ts` refuses to run under

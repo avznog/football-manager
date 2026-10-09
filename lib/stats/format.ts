@@ -37,38 +37,6 @@ export function formatPercent(rate: number | null): string {
   return rate === null ? NO_VALUE_FR : `${Math.round(rate * 100)} %`;
 }
 
-/**
- * An attendance rate that always carries its denominator: « 8/10 · 80 % » (decision 020). A rate
- * without the number of judged sessions behind it invites the reader to assume the denominator is
- * the squad, which is exactly the misreading the decision exists to prevent.
- */
-export function formatAttendance(present: number, marked: number, rate: number | null): string {
-  if (marked === 0) return NO_VALUE_FR;
-  return `${present}/${marked} · ${formatPercent(rate)}`;
-}
-
-/**
- * What sits under an attendance rate, saying what the denominator counts — and, when a competition
- * filter is on, that this one figure is not inside it.
- *
- * A training belongs to no competition (decision 020), so the filter cannot apply to it. On the
- * « Coupe » tab that left a player's card with five dashes and one number: no matches, no minutes,
- * no goals, no assists, no rating, and « 1/2 · 50 % ». The dashes say « nothing in this selection »
- * and the rate says something — about the whole season, which the card never mentioned.
- */
-export function attendanceHintFr(filtered: boolean): string {
-  return filtered ? "séances pointées, toute la saison" : "séances pointées";
-}
-
-/**
- * Why that figure ignores the chip at the top of the screen. One sentence, shared by the player
- * cards and the « Présence aux entraînements » card, so the two cannot come to disagree about a rule
- * that belongs to neither of them.
- */
-export const ATTENDANCE_NOT_FILTERED_FR =
-  "Le filtre par compétition ne s’applique pas à la présence : un entraînement n’appartient à " +
-  "aucune compétition.";
-
 /** `+3`, `-1`, `0` — a goal difference is always signed. */
 export function formatSigned(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;

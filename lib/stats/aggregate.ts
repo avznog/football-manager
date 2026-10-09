@@ -2,20 +2,18 @@
  * Season aggregation — pure, and the only place a season number is decided.
  *
  * Input: the per-match lines from `match-lines.ts` (cache or reduction, already resolved), the
- * match sheets, the trainings that were marked, and the notes of the matches whose means are out.
+ * match sheets, and the notes of the matches whose means are out.
  * Output: one row per member plus the team's own tally. No database, no clock, no `Date.now()` —
  * the same season always aggregates to the same numbers, which is what makes them arguable.
  *
  * ## The rules that neither the plan nor the notes settled
  *
- * 1. **A number nobody has yet is `null`, never `0`.** An average rating with no ratings, an
- *    attendance rate with nothing marked: both come out as `null` so the screen can say « pas
- *    encore de données » instead of publishing a zero that reads as a fact. There is exactly one
- *    division in this file and it cannot be by zero.
+ * 1. **A number nobody has yet is `null`, never `0`.** An average rating with no ratings comes out
+ *    as `null` so the screen can say « pas encore de données » instead of publishing a zero that
+ *    reads as a fact. No division in this file can be by zero.
  *
- * 2. **Attendance is `présent / marqué`, never `présent / effectif`** (decision 020). A player
- *    nobody marked is not an absent player, so he is in neither the numerator nor the denominator.
- *    The denominator travels with the rate so the UI can state it out loud.
+ * 2. *(Retired.)* Attendance — `présent / marqué` — went with the trainings (decision 155). The
+ *    number is kept free so the rules below keep the numbers the rest of the code cites.
  *
  * 3. **"Played" means `minutes > 0`.** The cache stores whole minutes, so that is the only
  *    definition that reads identically whether the line came from the cache or from the log
@@ -91,11 +89,6 @@ export type SquadAppearanceRow = {
   role: SquadRole;
 };
 
-export type AttendanceMarkRow = {
-  teamMemberId: string;
-  present: boolean;
-};
-
 /**
  * One note, from one unnamed teammate, about one player, in one match.
  *
@@ -115,8 +108,6 @@ export type SeasonInput = {
   matches: readonly StatsMatch[];
   lines: readonly MatchStatLine[];
   squad: readonly SquadAppearanceRow[];
-  /** One row per judged player per session — trainings have no competition (decision 020). */
-  attendance: readonly AttendanceMarkRow[];
   /**
    * The notes of the matches whose means are **out** — and of no others. `lib/stats/ratings.ts`
    * decides which those are and `queries.ts` selects nothing from the rest, so there is no filtering
@@ -177,14 +168,6 @@ export type PlayerRating = {
   variance: number | null;
 };
 
-export type PlayerAttendance = {
-  present: number;
-  /** Sessions somebody judged them at. The denominator, stated out loud (rule 2). */
-  marked: number;
-  /** `present / marked`, 0..1. Null when nothing was marked. */
-  rate: number | null;
-};
-
 export type PlayerSeasonStats = {
   teamMemberId: string;
   displayName: string;
@@ -209,7 +192,6 @@ export type PlayerSeasonStats = {
   cleanMinutes: number;
   concededWhileOn: number;
   rating: PlayerRating;
-  attendance: PlayerAttendance;
   /** False for a member who appears nowhere in this filtered season. */
   hasData: boolean;
 };
@@ -266,7 +248,7 @@ export type SeasonStats = {
   topRated: LeaderboardEntry[];
   /** Players who spent time in goal, best clean-sheet record first. */
   keepers: PlayerSeasonStats[];
-  /** True when not one match, rating or marked session survives the filter. */
+  /** True when not one match or rating survives the filter. */
   isEmpty: boolean;
   /**
    * How many matches hold notes that are not out yet — identical for every reader (decision 137), and
@@ -297,12 +279,6 @@ export const LEADERBOARD_SIZE = 5;
 /* -------------------------------------------------------------------------- */
 /* Small pure helpers, exported because the screen and the tests both want them */
 /* -------------------------------------------------------------------------- */
-
-/** `présent / marqué` (decision 020). Null rather than `NaN` when nothing was marked. */
-export function attendanceRate(present: number, marked: number): number | null {
-  if (marked <= 0) return null;
-  return present / marked;
-}
 
 /** Null rather than `0` when there is nothing to average (rule 1). */
 export function average(values: readonly number[]): number | null {
@@ -356,8 +332,6 @@ type Accumulator = {
   concededWhileOn: number;
   /** matchId → the notes this player received in it. Collapsed to one mean per match at the end. */
   notesByMatch: Map<string, number[]>;
-  present: number;
-  marked: number;
 };
 
 function newAccumulator(member: StatsMember): Accumulator {
@@ -379,8 +353,6 @@ function newAccumulator(member: StatsMember): Accumulator {
     cleanMinutes: 0,
     concededWhileOn: 0,
     notesByMatch: new Map(),
-    present: 0,
-    marked: 0,
   };
 }
 
@@ -447,7 +419,7 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     }
   }
 
-  /* ---- ratings and attendance -------------------------------------------- */
+  /* ---- ratings ----------------------------------------------------------- */
 
   for (const rating of input.ratings) {
     if (!matchIds.has(rating.matchId)) continue;
@@ -455,12 +427,6 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     const notes = byMatch.get(rating.matchId);
     if (notes) notes.push(rating.score);
     else byMatch.set(rating.matchId, [rating.score]);
-  }
-
-  for (const mark of input.attendance) {
-    const acc = accumulatorFor(mark.teamMemberId);
-    acc.marked += 1;
-    if (mark.present) acc.present += 1;
   }
 
   /* ---- shape the players ------------------------------------------------- */
@@ -489,8 +455,7 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
         acc.penaltiesMissed > 0 ||
         // A note received is something to show even where there are too few for a mean: the row is
         // how he finds out the match exists in the ratings at all.
-        acc.notesByMatch.size > 0 ||
-        acc.marked > 0;
+        acc.notesByMatch.size > 0;
 
       return {
         teamMemberId: acc.member.teamMemberId,
@@ -517,11 +482,6 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
           average: average(matchMeans),
           count: matchMeans.length,
           variance: variance(matchMeans),
-        },
-        attendance: {
-          present: acc.present,
-          marked: acc.marked,
-          rate: attendanceRate(acc.present, acc.marked),
         },
         hasData,
       };
@@ -616,11 +576,7 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
         a.displayName.localeCompare(b.displayName, "fr"),
     );
 
-  const isEmpty =
-    team.played === 0 &&
-    input.lines.length === 0 &&
-    input.ratings.length === 0 &&
-    players.every((player) => player.attendance.marked === 0);
+  const isEmpty = team.played === 0 && input.lines.length === 0 && input.ratings.length === 0;
 
   return {
     team,
@@ -638,15 +594,9 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
 /* Sorting and ranking                                                        */
 /* -------------------------------------------------------------------------- */
 
-export type PlayerSortKey = "minutes" | "goals" | "assists" | "rating" | "attendance";
+export type PlayerSortKey = "minutes" | "goals" | "assists" | "rating";
 
-export const PLAYER_SORT_KEYS: readonly PlayerSortKey[] = [
-  "minutes",
-  "goals",
-  "assists",
-  "rating",
-  "attendance",
-];
+export const PLAYER_SORT_KEYS: readonly PlayerSortKey[] = ["minutes", "goals", "assists", "rating"];
 
 export function isPlayerSortKey(value: string | null | undefined): value is PlayerSortKey {
   return value !== null && value !== undefined && PLAYER_SORT_KEYS.includes(value as PlayerSortKey);
@@ -656,7 +606,7 @@ export function isPlayerSortKey(value: string | null | undefined): value is Play
  * Descending on the chosen key, with minutes as the first tie-break and the name as the last, so
  * two identical rows never swap between two renders.
  *
- * A player with no value for the key (no rating, nothing marked) sorts last rather than first:
+ * A player with no value for the key (no rating) sorts last rather than first:
  * `null` is "unknown", and unknown is not "worst" — but it cannot head a ranking either.
  */
 export function comparePlayers(key: PlayerSortKey) {
@@ -668,8 +618,6 @@ export function comparePlayers(key: PlayerSortKey) {
         return player.assists;
       case "rating":
         return player.rating.count > 0 ? player.rating.average : null;
-      case "attendance":
-        return player.attendance.rate;
       case "minutes":
         return player.minutes;
     }

@@ -4,8 +4,6 @@ import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
 import {
   addMinutes,
   answersLineFr,
-  ATTENDANCE_OPENS_MINUTES_BEFORE,
-  attendanceIsOpen,
   availabilityIsWorthShowing,
   buildReminderMessage,
   byStartAscending,
@@ -20,7 +18,6 @@ import {
   reminderCardFr,
   splitTimeline,
   tallyAvailability,
-  trainingWindowMinutes,
   type PastSectionItem,
   type Responder,
   type TimelineItem,
@@ -42,15 +39,6 @@ function match(startsAt: string, status: MatchStatus = "scheduled"): Item {
   };
 }
 
-function training(startsAt: string): Item {
-  return {
-    id: `training-${startsAt}`,
-    kind: "training",
-    startsAt,
-    endsAt: addMinutes(new Date(startsAt), trainingWindowMinutes()),
-  };
-}
-
 /* -------------------------------------------------------------------------- */
 /* Durations                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -68,12 +56,6 @@ describe("matchWindowMinutes", () => {
   });
 });
 
-describe("trainingWindowMinutes", () => {
-  it("is 90 minutes plus grace", () => {
-    expect(trainingWindowMinutes()).toBe(150);
-  });
-});
-
 describe("addMinutes", () => {
   it("returns an ISO instant", () => {
     expect(addMinutes(new Date("2026-09-27T08:30:00Z"), 135)).toBe("2026-09-27T10:45:00.000Z");
@@ -86,19 +68,10 @@ describe("addMinutes", () => {
 
 describe("byStartAscending", () => {
   it("sorts oldest first", () => {
-    const items = [training("2026-09-27T08:00:00Z"), match("2026-09-20T08:00:00Z")];
-    expect([...items].sort(byStartAscending).map((item) => item.kind)).toEqual([
-      "match",
-      "training",
-    ]);
-  });
-
-  it("puts a match before a training that starts at the same minute", () => {
-    const sameTime = "2026-09-27T08:00:00Z";
-    const items = [training(sameTime), match(sameTime)];
-    expect([...items].sort(byStartAscending).map((item) => item.kind)).toEqual([
-      "match",
-      "training",
+    const items = [match("2026-09-27T08:00:00Z"), match("2026-09-20T08:00:00Z")];
+    expect([...items].sort(byStartAscending).map((item) => item.id)).toEqual([
+      "match-2026-09-20T08:00:00Z",
+      "match-2026-09-27T08:00:00Z",
     ]);
   });
 });
@@ -107,7 +80,6 @@ describe("isLiveEvent", () => {
   it("is true only for a match being played", () => {
     expect(isLiveEvent(match("2026-09-27T08:00:00Z", "live"))).toBe(true);
     expect(isLiveEvent(match("2026-09-27T08:00:00Z"))).toBe(false);
-    expect(isLiveEvent(training("2026-09-27T08:00:00Z"))).toBe(false);
   });
 });
 
@@ -116,7 +88,6 @@ describe("isFinishedEvent", () => {
     expect(isFinishedEvent(match("2026-09-27T08:00:00Z", "finished"))).toBe(true);
     expect(isFinishedEvent(match("2026-09-27T08:00:00Z", "live"))).toBe(false);
     expect(isFinishedEvent(match("2026-09-27T08:00:00Z"))).toBe(false);
-    expect(isFinishedEvent(training("2026-09-27T08:00:00Z"))).toBe(false);
   });
 });
 
@@ -161,23 +132,14 @@ describe("isOngoing and isPast", () => {
     expect(isPast(early, duringTheWindow)).toBe(true);
     expect(isOngoing(early, duringTheWindow)).toBe(false);
   });
-
-  it("keeps a training that just started in the present, for attendance marking", () => {
-    const session = training("2026-09-27T17:00:00Z"); // window ends 19:30Z
-    const twentyMinutesIn = new Date("2026-09-27T17:20:00Z");
-    expect(isPast(session, twentyMinutesIn)).toBe(false);
-    expect(isOngoing(session, twentyMinutesIn)).toBe(true);
-  });
 });
 
 describe("splitTimeline", () => {
   const items = [
     match("2026-09-06T08:00:00Z", "finished"),
-    training("2026-09-10T17:00:00Z"),
     match("2026-09-20T08:00:00Z", "finished"),
-    training("2026-09-24T17:00:00Z"),
     match("2026-09-27T08:00:00Z"),
-    training("2026-10-01T17:00:00Z"),
+    match("2026-10-04T08:00:00Z"),
     match("2026-10-11T08:00:00Z"),
   ];
 
@@ -189,7 +151,7 @@ describe("splitTimeline", () => {
   it("lists the rest of the future chronologically, without the pinned one", () => {
     const timeline = splitTimeline(items, new Date("2026-09-25T12:00:00Z"));
     expect(timeline.upcoming.map((item) => item.id)).toEqual([
-      "training-2026-10-01T17:00:00Z",
+      "match-2026-10-04T08:00:00Z",
       "match-2026-10-11T08:00:00Z",
     ]);
   });
@@ -197,18 +159,16 @@ describe("splitTimeline", () => {
   it("lists the past most recent first", () => {
     const timeline = splitTimeline(items, new Date("2026-09-25T12:00:00Z"));
     expect(timeline.past.map((item) => item.id)).toEqual([
-      "training-2026-09-24T17:00:00Z",
       "match-2026-09-20T08:00:00Z",
-      "training-2026-09-10T17:00:00Z",
       "match-2026-09-06T08:00:00Z",
     ]);
   });
 
   it("pins the event that is happening rather than the next one", () => {
-    // Half-time of the 27th. The pinned card must be that match, not the October training.
+    // Half-time of the 27th. The pinned card must be that match, not the October one.
     const timeline = splitTimeline(items, new Date("2026-09-27T08:35:00Z"));
     expect(timeline.next?.id).toBe("match-2026-09-27T08:00:00Z");
-    expect(timeline.past).toHaveLength(4);
+    expect(timeline.past).toHaveLength(2);
   });
 
   it("pins a live match even long after its scheduled end", () => {
@@ -221,10 +181,10 @@ describe("splitTimeline", () => {
     // Typed up in advance: the 11th of October, entered on the 25th of September (decision 121).
     const declared = [
       match("2026-10-11T08:00:00Z", "finished"),
-      training("2026-10-01T17:00:00Z"),
+      match("2026-10-04T08:00:00Z"),
     ];
     const timeline = splitTimeline(declared, new Date("2026-09-25T12:00:00Z"));
-    expect(timeline.next?.id).toBe("training-2026-10-01T17:00:00Z");
+    expect(timeline.next?.id).toBe("match-2026-10-04T08:00:00Z");
     expect(timeline.upcoming).toEqual([]);
     expect(timeline.past.map((item) => item.id)).toEqual(["match-2026-10-11T08:00:00Z"]);
   });
@@ -346,8 +306,8 @@ describe("buildReminderMessage", () => {
 
   it("uses the singular for a single straggler", () => {
     const message = buildReminderMessage({
-      title: "Entraînement",
-      when: "mardi 29/09/2026 à 19:00",
+      title: "CS Morvan (coupe)",
+      when: "dimanche 04/10/2026 à 10:30",
       pending: [{ membershipId: "m-mehdi", displayName: "Mehdi" }],
     });
     expect(message).toContain(`Il manque la réponse de${NBSP}: Mehdi.`);
@@ -355,8 +315,8 @@ describe("buildReminderMessage", () => {
 
   it("says thank you when the whole squad has answered", () => {
     const message = buildReminderMessage({
-      title: "Entraînement",
-      when: "mardi 29/09/2026 à 19:00",
+      title: "CS Morvan (coupe)",
+      when: "dimanche 04/10/2026 à 10:30",
       pending: [],
     });
     expect(message).toContain("Tout le monde a répondu.");
@@ -371,9 +331,9 @@ describe("availabilityIsWorthShowing", () => {
   });
 
   /**
-   * The demo season's 29 August session: nobody answered, and the card was still the largest thing
-   * on the player's page a month later — thirteen names under « Sans réponse » about a session whose
-   * présences are recorded right above. A record of nothing is not a record.
+   * Nobody answered, and the card would still be the largest thing on the page a month later —
+   * thirteen names under « Sans réponse » about a match that has happened. A record of nothing is not
+   * a record.
    */
   it("drops it afterwards when there was nothing to record", () => {
     expect(availabilityIsWorthShowing({ answered: 0 }, true)).toBe(false);
@@ -389,17 +349,11 @@ describe("availabilityIsWorthShowing", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("pastSectionTitleFr", () => {
-  const played: PastSectionItem = { kind: "match", score: { goalsFor: 2, goalsAgainst: 1 } };
-  const unrecorded: PastSectionItem = { kind: "match", score: null };
-  const session: PastSectionItem = { kind: "training" };
+  const played: PastSectionItem = { score: { goalsFor: 2, goalsAgainst: 1 } };
+  const unrecorded: PastSectionItem = { score: null };
 
   it("says « Déjà joué » when every row is a match that was played", () => {
     expect(pastSectionTitleFr([played, played])).toBe("Déjà joué");
-  });
-
-  /** The demo season interleaves four sessions with the matches: an entraînement is not « joué ». */
-  it("widens the word as soon as a training is in the list", () => {
-    expect(pastSectionTitleFr([played, session])).toBe("Déjà passé");
   });
 
   /**
@@ -423,8 +377,8 @@ describe("answersLineFr", () => {
   });
 
   /**
-   * The 26 September session, read three days early: one player had tapped « pas dispo » and the line
-   * called him « 1 absent », a fact about an evening nobody had attended yet.
+   * Read three days early: one player had tapped « pas dispo » and the line called him « 1 absent »,
+   * a fact about an evening nobody had attended yet.
    */
   it("never calls a player who said no an absent one", () => {
     const line = answersLineFr({ yes: 7, no: 1, maybe: 1 }, 13);
@@ -474,31 +428,5 @@ describe("reminderCardFr", () => {
       titleFr: "Personne à relancer",
       descriptionFr: "Tout le monde a répondu. Rien à faire.",
     });
-  });
-});
-
-describe("attendanceIsOpen", () => {
-  const startsAt = new Date("2026-09-26T19:00:00+02:00");
-  const minutes = (n: number) => new Date(startsAt.getTime() + n * 60_000);
-
-  it("is closed four days before the séance", () => {
-    // The demo season's 26 September training, read on the 22nd — the state the audit screenshotted,
-    // where « Tout le monde est là » was one tap and put 13 rows in `training_attendance`.
-    expect(attendanceIsOpen(startsAt, new Date("2026-09-22T14:00:00+02:00"))).toBe(false);
-  });
-
-  it("is closed an hour before, and open half an hour before", () => {
-    expect(attendanceIsOpen(startsAt, minutes(-60))).toBe(false);
-    expect(attendanceIsOpen(startsAt, minutes(-ATTENDANCE_OPENS_MINUTES_BEFORE))).toBe(true);
-  });
-
-  it("is open at kick-off and during the séance", () => {
-    expect(attendanceIsOpen(startsAt, startsAt)).toBe(true);
-    expect(attendanceIsOpen(startsAt, minutes(45))).toBe(true);
-  });
-
-  it("never closes again, because a coach who forgot last Thursday must still be able to", () => {
-    // Decision 076's « Présences pas encore pointées » only makes sense if the marking stays open.
-    expect(attendanceIsOpen(startsAt, minutes(60 * 24 * 30))).toBe(true);
   });
 });

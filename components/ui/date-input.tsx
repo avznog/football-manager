@@ -47,7 +47,7 @@ export function DateInput({
   className,
   ...props
 }: DateInputProps) {
-  // Uncontrolled inputs (the match, training and « Guéri le » forms) need a mirror to write the echo
+  // Uncontrolled inputs (the match and « Guéri le » forms) need a mirror to write the echo
   // from, exactly as `MatchForm` mirrors its two numbers; a controlled one (the injury start date,
   // whose value also drives the `min` of the return date) is already the truth, so it is read
   // directly and the mirror is ignored. One component covers both rather than five copies of either.

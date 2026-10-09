@@ -12,17 +12,14 @@ import { Card } from "@/components/ui/card";
 import { matchNameFr } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatRelativeDays, formatWhen } from "@/lib/calendar/time";
 import type { CalendarEvent } from "@/lib/calendar/timeline";
-import { isOngoing } from "@/lib/calendar/timeline";
 import { AvailabilityControl } from "./availability-control";
 import {
   AnswersLine,
   AvailabilityBadge,
-  KindBadge,
   MatchStatusBadge,
   ScorePill,
   matchSubtitle,
   matchTitle,
-  trainingSubtitle,
 } from "./event-parts";
 
 export type NextEventCardProps = {
@@ -35,25 +32,23 @@ export type NextEventCardProps = {
 
 export function NextEventCard({ event, teamId, canDeclare, now }: NextEventCardProps) {
   const startsAt = new Date(event.startsAt);
-  const href = event.kind === "match" ? `/match/${event.id}` : `/entrainements/${event.id}`;
-  const title = event.kind === "match" ? matchTitle(event) : "Entraînement";
-  const subtitle = event.kind === "match" ? matchSubtitle(event) : trainingSubtitle(event);
-  const live = event.kind === "match" && event.status === "live";
+  const href = `/match/${event.id}`;
+  const title = matchTitle(event);
+  const subtitle = matchSubtitle(event);
+  const live = event.status === "live";
 
   /**
    * The control is offered while the answer can still change something. Once a match has kicked
    * off the sheet is what counts, and `setMatchAvailability` refuses anyway — so the UI must not
    * pretend otherwise.
    */
-  const declarable =
-    canDeclare && (event.kind === "training" ? !isOngoing(event, now) : event.status === "scheduled");
+  const declarable = canDeclare && event.status === "scheduled";
 
   return (
     <Card className={live ? "border-danger/50" : "border-accent/40"}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <KindBadge kind={event.kind} />
-          {event.kind === "match" ? <MatchStatusBadge status={event.status} /> : null}
+          <MatchStatusBadge status={event.status} />
           <span className="text-xs font-medium text-ink-subtle">
             {formatRelativeDays(startsAt, now)}
           </span>
@@ -76,20 +71,15 @@ export function NextEventCard({ event, teamId, canDeclare, now }: NextEventCardP
 
         {declarable ? (
           <AvailabilityControl
-            kind={event.kind}
             teamId={teamId}
-            eventId={event.id}
+            matchId={event.id}
             value={event.myAvailability}
-            legend={
-              event.kind === "match"
-                ? `Ta disponibilité pour le match ${matchNameFr(event.opponentName, event.isHome)}`
-                : "Ta disponibilité pour cet entraînement"
-            }
+            legend={`Ta disponibilité pour le match ${matchNameFr(event.opponentName, event.isHome)}`}
           />
         ) : (
           <div className="flex items-center gap-2">
             <AvailabilityBadge status={event.myAvailability} />
-            {event.kind === "match" ? <ScorePill match={event} /> : null}
+            <ScorePill match={event} />
           </div>
         )}
 

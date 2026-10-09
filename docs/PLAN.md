@@ -97,7 +97,8 @@ Benjamin coaches a 7-a-side football team and currently manages the season by ha
 (WhatsApp for availability, memory for compositions, nothing for stats). The goal is a
 mobile-first web app, used in the browser, deployed on Vercel, that covers the full
 season loop: calendar → availability → squad selection → composition → live match →
-stats → player ratings, plus training attendance.
+stats → player ratings, plus training attendance. *(Trainings were removed on 2026-10-09 at the
+owner's request — decision 155; the sections below still describe them as originally planned.)*
 
 Source of requirements: `instructions.md` (in French, written by Benjamin) plus the
 decisions captured in the planning conversation and recorded below.
@@ -300,8 +301,8 @@ Mobile-first, a bottom tab bar on phones (Calendrier · Équipe · Stats · Moi)
     clean minutes, appearances as starter / substitute / GK / supporter, training attendance rate,
     average rating received. Per team: results, form, top scorers, top rated. Filterable by
     competition.
-12. **Entraînements** — calendar, availability, and a fast "présent / absent" toggle list for the
-    coach on the day.
+12. ~~**Entraînements** — calendar, availability, and a fast "présent / absent" toggle list for the
+    coach on the day.~~ Removed, decision 155.
 
 ---
 

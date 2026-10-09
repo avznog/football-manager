@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ATTENDANCE_NOT_FILTERED_FR,
   NO_VALUE_FR,
   appearancesLineFr,
-  attendanceHintFr,
-  formatAttendance,
   formatDecimal,
   formatMinutes,
   formatPercent,
@@ -55,17 +52,6 @@ describe("formatPercent", () => {
 
   it("shows a dash rather than 0 % for an unknown rate", () => {
     expect(formatPercent(null)).toBe(NO_VALUE_FR);
-  });
-});
-
-describe("formatAttendance", () => {
-  it("always carries its denominator (decision 020)", () => {
-    expect(formatAttendance(8, 10, 0.8)).toBe("8/10 · 80 %");
-    expect(formatAttendance(0, 2, 0)).toBe("0/2 · 0 %");
-  });
-
-  it("shows a dash for a player nobody marked — not 0/0, not 0 %", () => {
-    expect(formatAttendance(0, 0, null)).toBe(NO_VALUE_FR);
   });
 });
 
@@ -151,41 +137,6 @@ describe("appearancesLineFr", () => {
     const none = { selected: 0, starter: 0, substitute: 0, supporter: 0, goalkeeper: 0 };
     expect(appearancesLineFr(none)).toBeNull();
     expect(appearancesLineFr(none, { withSheetTotal: true })).toBeNull();
-  });
-});
-
-describe("attendanceHintFr", () => {
-  /** The usual case: every figure on the card covers the same season, so the hint only has to say
-   *  what the denominator counts (decision 020). */
-  it("names the denominator when nothing is filtered", () => {
-    expect(attendanceHintFr(false)).toBe("séances pointées");
-  });
-
-  /**
-   * The « Coupe » tab left a player's card showing five dashes — no matches, minutes, goals, assists
-   * or rating in this selection — and one number, « 1/2 · 50 % », which was the whole season's. The
-   * hint is what tells the reader that this one figure is outside the chip he tapped.
-   */
-  it("says the rate covers the whole season when a competition filter is on", () => {
-    expect(attendanceHintFr(true)).toBe("séances pointées, toute la saison");
-    expect(attendanceHintFr(true)).toContain("toute la saison");
-  });
-
-  /** The two must differ, or the figure is unqualified on the screen where it needs qualifying. */
-  it("never says the same thing in both states", () => {
-    expect(attendanceHintFr(true)).not.toBe(attendanceHintFr(false));
-  });
-});
-
-describe("ATTENDANCE_NOT_FILTERED_FR", () => {
-  /**
-   * Shared by the per-player cards and « Présence aux entraînements », so it cannot say « cette
-   * carte » — on a player's card the filter applies to everything *except* the presence.
-   */
-  it("says why the figure ignores the filter, without naming a card", () => {
-    expect(ATTENDANCE_NOT_FILTERED_FR).toContain("ne s’applique pas à la présence");
-    expect(ATTENDANCE_NOT_FILTERED_FR).toContain("n’appartient à aucune compétition");
-    expect(ATTENDANCE_NOT_FILTERED_FR).not.toContain("cette carte");
   });
 });
 

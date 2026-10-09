@@ -280,8 +280,8 @@ function breaches(source: string, rule: RegExp): { line: number; text: string }[
  * `app/`, `components/` and `lib/` are the shipped copy, and the first two are the hole this file
  * exists for.
  *
- * `db/` is in, for `db/seed.ts`: the demo season is data a human reads on a screen — training themes,
- * match notes, team names — and `npm run db:reset` then walking the season is, per `CLAUDE.md`, the
+ * `db/` is in, for `db/seed.ts`: the demo season is data a human reads on a screen — match notes,
+ * team names — and `npm run db:reset` then walking the season is, per `CLAUDE.md`, the
  * cheapest review tool in the repo. A « Confirmez votre présence » typed into a seeded notification
  * would be read by exactly the person this rule protects. `db/migrations/` is excluded: it is
  * generated, committed and never rewritten, so a finding there would be one nobody is allowed to fix.

@@ -23,13 +23,10 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { AvailabilityStatus } from "@/db/schema";
 import { AVAILABILITY_OPTIONS } from "@/lib/calendar/labels";
 import { setMatchAvailability } from "@/lib/match/actions";
-import { setTrainingAvailability } from "@/lib/training/actions";
 
 export type AvailabilityControlProps = {
-  kind: "match" | "training";
   teamId: string;
-  /** The match id or the training id, depending on `kind`. */
-  eventId: string;
+  matchId: string;
   /** The viewer's current answer, or null if they have not answered yet. */
   value: AvailabilityStatus | null;
   /**
@@ -42,9 +39,8 @@ export type AvailabilityControlProps = {
 };
 
 export function AvailabilityControl({
-  kind,
   teamId,
-  eventId,
+  matchId,
   value,
   name = "status",
   legend = "Ta disponibilité",
@@ -52,13 +48,10 @@ export function AvailabilityControl({
   const formRef = useRef<HTMLFormElement>(null);
   const enhanced = useIsHydrated();
 
-  const action = kind === "match" ? setMatchAvailability : setTrainingAvailability;
-  const idField = kind === "match" ? "matchId" : "trainingId";
-
   return (
-    <form ref={formRef} action={action} className="space-y-2">
+    <form ref={formRef} action={setMatchAvailability} className="space-y-2">
       <input type="hidden" name="teamId" value={teamId} />
-      <input type="hidden" name={idField} value={eventId} />
+      <input type="hidden" name="matchId" value={matchId} />
 
       <SegmentedControl
         name={name}
