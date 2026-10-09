@@ -54,7 +54,8 @@ import type { StatsFilter } from "./queries";
  * Built on `RankableFormation` rather than repeating its six fields, so the compiler — and not a
  * reader's memory — guarantees that what the screen shows is what the comparator ranked. `matches`
  * in particular is never returned without the shape it counts: « 2-3-1 » alone is a claim with a
- * hidden denominator (`aggregate.ts`, rule 2, applied to a label rather than to a rate).
+ * hidden denominator (decision 020's rule that a rate travels with its denominator, applied to a
+ * label).
  */
 export type FormationUsage = RankableFormation & {
   /** The coach's name for it, e.g. « Losange ». The `label` is the shape, this is the name. */

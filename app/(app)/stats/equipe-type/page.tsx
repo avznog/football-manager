@@ -216,7 +216,7 @@ function Body({
           title="Pas encore de statistiques"
           description={
             filterLabel === null
-              ? "Dès qu’un match sera terminé ou qu’une séance sera pointée, les buts, les minutes et les présences apparaîtront ici."
+              ? "Dès qu’un match sera terminé, les buts, les minutes et les notes apparaîtront ici."
               : `Aucun match terminé en ${scopeLabel}, et aucune note à afficher. Choisis « Toutes » pour voir la saison entière.`
           }
         />

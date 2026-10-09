@@ -1,7 +1,7 @@
 import "server-only";
 
 /**
- * The reads behind `/stats`. Same contract as `lib/match/queries.ts` and `lib/training/queries.ts`:
+ * The reads behind `/stats`. Same contract as `lib/match/queries.ts`:
  * queries live apart from actions, the `teamId` is always inside the predicate, and everything that
  * comes back is plain and serialisable — instants leave as ISO strings, counts as numbers, and no
  * Drizzle row with a live `Date` on it ever crosses the RSC boundary (`CLAUDE.md`).
@@ -13,9 +13,8 @@ import "server-only";
  *
  * ## Cost
  *
- * Six small round trips, all independent of the number of players: the matches, their scores, the
- * cached per-player rows, the sheets, the ratings, the attendance marks — plus the member list and
- * the slot catalogue. The event log is read **only** for finished matches that have no cached row
+ * Five small round trips, all independent of the number of players: the matches, their scores, the
+ * cached per-player rows, the sheets, the ratings — plus the member list and the slot catalogue. The event log is read **only** for finished matches that have no cached row
  * (`matchesNeedingReduction`), which is the entire point of `match_player_stats` being a cache: once
  * M4 freezes a match at the final whistle, a season aggregate replays nothing at all.
  */
@@ -34,8 +33,6 @@ import {
   matches,
   ratings,
   teamMembers,
-  trainingAttendance,
-  trainings,
   users,
 } from "@/db/schema";
 import type { SquadRole } from "@/db/schema";
@@ -43,7 +40,6 @@ import type { SlotInfo } from "@/lib/match/lineup";
 import { getMatchScores } from "@/lib/match/queries";
 import type { MatchEventRecord } from "@/lib/match/reducer";
 import {
-  type AttendanceMarkRow,
   type SeasonStats,
   type StatsMatch,
   type StatsMember,
@@ -279,26 +275,6 @@ async function getVisibleRatingScores(
     .where(inArray(ratings.matchId, [...publishedMatchIds]));
 }
 
-/**
- * One row per judged player per session. A member with no row is unmarked, not absent, so nothing
- * is invented for them here — the rate is `présent / marqué` (decision 020).
- *
- * Trainings carry no competition, so this is never filtered: the screen says as much.
- */
-async function getAttendanceMarks(
-  teamId: string,
-): Promise<Array<AttendanceMarkRow & { trainingId: string }>> {
-  return db
-    .select({
-      trainingId: trainingAttendance.trainingId,
-      teamMemberId: trainingAttendance.teamMemberId,
-      present: trainingAttendance.present,
-    })
-    .from(trainingAttendance)
-    .innerJoin(trainings, eq(trainings.id, trainingAttendance.trainingId))
-    .where(eq(trainings.teamId, teamId));
-}
-
 /* -------------------------------------------------------------------------- */
 /* The season                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -310,8 +286,6 @@ export type SeasonStatsResult = SeasonStats & {
   matchesConsidered: number;
   /** Matches in progress, excluded on purpose. */
   liveMatches: number;
-  /** Sessions with at least one player judged — the denominator's denominator. */
-  markedSessions: number;
   /**
    * Matches whose numbers had to be replayed from the log because the cache had no row for them.
    * Zero once M4 freezes every final whistle; useful while it does not.
@@ -342,10 +316,9 @@ export const getSeasonStats = cache(
     teamId: string,
     filter: StatsFilter = { competitionId: null },
   ): Promise<SeasonStatsResult> => {
-    const [{ rows: matchRows, liveCount }, members, attendance] = await Promise.all([
+    const [{ rows: matchRows, liveCount }, members] = await Promise.all([
       getFinishedMatches(teamId, filter),
       getStatsMembers(teamId),
-      getAttendanceMarks(teamId),
     ]);
 
     const matchIds = matchRows.map((match) => match.id);
@@ -378,10 +351,6 @@ export const getSeasonStats = cache(
     // A second round trip, on purpose: publication is decided first, and only then are any scores
     // read. A hidden match's notes never reach this process.
     const visibleRatings = getVisibleRatingScores(publication.publishedMatchIds);
-
-    // « sur N séances pointées » — counted here rather than in a second `count(distinct)` round
-    // trip, since every mark is already in hand (decision 020).
-    const markedSessions = new Set(attendance.map((mark) => mark.trainingId)).size;
 
     /**
      * **The cache-or-reduce fallback, and the only place it happens.** `matchesNeedingReduction`
@@ -440,7 +409,6 @@ export const getSeasonStats = cache(
       matches: statsMatches,
       lines,
       squad,
-      attendance,
       ratings: visibleRatingRows,
       pendingRatingMatches: publication.pendingMatchIds.length,
     });
@@ -450,7 +418,6 @@ export const getSeasonStats = cache(
       competitionId: filter.competitionId,
       matchesConsidered: matchRows.length,
       liveMatches: liveCount,
-      markedSessions,
       reducedFromLog: reducedMatchIds.length,
     };
   },

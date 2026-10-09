@@ -23,7 +23,7 @@
  *
  * It is not part of `npm run test:e2e` on purpose. That suite owns a run-scoped fixture team and
  * never touches the demo season (decision 044), whereas this needs a *full* season to have anything
- * to look at: a played match, a match typed up afterwards, one still to come, ratings, trainings. Run
+ * to look at: a played match, a match typed up afterwards, one still to come, ratings. Run
  * `npm run db:reset` first, walk the output, then look at the PNGs it points you at.
  *
  * ## Why the ids are discovered and not written down
@@ -143,31 +143,6 @@ async function discover(): Promise<{ coach: string; player: string; targets: Tar
     await sql<{ id: string }[]>`
       select l.id from lineups l where l.match_id = ${played.id} order by l.from_minute limit 1`,
   );
-  const training = await one(
-    "un entraînement",
-    await sql<{ id: string }[]>`
-      select id from trainings where team_id = ${team.id} order by starts_at desc limit 1`,
-  );
-  // A session that is over has two states and they are not the same fact: the coach ticked the list,
-  // or he never did. Only the upcoming one used to be visited, so neither had ever been looked at —
-  // `PresenceSummary`, `departedMarksNoteFr` and the « jamais pointée » case were all unaudited.
-  const markedTraining = await one(
-    "une séance passée et pointée",
-    await sql<{ id: string }[]>`
-      select t.id from trainings t
-      where t.team_id = ${team.id} and t.starts_at < now()
-        and exists (select 1 from training_attendance a where a.training_id = t.id)
-      order by t.starts_at limit 1`,
-  );
-  const unmarkedTraining = await one(
-    "une séance passée jamais pointée",
-    await sql<{ id: string }[]>`
-      select t.id from trainings t
-      where t.team_id = ${team.id} and t.starts_at < now()
-        and not exists (select 1 from training_attendance a where a.training_id = t.id)
-      order by t.starts_at desc limit 1`,
-  );
-
   return {
     coach: coach.username,
     player: player.username,
@@ -177,12 +152,6 @@ async function discover(): Promise<{ coach: string; player: string; targets: Tar
       { name: "stats", path: "/stats", audience: "everyone" },
       // The filter and the sort are the two bits of `/stats` that change the numbers on screen.
       { name: "stats-coupe-buts", path: "/stats?competition=cup&tri=buts", audience: "everyone" },
-      { name: "entrainements", path: "/entrainements", audience: "everyone" },
-      { name: "entrainement", path: `/entrainements/${training.id}`, audience: "everyone" },
-      { name: "entrainement-pointe", path: `/entrainements/${markedTraining.id}`, audience: "everyone" },
-      { name: "entrainement-non-pointe", path: `/entrainements/${unmarkedTraining.id}`, audience: "everyone" },
-      { name: "entrainement-nouveau", path: "/entrainements/nouveau", audience: "coach" },
-      { name: "entrainement-modifier", path: `/entrainements/${training.id}/modifier`, audience: "coach" },
       { name: "moi", path: "/moi", audience: "everyone" },
       { name: "joueur", path: `/joueur/${player.membership}`, audience: "everyone" },
       { name: "match-a-venir", path: `/match/${scheduled.id}`, audience: "everyone" },

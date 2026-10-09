@@ -51,7 +51,6 @@ describe("can — players", () => {
     expect(can(player, "team:appointCoach", { teamId: TEAM })).toBe(false);
     expect(can(player, "member:resetPassword", { teamId: TEAM })).toBe(false);
     expect(can(player, "match:create", { teamId: TEAM })).toBe(false);
-    expect(can(player, "training:markAttendance", { teamId: TEAM })).toBe(false);
   });
 
   it("may read their team", () => {
@@ -111,7 +110,6 @@ describe("can — coaches", () => {
     // The competitions the team plays in are the coach's to define (decision 107).
     expect(can(coach, "competition:manage", { teamId: TEAM })).toBe(true);
     expect(can(coach, "team:appointCoach", { teamId: TEAM })).toBe(true);
-    expect(can(coach, "training:markAttendance", { teamId: TEAM })).toBe(true);
   });
 
   it("may declare an injury for another player", () => {

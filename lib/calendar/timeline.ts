@@ -1,8 +1,9 @@
 /**
  * The unified calendar, as pure data.
  *
- * `docs/PROJECT.md` describes one chronological list of matches **and** trainings, with the next
- * event pinned at the top and a big availability control on it. That merge, and the definition of
+ * `docs/PROJECT.md` describes one chronological list of matches, with the next one pinned at the
+ * top and a big availability control on it. (It used to merge trainings in too; they were removed by
+ * decision 155.) That merge, and the definition of
  * "next", live here rather than in the page so they can be unit tested without a database or a
  * browser — see `timeline.test.ts`.
  *
@@ -20,15 +21,10 @@ import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
 export const HALF_TIME_MINUTES = 15;
 
 /**
- * How long an event is considered to be *happening*. Nothing is stored about the end of a
- * match or a training, so it is estimated: the estimate is only used to decide when an event
- * stops being "next" and becomes history.
- */
-export const TRAINING_DURATION_MINUTES = 90;
-
-/**
- * A generous tail after the final whistle. The coach marks attendance and the squad rates each
- * other in the minutes after an event, so it must stay pinned rather than vanish on the whistle.
+ * A generous tail after the final whistle. Nothing is stored about the end of a match, so it is
+ * estimated, and the squad rates each other in the minutes after it, so it must stay pinned rather
+ * than vanish on the whistle. The estimate is only used to decide when a match stops being "next"
+ * and becomes history.
  */
 export const GRACE_MINUTES = 60;
 
@@ -37,36 +33,6 @@ export function matchWindowMinutes(periodsCount: number, periodMinutes: number):
   const play = periodsCount * periodMinutes;
   const breaks = Math.max(0, periodsCount - 1) * HALF_TIME_MINUTES;
   return play + breaks + GRACE_MINUTES;
-}
-
-/** Total wall-clock length of a training, grace included. */
-export function trainingWindowMinutes(): number {
-  return TRAINING_DURATION_MINUTES + GRACE_MINUTES;
-}
-
-/**
- * How long before a session a coach can already be at the pitch counting heads.
- *
- * Not zero: he arrives before the players and marks the first arrivals while they change. Not an
- * hour: the point of the window is that the people being marked can plausibly be in front of him.
- */
-export const ATTENDANCE_OPENS_MINUTES_BEFORE = 30;
-
-/**
- * Whether a coach may write `training_attendance` for a session starting at `startsAt`.
- *
- * Decision 090 separated the intention from the fact — « pas dispo » is a declaration about a
- * Saturday that has not happened, « absent » is an observation about one that has — and it fixed the
- * *words* on every screen that said them. It did not close the door the words came through:
- * `AttendanceList` rendered for a coach whether or not the session was over, so « Tout le monde est
- * là » was one tap on a séance four days away, and the observation went into the fact table
- * (decision 099).
- *
- * It never closes again. A coach who forgot to mark last Thursday must still be able to, which is
- * the whole premise of decision 076's « Présences pas encore pointées ».
- */
-export function attendanceIsOpen(startsAt: Date, now: Date): boolean {
-  return startsAt.getTime() - ATTENDANCE_OPENS_MINUTES_BEFORE * 60_000 <= now.getTime();
 }
 
 /** `startsAt` + `minutes`, as an ISO string. */
@@ -105,21 +71,7 @@ export type CalendarMatch = {
   squadSize: number;
 };
 
-export type CalendarTraining = {
-  kind: "training";
-  id: string;
-  startsAt: string;
-  endsAt: string;
-  venue: string | null;
-  note: string | null;
-  myAvailability: AvailabilityStatus | null;
-  answers: AvailabilityCounts;
-  squadSize: number;
-  /** Actual attendance, once the coach has ticked it. `marked` is 0 when nobody has been. */
-  attendance: { present: number; marked: number };
-};
-
-export type CalendarEvent = CalendarMatch | CalendarTraining;
+export type CalendarEvent = CalendarMatch;
 
 /** `true` while a match is being played — such an event is never history. */
 export function isLiveEvent(event: TimelineItem): boolean {
@@ -154,15 +106,13 @@ export function isFinishedEvent(event: TimelineItem): boolean {
 export type TimelineItem = {
   startsAt: string;
   endsAt: string;
-} & ({ kind: "match"; status: MatchStatus } | { kind: "training" });
+  kind: "match";
+  status: MatchStatus;
+};
 
-/** Oldest first. Ties broken on kind then start string, so the order is total and stable. */
+/** Oldest first. */
 export function byStartAscending(a: TimelineItem, b: TimelineItem): number {
-  const delta = Date.parse(a.startsAt) - Date.parse(b.startsAt);
-  if (delta !== 0) return delta;
-  // A match outranks a training at the same minute: it is the bigger commitment.
-  if (a.kind !== b.kind) return a.kind === "match" ? -1 : 1;
-  return 0;
+  return Date.parse(a.startsAt) - Date.parse(b.startsAt);
 }
 
 /** Started, not finished: the event that is happening right now. */
@@ -188,8 +138,7 @@ export type Timeline<T extends TimelineItem> = {
   /**
    * The one event pinned at the top of `/calendrier`, with the big « Je suis dispo » control.
    *
-   * It is the event happening now if there is one — a match being played, or a training that
-   * started twenty minutes ago — and otherwise the soonest one to come. Null only when the
+   * It is the match happening now if there is one, and otherwise the soonest one to come. Null only when the
    * season is over and nothing is planned.
    */
   next: T | null;
@@ -200,10 +149,10 @@ export type Timeline<T extends TimelineItem> = {
 };
 
 /**
- * Splits one merged list of matches and trainings into what the page renders.
+ * Splits the list of matches into what the page renders.
  *
- * `now` is a parameter, never `Date.now()`: that is what makes the boundary cases — an event
- * starting this second, a match that overran, a training that ended a minute ago — testable.
+ * `now` is a parameter, never `Date.now()`: that is what makes the boundary cases — a match
+ * starting this second, one that overran, one whose grace window ended a minute ago — testable.
  */
 export function splitTimeline<T extends TimelineItem>(items: readonly T[], now: Date): Timeline<T> {
   const sorted = [...items].sort(byStartAscending);
@@ -216,10 +165,8 @@ export function splitTimeline<T extends TimelineItem>(items: readonly T[], now: 
 /**
  * The heading of the history section, which used to be « Déjà joué » on every list.
  *
- * Two kinds of row have never been joué. A **training** is not played, and the demo season's history
- * has three of them interleaved with the matches — the single merged agenda is the point of the screen
- * (`docs/PROJECT.md`), so the heading has to be true of both kinds. And a **match nobody recorded**:
- * the window closes, the row drops into the history with no score, and saying it was played is the
+ * One kind of row has never been joué — a **match nobody recorded** (trainings, the other kind, were
+ * removed by decision 155): the window closes, the row drops into the history with no score, and saying it was played is the
  * calendar's version of the invention decision 013 refused — the demo season keeps exactly that row,
  * FC des Deux-Ponts, nine men named on the sheet and not one event.
  *
@@ -228,14 +175,14 @@ export function splitTimeline<T extends TimelineItem>(items: readonly T[], now: 
  * row, not the first three.
  */
 export function pastSectionTitleFr(past: readonly PastSectionItem[]): string {
-  const allPlayed = past.every((event) => event.kind === "match" && event.score !== null);
+  const allPlayed = past.every((event) => event.score !== null);
   return allPlayed ? "Déjà joué" : "Déjà passé";
 }
 
 /** Declared structurally, like `TimelineItem`, so the heading is testable against literals. */
-export type PastSectionItem =
-  | { kind: "match"; score: { goalsFor: number; goalsAgainst: number } | null }
-  | { kind: "training" };
+export type PastSectionItem = {
+  score: { goalsFor: number; goalsAgainst: number } | null;
+};
 
 /* -------------------------------------------------------------------------- */
 /* Who has answered, and who has not                                          */
@@ -256,7 +203,7 @@ export type AvailabilityTally = {
   yes: Responder[];
   no: Responder[];
   maybe: Responder[];
-  /** No row in `match_availability` / `training_availability` at all. */
+  /** No row in `match_availability` at all. */
   pending: Responder[];
   answered: number;
   total: number;
@@ -301,10 +248,8 @@ export function tallyAvailability(
  * Before the event, always: « 0 réponse sur 13 joueurs » with thirteen names under « Sans réponse »
  * is the list of people to chase, which is the coach's whole reason for looking.
  *
- * Afterwards, only if somebody answered. A past event nobody replied to has no record to keep, and
- * the card was the largest thing on the player's page for the demo season's 29 August session:
+ * Afterwards, only if somebody answered. A past event nobody replied to has no record to keep:
  * thirteen names, a month old, under a question that has already been answered by what happened.
- * The présences are the answer by then.
  */
 export function availabilityIsWorthShowing(
   tally: Pick<AvailabilityTally, "answered">,
@@ -321,12 +266,9 @@ export function countsOf(tally: AvailabilityTally): AvailabilityCounts {
 /**
  * The tally under a pinned event: « 7 dispo · 1 pas dispo · 1 peut-être · 4 sans réponse ».
  *
- * It used to count « 1 absent », three days before a session nobody had attended yet. Availability is
- * an intention and a présence is a fact, and this app keeps them in two different tables on purpose:
- * `training_attendance` is the one that may call somebody absent, and it only ever does so about an
- * evening that has happened (decision 076 — an unmarked player is not an absent one). Saying
- * « 1 absent » about an answer borrowed the word from the fact, on the one screen where both can be on
- * the same card.
+ * It used to count « 1 absent », days before an event nobody had attended yet. Availability is an
+ * intention, not a fact: saying « 1 absent » about an answer borrowed the word of an observation about
+ * an evening that has happened (decision 076).
  *
  * « pas dispo » is what the player tapped, what his badge says, and what the relance message asks for.
  * Nothing is pluralised: « 2 pas dispo » is the same words as « 1 pas dispo », which is what makes the
@@ -374,7 +316,7 @@ export function reminderCardFr(pending: number): { titleFr: string; descriptionF
  * the coach exactly who to nag, in a form he can copy in one tap.
  */
 export function buildReminderMessage(input: {
-  /** e.g. « Étoile du Parc (championnat) » or « Entraînement ». */
+  /** e.g. « Étoile du Parc (championnat) ». */
   title: string;
   /** e.g. « dimanche 27/09/2026 à 10:30 ». */
   when: string;

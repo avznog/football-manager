@@ -511,58 +511,6 @@ export const matchPlayerStats = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
-/* Trainings                                                                  */
-/* -------------------------------------------------------------------------- */
-
-export const trainings = pgTable(
-  "trainings",
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    teamId: uuid()
-      .notNull()
-      .references(() => teams.id, { onDelete: "cascade" }),
-    startsAt: timestamp({ withTimezone: true }).notNull(),
-    venue: text(),
-    note: text(),
-    createdBy: uuid().references(() => users.id, { onDelete: "set null" }),
-    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("trainings_team_starts_idx").on(t.teamId, t.startsAt)],
-);
-
-export const trainingAvailability = pgTable(
-  "training_availability",
-  {
-    trainingId: uuid()
-      .notNull()
-      .references(() => trainings.id, { onDelete: "cascade" }),
-    teamMemberId: uuid()
-      .notNull()
-      .references(() => teamMembers.id, { onDelete: "cascade" }),
-    status: availabilityStatus().notNull(),
-    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [unique("training_availability_unique").on(t.trainingId, t.teamMemberId)],
-);
-
-/** Deliberately separate from declared availability — the gap between them is interesting. */
-export const trainingAttendance = pgTable(
-  "training_attendance",
-  {
-    trainingId: uuid()
-      .notNull()
-      .references(() => trainings.id, { onDelete: "cascade" }),
-    teamMemberId: uuid()
-      .notNull()
-      .references(() => teamMembers.id, { onDelete: "cascade" }),
-    present: boolean().notNull(),
-    markedBy: uuid().references(() => users.id, { onDelete: "set null" }),
-    markedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [unique("training_attendance_unique").on(t.trainingId, t.teamMemberId)],
-);
-
-/* -------------------------------------------------------------------------- */
 /* Injuries                                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -656,7 +604,6 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
 export const teamsRelations = relations(teams, ({ many }) => ({
   members: many(teamMembers),
   matches: many(matches),
-  trainings: many(trainings),
   formations: many(formations),
   competitions: many(competitions),
   invites: many(invites),
@@ -761,12 +708,6 @@ export const matchPlayerStatsRelations = relations(matchPlayerStats, ({ one }) =
   }),
 }));
 
-export const trainingsRelations = relations(trainings, ({ one, many }) => ({
-  team: one(teams, { fields: [trainings.teamId], references: [teams.id] }),
-  availability: many(trainingAvailability),
-  attendance: many(trainingAttendance),
-}));
-
 export const injuriesRelations = relations(injuries, ({ one }) => ({
   member: one(teamMembers, {
     fields: [injuries.teamMemberId],
@@ -806,7 +747,6 @@ export type Match = typeof matches.$inferSelect;
 export type MatchEvent = typeof matchEvents.$inferSelect;
 export type Lineup = typeof lineups.$inferSelect;
 export type LineupSlot = typeof lineupSlots.$inferSelect;
-export type Training = typeof trainings.$inferSelect;
 export type Injury = typeof injuries.$inferSelect;
 export type Rating = typeof ratings.$inferSelect;
 export type MatchPlayerStats = typeof matchPlayerStats.$inferSelect;

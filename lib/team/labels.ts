@@ -35,9 +35,9 @@ export function inviteCardFr(): { titleFr: string; descriptionFr: string } {
  * usually a coach who plays, and he is in « Effectif », one card up, with a « coach » badge. A reader
  * asking who runs the team read a list of one and was not told it was a list of one *kind*.
  *
- * So the card explains its own boundary, the way the training page explains a denominator larger than
- * the list under it (decision 076): « 1 coach joue aussi, et apparaît dans l'effectif. » Nothing is
- * said when there is nothing to explain.
+ * So the card explains its own boundary, the way the (since removed) training page explained a
+ * denominator larger than the list under it (decision 076): « 1 coach joue aussi, et apparaît dans
+ * l'effectif. » Nothing is said when there is nothing to explain.
  */
 export function staffCardFr(playingCoachCount: number): {
   titleFr: string;

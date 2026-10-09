@@ -9,7 +9,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { AvailabilityStatus, MatchStatus } from "@/db/schema";
 import {
-  attendanceLineFr,
   AVAILABILITY_LABELS,
   matchNameFr,
   NOT_RECORDED_FR,
@@ -19,17 +18,8 @@ import {
   venuePhraseFr,
 } from "@/lib/calendar/labels";
 import { capitalizeFirst } from "@/lib/calendar/time";
-import type { AvailabilityCounts, CalendarMatch, CalendarTraining } from "@/lib/calendar/timeline";
+import type { AvailabilityCounts, CalendarMatch } from "@/lib/calendar/timeline";
 import { answersLineFr } from "@/lib/calendar/timeline";
-
-/** « Match » or « Entraînement » — the one thing to read first on a mixed list. */
-export function KindBadge({ kind }: { kind: "match" | "training" }) {
-  return (
-    <Badge variant={kind === "match" ? "accent" : "neutral"}>
-      {kind === "match" ? "Match" : "Entraînement"}
-    </Badge>
-  );
-}
 
 const AVAILABILITY_VARIANT = {
   yes: "success",
@@ -139,23 +129,4 @@ export function matchSubtitle(match: CalendarMatch): string {
  */
 export function matchTitle(match: CalendarMatch): string {
   return capitalizeFirst(matchNameFr(match.opponentName, match.isHome));
-}
-
-/** « Gymnase Jean-Moulin » or the session's note, whichever there is. */
-export function trainingSubtitle(training: CalendarTraining): string {
-  return [training.venue, training.note].filter((part): part is string => Boolean(part)).join(" · ");
-}
-
-/**
- * « 10 présents sur 13 pointés » once the coach has ticked the list, « Présences pas encore
- * pointées » on a session that is over and never was — `attendanceLineFr` decides which, and
- * nothing at all before the session happens.
- */
-export function attendanceSummary(
-  training: CalendarTraining,
-  variant: "upcoming" | "past",
-): string | null {
-  return attendanceLineFr(training.attendance.present, training.attendance.marked, {
-    isPast: variant === "past",
-  });
 }

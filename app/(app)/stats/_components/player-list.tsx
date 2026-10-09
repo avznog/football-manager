@@ -13,11 +13,8 @@
 import { Card } from "@/components/ui/card";
 import type { PlayerSeasonStats, PlayerSortKey } from "@/lib/stats/aggregate";
 import {
-  ATTENDANCE_NOT_FILTERED_FR,
   NO_DATA_FR,
   appearancesLineFr,
-  attendanceHintFr,
-  formatAttendance,
   formatMinutes,
   formatRating,
   pendingRatingMatchesNoteFr,
@@ -30,29 +27,20 @@ import { CardEmpty, Figure, FigureGrid, Note, PlayerIdentity } from "./parts";
 export function PlayerList({
   players,
   query,
-  markedSessions,
   pendingRatingMatches,
 }: {
   players: readonly PlayerSeasonStats[];
   query: StatsQuery;
-  markedSessions: number;
   /**
    * Matches whose means are not out yet, so a dash is not read as « nobody rated him ». It used to be
    * a count of matches *this reader* had not rated — the same number for everybody now (decision 137).
    */
   pendingRatingMatches: number;
 }) {
-  /**
-   * Every figure on a row is inside the competition filter except the attendance, which cannot be:
-   * a training belongs to no competition. So the rows have to say which one is the exception
-   * (decision 082).
-   */
-  const filtered = query.competitionId !== null;
-
   return (
     <Card
       title="Joueurs"
-      description="Buts, minutes, notes et présence, par joueur."
+      description="Buts, minutes et notes, par joueur."
       as="h2"
       flush
     >
@@ -67,30 +55,19 @@ export function PlayerList({
       ) : (
         <ul className="divide-y divide-border/60">
           {players.map((player) => (
-            <PlayerRow
-              key={player.teamMemberId}
-              player={player}
-              sort={query.sort}
-              filtered={filtered}
-            />
+            <PlayerRow key={player.teamMemberId} player={player} sort={query.sort} />
           ))}
         </ul>
       )}
 
-      <div className="px-4 pb-3">
-        <Note>
-          La présence est calculée sur les séances où le joueur a été pointé, pas sur toutes les
-          séances : {markedSessions > 0 ? `${plural(markedSessions, "séance")} pointée${markedSessions > 1 ? "s" : ""} au total` : "aucune séance pointée pour l’instant"}.
-          Un joueur non pointé n’est pas un absent.
-          {filtered ? ` ${ATTENDANCE_NOT_FILTERED_FR}` : ""}
-        </Note>
-        {pendingRatingMatches > 0 ? (
-          // Without this, a figure short of matches is indistinguishable from an average nobody has
-          // given. One sentence from one place, so this table and « Meilleures notes » above it
-          // cannot come to disagree about a rule that belongs to neither of them.
+      {pendingRatingMatches > 0 ? (
+        // Without this, a figure short of matches is indistinguishable from an average nobody has
+        // given. One sentence from one place, so this table and « Meilleures notes » above it
+        // cannot come to disagree about a rule that belongs to neither of them.
+        <div className="px-4 pb-3">
           <Note>{pendingRatingMatchesNoteFr(pendingRatingMatches)}</Note>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -99,8 +76,7 @@ export function PlayerList({
  * Whether this player has any match record at all.
  *
  * A player nobody has ever put on a sheet has not "scored 0 goals" — he has no match to have scored
- * in. So his football figures are `null`, not `0`, while his ratings and his attendance keep their
- * real values (`aggregate.ts`, rule 1). A substitute who was named and stayed on the bench *does*
+ * in. So his football figures are `null`, not `0`, while his ratings keep their real values (`aggregate.ts`, rule 1). A substitute who was named and stayed on the bench *does*
  * have a record: 0 goals in 0 minutes is a fact about him.
  */
 function hasMatchRecord(player: PlayerSeasonStats): boolean {
@@ -109,13 +85,11 @@ function hasMatchRecord(player: PlayerSeasonStats): boolean {
 
 /**
  * The figure promoted next to the name: whatever the list is sorted by. It replaces the grid
- * column, so it has to carry everything that column carried — notably the attendance denominator,
- * which decision 020 forbids dropping.
+ * column, so it has to carry everything that column carried — the rating's count included.
  */
 function promoted(
   player: PlayerSeasonStats,
   sort: PlayerSortKey,
-  filtered: boolean,
 ): { value: string | null; hint?: string } {
   const played = hasMatchRecord(player);
   switch (sort) {
@@ -132,32 +106,12 @@ function promoted(
             hint: `sur ${plural(player.rating.count, "note")}`,
           }
         : { value: null };
-    case "attendance":
-      return player.attendance.marked > 0
-        ? {
-            value: formatAttendance(
-              player.attendance.present,
-              player.attendance.marked,
-              player.attendance.rate,
-            ),
-            hint: attendanceHintFr(filtered),
-          }
-        : { value: null };
   }
 }
 
-function PlayerRow({
-  player,
-  sort,
-  filtered,
-}: {
-  player: PlayerSeasonStats;
-  sort: PlayerSortKey;
-  /** A competition filter is on, so the attendance figure is the odd one out on the row. */
-  filtered: boolean;
-}) {
+function PlayerRow({ player, sort }: { player: PlayerSeasonStats; sort: PlayerSortKey }) {
   const played = hasMatchRecord(player);
-  const headline = promoted(player, sort, filtered);
+  const headline = promoted(player, sort);
   // The sorted figure is already promoted next to the name; repeating it in the grid would show the
   // same number twice on a 320 px row.
   const show = (key: PlayerSortKey) => key !== sort;
@@ -196,21 +150,6 @@ function PlayerRow({
                 hint={
                   player.rating.count > 0 ? `sur ${plural(player.rating.count, "note")}` : undefined
                 }
-              />
-            ) : null}
-            {show("attendance") ? (
-              <Figure
-                label="Présence"
-                value={
-                  player.attendance.marked > 0
-                    ? formatAttendance(
-                        player.attendance.present,
-                        player.attendance.marked,
-                        player.attendance.rate,
-                      )
-                    : null
-                }
-                hint={attendanceHintFr(filtered)}
               />
             ) : null}
           </FigureGrid>

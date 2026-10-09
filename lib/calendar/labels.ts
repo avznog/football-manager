@@ -201,94 +201,9 @@ export function resultLetter(goalsFor: number, goalsAgainst: number): "V" | "N" 
 }
 
 /**
- * « 11 présents sur 14 pointés » — the attendance of one session, denominator included.
- *
- * The denominator is the number of players the coach **marked**, never the size of the squad, and
- * the word « pointés » is what says so (decision 020). Without it the demo season's 29 August
- * session reads « 11 présents sur 14 » to a coach who has thirteen players — the fourteenth had left
- * by September, so the figure is right about that night and only the missing word makes it look
- * wrong. Both places that print this line, the calendar row and the coach's marking card, come
- * through here, and `labels.test.ts` pins the two plurals.
- */
-export function attendanceCountFr(present: number, marked: number): string {
-  return `${pluralize(present, "présent")} sur ${pluralize(marked, "pointé")}`;
-}
-
-/**
- * The présences of one session, on a list row — or the fact that there are none.
- *
- * `null` for a session still to come: nothing has happened, so there is nothing to say. But a
- * session that is **over** and was never pointed is a fact of its own, and the row used to print
- * nothing for it, which is how a player ended up scrolling a past session that shows a date, a
- * venue and silence. Silence is not the same statement as « 0 présent sur 13 pointés » — one says
- * the pitch was unplayable and nobody trained, the other says the coach never ticked the list — and
- * the list has room to say which (decision 076).
- *
- * « pas encore », because it stays true: a coach can point a session weeks later, and the card on
- * the session's own page offers exactly that.
- */
-export function attendanceLineFr(
-  present: number,
-  marked: number,
-  options: { isPast: boolean },
-): string | null {
-  if (marked > 0) return attendanceCountFr(present, marked);
-  return options.isPast ? "Présences pas encore pointées" : null;
-}
-
-/**
- * What a player reads on a past session nobody pointed, where the whole page was otherwise empty.
- *
- * The second sentence is the one worth printing. « Personne n'a été pointé » on its own invites the
- * reading that everybody was absent — which is a real state the demo season also contains, and the
- * two are counted differently: an unpointed session is in nobody's denominator at all (decision 020).
- * A player who trained that evening should not have to wonder whether the app has him down as absent.
- */
-export const unmarkedSessionNoteFr =
-  "Aucune présence n’a été pointée pour cette séance. Elle ne compte donc dans aucun taux de présence.";
-
-/**
- * What the coach reads where the pointage list will be, on a séance that has not started.
- *
- * The list used to be there, in the present indicative: « Présences », « Tout le monde est là »,
- * « Enregistrer les présences », on a session four days away. One tap put thirteen observations in
- * `training_attendance` about an evening nobody had lived, and `/stats` then said « 3 séances
- * pointées » in a season of two, with Brice at 1/3 instead of 0/2 (decision 099).
- *
- * Hiding the card would leave a coach looking for it, so the card stays and says when it opens and
- * what to use instead. The second sentence is the one doing the work: it does not just refuse, it
- * points at the tool for the question he is actually asking, which is decision 090's distinction
- * said out loud to the one person who can blur it.
- */
-export function attendanceNotOpenFr(minutesBefore: number): string {
-  return (
-    `Le pointage ouvre ${minutesBefore} minutes avant la séance. ` +
-    "D’ici là, ce sont les disponibilités au-dessus qui disent qui vient : " +
-    "ce que les joueurs annoncent est une intention, une présence est un fait."
-  );
-}
-
-/**
- * Why « sur 14 pointés » can sit above a list of thirteen names.
- *
- * The attendance of a session is a fact about that evening and does not change when somebody leaves
- * the club, so the count is taken over the marks (the calendar row counts the same way). The list
- * underneath can only show players who are still in the squad — there is no présent/absent to set
- * for a man who has gone — and a coach counting the rows would otherwise be one short with no way to
- * find out why. That is the whole job of this sentence, and it is only printed when the two differ.
- */
-export function departedMarksNoteFr(departed: number): string | null {
-  if (departed <= 0) return null;
-  return departed === 1
-    ? "1 joueur pointé ce soir-là a quitté l’équipe depuis."
-    : `${departed} joueurs pointés ce soir-là ont quitté l’équipe depuis.`;
-}
-
-/**
  * « 13 réponses sur 13 joueurs » — how far round the squad the question has got.
  *
- * The denominator is named for the same reason it is on `attendanceCountFr`: « 11 sur 13 » alone
- * leaves a coach guessing what the 13 counts. Here it is the players the question was put to, which
+ * The denominator is named because « 11 sur 13 » alone leaves a coach guessing what the 13 counts. Here it is the players the question was put to, which
  * is the squad, and not the size of the match sheet.
  */
 export function availabilityCountFr(answered: number, total: number): string {
@@ -299,22 +214,19 @@ export function availabilityCountFr(answered: number, total: number): string {
  * The same line once the event has happened: « Avant le match · 11 réponses sur 13 joueurs ».
  *
  * A list of who *said* they would come outlives the question it answered, and on a past event it is
- * the only thing on the screen that is no longer actionable — « Sans réponse : 2 » about a session
- * that finished on Tuesday is not a list to chase, it is a record. Naming the moment is what keeps a
+ * the only thing on the screen that is no longer actionable — « Sans réponse : 2 » about a match
+ * that finished on Sunday is not a list to chase, it is a record. Naming the moment is what keeps a
  * reader from taking it for the present tense, and the pages that show it put the card *below* what
  * actually happened (decision 068).
- *
- * « la séance » rather than « l’entraînement » because the card is already inside a training page:
- * the shorter word is the one a coach says, and it does not repeat the page title.
  */
 export function availabilitySubtitleFr(
   answered: number,
   total: number,
-  past: "match" | "training" | null,
+  past: "match" | null,
 ): string {
   const count = availabilityCountFr(answered, total);
   if (past === null) return count;
-  return `${past === "match" ? "Avant le match" : "Avant la séance"} · ${count}`;
+  return `Avant le match · ${count}`;
 }
 
 /** A plural `s` only when it is needed: `pluralize(1, "joueur")` → « 1 joueur ». */

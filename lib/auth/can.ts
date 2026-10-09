@@ -44,10 +44,6 @@ export type Action =
   | "match:create"
   | "match:update"
   | "match:delete"
-  | "training:create"
-  | "training:update"
-  | "training:delete"
-  | "training:markAttendance"
   // Match preparation and play
   | "match:selectSquad"
   | "match:manageLineups"
@@ -127,10 +123,6 @@ const COACH_ACTIONS = new Set<Action>([
   "match:create",
   "match:update",
   "match:delete",
-  "training:create",
-  "training:update",
-  "training:delete",
-  "training:markAttendance",
   "match:selectSquad",
   "match:manageLineups",
   "match:operate",

@@ -120,7 +120,6 @@ const SORT_LABELS: Record<PlayerSortKey, string> = {
   goals: "Buts",
   assists: "Passes déc.",
   rating: "Note",
-  attendance: "Présence",
 };
 
 export const SORT_OPTIONS: readonly PlayerSortKey[] = [
@@ -128,7 +127,6 @@ export const SORT_OPTIONS: readonly PlayerSortKey[] = [
   "goals",
   "assists",
   "rating",
-  "attendance",
 ];
 
 /** How the player list is ordered. Same link-based approach, scoped to the list it sorts. */

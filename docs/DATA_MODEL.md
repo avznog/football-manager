@@ -130,16 +130,9 @@ Written by the player themselves; a coach may not answer on their behalf.
 The match sheet. Only members listed here may rate after the match (decision 007), and only
 `starter`/`substitute` may appear in a lineup.
 
-### `trainings`
-`id`, `team_id`, `starts_at`, `venue`, `note`, `created_by`.
-
-### `training_availability`
-`(training_id, team_member_id)` unique, `status`, `updated_at`.
-
-### `training_attendance`
-`(training_id, team_member_id)` unique, `present`, `marked_by`, `marked_at`.
-Declared availability and actual attendance are deliberately separate — the gap between them is
-interesting.
+### ~~`trainings`, `training_availability`, `training_attendance`~~
+Dropped by migration `0011` (decision 155, 2026-10-09): the team no longer manages trainings in the
+app. The `availability_status` enum they shared with `match_availability` is kept for the latter.
 
 ### `injuries`
 `id`, `team_member_id`, `started_on`, `expected_return_on`, `note`, `declared_by`, `resolved_on`.
