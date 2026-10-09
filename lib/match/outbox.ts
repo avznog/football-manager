@@ -301,6 +301,13 @@ export type EnqueueInput = {
   voidsEventId?: string | null;
   /** Device wall clock of the tap. Defaults to `now()`. */
   occurredAtMs?: number;
+  /**
+   * Supplied only for an action the app writes on its own and that two devices may write at once —
+   * the composition applied when game mode opens (decision 153). Derived from what it records, so
+   * the second copy is the same row: upserted here, `on conflict do nothing` on the server
+   * (invariant 6). A tap never supplies one: two taps are two actions.
+   */
+  clientEventId?: string;
 };
 
 export type OutboxOptions = {
@@ -385,7 +392,7 @@ export function createOutbox(options: OutboxOptions): Outbox {
   function newRecord(input: EnqueueInput, offset = 0): OutboxRecord {
     const at = input.occurredAtMs ?? now();
     return {
-      clientEventId: newId(),
+      clientEventId: input.clientEventId ?? newId(),
       matchId,
       type: input.type,
       period: input.stamp.period,

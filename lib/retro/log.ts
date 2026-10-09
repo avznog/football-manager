@@ -49,6 +49,7 @@ import {
   regulationMs,
 } from "@/lib/match/clock";
 import type { MatchEventInput, MatchEventType } from "@/lib/match/events";
+import { deterministicUuid } from "@/lib/match/ids";
 import type { MatchEventRecord } from "@/lib/match/reducer";
 
 /* -------------------------------------------------------------------------- */
@@ -643,32 +644,12 @@ export function retroEventId(submissionId: string, index: number): string {
  * - it is the same on the server and in the browser, which a random uuid in a hidden input is not:
  *   the two would disagree and React would report a hydration mismatch on every load of the form.
  *
- * FNV-1a, four times over the same seed with four different offset bases. Not a cryptographic hash
- * and not meant to be one — a collision would mean two *different* sheets for the same match hashing
- * together, and the sheet is re-read from the database before anything is written. The version and
- * variant nibbles are forced, so the result is a well-formed uuid for `matchEventInputSchema`.
+ * The hash is `deterministicUuid` (`lib/match/ids.ts`), which game mode's automatic composition
+ * shares (decision 153). A collision would mean two *different* sheets for the same match hashing
+ * together, and the sheet is re-read from the database before anything is written.
  */
 export function retroSubmissionId(parts: readonly (string | number | null | undefined)[]): string {
-  const seed = parts.map((part) => (part === null || part === undefined ? "" : part)).join("");
-  const words = [0x811c9dc5, 0x01000193, 0x9e3779b9, 0x85ebca6b].map((base) => fnv1a(seed, base));
-  const hex = words.map((word) => word.toString(16).padStart(8, "0")).join("");
-
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    `4${hex.slice(13, 16)}`,
-    `8${hex.slice(17, 20)}`,
-    hex.slice(20, 32),
-  ].join("-");
-}
-
-function fnv1a(input: string, base: number): number {
-  let hash = base >>> 0;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash >>> 0;
+  return deterministicUuid(parts);
 }
 
 /**

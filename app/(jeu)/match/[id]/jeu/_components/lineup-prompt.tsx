@@ -20,15 +20,22 @@ export type LineupPromptProps = {
    */
   onAdjust: (() => void) | null;
   onLater: () => void;
+  /**
+   * The starting composition before the kick-off, seen by somebody who does not operate the match:
+   * nobody will tap « Appliquer », the operator opening game mode applies it (decision 153).
+   */
+  appliesOnOpen?: boolean;
 };
 
 /**
  * The planned composition, proposed and waiting.
  *
- * **Invariant 3**: a planned composition is never applied automatically. This card describes what
- * would change, flags the players it would be odd to field — injured, already substituted off, not
- * on the match sheet — and does nothing at all until the coach taps « Appliquer ». « Plus tard »
- * only hides the card: the plan stays in `lineups`, unapplied, and the log is untouched.
+ * **Invariant 3**: a planned composition is never applied automatically — except the starting one,
+ * which game mode applies when the operator opens it before the kick-off (decision 153), so the
+ * operator never sees this card for it. This card describes what would change, flags the players it
+ * would be odd to field — injured, already substituted off, not on the match sheet — and does nothing
+ * at all until the coach taps « Appliquer ». « Plus tard » only hides the card: the plan stays in
+ * `lineups`, unapplied, and the log is untouched.
  *
  * It is a card at the top of the page and not a modal on purpose: a dialog that appears at 45′ over
  * the pitch, while the coach is mid-tap on something else, is a dialog that gets dismissed by
@@ -39,7 +46,15 @@ export type LineupPromptProps = {
  * is wrong instead of applying a composition he knows to be stale — and it still writes nothing until
  * he validates there.
  */
-export function LineupPrompt({ view, slots, kit, onApply, onAdjust, onLater }: LineupPromptProps) {
+export function LineupPrompt({
+  view,
+  slots,
+  kit,
+  onApply,
+  onAdjust,
+  onLater,
+  appliesOnOpen = false,
+}: LineupPromptProps) {
   const changes = pendingLineupChangesFr(view);
 
   return (
@@ -48,7 +63,9 @@ export function LineupPrompt({ view, slots, kit, onApply, onAdjust, onLater }: L
       description={
         onApply
           ? "Proposée, pas appliquée : rien ne change avant ta confirmation."
-          : "Proposée, pas appliquée : rien ne change avant la confirmation de l’opérateur."
+          : appliesOnOpen
+            ? "Pas encore appliquée : elle entre sur le terrain dès que l’opérateur ouvre le mode match."
+            : "Proposée, pas appliquée : rien ne change avant la confirmation de l’opérateur."
       }
       className="border-accent/50 ring-1 ring-accent/20"
     >

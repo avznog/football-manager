@@ -761,9 +761,28 @@ export function reduceMatch(
     if (!pitch.has(memberId)) return false;
     accrue(memberId, atMs);
     const player = playerOf(memberId);
+    const open = player.spells[player.spells.length - 1];
+    pitch.delete(memberId);
+    if (open && open.toClockMs === null && open.fromClockMs === atMs) {
+      /*
+       * A spell that ends at the instant it began was never played: the composition he was in was
+       * replaced at the same reading — two snapshots at 0′ before the kick-off, the second one
+       * correcting the first (decision 153). Keeping it would make him a starter (`startedMatch`),
+       * a player of the match (`playedMatch`), « déjà sorti » for the next plan, and a goalkeeper if
+       * that was his slot. It accrued nothing, so dropping it moves no minute.
+       */
+      player.spells.pop();
+      // Every position spell of that spell began at this instant — the open one, and any a move at
+      // the same reading already closed.
+      player.positionSpells = player.positionSpells.filter(
+        (spell) => !(spell.fromClockMs === atMs && (spell.toClockMs ?? atMs) === atMs),
+      );
+      player.wasGoalkeeper = player.positionSpells.some((spell) => slots.isGoal(spell.slotId));
+      if (player.spells.length > 0) everLeftPitch.add(memberId);
+      return true;
+    }
     closeLast(player.spells, atMs);
     closeLast(player.positionSpells, atMs);
-    pitch.delete(memberId);
     everLeftPitch.add(memberId);
     return true;
   };
@@ -787,6 +806,14 @@ export function reduceMatch(
     }
     entry.slotId = slotId;
     closeLast(player.positionSpells, atMs);
+    // A post held for no time at all was never held — the same rule as `leavePitch`'s spell
+    // (decision 153): a second composition at 0′ moving Hugo out of goal does not make him a keeper.
+    const last = player.positionSpells[player.positionSpells.length - 1];
+    if (last && last.fromClockMs === atMs && last.toClockMs === atMs) {
+      player.positionSpells.pop();
+      player.wasGoalkeeper =
+        nowInGoal || player.positionSpells.some((spell) => slots.isGoal(spell.slotId));
+    }
     player.positionSpells.push({
       slotId,
       positionCode: slots.positionOf(slotId),
@@ -1032,7 +1059,9 @@ export function reduceMatch(
               }
             }
             // Read before anybody moves: an empty pitch that this event fills is the kick-off seven.
-            startingLineup = pitch.size === 0 && diff.comingOn.length > 0;
+            // So is a composition game mode applied on its own before the kick-off (decision 153):
+            // it replaces the starting seven, never a change, and is as un-annullable as they are.
+            startingLineup = (pitch.size === 0 && diff.comingOn.length > 0) || applied.auto === true;
             for (const memberId of diff.goingOff) leavePitch(memberId, clockMs);
             for (const change of diff.positionChanges) {
               moveTo(change.memberId, change.toSlotId, clockMs);
@@ -1223,10 +1252,14 @@ export function reduceMatch(
       };
     });
 
-  const pendingLineup =
-    plannedLineups.find((lineup) => lineup.due && !lineup.applied && !lineup.diff.isEmpty) ?? null;
-
   const finished = phase === "finished";
+
+  // A finished match proposes nothing: a plan nobody applied is history now, and the prompt over a
+  // frozen match said « rien ne change avant ta confirmation » about a confirmation nobody can give.
+  const pendingLineup = finished
+    ? null
+    : (plannedLineups.find((lineup) => lineup.due && !lineup.applied && !lineup.diff.isEmpty) ??
+      null);
 
   return {
     periods,

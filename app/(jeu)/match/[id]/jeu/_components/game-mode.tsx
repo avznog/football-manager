@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ACTION_ICONS,
@@ -25,6 +25,7 @@ import {
   type MatchEventType,
   type RemarkKind,
 } from "@/lib/match/events";
+import { autoLineupToApply } from "@/lib/match/auto-lineup";
 import { createOutbox, toWireEvent, type OutboxRecord, type OutboxState } from "@/lib/match/outbox";
 import {
   availableOptions,
@@ -32,6 +33,7 @@ import {
   enterableCardFr,
   eventLabel,
   finalWhistleEvents,
+  mergeEvents,
   minuteLabelFr,
   nextEventStamp,
   onPitchOptions,
@@ -45,6 +47,7 @@ import {
   reduceLive,
   emptyPitchFr,
   timelineLines,
+  type EventStamp,
   type LiveMatch,
   type PendingEvent,
   type PlayerOption,
@@ -399,11 +402,31 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     [state, players, queuedIds],
   );
 
+  /**
+   * The starting composition this device should apply on its own, now (decision 153) — or null.
+   * Asked of the log as this device sees it, pending actions included, so a tap that has not reached
+   * the server yet still counts as the coach's own arrangement.
+   */
+  const autoLineup = useMemo(
+    () =>
+      autoLineupToApply({
+        matchId,
+        canOperate,
+        entryMode: live.match.entryMode,
+        state,
+        events: mergeEvents(live.events, local),
+        lineups: live.lineups,
+      }),
+    [matchId, canOperate, live.match.entryMode, state, live.events, local, live.lineups],
+  );
+
   const prompt = useMemo(() => {
     const view = pendingLineupView(state.pendingLineup, live.lineups, players);
     if (!view || postponed.includes(view.lineupId)) return null;
+    // About to be applied by the effect below: no « Appliquer » for the frame in between.
+    if (autoLineup && view.lineupId === autoLineup.lineupId) return null;
     return view;
-  }, [state.pendingLineup, live.lineups, players, postponed]);
+  }, [state.pendingLineup, live.lineups, players, postponed, autoLineup]);
 
   const promptSlots = useMemo(() => {
     if (!prompt) return [];
@@ -445,6 +468,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     hasLineups: live.lineups.length > 0,
     isProposed: prompt !== null,
     canOperate,
+    started: state.started,
   });
 
   /* ---------------------------------------------------------------------- */
@@ -457,17 +481,25 @@ export function GameMode({ live, canOperate }: GameModeProps) {
    */
   const emitAll = useCallback(
     async (
-      actions: readonly { type: MatchEventType; payload?: unknown; voidsEventId?: string }[],
+      actions: readonly {
+        type: MatchEventType;
+        payload?: unknown;
+        voidsEventId?: string;
+        /** Only for what the app writes on its own: the automatic composition (decision 153). */
+        stamp?: EventStamp;
+        clientEventId?: string;
+      }[],
       options: { atMs?: number } = {},
     ) => {
       const atMs = options.atMs ?? Date.now();
       const records = await outbox.enqueueAll(
-        actions.map(({ type, payload, voidsEventId }) => ({
+        actions.map(({ type, payload, voidsEventId, stamp, clientEventId }) => ({
           type,
-          stamp: nextEventStamp(state, type, atMs),
+          stamp: stamp ?? nextEventStamp(state, type, atMs),
           payload,
           voidsEventId: voidsEventId ?? null,
           occurredAtMs: atMs,
+          clientEventId,
         })),
       );
       // Optimistic: the reducer sees it immediately, so the score moves on the tap. The local copy
@@ -490,6 +522,27 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     },
     [outbox, state, router, live.events],
   );
+
+  /**
+   * Apply the starting composition the moment game mode opens (decision 153, superseding invariant
+   * 3's « never automatically » for this one composition). Once per version per mount: the ref holds
+   * the ids already written, and the id itself is derived from the match, the plan and its seven, so
+   * a second phone opening at the same time writes the same row and the server keeps one
+   * (invariant 6). Stamped at 0′ of the first period whatever the wall clock says.
+   */
+  const autoApplied = useRef(new Set<string>());
+  useEffect(() => {
+    if (!autoLineup || autoApplied.current.has(autoLineup.clientEventId)) return;
+    autoApplied.current.add(autoLineup.clientEventId);
+    void emitAll([
+      {
+        type: "LINEUP_APPLIED",
+        payload: autoLineup.payload,
+        clientEventId: autoLineup.clientEventId,
+        stamp: { period: 1, minute: 0, clockMs: 0 },
+      },
+    ]);
+  }, [autoLineup, emitAll]);
 
   const emit = useCallback(
     (
@@ -687,6 +740,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
                 : null
             }
             onLater={() => setPostponed((current) => [...current, prompt.lineupId])}
+            appliesOnOpen={!state.started && state.onPitch.length === 0}
           />
         ) : null}
 

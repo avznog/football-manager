@@ -222,6 +222,13 @@ function buildPayloadSchemas<Kind extends string>(
     LINEUP_APPLIED: z.object({
       lineupId: id.nullish(),
       slots: z.array(z.object({ slotId: id, memberId: id })).min(1),
+      /**
+       * Written by game mode on its own when it opens before the kick-off, never by a coach's tap
+       * (decision 153). Absent on every other `LINEUP_APPLIED`. It keeps the composition editable
+       * until the kick-off, lets a later version replace it, and stops being written the moment the
+       * coach arranges the pitch himself.
+       */
+      auto: z.literal(true).optional(),
     }),
 
     FOUL: z.object({ memberId: id }),

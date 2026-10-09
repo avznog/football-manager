@@ -849,7 +849,14 @@ tag during this rework** (decision 146): every item below reaches the preview on
       and the recap alike (« Composition de départ » / « Changement » / « Changement de poste »). A
       disc on the pitch opens ACTION about that player. Production check of decision 147: the query
       returned no row on the local restore; the run against production is the orchestrator's
-- [ ] **S9** · #168 · the starting composition applied when game mode opens
+- [x] **S9** · #168 · the starting composition applied when game mode opens, decision **153**
+      (supersedes invariant 3 for the starting composition, and decision 006 for it). Pure
+      `autoLineupToApply` decides; game mode writes one `LINEUP_APPLIED { auto: true }` at 0′ with a
+      `client_event_id` derived from the match, the plan and its seven (`lib/match/ids.ts`), so two
+      phones write one row. Before the kick-off the composition stays editable and an edited version
+      is re-applied; the kick-off freezes it (`autoLineupToLock`). A coach's own arrangement stops it
+      for good. The reducer drops zero-length spells and posts (no phantom starter), and a finished
+      match proposes no plan any more
 - [ ] **S10** · #169 · add changes after the match, realistically
 - [x] **S11** · #170 · only starters, substitutes and supporters may rate
       - [x] **Only the match sheet rates** — starters, substitutes and supporters of that match, plus anybody

@@ -148,6 +148,18 @@ describe("the outbox", () => {
     expect(new Set(post.sent[0].events.map((event) => event.occurredAt)).size).toBe(1);
   });
 
+  it("keeps a supplied client_event_id, and the same one twice is one action (decision 153)", async () => {
+    const { outbox, post, storage } = harness([offline]);
+    const id = "12345678-1234-4123-8123-123456789abc";
+
+    await outbox.enqueue({ type: "LINEUP_APPLIED", stamp: stamp(0), clientEventId: id });
+    await outbox.enqueue({ type: "LINEUP_APPLIED", stamp: stamp(0), clientEventId: id });
+
+    expect(outbox.state().pending.map((record) => record.clientEventId)).toEqual([id]);
+    expect(await storage.all(MATCH_ID)).toHaveLength(1);
+    expect(post.sent[0].events[0].clientEventId).toBe(id);
+  });
+
   it("notifies subscribers so the badge can count", async () => {
     const { outbox } = harness([offline]);
     const counts: number[] = [];

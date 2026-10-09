@@ -900,6 +900,8 @@ export function emptyPitchFr(input: {
   isProposed: boolean;
   /** The viewer may operate the match, so the confirmation is theirs to give. */
   canOperate: boolean;
+  /** A period has kicked off: game mode no longer applies the starting composition on its own. */
+  started?: boolean;
 }): { title: string; description: string } {
   if (!input.hasLineups) {
     return {
@@ -913,7 +915,12 @@ export function emptyPitchFr(input: {
       title: "Personne n’est encore sur le terrain.",
       description: input.canOperate
         ? "La composition ci-dessus attend ta confirmation : c’est elle qui fait entrer les joueurs."
-        : "La composition ci-dessus attend la confirmation de l’opérateur : c’est elle qui fait entrer les joueurs.",
+        : // Decision 153: before the kick-off the operator taps nothing for the starting seven,
+          // opening game mode is enough — so that is what a viewer is told he is waiting for. After
+          // it, game mode no longer applies anything on its own, and the operator has to confirm.
+          input.started
+          ? "La composition ci-dessus attend la confirmation de l’opérateur : c’est elle qui fait entrer les joueurs."
+          : "La composition ci-dessus entre sur le terrain dès que l’opérateur ouvre le mode match.",
     };
   }
   return {

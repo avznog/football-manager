@@ -4917,3 +4917,39 @@ password reset again).
 - Gates: typecheck, eslint, Vitest 66 files / 1336 tests, Playwright 6/6 on port 3102.
 - Left as is, worth a look: « feuille de match » still names the selection in the ratings wording (« 4 sur
   8 de la feuille de match ») and in the deletion warning, and game mode still says « hors feuille ».
+
+## 2026-10-09 — S9: the starting composition applies itself when game mode opens (decision 153)
+
+- `lib/match/auto-lineup.ts` (new) — `autoLineupToApply`, `autoLineupToLock`, `isAutoLineupPayload`.
+  `lib/match/ids.ts` (new) — `deterministicUuid`, moved out of `lib/retro/log.ts`, whose
+  `retroSubmissionId` delegates to it.
+- `lib/match/events.ts` — `LINEUP_APPLIED` takes `auto: true` (optional).
+- `lib/match/outbox.ts` — `EnqueueInput.clientEventId`, kept when supplied.
+- `lib/match/append.ts` — an automatic application does not set `lineups.applied_event_id`; a batch
+  with a `KICKOFF` sets it from `autoLineupToLock`.
+- `lib/match/reducer.ts` — `leavePitch` drops a zero-length spell and its posts, `moveTo` a zero-length
+  post; `startingLineup` covers an automatic application; no `pendingLineup` on a finished match.
+- `lib/match/presenter.ts` — `emptyPitchFr` tells a viewer the operator opening game mode is what he
+  waits for, before the kick-off. `lineup-prompt.tsx` says the same on the card (`appliesOnOpen`).
+- `game-mode.tsx` — the `useEffect` that writes it, the prompt hidden for the composition about to be
+  applied, `emitAll` accepting a stamp and a `clientEventId`.
+- `CLAUDE.md` — invariant 3 rewritten.
+- Tests: `auto-lineup.test.ts` (new — the predicate, the id, the lock), `reducer.test.ts` (no phantom
+  starter, the replaced keeper is no keeper, a later plan does not call him « déjà sorti », both are
+  starting compositions, the frozen rows match a one-snapshot log, a finished match proposes
+  nothing), `outbox.test.ts` (a supplied id kept, twice is one), `presenter.test.ts` (an automatic
+  re-application cannot be annulled; the viewer copy). E2E: the happy path now opens game mode as a
+  player first (nothing written, checked after a reload), then as the coach in **two tabs at once** —
+  the pitch is there on both, no « Appliquer », and after a reload one « Composition de départ » line
+  at 0′ without « Annuler »; the group-change test no longer taps « Appliquer ».
+
+**Looked at, 390 px, light and dark, coach and player in one pass**, on two local matches seeded in
+`football_wa` with a match sheet and a starting composition (« Racing du Samedi », « Olympique du
+Dimanche »): the player opening first sees the composition proposed and the empty pitch, both saying it
+enters when the operator opens game mode; the coach opening sees the seven on the pitch and one
+« Composition de départ » line; the player then sees them too; the composition page is still editable
+(« Enregistrer »); after swapping Clément in for Charles there, game mode shows the new seven and a
+second « Composition de départ » line « Entre : Clément — Sort : Charles », and Charles is a plain
+« titulaire » on the bench, not « déjà joué ». After the kick-off the composition is locked (« Elle ne
+se modifie plus ») and `applied_event_id` points at the second automatic event. « Racing du Samedi »
+is now live in `football_wa`.
