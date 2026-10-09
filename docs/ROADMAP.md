@@ -819,7 +819,16 @@ tag during this rework** (decision 146): every item below reaches the preview on
       is « Sifflet » straight away, and its confirmation writes `PERIOD_END` + `FINAL_WHISTLE` in one
       outbox batch (`enqueueAll`, `finalWhistleEvents`) — checked in the database: same stamp,
       consecutive `seq`, match finished, stats frozen. « Changement » itself is unchanged until S8
-- [ ] **S8** · #167 · unpaired group changes, goal-before-change ordering, tap a player to act
+- [x] **S8** · #167 · unpaired group changes, goal-before-change ordering, tap a player to act,
+      decisions **147** and **152**. « Changement » asks who goes out and who comes in (any number,
+      zero included), then opens the pitch pre-arranged by `changeArrangement`; « Valider » writes one
+      `LINEUP_APPLIED` stamped at the ACTION tap. The paired `sub-out` / `sub-in` flow is gone, and so
+      is the TERRAIN button (a 0 / 0 « Changement » is the same pitch). `orderMatchEvents` puts facts
+      before pitch events at an identical reading, segment by segment between clock events, except in
+      the segment that first fills the pitch. `pitchEventFr` names a `LINEUP_APPLIED` for game mode
+      and the recap alike (« Composition de départ » / « Changement » / « Changement de poste »). A
+      disc on the pitch opens ACTION about that player. Production check of decision 147: the query
+      returned no row on the local restore; the run against production is the orchestrator's
 - [ ] **S9** · #168 · the starting composition applied when game mode opens
 - [ ] **S10** · #169 · add changes after the match, realistically
 - [x] **S11** · #170 · only starters, substitutes and supporters may rate

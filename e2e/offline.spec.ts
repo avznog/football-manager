@@ -105,7 +105,7 @@ test("le hors-ligne : les actions tapées sans réseau arrivent une fois chacune
       await page.clock.setFixedTime(at(minute));
       await expect(clock).toHaveText(`${minute}:00`);
 
-      await page.getByRole("button", { name: "ACTION" }).click();
+      await page.getByRole("button", { name: "ACTION", exact: true }).click();
       await page
         .getByRole("dialog", { name: "Action" })
         .getByRole("button", { name: "But encaissé" })
@@ -171,7 +171,7 @@ test("le hors-ligne : les actions tapées sans réseau arrivent une fois chacune
       (response) => response.url().includes("/api/match-events") && response.status() === 503,
     );
 
-    await page.getByRole("button", { name: "ACTION" }).click();
+    await page.getByRole("button", { name: "ACTION", exact: true }).click();
     await page
       .getByRole("dialog", { name: "Action" })
       .getByRole("button", { name: "But encaissé" })

@@ -37,7 +37,7 @@
 import type { SquadRole } from "@/db/schema";
 import { pluralize, resultLabel, scoreLineFr } from "@/lib/calendar/labels";
 import { VOIDED_SUFFIX_FR } from "@/lib/match/events";
-import { noteDetailFr, remarkDetailFr } from "@/lib/match/presenter";
+import { noteDetailFr, pitchEventFr, remarkDetailFr } from "@/lib/match/presenter";
 import type { MatchState, PlayerMatchState, TimelineEntry } from "@/lib/match/reducer";
 
 /** What this module needs to know about a person: how to write their name. */
@@ -267,17 +267,23 @@ export function buildTimeline(
       .filter((entry) => !HIDDEN_EVENT_TYPES.has(entry.type))
       // The starting eleven, applied at 0’, is the composition — not seven changes.
       .filter((entry) => !(entry.type === "LINEUP_APPLIED" && entry.clockMs === 0))
-      .map((entry) => ({
-        eventId: entry.eventId,
-        minuteLabel: entry.minuteLabel,
-        label: entry.voided ? `${entry.labelFr} — ${VOIDED_SUFFIX_FR}` : entry.labelFr,
-        detail: detailOf(entry),
-        voided: entry.voided,
-        scoreAfter: entry.scoreAfter
-          ? scoreLineFr(entry.scoreAfter.goalsFor, entry.scoreAfter.goalsAgainst)
-          : null,
-        tone: toneOf(entry),
-      }))
+      .map((entry) => {
+        // A change is one `LINEUP_APPLIED`, named and described by the helper game mode's timeline
+        // uses too (decision 152).
+        const pitchEvent = pitchEventFr(entry, nameOf);
+        const label = pitchEvent?.title ?? entry.labelFr;
+        return {
+          eventId: entry.eventId,
+          minuteLabel: entry.minuteLabel,
+          label: entry.voided ? `${label} — ${VOIDED_SUFFIX_FR}` : label,
+          detail: pitchEvent ? pitchEvent.detail : detailOf(entry),
+          voided: entry.voided,
+          scoreAfter: entry.scoreAfter
+            ? scoreLineFr(entry.scoreAfter.goalsFor, entry.scoreAfter.goalsAgainst)
+            : null,
+          tone: toneOf(entry),
+        };
+      })
   );
 }
 

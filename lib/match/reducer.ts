@@ -99,7 +99,7 @@ import {
   type MatchEventPayloads,
   type MatchEventType,
   type RemarkKind,
-  compareMatchEvents,
+  orderMatchEvents,
   isRemarkKind,
   parseMatchEventPayload,
 } from "./events";
@@ -256,6 +256,11 @@ export type TimelineActorRole =
 export type TimelineActor = {
   memberId: string;
   role: TimelineActorRole;
+  /**
+   * Where he stands after the event, on the `in` and `moved` actors of a `LINEUP_APPLIED` — so the
+   * timeline can say « Karim → AT » without re-reading the payload. Absent everywhere else.
+   */
+  positionCode?: string | null;
 };
 
 export type TimelineEntry = {
@@ -490,18 +495,21 @@ export function reduceMatch(
 
   /* ---- 1. Order the log, and work out what is annulled ------------------- */
 
-  const prepared: Prepared[] = events
-    .map((event) => ({
+  // `orderMatchEvents`, not a plain sort: at an identical reading, facts come before pitch events,
+  // segment by segment between clock events (decision 147).
+  const prepared: Prepared[] = orderMatchEvents(
+    events.map((event) => ({
       event,
       clockMs: resolveClockMs(event),
       occurredAtMs: toEpochMs(event.occurredAt),
-    }))
-    .sort((a, b) =>
-      compareMatchEvents(
-        { clockMs: a.clockMs, seq: a.event.seq, id: a.event.id },
-        { clockMs: b.clockMs, seq: b.event.seq, id: b.event.id },
-      ),
-    );
+    })),
+    (item) => ({
+      clockMs: item.clockMs,
+      seq: item.event.seq,
+      id: item.event.id,
+      type: item.event.type,
+    }),
+  );
 
   const byId = new Map(prepared.map((item) => [item.event.id, item]));
   /** target event id → the `VOID` event that annuls it. */
@@ -979,9 +987,16 @@ export function reduceMatch(
               enterPitch(memberId, slotId, clockMs);
             }
             for (const memberId of diff.goingOff) actors.push({ memberId, role: "out" });
-            for (const memberId of diff.comingOn) actors.push({ memberId, role: "in" });
+            for (const memberId of diff.comingOn) {
+              const slotId = pitch.get(memberId)?.slotId ?? null;
+              actors.push({ memberId, role: "in", positionCode: slots.positionOf(slotId) });
+            }
             for (const change of diff.positionChanges) {
-              actors.push({ memberId: change.memberId, role: "moved" });
+              actors.push({
+                memberId: change.memberId,
+                role: "moved",
+                positionCode: slots.positionOf(change.toSlotId),
+              });
             }
             if (applied.lineupId) appliedLineupIds.push(applied.lineupId);
             checkPitch(event, clockMs);

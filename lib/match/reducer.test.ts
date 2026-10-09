@@ -1184,6 +1184,197 @@ describe("a log that cannot be true", () => {
 /* Planned compositions                                                       */
 /* -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- */
+/* Group changes (decision 147)                                               */
+/* -------------------------------------------------------------------------- */
+
+describe("a group change is one snapshot of the pitch", () => {
+  const AT_23_41 = 23 + 41 / 60;
+  const AFTER = {
+    [SLOT.gb]: "samir",
+    [SLOT.dg]: "hugo",
+    [SLOT.dc]: "thomas",
+    [SLOT.dd]: "nico",
+    [SLOT.mc1]: "momo",
+    [SLOT.mc2]: "karim",
+    [SLOT.at]: "yanis",
+  };
+  const frame = (middle: Fixture[]): MatchEventRecord[] =>
+    log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+      ...middle,
+      { type: "PERIOD_END", min: 30, period: 1 },
+      { type: "KICKOFF", min: 30, period: 2 },
+      { type: "PERIOD_END", min: 60, period: 2 },
+      { type: "FINAL_WHISTLE", min: 60, period: 2 },
+    ]);
+
+  it("2 in, 2 out and a goalkeeper swap at 23:41: minutes, goal, clean sheet and who did what", () => {
+    const state = reduceMatch(
+      frame([
+        { type: "GOAL_AGAINST", min: 10 },
+        { type: "LINEUP_APPLIED", min: AT_23_41, payload: lineupPayload(AFTER) },
+      ]),
+      [],
+      CONFIG,
+    );
+    const changeMs = Math.round(AT_23_41 * MIN);
+    const p = (id: string) => playerState(state, id)!;
+
+    // Out at 23:41: the exact figure, and the rounded one (rule 1).
+    expect(p("leo")).toMatchObject({ playedMs: changeMs, minutes: 24, onPitch: false, startedMatch: true });
+    expect(p("julien")).toMatchObject({ playedMs: changeMs, minutes: 24, cleanMinutes: 10 });
+    // In at 23:41, never on before: not starters, and a clean spell of their own (rule 3).
+    expect(p("momo")).toMatchObject({ minutes: 36, cleanMinutes: 36, startedMatch: false, positionCode: "MC" });
+    expect(p("yanis")).toMatchObject({ minutes: 36, positionCode: "AT", concededWhileOn: 0 });
+    // The keepers swapped: goalkeeper minutes follow the GB slot, the goal follows the man in it.
+    expect(p("hugo")).toMatchObject({ minutes: 60, gkMinutes: 24, concededWhileGk: 1, positionCode: "DG" });
+    expect(p("samir")).toMatchObject({ minutes: 60, gkMinutes: 36, gkCleanMinutes: 36, concededWhileGk: 0 });
+    expect(state.goalkeeperId).toBe("samir");
+    expect(state.anomalies).toEqual([]);
+
+    const change = state.timeline.find((entry) => entry.minute === 23 && entry.type === "LINEUP_APPLIED");
+    expect(change?.startingLineup).toBe(false);
+    expect(change?.actors).toEqual(
+      expect.arrayContaining([
+        { memberId: "leo", role: "out" },
+        { memberId: "julien", role: "out" },
+        { memberId: "momo", role: "in", positionCode: "MC" },
+        { memberId: "yanis", role: "in", positionCode: "AT" },
+        { memberId: "samir", role: "moved", positionCode: "GB" },
+        { memberId: "hugo", role: "moved", positionCode: "DG" },
+      ]),
+    );
+    expect(change?.actors).toHaveLength(6);
+  });
+
+  it("0 in, 0 out: a reshuffle moves shirts and nobody's minutes", () => {
+    const swapped = { ...STARTING_ELEVEN, [SLOT.mc2]: "julien", [SLOT.at]: "karim" };
+    const state = reduceMatch(
+      frame([{ type: "LINEUP_APPLIED", min: 20, payload: lineupPayload(swapped) }]),
+      [],
+      CONFIG,
+    );
+    expect(state.players.filter((player) => player.playedMatch).every((player) => player.minutes === 60)).toBe(true);
+    expect(playerState(state, "karim")?.positionCode).toBe("AT");
+    expect(playerState(state, "karim")?.positionSpells.map((spell) => spell.positionCode)).toEqual(["MC", "AT"]);
+    const change = state.timeline.find((entry) => entry.minute === 20);
+    expect(change?.actors.map((actor) => actor.role)).toEqual(["moved", "moved"]);
+  });
+
+  it("annulling a mid-match change puts the previous pitch back, minutes and all", () => {
+    const state = reduceMatch(
+      frame([
+        { type: "LINEUP_APPLIED", min: AT_23_41, payload: lineupPayload(AFTER) },
+        { type: "VOID", min: 25, voids: 3 },
+      ]),
+      [],
+      CONFIG,
+    );
+    const plain = reduceMatch(frame([]), [], CONFIG);
+    expect(state.onPitch).toEqual(plain.onPitch);
+    expect(state.players.map(minutesOfPlayer)).toEqual(plain.players.map(minutesOfPlayer));
+    expect(playerState(state, "momo")?.playedMatch).toBe(false);
+  });
+});
+
+describe("at an identical reading, facts come before pitch events (decision 147)", () => {
+  const change = { ...STARTING_ELEVEN, [SLOT.mc1]: "momo", [SLOT.at]: "yanis" };
+  const frame = (middle: Fixture[]): MatchEventRecord[] =>
+    log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+      ...middle,
+      { type: "PERIOD_END", min: 30, period: 1 },
+      { type: "FINAL_WHISTLE", min: 30, period: 1 },
+    ], { periodsCount: 1 });
+  const conceded = (state: ReturnType<typeof reduceMatch>) =>
+    Object.fromEntries(state.players.map((player) => [player.memberId, player.concededWhileOn]));
+
+  it("counts a goal against the players going off, whichever was entered first", () => {
+    const goalFirst = reduceMatch(
+      frame([
+        { type: "GOAL_AGAINST", min: 20 },
+        { type: "LINEUP_APPLIED", min: 20, payload: lineupPayload(change) },
+      ]),
+      [],
+      { ...CONFIG, periodsCount: 1 },
+    );
+    const changeFirst = reduceMatch(
+      frame([
+        { type: "LINEUP_APPLIED", min: 20, payload: lineupPayload(change) },
+        { type: "GOAL_AGAINST", min: 20 },
+      ]),
+      [],
+      { ...CONFIG, periodsCount: 1 },
+    );
+
+    expect(conceded(changeFirst)).toEqual(conceded(goalFirst));
+    expect(conceded(goalFirst)).toMatchObject({ leo: 1, julien: 1, momo: 0, yanis: 0 });
+    // The display follows the replay: the goal is listed before the change in both logs.
+    const order = (state: ReturnType<typeof reduceMatch>) =>
+      state.timeline.filter((entry) => entry.minute === 20).map((entry) => entry.type);
+    expect(order(changeFirst)).toEqual(["GOAL_AGAINST", "LINEUP_APPLIED"]);
+    expect(order(goalFirst)).toEqual(["GOAL_AGAINST", "LINEUP_APPLIED"]);
+  });
+
+  it("keeps « fin de période → changement → coup d'envoi » in that order at the break", () => {
+    const state = reduceMatch(
+      log([
+        { type: "KICKOFF", min: 0, period: 1 },
+        { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+        { type: "PERIOD_END", min: 30, period: 1 },
+        { type: "LINEUP_APPLIED", min: 30, period: 1, payload: lineupPayload(change) },
+        { type: "KICKOFF", min: 30, period: 2 },
+        { type: "GOAL_AGAINST", min: 30, period: 2 },
+        { type: "PERIOD_END", min: 60, period: 2 },
+        { type: "FINAL_WHISTLE", min: 60, period: 2 },
+      ]),
+      [],
+      CONFIG,
+    );
+    expect(state.timeline.filter((entry) => entry.minute === 30).map((entry) => entry.type)).toEqual([
+      "PERIOD_END",
+      "LINEUP_APPLIED",
+      "KICKOFF",
+      "GOAL_AGAINST",
+    ]);
+    // The goal after the second kick-off is the new pitch's.
+    expect(playerState(state, "momo")?.concededWhileOn).toBe(1);
+    expect(playerState(state, "leo")?.concededWhileOn).toBe(0);
+    expect(state.anomalies).toEqual([]);
+  });
+
+  it("never moves a fact ahead of the composition the match starts in", () => {
+    // A retro sheet's goal at 0′ is emitted after the starting seven, at the same reading: it is
+    // theirs, and moving it first would score it by nobody (decision 152).
+    const state = reduceMatch(
+      log([
+        { type: "KICKOFF", min: 0, period: 1 },
+        { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+        { type: "GOAL_FOR", min: 0, period: 1, payload: { scorerId: "julien" } },
+        { type: "FINAL_WHISTLE", min: 60, period: 2 },
+      ]),
+      [],
+      CONFIG,
+    );
+    expect(playerState(state, "julien")?.goals).toBe(1);
+    expect(state.anomalies.filter((anomaly) => anomaly.code === "scorer-off-pitch")).toEqual([]);
+  });
+
+  it("reduces the seeded log exactly as the plain sort did", () => {
+    // The seeded match has a goal and its VOID at 27′ and a position change then a substitution
+    // at 55′ — every same-reading case a real log holds. None of them is a fact after a pitch event.
+    const state = reduceMatch(SEED_LOG, [], CONFIG);
+    expect(state.timeline.map((entry) => entry.eventId)).toEqual(SEED_LOG.map((event) => event.id));
+  });
+});
+
+function minutesOfPlayer(player: { memberId: string; playedMs: number; gkMs: number; cleanMs: number }) {
+  return [player.memberId, player.playedMs, player.gkMs, player.cleanMs];
+}
+
 describe("planned compositions", () => {
   const events = log([
     { type: "KICKOFF", min: 0, period: 1 },

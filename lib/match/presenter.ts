@@ -640,7 +640,7 @@ export function timelineLines(
         eventId: entry.eventId,
         clientEventId: entry.clientEventId,
         minuteLabel: entry.minuteLabel,
-        title: entry.labelFr,
+        title: pitchEventFr(entry, players.nameOf)?.title ?? entry.labelFr,
         detail: detailFr(entry, players),
         scoreLabel: entry.scoreAfter
           ? scoreLineFr(entry.scoreAfter.goalsFor, entry.scoreAfter.goalsAgainst)
@@ -711,6 +711,8 @@ export function remarkDetailFr(
 
 /** The line under the title: the free text the event carries, or who it was about. */
 function detailFr(entry: TimelineEntry, players: PlayerIndex): string | null {
+  const pitchEvent = pitchEventFr(entry, players.nameOf);
+  if (pitchEvent) return pitchEvent.detail;
   return (
     noteDetailFr(entry, players.nameOf) ??
     remarkDetailFr(entry, players.nameOf) ??
@@ -739,20 +741,6 @@ function describeActorsFr(
     if (!out && !into) return null;
     return `${out ?? "?"} → ${into ?? "?"}`;
   }
-  if (type === "LINEUP_APPLIED") {
-    // A composition is the one event that is about several people at once — a TERRAIN change can be
-    // two substitutions and a move. Falling through to the single-actor case below would print one
-    // arbitrary name and hide the rest, which is exactly what the coach would check the log for.
-    const all = (role: string) =>
-      actors.filter((actor) => actor.role === role).map((actor) => players.nameOf(actor.memberId));
-    const parts = [
-      labelledFr("Sort", "Sortent", all("out")),
-      labelledFr("Entre", "Entrent", all("in")),
-      labelledFr("Change de poste", "Changent de poste", all("moved")),
-    ].filter((part): part is string => part !== null);
-    return parts.length > 0 ? parts.join(" · ") : null;
-  }
-
   const single =
     find("scorer") ??
     find("penalty") ??
@@ -763,6 +751,50 @@ function describeActorsFr(
     find("commented") ??
     find("remarked");
   return single ? players.nameOf(single.memberId) : null;
+}
+
+/**
+ * What a `LINEUP_APPLIED` is called and what it says, for game mode's timeline **and** the recap's
+ * Déroulé — one helper, so the two screens cannot disagree about a change (decision 152). Null for
+ * every other type, which keeps its own label and detail.
+ *
+ * A group change is one `LINEUP_APPLIED` (decision 147), so the event type says nothing about what
+ * happened; the actors the reducer derived from the diff do:
+ *
+ * - it filled an empty pitch → « Composition de départ », and the seven who walked on;
+ * - somebody went on or off → « Changement », « Entrent : Yanis, Momo — Sortent : Léo, Julien »,
+ *   with any position moves after them;
+ * - only moves → « Changement de poste », « Postes : Karim → AT, Julien → MC »;
+ * - no actors at all → « Changement », no detail. That is an annulled change (the reducer derives
+ *   nothing from a voided event, so the struck-through line still says what it was) or a
+ *   re-confirmation of the pitch as it stood.
+ *
+ * In and out are listed unpaired, because that is how they were entered: « on s'en fiche de savoir
+ * qui remplace qui ».
+ */
+export function pitchEventFr(
+  entry: Pick<TimelineEntry, "type" | "actors" | "startingLineup">,
+  nameOf: (memberId: string) => string,
+): { title: string; detail: string | null } | null {
+  if (entry.type !== "LINEUP_APPLIED") return null;
+
+  const of = (role: string) => entry.actors.filter((actor) => actor.role === role);
+  const names = (role: string) => of(role).map((actor) => nameOf(actor.memberId));
+  const moves = of("moved").map((actor) =>
+    actor.positionCode ? `${nameOf(actor.memberId)} → ${actor.positionCode}` : nameOf(actor.memberId),
+  );
+
+  const parts = [
+    labelledFr("Entre", "Entrent", names("in")),
+    labelledFr("Sort", "Sortent", names("out")),
+    labelledFr("Poste", "Postes", moves),
+  ].filter((part): part is string => part !== null);
+  const detail = parts.length > 0 ? parts.join(" — ") : null;
+
+  if (entry.startingLineup) return { title: "Composition de départ", detail };
+  if (of("in").length > 0 || of("out").length > 0) return { title: "Changement", detail };
+  if (moves.length > 0) return { title: "Changement de poste", detail };
+  return { title: "Changement", detail };
 }
 
 /** « Entre : Yanis », « Entrent : Yanis, Momo » — null for an empty list, so it disappears. */

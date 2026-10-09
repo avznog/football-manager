@@ -4806,3 +4806,50 @@ Looked at, 390 px, light and dark, in one pass: `/joueur/[id]` as coach (editabl
 himself (read-only, with the new line), `/moi` as Thomas, and the composition editor's bench as coach
 (no position code on the discs). Thomas's local password on `football_wc` was set again by a scratch
 script, deleted afterwards.
+
+## 2026-10-09 — S8: group changes, facts before changes, tap a player (decisions 147 and 152)
+
+- `lib/match/events.ts` — `PITCH_EVENT_TYPES`, `isPitchEvent`, `orderMatchEvents`.
+  `lib/match/reducer.ts` replays through it instead of the plain `compareMatchEvents` sort, and puts
+  `positionCode` on the `in` / `moved` actors of a `LINEUP_APPLIED`. Every other place that orders
+  events for display reads `state.timeline` (game mode's timeline, the recap), so both follow the
+  replay; `lib/retro/log.ts` already emits a minute's facts before its substitutions.
+- `lib/match/terrain.ts` — `changeArrangement(onPitch, outIds, inIds, formationSlots)`.
+- `lib/match/presenter.ts` — `pitchEventFr`, used by `timelineLines` and by `lib/rating/recap.ts`.
+- `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx` — the `change-out` / `change-in` flow into the
+  `TerrainSheet` titled « Changement »; a `subject` on the menu flows; the pitch's `renderItem` makes
+  each disc a button for whoever can act; the bench row opens « Changement »; the TERRAIN button and
+  the `sub-out` / `sub-in` steps are gone. `comment-sheet.tsx` takes an `initialMemberId`.
+  `components/action-sheet/multi-player-picker.tsx` is new.
+- Tests: `reducer.test.ts` (a 2 in / 2 out change with a goalkeeper swap at 23:41 — minutes, gk
+  minutes, clean minutes, actors, `startedMatch`; a 0 / 0 reshuffle; voiding a mid-match change
+  restores the pitch; a goal and a change at one reading in both orders give identical
+  `concededWhileOn`; the break segment keeps its order; a goal at 0′ after the starting seven; the
+  seeded log reduces in its original order), `events.test.ts` (`orderMatchEvents` deterministic, a
+  no-op on its own output, stable inside each group), `terrain.test.ts` (`changeArrangement`, uneven
+  counts included), `presenter.test.ts` and `recap.test.ts` (the titles). E2E: a new test, « un
+  changement en groupe », 2 out / 1 in from the striker's disc then 2 out / 2 in from the menu,
+  stamped at the ACTION tap; the e2e helpers now find ACTION with `exact: true`, since every disc is a
+  button whose name contains « Action ».
+
+**The production check of decision 147**, read-only, for the orchestrator to run against production:
+
+```sql
+select f.match_id, f.clock_ms, f.type, p.type from match_events f join match_events p
+  on p.match_id = f.match_id and p.clock_ms = f.clock_ms and p.seq < f.seq
+where f.type in ('GOAL_FOR','GOAL_AGAINST','OWN_GOAL','PENALTY_SCORED','PENALTY_MISSED','INJURY','FOUL','COMMENT','REMARK')
+  and p.type in ('SUBSTITUTION','POSITION_CHANGE','LINEUP_APPLIED');
+```
+
+On `football_wa` (the local restore of production, plus this track's test matches) it returned **0
+rows**.
+
+**Looked at, 390 px, light and dark, coach and player in one pass**, on the local « Atletico
+supporters de Nice » match (kicked off through `/api/match-events` with seven players, no match
+sheet, so everybody reads « hors feuille »): a tap on Charles's disc opens ACTION with « Charles ·
+12’ » and the subject hints; « Qui sort ? » with Charles pre-ticked and Pierre added; « Qui entre ? »
+with Clément and Lucas; the pre-arranged « Changement » pitch (Clément in Pierre's slot, Lucas in
+Charles's); the timeline line « Changement — Entrent : Clément, Lucas — Sortent : Pierre, Charles »
+for the coach (with « Annuler ») and the player (without, and his discs are not buttons); then, after
+the whistle, the recap's Déroulé showing the same line to both. That match is now finished in
+`football_wa`.

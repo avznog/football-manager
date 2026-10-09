@@ -8,6 +8,7 @@ import {
   ActionMenu,
   ConfirmSheet,
   LineupComposer,
+  MultiPlayerPicker,
   OptionRow,
   PlayerPicker,
   REMARK_ICONS,
@@ -49,7 +50,12 @@ import {
   type PlayerOption,
   type TimelineLine,
 } from "@/lib/match/presenter";
-import { terrainPayload, type SlotAssignment, type TerrainOrigin } from "@/lib/match/terrain";
+import {
+  changeArrangement,
+  terrainPayload,
+  type SlotAssignment,
+  type TerrainOrigin,
+} from "@/lib/match/terrain";
 import { CommentSheet } from "./comment-sheet";
 import { EventTimeline } from "./event-timeline";
 import { LineupPrompt } from "./lineup-prompt";
@@ -66,11 +72,16 @@ import { useNowMs } from "./use-now";
  * tap says what happened, one or two taps say who — and each of those taps is a 56 px row.
  */
 type Flow =
-  | { step: "menu" }
+  /**
+   * `subject` is the player whose disc was tapped on the pitch (decision 152): the action is about
+   * him, so every « who » question it would have asked is skipped. It travels through « Autre… »
+   * and the remark grid, which are the same flow one tap further.
+   */
+  | { step: "menu"; subject?: string }
   /** The second menu, behind « Autre… »: the rarer facts, and the two tiles that open a sheet. */
-  | { step: "more" }
+  | { step: "more"; subject?: string }
   /** The one step with a keyboard, so the one step that is a form (`comment-sheet.tsx`). */
-  | { step: "comment" }
+  | { step: "comment"; subject?: string }
   /**
    * « Remarque »: the sheet of six, then the one question a remark cannot skip — about whom.
    *
@@ -78,12 +89,17 @@ type Flow =
    * tapped, because it is one flow stamped at one minute: the second screen is this step one tap
    * further, exactly as « Autre… » is the menu one tap further. Closing either closes the flow.
    */
-  | { step: "remark"; kind?: RemarkKind }
+  | { step: "remark"; kind?: RemarkKind; subject?: string }
   | { step: "goal-scorer" }
   | { step: "goal-assist"; scorerId: string }
   | { step: "actor"; type: "OWN_GOAL" | "PENALTY_SCORED" | "PENALTY_MISSED" | "FOUL" | "INJURY" }
-  | { step: "sub-out"; inId?: string }
-  | { step: "sub-in"; outId: string }
+  /**
+   * « Changement » (decision 147): who goes out, then who comes in — any number of each, unpaired,
+   * zero included — then the pitch, pre-arranged by `changeArrangement`, where the drag & drop says
+   * where everybody stands. One `LINEUP_APPLIED`, stamped at the tap that opened the flow.
+   */
+  | { step: "change-out"; outIds: readonly string[]; inIds: readonly string[] }
+  | { step: "change-in"; outIds: readonly string[]; inIds: readonly string[] }
   /**
    * TERRAIN: several changes arranged on the pitch, one confirmation. `origin` says what the
    * arrangement started from — the pitch, or a planned composition the coach chose to adjust — and
@@ -95,6 +111,8 @@ type Flow =
       initial: readonly SlotAssignment[];
       /** The shape to draw: the plan's own formation, or the one being played. */
       formationId: string | null;
+      /** « Changement » when it is the last step of that flow; otherwise derived from `origin`. */
+      title?: string;
     }
   /** `initial` is set when TERRAIN hands its arrangement over to the list. */
   | { step: "composer"; initial?: readonly SlotAssignment[] }
@@ -502,30 +520,64 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     setTappedAtMs(null);
   }
 
-  function pickAction(type: MenuKey) {
+  /**
+   * Where a tile leads. With a `subject` — the player tapped on the pitch — every « who » question is
+   * already answered: « But » goes straight to the assist, « Changement » opens with him going out,
+   * CSC, the penalties and « Blessure » are recorded on the spot, « Remarque » still asks which
+   * remark, « Commentaire » opens with his name chosen. « But encaissé » is about nobody either way.
+   */
+  function pickAction(type: MenuKey, subject?: string) {
     switch (type) {
       case MORE:
-        return setFlow({ step: "more" });
+        return setFlow({ step: "more", subject });
       case "COMMENT":
-        return setFlow({ step: "comment" });
+        return setFlow({ step: "comment", subject });
       case "REMARK":
-        return setFlow({ step: "remark" });
+        return setFlow({ step: "remark", subject });
       case "GOAL_FOR":
-        return setFlow({ step: "goal-scorer" });
+        return setFlow(
+          subject ? { step: "goal-assist", scorerId: subject } : { step: "goal-scorer" },
+        );
       case "GOAL_AGAINST":
         return finish("GOAL_AGAINST", {});
       case "SUBSTITUTION":
-        return setFlow({ step: "sub-out" });
+        return setFlow({ step: "change-out", outIds: subject ? [subject] : [], inIds: [] });
       case "OWN_GOAL":
       case "PENALTY_SCORED":
       case "PENALTY_MISSED":
+        return subject ? finish(type, { scorerId: subject }) : setFlow({ step: "actor", type });
       case "FOUL":
       case "INJURY":
-        return setFlow({ step: "actor", type });
+        return subject ? finish(type, { memberId: subject }) : setFlow({ step: "actor", type });
       default:
         return setFlow(null);
     }
   }
+
+  /** Toggle `memberId` in a list of ids, keeping the order the coach ticked them in. */
+  const toggled = (ids: readonly string[], memberId: string): string[] =>
+    ids.includes(memberId) ? ids.filter((id) => id !== memberId) : [...ids, memberId];
+
+  /** From « qui entre ? » to the pitch, laid out by `changeArrangement` for the drag & drop. */
+  function arrangeChange(outIds: readonly string[], inIds: readonly string[]) {
+    const { assignments } = changeArrangement(
+      onPitchAssignments,
+      outIds,
+      inIds,
+      live.slots.filter((slot) => slot.formationId === currentFormationId),
+    );
+    setFlow({
+      step: "terrain",
+      origin: { kind: "pitch" },
+      initial: assignments,
+      formationId: currentFormationId,
+      title: "Changement",
+    });
+  }
+
+  /** « Karim · 34’ · 2e période » on every sheet of a flow opened from his disc. */
+  const subjectLabel = (subject: string | undefined) =>
+    subject ? `${players.nameOf(subject)} · ${stampLabel}` : stampLabel;
 
   function pressClockAction() {
     if (!clockAction.event) return;
@@ -560,35 +612,16 @@ export function GameMode({ live, canOperate }: GameModeProps) {
   ];
 
   /**
-   * The one button that earns a place beside the score, because it is the only one that changes what
-   * the pitch *is*. It used to be the `action` slot of a « Sur le terrain » card header; that header
-   * cost 68 px of the pitch's height to print a heading nobody needs above a drawing of a pitch.
+   * The one button beside the score, and only while nobody is on the pitch: then the fastest way in
+   * is the list of seven dropdowns. Once a team is playing there is no button here — TERRAIN went
+   * (decision 152), because « Changement » with nobody in and nobody out opens the same pitch, from
+   * the menu every other action already starts from.
    */
   const pitchAction =
-    canOperate && !state.finished ? (
-      // With nobody on the pitch there is nothing to rearrange: the fastest way in is the list of
-      // seven dropdowns. Once a team is playing, the same button opens TERRAIN, where several
-      // changes are arranged at once and confirmed together (`docs/PLAN.md`, screen 5).
-      state.onPitch.length === 0 ? (
-        <Button variant="secondary" size="sm" onClick={() => openFlow({ step: "composer" })}>
-          Composition
-        </Button>
-      ) : (
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() =>
-            openFlow({
-              step: "terrain",
-              origin: { kind: "pitch" },
-              initial: onPitchAssignments,
-              formationId: currentFormationId,
-            })
-          }
-        >
-          TERRAIN
-        </Button>
-      )
+    canOperate && !state.finished && state.onPitch.length === 0 ? (
+      <Button variant="secondary" size="sm" onClick={() => openFlow({ step: "composer" })}>
+        Composition
+      </Button>
     ) : null;
 
   return (
@@ -675,7 +708,34 @@ export function GameMode({ live, canOperate }: GameModeProps) {
             <EmptyState {...emptyPitch} />
           </Card>
         ) : (
-          <PitchLayout slots={pitch} kit={live.kit} pitchLabel="Joueurs sur le terrain" />
+          <PitchLayout
+            slots={pitch}
+            kit={live.kit}
+            pitchLabel="Joueurs sur le terrain"
+            // A disc is a button for whoever can act (decision 152): a tap opens ACTION about him,
+            // stamped at that tap. A sibling over the disc rather than a wrapper, so the disc keeps
+            // its own `img` name — a button's children are presentational and would lose it.
+            renderItem={
+              canAct
+                ? (slot, content) =>
+                    slot.player ? (
+                      <div className="relative">
+                        {content}
+                        <button
+                          type="button"
+                          aria-label={`Action : ${slot.player.name}`}
+                          onClick={() =>
+                            openFlow({ step: "menu", subject: slot.player?.id ?? undefined })
+                          }
+                          className="absolute inset-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        />
+                      </div>
+                    ) : (
+                      content
+                    )
+                : undefined
+            }
+          />
         )}
 
         {/* Not « Remplaçants »: ten of the thirteen rows under that heading were not (decision 087). */}
@@ -694,7 +754,9 @@ export function GameMode({ live, canOperate }: GameModeProps) {
                     warn={option.warn}
                     leading={option.jerseyNumber ?? undefined}
                     disabled={!canAct}
-                    onClick={() => openFlow({ step: "sub-out", inId: option.memberId })}
+                    onClick={() =>
+                      openFlow({ step: "change-out", outIds: [], inIds: [option.memberId] })
+                    }
                   />
                 </li>
               ))}
@@ -729,9 +791,9 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         <ActionMenu
           open
           onClose={closeFlow}
-          stampLabel={stampLabel}
-          choices={CHOICES}
-          onPick={pickAction}
+          stampLabel={subjectLabel(flow.subject)}
+          choices={flow.subject ? withSubject(CHOICES) : CHOICES}
+          onPick={(type) => pickAction(type, flow.subject)}
         />
       ) : null}
 
@@ -742,9 +804,9 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           open
           onClose={closeFlow}
           title="Autre action"
-          stampLabel={stampLabel}
-          choices={MORE_CHOICES}
-          onPick={pickAction}
+          stampLabel={subjectLabel(flow.subject)}
+          choices={flow.subject ? withSubject(MORE_CHOICES) : MORE_CHOICES}
+          onPick={(type) => pickAction(type, flow.subject)}
         />
       ) : null}
 
@@ -754,6 +816,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           onClose={closeFlow}
           stampLabel={stampLabel}
           options={everyone}
+          initialMemberId={flow.subject ?? null}
           onConfirm={(note, memberId) =>
             finish("COMMENT", memberId ? { note, memberId } : { note })
           }
@@ -767,9 +830,14 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           open
           onClose={closeFlow}
           title="Remarque"
-          stampLabel={stampLabel}
+          stampLabel={subjectLabel(flow.subject)}
           choices={REMARK_CHOICES}
-          onPick={(kind) => setFlow({ step: "remark", kind })}
+          // About the player tapped on the pitch: the kind is the only question left.
+          onPick={(kind) =>
+            flow.subject
+              ? finish("REMARK", { kind, memberId: flow.subject })
+              : setFlow({ step: "remark", kind })
+          }
         />
       ) : null}
 
@@ -831,31 +899,36 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         />
       ) : null}
 
-      {flow?.step === "sub-out" ? (
-        <PlayerPicker
+      {/* « Changement »: two questions with any number of answers, then the pitch (decision 147).
+          `setFlow` throughout, so the change keeps the minute of the tap that opened it. */}
+      {flow?.step === "change-out" ? (
+        <MultiPlayerPicker
           open
           onClose={closeFlow}
           title="Qui sort ?"
-          description={
-            flow.inId ? `${players.nameOf(flow.inId)} entre · ${stampLabel}` : stampLabel
-          }
+          description={`${countFr(flow.outIds.length, "sort", "sortent")} · ${stampLabel}`}
           options={onPitch}
-          onPick={(memberId) =>
-            flow.inId
-              ? finish("SUBSTITUTION", { outId: memberId, inId: flow.inId })
-              : setFlow({ step: "sub-in", outId: memberId })
+          selected={flow.outIds}
+          onToggle={(memberId) =>
+            setFlow({ ...flow, outIds: toggled(flow.outIds, memberId) })
           }
+          confirmLabel="Suivant"
+          onConfirm={() => setFlow({ ...flow, step: "change-in" })}
+          emptyLabel="Personne sur le terrain."
         />
       ) : null}
 
-      {flow?.step === "sub-in" ? (
-        <PlayerPicker
+      {flow?.step === "change-in" ? (
+        <MultiPlayerPicker
           open
           onClose={closeFlow}
           title="Qui entre ?"
-          description={`${players.nameOf(flow.outId)} sort · ${stampLabel}`}
+          description={`${countFr(flow.outIds.length, "sort", "sortent")}, ${countFr(flow.inIds.length, "entre", "entrent")} · ${stampLabel}`}
           options={available}
-          onPick={(memberId) => finish("SUBSTITUTION", { outId: flow.outId, inId: memberId })}
+          selected={flow.inIds}
+          onToggle={(memberId) => setFlow({ ...flow, inIds: toggled(flow.inIds, memberId) })}
+          confirmLabel="Placer sur le terrain"
+          onConfirm={() => arrangeChange(flow.outIds, flow.inIds)}
           emptyLabel="Personne sur le banc."
         />
       ) : null}
@@ -864,7 +937,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
         <TerrainSheet
           open
           onClose={closeFlow}
-          title={flow.origin.kind === "plan" ? flow.origin.title : "Terrain"}
+          title={flow.title ?? (flow.origin.kind === "plan" ? flow.origin.title : "Terrain")}
           stampLabel={stampLabel}
           kit={live.kit}
           slots={live.slots}
@@ -949,6 +1022,29 @@ export function GameMode({ live, canOperate }: GameModeProps) {
       ) : null}
     </>
   );
+}
+
+/**
+ * The hints of a menu opened from a player's disc: the « who » they announced is already answered,
+ * so they say what is left instead. Short and true, like every hint (decision 151).
+ */
+const SUBJECT_HINTS: Partial<Record<MenuKey, string>> = {
+  GOAL_FOR: "passeur",
+  SUBSTITUTION: "il sort, qui entre",
+  OWN_GOAL: "enregistré aussitôt",
+  PENALTY_SCORED: "enregistré aussitôt",
+  PENALTY_MISSED: "enregistré aussitôt",
+  INJURY: "enregistré aussitôt",
+};
+
+function withSubject<T extends MenuKey>(choices: readonly ActionChoice<T>[]): ActionChoice<T>[] {
+  return choices.map((choice) => ({ ...choice, hint: SUBJECT_HINTS[choice.type] ?? choice.hint }));
+}
+
+/** « 1 sort », « 2 sortent », « personne ne sort » — and « personne n’entre », elided. */
+function countFr(count: number, singular: "sort" | "entre", plural: string): string {
+  if (count === 0) return singular === "entre" ? "personne n’entre" : `personne ne ${singular}`;
+  return `${count} ${count > 1 ? plural : singular}`;
 }
 
 const ACTOR_QUESTIONS = {

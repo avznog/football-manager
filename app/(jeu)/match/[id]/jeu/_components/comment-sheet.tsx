@@ -16,6 +16,8 @@ export type CommentSheetProps = {
   /** Everyone the note can be attached to: on the pitch first, then the bench. */
   options: readonly PlayerOption[];
   onConfirm: (note: string, memberId: string | null) => void;
+  /** The player tapped on the pitch, when the comment was opened from his disc (decision 152). */
+  initialMemberId?: string | null;
 };
 
 /**
@@ -35,9 +37,16 @@ export type CommentSheetProps = {
  * Attaching a player is optional and unset by default. « À propos de… » is not « qui », because a
  * note about a player is not a note blaming one.
  */
-export function CommentSheet({ open, onClose, stampLabel, options, onConfirm }: CommentSheetProps) {
+export function CommentSheet({
+  open,
+  onClose,
+  stampLabel,
+  options,
+  onConfirm,
+  initialMemberId = null,
+}: CommentSheetProps) {
   const [note, setNote] = useState("");
-  const [memberId, setMemberId] = useState("");
+  const [memberId, setMemberId] = useState(initialMemberId ?? "");
 
   const trimmed = note.trim();
   const remaining = MAX_NOTE - note.length;
