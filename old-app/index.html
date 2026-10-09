@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FC Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        bg: '#0A0E1A',
+        card: '#131A2C',
+        cardHi: '#1A2340',
+        line: '#1F2937',
+        lineHi: '#2A3244',
+        ink: '#E8ECF4',
+        ink2: '#94A3B8',
+        ink3: '#64748B',
+        accent: '#B4FF39',
+        pitch: '#0D2B1F',
+        pitchLine: '#14432E',
+        ok: '#22C55E',
+        bad: '#EF4444',
+        warn: '#F59E0B',
+      },
+      fontFamily: {
+        h: ['"Barlow Condensed"', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  html, body { background: #0A0E1A; color: #E8ECF4; }
+  body { -webkit-font-smoothing: antialiased; font-family: 'Inter', system-ui, sans-serif; }
+  * { -webkit-tap-highlight-color: transparent; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2A3244; border-radius: 4px; }
+
+  /* Focus */
+  input:focus, select:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid #B4FF39;
+    outline-offset: 2px;
+  }
+
+  /* Sortable */
+  .sortable-ghost { opacity: 0.4; }
+  .sortable-drag { opacity: 0.9; }
+  .slot {
+    min-width: 44px; min-height: 52px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .slot:empty::before {
+    content: '';
+    display: block;
+    width: 34px; height: 34px;
+    border: 1.5px dashed #14432E;
+    border-radius: 50%;
+  }
+  .slot.slot-pref {
+    background: rgba(180, 255, 57, 0.10);
+    border-radius: 999px;
+    transition: background 120ms;
+  }
+  .slot.slot-pref:empty::before {
+    border-color: #B4FF39;
+  }
+
+  /* Proposal pitch (mini) */
+  .prop-slot {
+    display: flex; align-items: center; justify-content: center;
+    gap: 2px; min-height: 30px;
+  }
+  .prop-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #B4FF39; color: #0A0E1A;
+    width: 22px; height: 22px; border-radius: 50%;
+    font-family: 'Barlow Condensed'; font-weight: 600; font-size: 11px;
+  }
+  .prop-empty { color: #14432E; font-size: 14px; }
+  .prop-more { font-size: 10px; color: #94A3B8; margin-left: 2px; }
+
+  /* Profile interactive pitch */
+  .prof-slot {
+    padding: 8px 10px; border-radius: 8px;
+    font-family: 'Barlow Condensed'; font-size: 12px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    background: rgba(255,255,255,0.04); color: #94A3B8;
+    border: 1.5px dashed #14432E;
+    cursor: pointer; transition: all 120ms;
+  }
+  .prof-slot:hover { border-color: #B4FF39; color: #E8ECF4; }
+  .prof-slot.on {
+    background: #B4FF39; color: #0A0E1A;
+    border-color: #B4FF39; border-style: solid;
+  }
+
+  /* Range slider (rating) */
+  input[type="range"].rating-slider {
+    -webkit-appearance: none; appearance: none;
+    background: transparent; width: 100%; height: 32px;
+  }
+  input[type="range"].rating-slider::-webkit-slider-runnable-track {
+    height: 4px; background: #2A3244; border-radius: 2px;
+  }
+  input[type="range"].rating-slider::-moz-range-track {
+    height: 4px; background: #2A3244; border-radius: 2px;
+  }
+  input[type="range"].rating-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    height: 22px; width: 22px; margin-top: -9px;
+    background: #B4FF39; border-radius: 50%; border: 2px solid #0A0E1A;
+    cursor: pointer;
+  }
+  input[type="range"].rating-slider::-moz-range-thumb {
+    height: 22px; width: 22px;
+    background: #B4FF39; border-radius: 50%; border: 2px solid #0A0E1A;
+    cursor: pointer;
+  }
+
+  /* Inputs */
+  .fld {
+    background: #131A2C; border: 1px solid #2A3244; color: #E8ECF4;
+    border-radius: 6px; padding: 10px 12px; width: 100%; font-size: 14px;
+  }
+  .fld::placeholder { color: #64748B; }
+
+  /* Toast */
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: #1A2340; border: 1px solid #2A3244; color: #E8ECF4;
+    padding: 10px 16px; border-radius: 8px; font-size: 13px;
+    z-index: 100; opacity: 0; transition: opacity 200ms;
+  }
+  .toast.show { opacity: 1; }
+  .toast.ok { border-color: #22C55E; }
+  .toast.bad { border-color: #EF4444; }
+
+  /* Player chip on pitch */
+  .chip {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    cursor: grab;
+  }
+  .chip:active { cursor: grabbing; }
+  .chip-num {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed'; font-weight: 600; font-size: 14px;
+    background: #FFFFFF; color: #0A0E1A;
+    border: 1.5px solid transparent;
+  }
+  .chip-num.gk { background: #B4FF39; }
+  .chip-name { font-size: 10.5px; color: #E8ECF4; white-space: nowrap; }
+
+  /* Pool chip (available player) */
+  .pool-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #131A2C; border: 1px solid #2A3244;
+    padding: 6px 10px; border-radius: 999px;
+    font-size: 13px; cursor: grab;
+  }
+  .pool-chip:active { cursor: grabbing; }
+  .pool-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #2A3244; color: #E8ECF4;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed'; font-weight: 600; font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<div id="app" class="min-h-screen"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+// =====================================================
+// CONFIG — REMPLACE PAR TES CLÉS SUPABASE
+// =====================================================
+const SUPABASE_URL = 'https://foqqovzyvstancdtxnyn.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvcXFvdnp5dnN0YW5jZHR4bnluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwNDM1NDEsImV4cCI6MjEwMjYxOTU0MX0.JW1wDFRNsA5x3KJR_oGlHYVvPQgHTSmd57I6_C1H9uo';
+
+// =====================================================
+// STATE + CLIENT
+// =====================================================
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const S = {
+  session: null,
+  me: null,          // profile
+  profiles: [],
+  matches: [],
+  match: null,       // current match detail
+  lineup: [],        // current match lineups
+  avail: [],         // current match availabilities
+  goalsConceded: [], // { id, minute, players: [ids] }
+  goalsFor: [],      // buts marqués
+  subs: [],          // substitutions of current match
+  pendingRatings: [], // match ids awaiting my rating (from RPC)
+  myRatingsThisMatch: {}, // { player_id: rating } prefill for current rate view
+  myRatingsDetail: [],    // [{match_id, rated_player_id, rating}] for player Notes view
+  preferences: [],        // [{player_id, formation, slot}] everyone's preferences
+  ratingsAll: [],     // (admin only) all ratings
+  allLineups: [],         // all lineups across all matches (loaded on stats/dashboard)
+  allGoalsConceded: [],   // all goals conceded across all matches
+  allGoalsConcededLineup: [], // all players-on-pitch rows
+  filter: { competition: 'all' },
+  sort: { key: 'minutes_played', dir: 'desc' },
+};
+
+// =====================================================
+// HELPERS
+// =====================================================
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+const app = () => $('#app');
+
+function escape(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function toast(msg, kind='') {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + kind;
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.className = 'toast', 2400);
+}
+
+function fmtDate(d) {
+  const date = new Date(d);
+  return date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function fmtTime(d) {
+  return new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+function fmtDateFull(d) {
+  return new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+function toInputDT(d) {
+  const dt = new Date(d);
+  const off = dt.getTimezoneOffset();
+  const local = new Date(dt.getTime() - off * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function nameOf(id) {
+  const p = S.profiles.find(x => x.id === id);
+  return p ? p.full_name : 'Inconnu';
+}
+function numOf(id) {
+  const p = S.profiles.find(x => x.id === id);
+  return p?.jersey_number ?? '';
+}
+
+function isAdmin() { return !!S.me?.is_admin; }
+
+// Avg rating received (admin only — needs S.ratingsAll)
+function avgRatingReceived(pid) {
+  if (!isAdmin()) return null;
+  const rs = (S.ratingsAll || []).filter(r => r.rated_player_id === pid);
+  if (rs.length === 0) return null;
+  return rs.reduce((s, r) => s + Number(r.rating), 0) / rs.length;
+}
+
+// Categories (GK/DEF/MID/ATT) the player has in the given formation
+function catsForPlayerInFormation(pid, formation) {
+  const cats = [...new Set(
+    (S.preferences || [])
+      .filter(x => x.player_id === pid && x.formation === formation)
+      .map(x => x.slot.split('_')[0])
+  )];
+  return cats.join('/');
+}
+
+// Slot config per formation
+const FORMATIONS = {
+  '2-3-1': [['ATT'], ['MID_L','MID_C','MID_R'], ['DEF_L','DEF_R'], ['GK']],
+  '3-2-1': [['ATT'], ['MID_L','MID_R'], ['DEF_L','DEF_C','DEF_R'], ['GK']],
+};
+
+// Renders a mini-pitch showing, per slot, the numbers of players in `playerIds` who prefer that slot.
+// Used for the "proposal" overlay on the match view.
+function pitchProposal(formation, playerIds) {
+  const rows = FORMATIONS[formation];
+  const numFor = (slot) => (S.preferences || [])
+    .filter(pref => pref.formation === formation && pref.slot === slot && playerIds.includes(pref.player_id))
+    .map(pref => {
+      const p = S.profiles.find(x => x.id === pref.player_id);
+      return p ? { num: p.jersey_number ?? '?', name: (p.full_name || '').split(' ')[0] } : null;
+    })
+    .filter(Boolean);
+  const slotCell = (slot) => {
+    const nums = numFor(slot);
+    return `<div class="prop-slot" title="${slot}">
+      ${nums.length
+        ? nums.slice(0, 4).map(n => `<span class="prop-num" title="${escape(n.name)}">${n.num}</span>`).join('')
+        : '<span class="prop-empty">·</span>'}
+      ${nums.length > 4 ? `<span class="prop-more">+${nums.length - 4}</span>` : ''}
+    </div>`;
+  };
+  return `
+    <div class="text-[10px] tracking-widest text-ink3 uppercase text-center mb-1">${formation}</div>
+    <div class="bg-pitch border border-pitchLine rounded-md p-2 grid grid-rows-4 gap-1" style="height: 180px;">
+      ${rows.map(r => `<div class="flex justify-around items-center h-full">${r.map(slotCell).join('')}</div>`).join('')}
+    </div>`;
+}
+
+// Interactive pitch for the profile page — clicking a slot toggles the current user's preference
+function pitchProfile(formation) {
+  const rows = FORMATIONS[formation];
+  const mine = new Set(
+    (S.preferences || [])
+      .filter(x => x.player_id === S.me.id && x.formation === formation)
+      .map(x => x.slot)
+  );
+  const slotCell = (slot) => {
+    const on = mine.has(slot);
+    return `<button data-act="toggle-pref" data-formation="${formation}" data-slot="${slot}"
+      class="prof-slot ${on ? 'on' : ''}"
+      title="${slot}${on?' (choisi)':''}"
+    >${slot.replace('_', ' ')}</button>`;
+  };
+  return `
+    <div class="text-[11px] tracking-widest text-ink3 uppercase text-center mb-2">${formation}</div>
+    <div class="bg-pitch border border-pitchLine rounded-lg p-3 grid grid-rows-4 gap-2" style="height: 260px;">
+      ${rows.map(r => `<div class="flex justify-around items-center h-full">${r.map(slotCell).join('')}</div>`).join('')}
+    </div>`;
+}
+
+// =====================================================
+// ROUTING
+// =====================================================
+function navigate(hash) {
+  if (location.hash === hash) render();
+  else location.hash = hash;
+}
+window.addEventListener('hashchange', render);
+
+// =====================================================
+// API
+// =====================================================
+async function loadMe() {
+  const { data, error } = await sb.from('profiles').select('*').eq('id', S.session.user.id).single();
+  if (error) { console.error(error); return; }
+  S.me = data;
+}
+async function loadProfiles() {
+  const { data, error } = await sb.from('profiles').select('*').order('full_name');
+  if (error) return console.error(error);
+  S.profiles = data;
+}
+async function loadMatches() {
+  const { data, error } = await sb.from('matches').select('*').order('match_date', { ascending: false });
+  if (error) return console.error(error);
+  S.matches = data;
+}
+async function loadMatch(id) {
+  const [m, l, a, gc, gcl, subs, gf] = await Promise.all([
+    sb.from('matches').select('*').eq('id', id).single(),
+    sb.from('lineups').select('*').eq('match_id', id),
+    sb.from('availabilities').select('*').eq('match_id', id),
+    sb.from('goals_conceded').select('*').eq('match_id', id).order('minute'),
+    sb.from('goals_conceded_lineup').select('*'),
+    sb.from('substitutions').select('*').eq('match_id', id).order('minute'),
+    sb.from('goals_for').select('*').eq('match_id', id).order('minute'),
+  ]);
+  if (m.error) throw m.error;
+  S.match = m.data;
+  S.lineup = l.data || [];
+  S.avail = a.data || [];
+  const gcRows = gc.data || [];
+  const gclRows = gcl.data || [];
+  S.goalsConceded = gcRows.map(g => ({
+    ...g,
+    players: gclRows.filter(x => x.goal_id === g.id).map(x => x.player_id),
+  }));
+  S.subs = subs.data || [];
+  S.goalsFor = gf.data || [];
+}
+async function loadRatingsAll() {
+  if (!isAdmin()) return;
+  const { data, error } = await sb.from('ratings').select('*');
+  if (error) return console.error(error);
+  S.ratingsAll = data || [];
+}
+async function loadAllLineups() {
+  // Needed for stats
+  const { data, error } = await sb.from('lineups').select('*');
+  if (error) return console.error(error);
+  S.allLineups = data || [];
+}
+async function loadAllGoalsConceded() {
+  const [gc, gcl] = await Promise.all([
+    sb.from('goals_conceded').select('*'),
+    sb.from('goals_conceded_lineup').select('*'),
+  ]);
+  S.allGoalsConceded = gc.data || [];
+  S.allGoalsConcededLineup = gcl.data || [];
+}
+
+async function loadMyRatingsForMatch(mid) {
+  // RPC because SELECT on ratings is admin-only
+  const { data, error } = await sb.rpc('my_ratings_for_match', { mid });
+  if (error) { console.error(error); S.myRatingsThisMatch = {}; return; }
+  S.myRatingsThisMatch = data || {};
+}
+
+async function loadMyRatingsDetail() {
+  const { data, error } = await sb.rpc('my_ratings_detail');
+  if (error) { console.error(error); S.myRatingsDetail = []; return; }
+  S.myRatingsDetail = data || [];
+}
+
+async function loadPreferences() {
+  const { data, error } = await sb.from('player_position_preferences').select('*');
+  if (error) { console.error(error); S.preferences = []; return; }
+  S.preferences = data || [];
+}
+
+async function checkPendingRatings() {
+  // RPC returns match IDs where I still need to rate (respects minutes > 0)
+  const { data, error } = await sb.rpc('my_pending_matches');
+  if (error) { console.error(error); S.pendingRatings = []; return; }
+  S.pendingRatings = data || [];
+}
+
+// =====================================================
+// TOP NAV
+// =====================================================
+function nav(active) {
+  const link = (href, label, key) => {
+    const on = key === active;
+    return `<a href="${href}" class="text-[13px] tracking-wide font-medium transition-colors ${on ? 'text-accent border-b-2 border-accent pb-1' : 'text-ink3 hover:text-ink2'}">${label}</a>`;
+  };
+  return `
+  <header class="sticky top-0 z-40 bg-bg/95 backdrop-blur border-b border-line">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <a href="#/calendrier" class="flex items-center gap-2.5 shrink-0">
+        <div class="w-7 h-7 bg-accent rounded"></div>
+        <span class="font-h uppercase tracking-widest text-[14px] font-semibold">FC Manager</span>
+      </a>
+      <nav class="flex items-center gap-5">
+        ${link('#/calendrier', 'Calendrier', 'calendar')}
+        ${link('#/stats', 'Stats', 'stats')}
+        ${isAdmin() ? link('#/analyse', 'Analyse', 'dashboard') : ''}
+        ${link('#/notes', 'Notes', 'notes')}
+        ${link('#/profil', 'Profil', 'profile')}
+        ${isAdmin() ? link('#/equipe', 'Équipe', 'team') : ''}
+      </nav>
+      <div class="flex items-center gap-3 shrink-0">
+        <span class="text-[12px] text-ink2 hidden sm:inline">${escape(S.me?.full_name || '')}</span>
+        <button data-act="logout" class="text-[12px] text-ink3 hover:text-ink2">Déconnexion</button>
+      </div>
+    </div>
+  </header>`;
+}
+
+// =====================================================
+// VIEWS
+// =====================================================
+
+// ------- LOGIN --------
+function viewLogin() {
+  const mode = S._authMode || 'login';
+  const err = S._authErr || '';
+  return `
+  <div class="min-h-screen flex items-center justify-center px-4">
+    <div class="w-full max-w-sm">
+      <div class="flex items-center gap-3 mb-8 justify-center">
+        <div class="w-10 h-10 bg-accent rounded-md"></div>
+        <div>
+          <div class="font-h uppercase tracking-widest text-[18px] font-semibold">FC Manager</div>
+          <div class="text-[11px] text-ink3 tracking-wide">Compo · dispos · stats</div>
+        </div>
+      </div>
+      <div class="bg-card border border-line rounded-lg p-6">
+        <div class="flex gap-1 mb-5 p-1 bg-bg rounded-md border border-line">
+          <button data-act="auth-mode" data-mode="login" class="flex-1 py-2 text-[13px] rounded ${mode==='login'?'bg-cardHi text-ink':'text-ink3'}">Connexion</button>
+          <button data-act="auth-mode" data-mode="signup" class="flex-1 py-2 text-[13px] rounded ${mode==='signup'?'bg-cardHi text-ink':'text-ink3'}">Inscription</button>
+        </div>
+        <form data-act="auth-submit" data-mode="${mode}" class="space-y-3">
+          ${mode==='signup' ? `<input class="fld" name="name" placeholder="Prénom / Pseudo" required>` : ''}
+          <input class="fld" type="email" name="email" placeholder="Email" required>
+          <input class="fld" type="password" name="password" placeholder="Mot de passe (6+ car.)" required minlength="6">
+          ${err ? `<div class="text-[12px] text-bad">${escape(err)}</div>` : ''}
+          <button type="submit" class="w-full bg-accent text-bg font-medium py-2.5 rounded font-h uppercase tracking-wider text-[14px]">
+            ${mode==='login' ? 'Connexion' : 'Créer mon compte'}
+          </button>
+        </form>
+      </div>
+      <div class="text-[11px] text-ink3 text-center mt-4">
+        L'admin te promouvra après ton 1er login.
+      </div>
+    </div>
+  </div>`;
+}
+
+// ------- CALENDAR --------
+function viewCalendar() {
+  const filt = S.filter.competition;
+  const matches = S.matches.filter(m => filt === 'all' || m.competition === filt);
+  const upcoming = matches.filter(m => m.status === 'upcoming');
+  const played = matches.filter(m => m.status === 'played');
+
+  return nav('calendar') + `
+  <main class="max-w-5xl mx-auto px-4 py-6">
+    <div class="flex items-center justify-between mb-5 gap-3 flex-wrap">
+      <h1 class="font-h uppercase tracking-widest text-[22px] font-semibold">Calendrier</h1>
+      <div class="flex items-center gap-2">
+        ${filterChip('all', 'Tout')}
+        ${filterChip('championnat', 'Champ.')}
+        ${filterChip('coupe', 'Coupe')}
+        ${isAdmin() ? `<button data-act="new-match" class="ml-2 px-3 py-1.5 bg-accent text-bg text-[13px] font-medium rounded">+ Match</button>` : ''}
+      </div>
+    </div>
+
+    ${upcoming.length ? `
+      <div class="mb-8">
+        <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">À venir</div>
+        <div class="space-y-2">${upcoming.map(matchCard).join('')}</div>
+      </div>
+    ` : ''}
+
+    ${played.length ? `
+      <div>
+        <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Joués</div>
+        <div class="space-y-2">${played.map(matchCard).join('')}</div>
+      </div>
+    ` : ''}
+
+    ${matches.length === 0 ? `
+      <div class="text-center py-16 text-ink3">
+        Aucun match ${isAdmin() ? '— crée le premier en haut à droite' : ''}
+      </div>
+    ` : ''}
+  </main>`;
+}
+function filterChip(val, label) {
+  const on = S.filter.competition === val;
+  return `<button data-act="filter-comp" data-val="${val}" class="px-3 py-1.5 rounded text-[12px] tracking-wide border ${on ? 'bg-accent text-bg border-accent' : 'border-line text-ink2 hover:bg-cardHi'}">${label}</button>`;
+}
+function matchCard(m) {
+  const myAvail = S.avail.find(a => a.match_id === m.id && a.player_id === S.me.id);
+  // Actually S.avail is only loaded for current match. Let me use S.allAvail? For simplicity here, skip.
+  const score = m.status === 'played' && m.goals_for !== null && m.goals_against !== null
+    ? `<span class="font-h font-semibold text-[20px]">${m.goals_for} – ${m.goals_against}</span>`
+    : '';
+  const badgeColor = m.competition === 'coupe' ? 'text-warn border-warn/30 bg-warn/10' : 'text-accent border-accent/30 bg-accent/10';
+  return `
+  <a href="#/match/${m.id}" class="block bg-card hover:bg-cardHi border border-line hover:border-lineHi rounded-lg p-4 transition-colors">
+    <div class="flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="text-[10px] tracking-widest uppercase px-1.5 py-0.5 rounded border ${badgeColor}">${m.competition}</span>
+          <span class="text-[11px] text-ink3">${fmtDate(m.match_date)} · ${fmtTime(m.match_date)}</span>
+        </div>
+        <div class="font-h font-medium text-[18px] truncate">FC Team — ${escape(m.opponent)}</div>
+        ${m.venue ? `<div class="text-[11px] text-ink3 mt-0.5">${escape(m.venue)}</div>` : ''}
+      </div>
+      <div class="text-right shrink-0">${score}</div>
+    </div>
+  </a>`;
+}
+
+// ------- MATCH DETAIL --------
+function viewMatch(id) {
+  const m = S.match;
+  if (!m || m.id !== id) return nav('') + `<main class="max-w-5xl mx-auto px-4 py-6 text-ink3">Chargement…</main>`;
+
+  const myAvail = S.avail.find(a => a.player_id === S.me.id);
+  const yesIds = S.avail.filter(a => a.status === 'yes').map(a => a.player_id);
+  const noIds = S.avail.filter(a => a.status === 'no').map(a => a.player_id);
+  const noRespIds = S.profiles.map(p => p.id).filter(pid => !yesIds.includes(pid) && !noIds.includes(pid));
+
+  return nav('calendar') + `
+  <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <div>
+      <a href="#/calendrier" class="text-[12px] text-ink3 hover:text-ink2">&larr; Calendrier</a>
+    </div>
+
+    <!-- Match header -->
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <div class="text-[10px] tracking-widest text-ink3 uppercase mb-1">${m.competition} · ${m.status === 'upcoming' ? 'à venir' : 'joué'}</div>
+        <h1 class="font-h font-medium text-[28px] leading-none">FC Team — ${escape(m.opponent)}</h1>
+        <div class="text-[13px] text-ink2 mt-1.5">${fmtDateFull(m.match_date)} · ${fmtTime(m.match_date)}${m.venue ? ' · ' + escape(m.venue) : ''}</div>
+      </div>
+      <div class="flex items-center gap-2">
+        ${isAdmin() ? `
+          <button data-act="edit-match" class="px-3 py-1.5 border border-line text-[12px] rounded hover:bg-cardHi">Modifier</button>
+          ${m.status === 'upcoming'
+            ? `<button data-act="mark-played" class="px-3 py-1.5 bg-accent text-bg text-[12px] font-medium rounded">Marquer joué</button>`
+            : `<button data-act="mark-upcoming" class="px-3 py-1.5 border border-line text-[12px] rounded hover:bg-cardHi">Réouvrir</button>`
+          }
+          <button data-act="delete-match" class="px-3 py-1.5 border border-line text-[12px] rounded text-bad hover:bg-cardHi">Suppr.</button>
+        ` : ''}
+      </div>
+    </div>
+
+    <!-- My availability -->
+    ${m.status === 'upcoming' ? `
+      <section class="bg-card border border-line rounded-lg p-4">
+        <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Ma dispo</div>
+        <div class="flex gap-2">
+          <button data-act="avail" data-status="yes" class="flex-1 py-2.5 rounded font-medium text-[14px] ${myAvail?.status==='yes' ? 'bg-ok text-bg' : 'bg-cardHi border border-line text-ink hover:border-ok'}">Présent</button>
+          <button data-act="avail" data-status="no" class="flex-1 py-2.5 rounded font-medium text-[14px] ${myAvail?.status==='no' ? 'bg-bad text-white' : 'bg-cardHi border border-line text-ink hover:border-bad'}">Absent</button>
+        </div>
+      </section>
+    ` : ''}
+
+    <!-- Availabilities overview -->
+    <section class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Dispos de l'équipe</div>
+      <div class="grid grid-cols-3 gap-3 text-center mb-4">
+        <div><div class="font-h text-[22px] text-ok">${yesIds.length}</div><div class="text-[10px] tracking-wide text-ink3 uppercase">Présents</div></div>
+        <div><div class="font-h text-[22px] text-bad">${noIds.length}</div><div class="text-[10px] tracking-wide text-ink3 uppercase">Absents</div></div>
+        <div><div class="font-h text-[22px] text-ink3">${noRespIds.length}</div><div class="text-[10px] tracking-wide text-ink3 uppercase">Sans réponse</div></div>
+      </div>
+      <details class="text-[12px]">
+        <summary class="cursor-pointer text-ink2 hover:text-ink">Détails</summary>
+        <div class="mt-3 space-y-2">
+          <div><span class="text-ink3 mr-2">Oui :</span>${yesIds.map(id => `<span class="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-ok/10 border border-ok/30 text-ok text-[11px]">${escape(nameOf(id))}</span>`).join('') || '<span class="text-ink3">—</span>'}</div>
+          <div><span class="text-ink3 mr-2">Non :</span>${noIds.map(id => `<span class="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-bad/10 border border-bad/30 text-bad text-[11px]">${escape(nameOf(id))}</span>`).join('') || '<span class="text-ink3">—</span>'}</div>
+          <div><span class="text-ink3 mr-2">? :</span>${noRespIds.map(id => `<span class="inline-block px-2 py-0.5 mr-1 mb-1 rounded bg-cardHi border border-line text-ink2 text-[11px]">${escape(nameOf(id))}</span>`).join('') || '<span class="text-ink3">—</span>'}</div>
+        </div>
+      </details>
+    </section>
+
+    <!-- Composition -->
+    ${(() => {
+      // Proposition (admin only, only if match upcoming or being setup): dispos non "no" et pas encore placés
+      if (!isAdmin() || m.status === 'played') return '';
+      const noIds = new Set(S.avail.filter(a => a.status === 'no').map(a => a.player_id));
+      const placedIds = new Set(S.lineup.map(l => l.player_id));
+      const candidateIds = S.profiles.filter(p => !noIds.has(p.id) && !placedIds.has(p.id)).map(p => p.id);
+      return `
+        <section>
+          <div class="flex items-end justify-between mb-3 gap-3 flex-wrap">
+            <div>
+              <div class="text-[11px] tracking-widest text-ink3 uppercase">Proposition selon les préférences</div>
+              <div class="text-[12px] text-ink3">Numéros des dispos pas encore placés · disparaissent au fur et à mesure</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>${pitchProposal('2-3-1', candidateIds)}</div>
+            <div>${pitchProposal('3-2-1', candidateIds)}</div>
+          </div>
+        </section>
+      `;
+    })()}
+
+    ${viewComposition(m)}
+
+    <!-- Post-match sections (only if played) -->
+    ${m.status === 'played' ? viewPostMatch(m) : ''}
+
+    ${m.status === 'played' && (() => {
+      const pl = S.lineup.filter(l => l.role === 'player');
+      if (pl.length === 0 || pl.some(l => l.minutes_played > 0)) return '';
+      return `<div class="bg-warn/10 border border-warn/30 text-warn text-[13px] rounded-lg p-3">
+        Aucune minute de jeu renseignée. Tant que les temps de jeu sont à 0, personne ne pourra noter ce match.
+      </div>`;
+    })()}
+  </main>`;
+}
+
+// Composition (pitch)
+function viewComposition(m) {
+  const admin = isAdmin();
+  const formation = m.formation;
+  const slots = formation === '2-3-1'
+    ? [['ATT'], ['MID_L','MID_C','MID_R'], ['DEF_L','DEF_R'], ['GK']]
+    : [['ATT'], ['MID_L','MID_R'], ['DEF_L','DEF_C','DEF_R'], ['GK']];
+
+  const players = S.lineup.filter(l => l.role === 'player');
+  const supporters = S.lineup.filter(l => l.role === 'supporter');
+  const assignedIds = new Set(S.lineup.map(l => l.player_id));
+
+  // Available = tous ceux qui n'ont pas dit "non" et qui ne sont pas déjà placés
+  const noIds = new Set(S.avail.filter(a => a.status === 'no').map(a => a.player_id));
+  const available = S.profiles.filter(p => !noIds.has(p.id) && !assignedIds.has(p.id));
+
+  const bench = S.lineup.filter(l => l.role === 'player' && !l.slot); // players on bench
+
+  const chipOf = (playerId, isGK=false) => {
+    const p = S.profiles.find(x => x.id === playerId);
+    if (!p) return '';
+    return `
+      <div class="chip" data-player-id="${p.id}">
+        <div class="chip-num ${isGK?'gk':''}">${p.jersey_number ?? '—'}</div>
+        <div class="chip-name">${escape((p.full_name||'').split(' ')[0])}</div>
+      </div>`;
+  };
+
+  const slotHtml = (slot) => {
+    const l = S.lineup.find(x => x.slot === slot);
+    const inner = l ? chipOf(l.player_id, slot==='GK') : '';
+    return `<div class="slot" data-slot="${slot}" data-admin="${admin}">${inner}</div>`;
+  };
+
+  const rowHtml = (row) => `
+    <div class="flex justify-around items-center h-full">
+      ${row.map(s => slotHtml(s)).join('')}
+    </div>`;
+
+  return `
+    <section>
+      <div class="flex items-end justify-between mb-3 gap-3 flex-wrap">
+        <div>
+          <div class="text-[11px] tracking-widest text-ink3 uppercase">Composition</div>
+          <div class="font-h text-[22px] font-medium">Formation ${formation}</div>
+        </div>
+        ${admin ? `
+          <div class="flex items-center gap-2">
+            <select data-act="change-formation" class="fld w-auto text-[13px] py-1.5">
+              <option value="2-3-1" ${formation==='2-3-1'?'selected':''}>2-3-1</option>
+              <option value="3-2-1" ${formation==='3-2-1'?'selected':''}>3-2-1</option>
+            </select>
+            <button data-act="clear-lineup" class="px-3 py-1.5 border border-line text-[12px] rounded hover:bg-cardHi">Vider</button>
+          </div>
+        ` : ''}
+      </div>
+
+      <div id="pitch" class="bg-pitch border border-pitchLine rounded-lg p-4 sm:px-8 grid grid-rows-4 gap-1" style="height: 300px;">
+        ${slots.map(r => rowHtml(r)).join('')}
+      </div>
+
+      ${admin ? `
+        <div class="mt-4 grid md:grid-cols-2 gap-4">
+          <div class="bg-card border border-line rounded-lg p-3">
+            <div class="text-[10px] tracking-widest text-ink3 uppercase mb-2">Banc (joueurs sans place)</div>
+            <div id="bench" class="flex flex-wrap gap-1.5 min-h-[40px]">
+              ${bench.map(l => {
+                const p = S.profiles.find(x => x.id === l.player_id);
+                const prefs = catsForPlayerInFormation(l.player_id, formation);
+                const avg = avgRatingReceived(l.player_id);
+                return `<div class="pool-chip" data-player-id="${l.player_id}"><span class="pool-num">${p?.jersey_number ?? '—'}</span>${escape(p?.full_name || '')}${prefs?`<span class="text-[9px] text-ink3 tracking-widest ml-1">${prefs}</span>`:''}${avg!==null?`<span class="text-[10px] text-accent font-h font-semibold ml-1">${avg.toFixed(1)}</span>`:''}</div>`;
+              }).join('')}
+            </div>
+          </div>
+          <div class="bg-card border border-line rounded-lg p-3">
+            <div class="text-[10px] tracking-widest text-ink3 uppercase mb-2">Disponibles (pas encore placés)</div>
+            <div id="pool" class="flex flex-wrap gap-1.5 min-h-[40px]">
+              ${available.map(p => {
+                const prefs = catsForPlayerInFormation(p.id, formation);
+                const avg = avgRatingReceived(p.id);
+                return `<div class="pool-chip" data-player-id="${p.id}"><span class="pool-num">${p.jersey_number ?? '—'}</span>${escape(p.full_name)}${prefs?`<span class="text-[9px] text-ink3 tracking-widest ml-1">${prefs}</span>`:''}${avg!==null?`<span class="text-[10px] text-accent font-h font-semibold ml-1">${avg.toFixed(1)}</span>`:''}</div>`;
+              }).join('') || '<div class="text-[12px] text-ink3">Aucun</div>'}
+            </div>
+          </div>
+        </div>
+        <div class="mt-4 bg-card border border-line rounded-lg p-3">
+          <div class="text-[10px] tracking-widest text-ink3 uppercase mb-2">Supporters (peuvent noter, ne jouent pas)</div>
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            ${supporters.map(l => {
+              const p = S.profiles.find(x => x.id === l.player_id);
+              return `<div class="pool-chip">
+                <span class="pool-num">${p?.jersey_number ?? '—'}</span>
+                ${escape(p?.full_name || '')}
+                <button data-act="remove-supporter" data-player-id="${l.player_id}" class="ml-1 text-ink3 hover:text-bad">×</button>
+              </div>`;
+            }).join('') || '<div class="text-[12px] text-ink3">Aucun</div>'}
+          </div>
+          <select data-act="add-supporter" class="fld text-[13px] py-1.5 w-full sm:w-auto">
+            <option value="">+ Ajouter un supporter</option>
+            ${S.profiles.filter(p => !assignedIds.has(p.id)).map(p => `<option value="${p.id}">${escape(p.full_name)}</option>`).join('')}
+          </select>
+        </div>
+      ` : `
+        <!-- Read-only for players -->
+        <div class="mt-4 grid grid-cols-2 gap-3">
+          <div class="bg-card border border-line rounded-lg p-3">
+            <div class="text-[10px] tracking-widest text-ink3 uppercase mb-2">Banc</div>
+            <div class="flex flex-wrap gap-1.5">
+              ${bench.length ? bench.map(l => `<span class="pool-chip"><span class="pool-num">${numOf(l.player_id)}</span>${escape(nameOf(l.player_id))}</span>`).join('') : '<span class="text-[12px] text-ink3">—</span>'}
+            </div>
+          </div>
+          <div class="bg-card border border-line rounded-lg p-3">
+            <div class="text-[10px] tracking-widest text-ink3 uppercase mb-2">Supporters</div>
+            <div class="flex flex-wrap gap-1.5">
+              ${supporters.length ? supporters.map(l => `<span class="pool-chip"><span class="pool-num">${numOf(l.player_id)}</span>${escape(nameOf(l.player_id))}</span>`).join('') : '<span class="text-[12px] text-ink3">—</span>'}
+            </div>
+          </div>
+        </div>
+      `}
+    </section>`;
+}
+
+// Post-match: score (derived), timeline, events, computed stats
+function viewPostMatch(m) {
+  const admin = isAdmin();
+  const players = S.lineup.filter(l => l.role === 'player');
+  const subs = (S.subs || []).slice().sort((a, b) => a.minute - b.minute);
+  const gf = (S.goalsFor || []).slice().sort((a, b) => a.minute - b.minute);
+  const gc = (S.goalsConceded || []).slice().sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999));
+
+  // Build unified timeline
+  const events = [];
+  events.push({ minute: 0, kind: 'start', desc: 'Coup d\'envoi' });
+  gf.forEach(g => events.push({
+    minute: g.minute, kind: 'for',
+    desc: g.scorer_id
+      ? `${escape(nameOf(g.scorer_id))}${g.assist_id ? ` <span class="text-ink3">(passe : ${escape(nameOf(g.assist_id))})</span>` : ''}`
+      : '<span class="text-ink3">Buteur non renseigné</span>',
+    id: g.id,
+  }));
+  gc.forEach(g => {
+    const onPitch = g.players.map(id => escape(nameOf(id))).join(', ');
+    events.push({
+      minute: g.minute ?? 0, kind: 'against',
+      desc: onPitch ? `<span class="text-ink3">Sur le terrain : ${onPitch}</span>` : '',
+      id: g.id,
+    });
+  });
+  subs.forEach(s => events.push({
+    minute: s.minute, kind: 'sub',
+    desc: `<span class="text-bad">↓ ${escape(nameOf(s.player_off))}</span> &nbsp; <span class="text-ok">↑ ${escape(nameOf(s.player_on))}</span>`,
+    id: s.id,
+  }));
+  events.push({ minute: m.duration, kind: 'end', desc: 'Fin' });
+  events.sort((a, b) => a.minute - b.minute);
+
+  const kindMeta = {
+    start:   { label: '',         cls: 'text-ink3' },
+    end:     { label: '',         cls: 'text-ink3' },
+    for:     { label: 'BUT',      cls: 'text-accent' },
+    against: { label: 'ENCAISSÉ', cls: 'text-bad' },
+    sub:     { label: 'SUB',      cls: 'text-ink2' },
+  };
+
+  return `
+    <!-- Score (auto) -->
+    <section class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-2">Résultat · durée ${m.duration}'</div>
+      <div class="font-h text-[42px] font-medium leading-none">
+        <span class="${gf.length > gc.length ? 'text-ok' : gf.length < gc.length ? 'text-bad' : ''}">${gf.length}</span>
+        <span class="text-ink3 mx-2">–</span>
+        <span>${gc.length}</span>
+      </div>
+      <div class="text-[11px] text-ink3 mt-1">Calculé à partir des buts marqués et encaissés ci-dessous</div>
+    </section>
+
+    <!-- Timeline -->
+    <section class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Timeline</div>
+      <div class="space-y-0">
+        ${events.map(e => {
+          const meta = kindMeta[e.kind];
+          return `
+            <div class="flex items-baseline gap-3 py-1.5 border-b border-line last:border-0">
+              <div class="font-h font-semibold text-[15px] text-ink w-9 text-right">${e.minute}'</div>
+              <div class="text-[9px] font-h font-semibold tracking-widest w-16 ${meta.cls}">${meta.label}</div>
+              <div class="text-[13px] flex-1 min-w-0">${e.desc}</div>
+            </div>`;
+        }).join('')}
+      </div>
+    </section>
+
+    <!-- Buts marqués -->
+    <section class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Buts marqués (${gf.length})</div>
+      ${gf.length === 0 ? '<div class="text-[13px] text-ink3 mb-3">Aucun but marqué.</div>' : `
+        <div class="space-y-1 mb-4">
+          ${gf.map(g => `
+            <div class="flex items-center gap-3 py-2 border-b border-line last:border-0">
+              <div class="font-h font-semibold text-[15px] text-accent w-10">${g.minute}'</div>
+              <div class="flex-1 text-[13px]">
+                ${g.scorer_id ? escape(nameOf(g.scorer_id)) : '<span class="text-ink3">Buteur non renseigné</span>'}
+                ${g.assist_id ? ` <span class="text-ink3">— passe : ${escape(nameOf(g.assist_id))}</span>` : ''}
+              </div>
+              ${admin ? `<button data-act="del-goal-for" data-id="${g.id}" class="text-[11px] text-bad hover:underline">Suppr.</button>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `}
+      ${admin ? `
+        <form data-act="add-goal-for" class="flex items-end gap-2 flex-wrap pt-3 border-t border-line">
+          <label class="text-[10px] text-ink3 uppercase tracking-wide">Min
+            <input type="number" name="minute" min="0" max="${m.duration}" required class="fld w-16 mt-1 text-center">
+          </label>
+          <label class="text-[10px] text-ink3 uppercase tracking-wide flex-1 min-w-[140px]">Buteur
+            <select name="scorer_id" class="fld mt-1">
+              <option value="">— (non renseigné) —</option>
+              ${players.map(l => `<option value="${l.player_id}">${escape(nameOf(l.player_id))}</option>`).join('')}
+            </select>
+          </label>
+          <label class="text-[10px] text-ink3 uppercase tracking-wide flex-1 min-w-[140px]">Passe déc.
+            <select name="assist_id" class="fld mt-1">
+              <option value="">— aucune —</option>
+              ${players.map(l => `<option value="${l.player_id}">${escape(nameOf(l.player_id))}</option>`).join('')}
+            </select>
+          </label>
+          <button type="submit" class="px-3 py-2 bg-accent text-bg font-medium text-[13px] rounded">+ But</button>
+        </form>
+      ` : ''}
+    </section>
+
+    <!-- Buts encaissés (simplifié) -->
+    <section class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Buts encaissés (${gc.length})</div>
+      ${gc.length === 0 ? '<div class="text-[13px] text-ink3 mb-3">Aucun but encaissé.</div>' : `
+        <div class="space-y-1 mb-4">
+          ${gc.map(g => `
+            <div class="py-2 border-b border-line last:border-0">
+              <div class="flex items-center gap-3">
+                <div class="font-h font-semibold text-[15px] text-bad w-10">${g.minute ?? '—'}${g.minute !== null ? "'" : ''}</div>
+                <div class="flex-1 text-[12px] text-ink3">${g.players.length ? 'Sur le terrain : ' + g.players.map(id => escape(nameOf(id))).join(', ') : (g.minute === null ? '<span class="text-warn">Minute manquante — impossible de déterminer qui était sur le terrain</span>' : '')}</div>
+                ${admin ? `<button data-act="del-goal-conceded" data-id="${g.id}" class="text-[11px] text-bad hover:underline">Suppr.</button>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+      ${admin ? `
+        <form data-act="add-goal-conceded" class="flex items-end gap-2 pt-3 border-t border-line">
+          <label class="text-[10px] text-ink3 uppercase tracking-wide">Min
+            <input type="number" name="minute" min="0" max="${m.duration}" required class="fld w-16 mt-1 text-center">
+          </label>
+          <button type="submit" class="px-3 py-2 bg-cardHi border border-line text-[13px] rounded">+ But encaissé</button>
+          <div class="text-[11px] text-ink3 flex-1">Les joueurs sur le terrain sont déduits automatiquement des remplacements.</div>
+        </form>
+      ` : ''}
+    </section>
+
+    <!-- Substitutions -->
+    <section class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Remplacements</div>
+      ${subs.length === 0 ? '<div class="text-[13px] text-ink3 mb-3">Aucun remplacement.</div>' : `
+        <div class="space-y-1 mb-4">
+          ${subs.map(s => `
+            <div class="flex items-center gap-3 py-2 border-b border-line last:border-0">
+              <div class="font-h font-semibold text-[15px] text-accent w-10">${s.minute}'</div>
+              <div class="flex-1 flex items-center gap-2 flex-wrap">
+                <span class="text-[13px] text-bad">↓ ${escape(nameOf(s.player_off))}</span>
+                <span class="text-ink3">→</span>
+                <span class="text-[13px] text-ok">↑ ${escape(nameOf(s.player_on))}</span>
+              </div>
+              ${admin ? `<button data-act="del-sub" data-id="${s.id}" class="text-[11px] text-bad hover:underline">Suppr.</button>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `}
+      ${admin ? `
+        <form data-act="add-sub" class="flex items-end gap-2 flex-wrap pt-3 border-t border-line">
+          <label class="text-[10px] text-ink3 uppercase tracking-wide">Min
+            <input type="number" name="minute" min="0" max="${m.duration}" required class="fld w-16 mt-1 text-center">
+          </label>
+          <label class="text-[10px] text-ink3 uppercase tracking-wide flex-1 min-w-[140px]">Sortant
+            <select name="player_off" required class="fld mt-1">
+              <option value="">Choisir…</option>
+              ${players.map(l => `<option value="${l.player_id}">${escape(nameOf(l.player_id))}${l.slot?` (${l.slot})`:''}</option>`).join('')}
+            </select>
+          </label>
+          <label class="text-[10px] text-ink3 uppercase tracking-wide flex-1 min-w-[140px]">Entrant
+            <select name="player_on" required class="fld mt-1">
+              <option value="">Choisir…</option>
+              ${players.map(l => `<option value="${l.player_id}">${escape(nameOf(l.player_id))}${l.slot?` (${l.slot})`:''}</option>`).join('')}
+            </select>
+          </label>
+          <button type="submit" class="px-3 py-2 bg-accent text-bg font-medium text-[13px] rounded">+ Sub</button>
+        </form>
+      ` : ''}
+    </section>
+
+    <!-- Stats par joueur (tout auto) -->
+    <section class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Récap par joueur</div>
+      ${players.length === 0 ? '<div class="text-[13px] text-ink3">Aucun joueur dans la compo.</div>' : `
+        <div class="space-y-2">
+          ${players.map(l => `
+            <div class="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center py-2 border-b border-line last:border-0">
+              <div class="min-w-0">
+                <div class="font-medium text-[14px] truncate">${escape(nameOf(l.player_id))}</div>
+                <div class="text-[11px] text-ink3">${escape(l.slot || 'banc au coup d\'envoi')} · #${numOf(l.player_id)}</div>
+              </div>
+              <div class="text-center w-14"><div class="font-h text-[16px] ${l.minutes_played>0?'text-ink':'text-ink3'}">${l.minutes_played}'</div><div class="text-[9px] tracking-widest text-ink3 uppercase">min</div></div>
+              <div class="text-center w-12"><div class="font-h text-[16px] ${l.goals>0?'text-accent':'text-ink3'}">${l.goals}</div><div class="text-[9px] tracking-widest text-ink3 uppercase">buts</div></div>
+              <div class="text-center w-12"><div class="font-h text-[16px] ${l.assists>0?'text-accent':'text-ink3'}">${l.assists}</div><div class="text-[9px] tracking-widest text-ink3 uppercase">pd</div></div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="text-[11px] text-ink3 mt-3">Tout est calculé automatiquement : minutes = titulaires + subs, buts &amp; passes = events "buts marqués" ci-dessus.</div>
+      `}
+    </section>`;
+}
+
+// ------- RATE (mandatory) --------
+function viewRate(matchId) {
+  const m = S.matches.find(x => x.id === matchId);
+  if (!m || !S.match || S.match.id !== matchId) {
+    return `<main class="max-w-5xl mx-auto px-4 py-6 text-ink3">Chargement…</main>`;
+  }
+  // Only players who actually played (minutes > 0) and not myself
+  const targets = S.lineup.filter(l => l.role === 'player' && l.player_id !== S.me.id && l.minutes_played > 0);
+  const already = S.myRatingsThisMatch || {}; // { player_id: rating }
+
+  return `
+  <main class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+    <div class="bg-warn/10 border border-warn/30 text-warn text-[13px] rounded p-3">
+      Tu dois noter tous les joueurs de ce match avant de continuer.
+    </div>
+    <div>
+      <div class="text-[10px] tracking-widest text-ink3 uppercase mb-1">${m.competition} · ${fmtDate(m.match_date)}</div>
+      <h1 class="font-h text-[24px] font-medium">Notes — FC Team vs ${escape(m.opponent)}</h1>
+      ${m.goals_for !== null ? `<div class="text-[13px] text-ink2 mt-1">Score : <span class="font-h font-semibold">${m.goals_for} – ${m.goals_against}</span></div>` : ''}
+    </div>
+    <form data-act="submit-ratings" data-match="${matchId}" class="space-y-3">
+      ${targets.map(l => {
+        const val = Number(already[l.player_id] ?? 5);
+        return `
+          <div class="bg-card border border-line rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <div class="font-medium text-[15px]">${escape(nameOf(l.player_id))}</div>
+                <div class="text-[11px] text-ink3">${escape(l.slot || 'banc')} · #${numOf(l.player_id)} · ${l.minutes_played}'</div>
+              </div>
+              <div class="font-h font-semibold text-[28px] text-accent" data-val="${l.player_id}">${val.toFixed(1)}</div>
+            </div>
+            <input type="range" min="0" max="10" step="0.5" value="${val}" class="rating-slider" data-rate="${l.player_id}">
+            <div class="flex justify-between text-[10px] text-ink3 mt-1"><span>0</span><span>5</span><span>10</span></div>
+          </div>`;
+      }).join('')}
+      ${targets.length === 0 ? '<div class="text-ink3 text-[13px]">Aucun joueur à noter pour ce match.</div>' : ''}
+      <button type="submit" class="w-full py-3 bg-accent text-bg font-h uppercase tracking-wider font-semibold rounded">Valider mes notes</button>
+    </form>
+  </main>`;
+}
+
+// ------- STATS --------
+function viewStats() {
+  const filt = S.filter.competition;
+  const soit = S.filter.side || 'played';
+
+  // Filter matches by competition
+  const matchIds = new Set(S.matches.filter(m => filt === 'all' || m.competition === filt).filter(m => m.status === 'played').map(m => m.id));
+
+  // Aggregate per player
+  const rows = S.profiles.map(p => {
+    const myLines = (S.allLineups || []).filter(l => l.player_id === p.id && matchIds.has(l.match_id));
+    const asPlayer = myLines.filter(l => l.role === 'player');
+    const asSupporter = myLines.filter(l => l.role === 'supporter');
+    const minutes = asPlayer.reduce((s, l) => s + (l.minutes_played||0), 0);
+    const goals = asPlayer.reduce((s, l) => s + (l.goals||0), 0);
+    const assists = asPlayer.reduce((s, l) => s + (l.assists||0), 0);
+    // goals conceded while on pitch
+    const myPresence = (S.allGoalsConcededLineup || []).filter(x => x.player_id === p.id);
+    const relevantGoals = (S.allGoalsConceded || []).filter(g => matchIds.has(g.match_id));
+    const conceded = myPresence.filter(x => relevantGoals.some(g => g.id === x.goal_id)).length;
+    const inv = conceded === 0 ? (minutes > 0 ? Infinity : 0) : minutes / conceded;
+    return {
+      id: p.id,
+      name: p.full_name,
+      num: p.jersey_number,
+      matches_played: asPlayer.length,
+      matches_supported: asSupporter.length,
+      minutes_played: minutes,
+      goals, assists, conceded,
+      inv,
+    };
+  });
+
+  // Sort
+  const { key, dir } = S.sort;
+  rows.sort((a, b) => {
+    let va = a[key], vb = b[key];
+    if (key === 'name') return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    if (va === Infinity) va = 999999;
+    if (vb === Infinity) vb = 999999;
+    return dir === 'asc' ? va - vb : vb - va;
+  });
+
+  const sideBtn = (v, l) => {
+    const on = soit === v;
+    return `<button data-act="side" data-val="${v}" class="px-3 py-1.5 rounded text-[12px] border ${on?'bg-accent text-bg border-accent':'border-line text-ink2 hover:bg-cardHi'}">${l}</button>`;
+  };
+
+  const th = (col, l) => {
+    const on = S.sort.key === col;
+    return `<th data-act="sort" data-col="${col}" class="p-2 text-[10px] tracking-widest uppercase text-ink3 cursor-pointer select-none hover:text-ink2 ${on?'text-accent':''}">${l}${on?(dir==='desc'?' ↓':' ↑'):''}</th>`;
+  };
+
+  return nav('stats') + `
+  <main class="max-w-5xl mx-auto px-4 py-6">
+    <div class="flex items-center justify-between mb-5 gap-3 flex-wrap">
+      <h1 class="font-h uppercase tracking-widest text-[22px] font-semibold">Stats</h1>
+      <div class="flex items-center gap-2">
+        ${filterChip('all', 'Tout')}
+        ${filterChip('championnat', 'Champ.')}
+        ${filterChip('coupe', 'Coupe')}
+      </div>
+    </div>
+
+    <div class="flex gap-2 mb-4">
+      ${sideBtn('played', 'Joués')}
+      ${sideBtn('supported', 'Supportés')}
+    </div>
+
+    <div class="bg-card border border-line rounded-lg overflow-x-auto">
+      <table class="w-full text-[13px]">
+        <thead class="border-b border-line">
+          <tr>
+            ${th('name', 'Joueur')}
+            ${soit==='played' ? `
+              ${th('matches_played', 'Matchs')}
+              ${th('minutes_played', 'Minutes')}
+              ${th('goals', 'Buts')}
+              ${th('assists', 'PD')}
+              ${th('inv', 'Invinc.')}
+            ` : `
+              ${th('matches_supported', 'Matchs support.')}
+            `}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr class="border-b border-line last:border-0 hover:bg-cardHi">
+              <td class="p-3">
+                <div class="flex items-center gap-2">
+                  <span class="pool-num shrink-0">${r.num ?? '—'}</span>
+                  <span class="truncate">${escape(r.name)}</span>
+                </div>
+              </td>
+              ${soit==='played' ? `
+                <td class="p-3 font-h text-[15px]">${r.matches_played}</td>
+                <td class="p-3 font-h text-[15px]">${r.minutes_played}'</td>
+                <td class="p-3 font-h text-[15px] ${r.goals>0?'text-accent':''}">${r.goals}</td>
+                <td class="p-3 font-h text-[15px] ${r.assists>0?'text-accent':''}">${r.assists}</td>
+                <td class="p-3 font-h text-[15px]">${r.inv === Infinity ? '∞' : r.inv > 0 ? r.inv.toFixed(0) + "'" : '—'}</td>
+              ` : `
+                <td class="p-3 font-h text-[15px]">${r.matches_supported}</td>
+              `}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="text-[11px] text-ink3 mt-3">Invincibilité = minutes jouées / buts encaissés pendant présence. Utile pour goals et défenseurs.</div>
+  </main>`;
+}
+
+// ------- DASHBOARD / ANALYSE (admin) --------
+function viewDashboard() {
+  if (!isAdmin()) return '';
+  const filt = S.filter.competition;
+  const played = S.matches.filter(m =>
+    m.status === 'played' && (filt === 'all' || m.competition === filt)
+  );
+  const matchIds = new Set(played.map(m => m.id));
+
+  // Aggregate per player
+  const stats = S.profiles.map(p => {
+    const myLines = (S.allLineups || []).filter(l =>
+      l.player_id === p.id && l.role === 'player' && matchIds.has(l.match_id)
+    );
+    const minutes = myLines.reduce((s, l) => s + (l.minutes_played || 0), 0);
+    const goals = myLines.reduce((s, l) => s + (l.goals || 0), 0);
+    const assists = myLines.reduce((s, l) => s + (l.assists || 0), 0);
+    const conceded = (S.allGoalsConcededLineup || []).filter(x =>
+      x.player_id === p.id &&
+      (S.allGoalsConceded || []).some(g => g.id === x.goal_id && matchIds.has(g.match_id))
+    ).length;
+    return {
+      id: p.id, name: p.full_name, num: p.jersey_number,
+      matches_played: myLines.length,
+      minutes, goals, assists, conceded,
+      per60Concede: minutes > 0 ? (conceded / minutes) * 60 : Infinity,
+      goalsAssists: goals + assists,
+    };
+  });
+
+  const MIN_MIN = 30;
+
+  function bestForSlot(formation, slot) {
+    const category = slot.split('_')[0];
+    const eligible = stats.filter(s =>
+      s.minutes >= MIN_MIN &&
+      (S.preferences || []).some(pref =>
+        pref.player_id === s.id && pref.formation === formation && pref.slot === slot
+      )
+    );
+    if (eligible.length === 0) return null;
+    let sorted;
+    if (category === 'GK' || category === 'DEF') {
+      sorted = eligible.slice().sort((a, b) =>
+        a.per60Concede - b.per60Concede || b.minutes - a.minutes
+      );
+    } else {
+      sorted = eligible.slice().sort((a, b) =>
+        b.goalsAssists - a.goalsAssists || b.goals - a.goals || a.per60Concede - b.per60Concede
+      );
+    }
+    return sorted[0];
+  }
+
+  const pitchXI = (formation) => {
+    const xi = FORMATIONS[formation].flat().map(slot =>
+      ({ slot, player: bestForSlot(formation, slot) })
+    );
+    const rows = FORMATIONS[formation];
+    const slotCell = (slot) => {
+      const entry = xi.find(x => x.slot === slot);
+      const p = entry?.player;
+      const category = slot.split('_')[0];
+      if (!p) {
+        return `<div class="flex flex-col items-center gap-1 py-1">
+          <div style="width:36px;height:36px;border:1.5px dashed rgba(148,163,184,0.3);border-radius:50%"></div>
+          <span class="text-[9px] text-ink3 tracking-widest">${slot.replace('_',' ')}</span>
+          <span class="text-[9px] text-warn">personne</span>
+        </div>`;
+      }
+      const metric = (category === 'GK' || category === 'DEF')
+        ? `${p.per60Concede.toFixed(2)} <span class="text-ink3">/60'</span>`
+        : `${p.goalsAssists} <span class="text-ink3">b+p</span>`;
+      return `<div class="flex flex-col items-center gap-1">
+        <div class="chip-num ${slot==='GK'?'gk':''}">${p.num ?? '?'}</div>
+        <div class="chip-name">${escape((p.name || '').split(' ')[0])}</div>
+        <div class="text-[9px] text-accent font-h font-semibold">${metric}</div>
+      </div>`;
+    };
+    return `
+      <div class="text-[11px] tracking-widest text-ink3 uppercase text-center mb-2">${formation}</div>
+      <div class="bg-pitch border border-pitchLine rounded-lg p-3 grid grid-rows-4 gap-2" style="min-height: 290px;">
+        ${rows.map(r => `<div class="flex justify-around items-center h-full">${r.map(slotCell).join('')}</div>`).join('')}
+      </div>`;
+  };
+
+  // Leaderboards
+  const topScorers = stats.filter(s => s.goals > 0)
+    .sort((a, b) => b.goals - a.goals || b.minutes - a.minutes).slice(0, 5);
+  const topAssists = stats.filter(s => s.assists > 0)
+    .sort((a, b) => b.assists - a.assists).slice(0, 5);
+  const topDef = stats.filter(s => s.minutes >= MIN_MIN)
+    .sort((a, b) => a.per60Concede - b.per60Concede).slice(0, 5);
+  const topMinutes = stats.filter(s => s.minutes > 0)
+    .sort((a, b) => b.minutes - a.minutes).slice(0, 5);
+
+  const board = (title, subtitle, rows, valFn, unit) => `
+    <div class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-1">${title}</div>
+      <div class="text-[10px] text-ink3 mb-3">${subtitle || '&nbsp;'}</div>
+      ${rows.length ? `
+        <div class="space-y-1">
+          ${rows.map((r, i) => `
+            <div class="flex items-center justify-between py-1.5 border-b border-line last:border-0">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="font-h text-ink3 text-[13px] w-5 text-right">${i+1}</span>
+                <span class="pool-num">${r.num ?? '—'}</span>
+                <span class="text-[13px] truncate">${escape(r.name)}</span>
+              </div>
+              <div class="flex items-baseline gap-1 shrink-0">
+                <span class="font-h font-semibold text-[17px] text-accent">${valFn(r)}</span>
+                ${unit ? `<span class="text-[10px] text-ink3">${unit}</span>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<div class="text-[13px] text-ink3">Pas encore de données</div>'}
+    </div>`;
+
+  const totalFor = played.reduce((s, m) => s + (m.goals_for || 0), 0);
+  const totalAgainst = played.reduce((s, m) => s + (m.goals_against || 0), 0);
+  const wins = played.filter(m => (m.goals_for||0) > (m.goals_against||0)).length;
+  const draws = played.filter(m => (m.goals_for||0) === (m.goals_against||0)).length;
+  const losses = played.filter(m => (m.goals_for||0) < (m.goals_against||0)).length;
+
+  return nav('dashboard') + `
+    <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <h1 class="font-h uppercase tracking-widest text-[22px] font-semibold">Analyse</h1>
+        <div class="flex gap-2">${filterChip('all','Tout')}${filterChip('championnat','Champ.')}${filterChip('coupe','Coupe')}</div>
+      </div>
+
+      ${played.length === 0 ? `
+        <div class="bg-card border border-line rounded-lg p-8 text-center">
+          <div class="text-[14px] text-ink3">Aucun match joué${filt !== 'all' ? ' en ' + filt : ''}. Les analyses s'afficheront dès les premiers résultats enregistrés.</div>
+        </div>
+      ` : `
+        <section class="bg-card border border-line rounded-lg p-4">
+          <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Bilan sur ${played.length} match${played.length>1?'s':''}</div>
+          <div class="grid grid-cols-4 gap-3 text-center">
+            <div><div class="font-h font-semibold text-[30px] text-ok leading-none">${wins}</div><div class="text-[10px] tracking-widest text-ink3 uppercase mt-1">Victoires</div></div>
+            <div><div class="font-h font-semibold text-[30px] text-ink2 leading-none">${draws}</div><div class="text-[10px] tracking-widest text-ink3 uppercase mt-1">Nuls</div></div>
+            <div><div class="font-h font-semibold text-[30px] text-bad leading-none">${losses}</div><div class="text-[10px] tracking-widest text-ink3 uppercase mt-1">Défaites</div></div>
+            <div><div class="font-h font-semibold text-[30px] text-accent leading-none">${totalFor}<span class="text-ink3 mx-1">–</span>${totalAgainst}</div><div class="text-[10px] tracking-widest text-ink3 uppercase mt-1">Buts</div></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="text-[11px] tracking-widest text-ink3 uppercase mb-2">Équipe type — meilleur XI par formation</div>
+          <div class="text-[12px] text-ink2 mb-4">Pour chaque poste : le joueur qui l'a coché en préférence <em>et</em> qui a les meilleures stats (min. ${MIN_MIN}' joués). Défense/GK : moins de buts encaissés/60'. Milieu/attaque : max buts + passes.</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-card border border-line rounded-lg p-4">${pitchXI('2-3-1')}</div>
+            <div class="bg-card border border-line rounded-lg p-4">${pitchXI('3-2-1')}</div>
+          </div>
+        </section>
+
+        <section>
+          <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Classements individuels</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${board('Meilleurs buteurs', 'Total buts marqués', topScorers, r => r.goals, 'buts')}
+            ${board('Meilleurs passeurs', 'Total passes décisives', topAssists, r => r.assists, 'pd')}
+            ${board('Meilleurs défensivement', 'Buts encaissés / 60min sur le terrain (min ' + MIN_MIN + "' joués)", topDef, r => r.per60Concede.toFixed(2), '')}
+            ${board('Les plus présents', 'Temps de jeu total', topMinutes, r => r.minutes, 'min')}
+          </div>
+        </section>
+      `}
+    </main>`;
+}
+
+// ------- NOTES (admin only) --------
+function viewNotesAdmin() {
+  if (!isAdmin()) { navigate('#/calendrier'); return ''; }
+  const filt = S.filter.competition;
+  const played = S.matches.filter(m => (filt === 'all' || m.competition === filt) && m.status === 'played');
+
+  // Global average per player
+  const global = S.profiles.map(p => {
+    const rs = S.ratingsAll.filter(r => r.rated_player_id === p.id && played.some(m => m.id === r.match_id));
+    const avg = rs.length ? rs.reduce((s, r) => s + Number(r.rating), 0) / rs.length : null;
+    return { id: p.id, name: p.full_name, num: p.jersey_number, avg, count: rs.length };
+  }).filter(x => x.count > 0).sort((a, b) => (b.avg||0) - (a.avg||0));
+
+  return nav('notes') + `
+  <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <h1 class="font-h uppercase tracking-widest text-[22px] font-semibold">Notes reçues</h1>
+      <div class="flex gap-2">${filterChip('all','Tout')}${filterChip('championnat','Champ.')}${filterChip('coupe','Coupe')}</div>
+    </div>
+
+    <section class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Classement des moyennes</div>
+      <div class="space-y-1">
+        ${global.map((g, i) => `
+          <div class="flex items-center justify-between py-2 border-b border-line last:border-0">
+            <div class="flex items-center gap-3">
+              <span class="font-h text-ink3 w-6 text-right">${i+1}</span>
+              <span class="pool-num">${g.num ?? '—'}</span>
+              <span class="text-[14px]">${escape(g.name)}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-[11px] text-ink3">${g.count} note${g.count>1?'s':''}</span>
+              <span class="font-h font-semibold text-[20px] text-accent">${g.avg.toFixed(2)}</span>
+            </div>
+          </div>
+        `).join('') || '<div class="text-[13px] text-ink3">Aucune note pour l\'instant</div>'}
+      </div>
+    </section>
+
+    <section>
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Match par match</div>
+      <div class="space-y-3">
+        ${played.map(m => {
+          const rs = S.ratingsAll.filter(r => r.match_id === m.id);
+          const players = [...new Set(rs.map(r => r.rated_player_id))];
+          const rows = players.map(pid => {
+            const list = rs.filter(r => r.rated_player_id === pid);
+            const avg = list.reduce((s, r) => s + Number(r.rating), 0) / list.length;
+            return { pid, avg, n: list.length };
+          }).sort((a, b) => b.avg - a.avg);
+          return `
+            <details class="bg-card border border-line rounded-lg">
+              <summary class="cursor-pointer p-3 flex items-center justify-between">
+                <div>
+                  <div class="font-h text-[16px]">FC Team — ${escape(m.opponent)}</div>
+                  <div class="text-[11px] text-ink3">${fmtDate(m.match_date)} · ${m.competition}${m.goals_for!==null?` · ${m.goals_for}-${m.goals_against}`:''}</div>
+                </div>
+                <span class="text-[11px] text-ink3">${rs.length} note${rs.length>1?'s':''}</span>
+              </summary>
+              <div class="border-t border-line p-3">
+                ${rows.length ? rows.map(r => `
+                  <div class="flex justify-between items-center py-1.5">
+                    <span class="text-[13px]">${escape(nameOf(r.pid))}</span>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[11px] text-ink3">${r.n}</span>
+                      <span class="font-h font-semibold text-[15px] text-accent">${r.avg.toFixed(2)}</span>
+                    </div>
+                  </div>
+                `).join('') : '<div class="text-[12px] text-ink3">Aucune note pour ce match</div>'}
+              </div>
+            </details>`;
+        }).join('')}
+      </div>
+    </section>
+  </main>`;
+}
+
+// ------- NOTES (player) --------
+function viewNotesPlayer() {
+  const detail = S.myRatingsDetail || [];
+  const totalN = detail.length;
+  const overallAvg = totalN > 0 ? detail.reduce((s, r) => s + Number(r.rating), 0) / totalN : null;
+
+  // Group by match
+  const byMatch = {};
+  detail.forEach(r => {
+    if (!byMatch[r.match_id]) byMatch[r.match_id] = [];
+    byMatch[r.match_id].push(r);
+  });
+
+  const rows = Object.entries(byMatch)
+    .map(([mid, ratings]) => {
+      const m = S.matches.find(x => x.id === mid);
+      if (!m) return null;
+      const avg = ratings.reduce((s, r) => s + Number(r.rating), 0) / ratings.length;
+      return { match: m, ratings, avg };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.match.match_date) - new Date(a.match.match_date));
+
+  return nav('notes') + `
+  <main class="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <h1 class="font-h uppercase tracking-widest text-[22px] font-semibold">Mes notes</h1>
+
+    <section class="bg-card border border-line rounded-lg p-4">
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-2">Ma moyenne globale donnée</div>
+      ${overallAvg !== null ? `
+        <div class="flex items-baseline gap-3">
+          <span class="font-h font-semibold text-[36px] text-accent">${overallAvg.toFixed(2)}</span>
+          <span class="text-[12px] text-ink3">sur ${totalN} note${totalN>1?'s':''} · ${rows.length} match${rows.length>1?'s':''}</span>
+        </div>
+      ` : `<div class="text-[13px] text-ink3">Tu n'as pas encore noté de match.</div>`}
+    </section>
+
+    <section>
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-3">Détail match par match</div>
+      <div class="space-y-3">
+        ${rows.length ? rows.map(r => `
+          <details class="bg-card border border-line rounded-lg">
+            <summary class="cursor-pointer p-3 flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-[10px] tracking-widest text-ink3 uppercase mb-0.5">${r.match.competition} · ${fmtDate(r.match.match_date)}</div>
+                <div class="font-h text-[16px] truncate">FC Team — ${escape(r.match.opponent)}</div>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-[11px] text-ink3">${r.ratings.length} note${r.ratings.length>1?'s':''}</span>
+                <span class="font-h font-semibold text-[20px] text-accent">${r.avg.toFixed(2)}</span>
+              </div>
+            </summary>
+            <div class="border-t border-line p-3 space-y-1">
+              ${r.ratings
+                .slice()
+                .sort((a, b) => Number(b.rating) - Number(a.rating))
+                .map(x => `
+                  <div class="flex justify-between items-center py-1">
+                    <span class="text-[13px]">${escape(nameOf(x.rated_player_id))}</span>
+                    <span class="font-h font-semibold text-[15px] text-accent">${Number(x.rating).toFixed(1)}</span>
+                  </div>
+                `).join('')}
+            </div>
+          </details>
+        `).join('') : '<div class="text-[13px] text-ink3">Aucun match noté pour l\'instant.</div>'}
+      </div>
+    </section>
+
+    <div class="text-[11px] text-ink3 leading-relaxed">
+      Tu vois seulement les notes que tu as mises. Les notes que tu reçois, et celles données par les autres, ne sont accessibles qu'à l'admin.
+    </div>
+  </main>`;
+}
+
+// ------- PROFIL --------
+function viewProfile() {
+  if (!S.me) return '<main class="max-w-3xl mx-auto px-4 py-6 text-ink3">Chargement…</main>';
+  return nav('profile') + `
+  <main class="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <div>
+      <h1 class="font-h uppercase tracking-widest text-[22px] font-semibold">${escape(S.me.full_name)}</h1>
+      <div class="text-[13px] text-ink2 mt-1">Numéro <span class="font-h font-semibold text-ink">${S.me.jersey_number ?? '—'}</span>${S.me.is_admin ? ' · <span class="text-accent">admin</span>' : ''}</div>
+    </div>
+
+    <section>
+      <div class="text-[11px] tracking-widest text-ink3 uppercase mb-2">Mes postes préférés</div>
+      <div class="text-[12px] text-ink2 mb-4">Clique sur les positions où tu aimes jouer, dans chaque formation. Coche autant de postes que tu veux — plus tu en coches, plus l'admin peut te placer facilement.</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-card border border-line rounded-lg p-4">
+          ${pitchProfile('2-3-1')}
+        </div>
+        <div class="bg-card border border-line rounded-lg p-4">
+          ${pitchProfile('3-2-1')}
+        </div>
+      </div>
+    </section>
+
+    <div class="text-[11px] text-ink3">Le nom et le numéro se modifient dans l'onglet Équipe (côté admin).</div>
+  </main>`;
+}
+
+// ------- TEAM (admin) --------
+function viewTeam() {
+  if (!isAdmin()) { navigate('#/calendrier'); return ''; }
+  return nav('team') + `
+  <main class="max-w-3xl mx-auto px-4 py-6">
+    <h1 class="font-h uppercase tracking-widest text-[22px] font-semibold mb-5">Équipe</h1>
+    <div class="bg-card border border-line rounded-lg divide-y divide-line">
+      ${S.profiles.map(p => `
+        <div class="p-3 flex items-center gap-3 flex-wrap">
+          <div class="pool-num shrink-0">${p.jersey_number ?? '—'}</div>
+          <input type="number" min="1" max="99" placeholder="N°" class="fld w-16 text-center" data-act="set-num" data-id="${p.id}" value="${p.jersey_number ?? ''}">
+          <input type="text" placeholder="Nom" class="fld flex-1 min-w-[140px]" data-act="set-name" data-id="${p.id}" value="${escape(p.full_name)}">
+          <button data-act="toggle-admin" data-id="${p.id}" class="px-2 py-1.5 text-[12px] border border-line rounded hover:bg-cardHi">${p.is_admin?'Rétrograder admin':'Promouvoir admin'}</button>
+        </div>
+      `).join('')}
+    </div>
+    <div class="text-[11px] text-ink3 mt-4">Les postes préférés se règlent sur la page Profil de chaque joueur.</div>
+    <div class="text-[11px] text-ink3 mt-4">Les inscriptions se font depuis l'écran de connexion.</div>
+  </main>`;
+}
+
+// ------- MATCH MODAL (create/edit) --------
+function modalMatch(m) {
+  const isEdit = !!m;
+  return `
+  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" data-modal>
+    <div class="bg-card border border-line rounded-lg w-full max-w-md p-5">
+      <h2 class="font-h text-[20px] mb-4">${isEdit?'Modifier le match':'Nouveau match'}</h2>
+      <form data-act="save-match" data-id="${m?.id ?? ''}" class="space-y-3">
+        <label class="block text-[11px] text-ink3 uppercase tracking-wide">Adversaire
+          <input class="fld mt-1" name="opponent" value="${escape(m?.opponent ?? '')}" required>
+        </label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block text-[11px] text-ink3 uppercase tracking-wide">Compétition
+            <select class="fld mt-1" name="competition" required>
+              <option value="championnat" ${m?.competition==='championnat'?'selected':''}>Championnat</option>
+              <option value="coupe" ${m?.competition==='coupe'?'selected':''}>Coupe</option>
+            </select>
+          </label>
+          <label class="block text-[11px] text-ink3 uppercase tracking-wide">Formation
+            <select class="fld mt-1" name="formation">
+              <option value="2-3-1" ${(m?.formation??'2-3-1')==='2-3-1'?'selected':''}>2-3-1</option>
+              <option value="3-2-1" ${m?.formation==='3-2-1'?'selected':''}>3-2-1</option>
+            </select>
+          </label>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block text-[11px] text-ink3 uppercase tracking-wide">Date &amp; heure
+            <input type="datetime-local" class="fld mt-1" name="match_date" value="${m ? toInputDT(m.match_date) : ''}" required>
+          </label>
+          <label class="block text-[11px] text-ink3 uppercase tracking-wide">Durée (min)
+            <input type="number" min="20" max="120" step="5" class="fld mt-1" name="duration" value="${m?.duration ?? 60}" required>
+          </label>
+        </div>
+        <label class="block text-[11px] text-ink3 uppercase tracking-wide">Lieu (optionnel)
+          <input class="fld mt-1" name="venue" value="${escape(m?.venue ?? '')}">
+        </label>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" data-act="close-modal" class="px-4 py-2 border border-line rounded text-[13px]">Annuler</button>
+          <button type="submit" class="px-4 py-2 bg-accent text-bg font-medium rounded text-[13px]">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+// =====================================================
+// RENDER
+// =====================================================
+async function render() {
+  const hash = location.hash || '#/calendrier';
+
+  if (!S.session) {
+    app().innerHTML = viewLogin();
+    return;
+  }
+
+  // Gate: pending ratings force redirect
+  if (S.pendingRatings.length > 0 && !hash.startsWith('#/rate/')) {
+    const id = S.pendingRatings[0];
+    location.hash = '#/rate/' + id;
+    return;
+  }
+
+  const parts = hash.slice(2).split('/');
+  const view = parts[0] || 'calendrier';
+
+  try {
+    if (view === 'calendrier') {
+      app().innerHTML = viewCalendar();
+    } else if (view === 'match') {
+      await loadMatch(parts[1]);
+      app().innerHTML = viewMatch(parts[1]);
+      initPitchSortable();
+    } else if (view === 'rate') {
+      await loadMatch(parts[1]);
+      await loadMyRatingsForMatch(parts[1]);
+      app().innerHTML = viewRate(parts[1]);
+      bindRateSliders();
+    } else if (view === 'stats') {
+      await loadAllLineups();
+      await loadAllGoalsConceded();
+      app().innerHTML = viewStats();
+    } else if (view === 'analyse') {
+      if (!isAdmin()) { navigate('#/calendrier'); return; }
+      await Promise.all([loadAllLineups(), loadAllGoalsConceded()]);
+      app().innerHTML = viewDashboard();
+    } else if (view === 'notes') {
+      if (isAdmin()) {
+        await loadRatingsAll();
+        app().innerHTML = viewNotesAdmin();
+      } else {
+        await loadMyRatingsDetail();
+        app().innerHTML = viewNotesPlayer();
+      }
+    } else if (view === 'profil') {
+      app().innerHTML = viewProfile();
+    } else if (view === 'equipe') {
+      app().innerHTML = viewTeam();
+    } else {
+      app().innerHTML = viewCalendar();
+    }
+  } catch (e) {
+    console.error(e);
+    toast('Erreur : ' + (e.message || e), 'bad');
+  }
+}
+
+// =====================================================
+// PITCH SORTABLE (drag & drop)
+// =====================================================
+function initPitchSortable() {
+  if (!isAdmin()) return;
+  const base = {
+    group: 'team',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    dragClass: 'sortable-drag',
+    onStart: (evt) => {
+      const pid = evt.item?.dataset?.playerId;
+      if (!pid || !S.match) return;
+      const prefSlots = new Set(
+        (S.preferences || [])
+          .filter(x => x.player_id === pid && x.formation === S.match.formation)
+          .map(x => x.slot)
+      );
+      $$('#pitch .slot').forEach(slot => {
+        if (prefSlots.has(slot.dataset.slot)) slot.classList.add('slot-pref');
+      });
+    },
+  };
+
+  $$('#pitch .slot').forEach(slotEl => Sortable.create(slotEl, {
+    ...base,
+    onAdd: (evt) => {
+      // Kick out any pre-existing chip (max 1 per slot)
+      [...slotEl.children].forEach(c => {
+        if (c !== evt.item && c.hasAttribute('data-player-id')) {
+          $('#pool')?.appendChild(c);
+        }
+      });
+    },
+    onEnd: async (evt) => {
+      $$('#pitch .slot').forEach(s => s.classList.remove('slot-pref'));
+      await persistAndRefresh();
+    },
+  }));
+
+  ['#bench', '#pool'].forEach(sel => {
+    const el = $(sel);
+    if (el) Sortable.create(el, {
+      ...base,
+      onEnd: async () => {
+        $$('#pitch .slot').forEach(s => s.classList.remove('slot-pref'));
+        await persistAndRefresh();
+      },
+    });
+  });
+}
+
+let _persisting = false;
+async function persistAndRefresh() {
+  if (_persisting) return;
+  _persisting = true;
+  try {
+    await persistLineup();
+    await loadMatch(S.match.id);
+    app().innerHTML = viewMatch(S.match.id);
+    initPitchSortable();
+  } finally {
+    _persisting = false;
+  }
+}
+
+async function persistLineup() {
+  const matchId = S.match.id;
+  const slotsDom = $$('#pitch .slot');
+  const benchDom = $$('#bench > [data-player-id]');
+
+  const assignments = [];
+  slotsDom.forEach(slot => {
+    // Any element with data-player-id counts, whether it came from pool (.pool-chip) or pitch (.chip)
+    const chip = slot.querySelector('[data-player-id]');
+    if (chip) assignments.push({
+      player_id: chip.dataset.playerId,
+      slot: slot.dataset.slot,
+      role: 'player',
+    });
+  });
+  benchDom.forEach(chip => {
+    assignments.push({ player_id: chip.dataset.playerId, slot: null, role: 'player' });
+  });
+
+  // Preserve supporters as-is
+  const supporters = S.lineup.filter(l => l.role === 'supporter')
+    .map(l => ({ player_id: l.player_id, slot: null, role: 'supporter' }));
+  const all = [...assignments, ...supporters];
+
+  const del = await sb.from('lineups').delete().eq('match_id', matchId);
+  if (del.error) return toast('Erreur suppression compo', 'bad');
+  if (all.length === 0) return;
+
+  const rows = all.map(a => ({ match_id: matchId, ...a }));
+  const ins = await sb.from('lineups').insert(rows);
+  if (ins.error) return toast('Erreur enregistrement compo', 'bad');
+  toast('Compo enregistrée', 'ok');
+}
+
+// =====================================================
+// EVENTS
+// =====================================================
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  // Skip forms: they're handled by the submit listener, and matching them on click
+  // would prevent inputs inside from receiving focus / firing empty submits.
+  if (el.tagName === 'FORM') return;
+  const act = el.dataset.act;
+  const H = handlers[act];
+  if (H) { e.preventDefault(); await H(el, e); }
+});
+
+document.addEventListener('submit', async (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act;
+  const H = handlers[act];
+  if (H) { e.preventDefault(); await H(el, e); }
+});
+
+document.addEventListener('change', async (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act;
+  const H = changeHandlers[act];
+  if (H) await H(el, e);
+});
+
+// -- Handlers map --
+const handlers = {
+  'logout': async () => {
+    await sb.auth.signOut();
+    location.hash = '#/login';
+    location.reload();
+  },
+  'auth-mode': (el) => {
+    S._authMode = el.dataset.mode;
+    S._authErr = '';
+    render();
+  },
+  'auth-submit': async (el) => {
+    const f = new FormData(el);
+    const mode = el.dataset.mode;
+    S._authErr = '';
+    if (mode === 'login') {
+      const { error } = await sb.auth.signInWithPassword({ email: f.get('email'), password: f.get('password') });
+      if (error) { S._authErr = error.message; render(); return; }
+    } else {
+      const { error } = await sb.auth.signUp({
+        email: f.get('email'), password: f.get('password'),
+        options: { data: { full_name: f.get('name') } },
+      });
+      if (error) { S._authErr = error.message; render(); return; }
+      S._authErr = 'Compte créé. Vérifie ton email si demandé, puis connecte-toi.';
+      S._authMode = 'login';
+      render();
+      return;
+    }
+    await init();
+  },
+  'filter-comp': (el) => { S.filter.competition = el.dataset.val; render(); },
+  'side': (el) => { S.filter.side = el.dataset.val; render(); },
+  'sort': (el) => {
+    const col = el.dataset.col;
+    if (S.sort.key === col) S.sort.dir = S.sort.dir === 'desc' ? 'asc' : 'desc';
+    else { S.sort.key = col; S.sort.dir = 'desc'; }
+    render();
+  },
+  'new-match': () => {
+    const div = document.createElement('div');
+    div.innerHTML = modalMatch(null);
+    document.body.appendChild(div.firstElementChild);
+  },
+  'edit-match': () => {
+    const div = document.createElement('div');
+    div.innerHTML = modalMatch(S.match);
+    document.body.appendChild(div.firstElementChild);
+  },
+  'close-modal': () => { $('[data-modal]')?.remove(); },
+  'save-match': async (el) => {
+    const f = new FormData(el);
+    const id = el.dataset.id;
+    const payload = {
+      opponent: f.get('opponent'),
+      competition: f.get('competition'),
+      formation: f.get('formation'),
+      match_date: new Date(f.get('match_date')).toISOString(),
+      duration: Number(f.get('duration')) || 60,
+      venue: f.get('venue') || null,
+    };
+    if (id) {
+      const { error } = await sb.from('matches').update(payload).eq('id', id);
+      if (error) return toast(error.message, 'bad');
+      toast('Match modifié', 'ok');
+    } else {
+      const { error } = await sb.from('matches').insert(payload);
+      if (error) return toast(error.message, 'bad');
+      toast('Match créé', 'ok');
+    }
+    $('[data-modal]')?.remove();
+    await loadMatches();
+    if (id && S.match) await loadMatch(id);
+    render();
+  },
+  'delete-match': async () => {
+    if (!confirm('Supprimer ce match définitivement ?')) return;
+    const { error } = await sb.from('matches').delete().eq('id', S.match.id);
+    if (error) return toast(error.message, 'bad');
+    await loadMatches();
+    navigate('#/calendrier');
+  },
+  'mark-played': async () => {
+    const { error } = await sb.from('matches').update({ status: 'played' }).eq('id', S.match.id);
+    if (error) return toast(error.message, 'bad');
+    await loadMatches(); await loadMatch(S.match.id);
+    render();
+  },
+  'mark-upcoming': async () => {
+    const { error } = await sb.from('matches').update({ status: 'upcoming' }).eq('id', S.match.id);
+    if (error) return toast(error.message, 'bad');
+    await loadMatches(); await loadMatch(S.match.id);
+    render();
+  },
+  'avail': async (el) => {
+    const status = el.dataset.status;
+    const { error } = await sb.from('availabilities').upsert({
+      match_id: S.match.id, player_id: S.me.id, status,
+    }, { onConflict: 'match_id,player_id' });
+    if (error) return toast(error.message, 'bad');
+    await loadMatch(S.match.id);
+    render();
+    toast('Dispo enregistrée', 'ok');
+  },
+  'remove-supporter': async (el) => {
+    const pid = el.dataset.playerId;
+    const { error } = await sb.from('lineups').delete().eq('match_id', S.match.id).eq('player_id', pid).eq('role', 'supporter');
+    if (error) return toast(error.message, 'bad');
+    await loadMatch(S.match.id); render();
+  },
+  'clear-lineup': async () => {
+    if (!confirm('Vider tous les postes ?')) return;
+    const { error } = await sb.from('lineups').delete().eq('match_id', S.match.id).eq('role', 'player');
+    if (error) return toast(error.message, 'bad');
+    await loadMatch(S.match.id); render(); initPitchSortable();
+  },
+  'add-goal-conceded': async (el) => {
+    // Now a form submit with a minute input
+    const f = new FormData(el);
+    const minute = Number(f.get('minute'));
+    const { error } = await sb.from('goals_conceded').insert({ match_id: S.match.id, minute });
+    if (error) return toast(error.message, 'bad');
+    toast('But encaissé enregistré', 'ok');
+    await loadMatch(S.match.id); await loadMatches(); render();
+  },
+  'del-goal-conceded': async (el) => {
+    const { error } = await sb.from('goals_conceded').delete().eq('id', el.dataset.id);
+    if (error) return toast(error.message, 'bad');
+    await loadMatch(S.match.id); await loadMatches(); render();
+  },
+  'add-goal-for': async (el) => {
+    const f = new FormData(el);
+    const minute = Number(f.get('minute'));
+    const scorer_id = f.get('scorer_id') || null;
+    const assist_id = f.get('assist_id') || null;
+    if (scorer_id && assist_id && scorer_id === assist_id) {
+      return toast('Buteur et passeur doivent être différents', 'bad');
+    }
+    const { error } = await sb.from('goals_for').insert({
+      match_id: S.match.id, minute, scorer_id, assist_id,
+    });
+    if (error) return toast(error.message, 'bad');
+    toast('But marqué enregistré', 'ok');
+    await loadMatch(S.match.id); await loadMatches(); render();
+  },
+  'del-goal-for': async (el) => {
+    const { error } = await sb.from('goals_for').delete().eq('id', el.dataset.id);
+    if (error) return toast(error.message, 'bad');
+    await loadMatch(S.match.id); await loadMatches(); render();
+  },
+  'add-sub': async (el) => {
+    const f = new FormData(el);
+    const minute = Number(f.get('minute'));
+    const player_off = f.get('player_off');
+    const player_on = f.get('player_on');
+    if (!player_off || !player_on || player_off === player_on) {
+      return toast('Choisis un sortant et un entrant différents', 'bad');
+    }
+    const { error } = await sb.from('substitutions').insert({
+      match_id: S.match.id, minute, player_off, player_on,
+    });
+    if (error) return toast(error.message, 'bad');
+    toast('Sub enregistrée', 'ok');
+    await loadMatch(S.match.id); render();
+  },
+  'del-sub': async (el) => {
+    const { error } = await sb.from('substitutions').delete().eq('id', el.dataset.id);
+    if (error) return toast(error.message, 'bad');
+    await loadMatch(S.match.id); render();
+  },
+  'submit-ratings': async (el) => {
+    const matchId = el.dataset.match;
+    const sliders = $$('input[data-rate]', el);
+    const entries = sliders.map(s => ({
+      rated_player_id: s.dataset.rate,
+      rating: Number(s.value),
+    }));
+    const { error } = await sb.rpc('submit_ratings', { mid: matchId, entries });
+    if (error) return toast(error.message, 'bad');
+    toast('Notes enregistrées', 'ok');
+    await checkPendingRatings();
+    if (S.pendingRatings.length > 0) {
+      location.hash = '#/rate/' + S.pendingRatings[0];
+      render();
+    } else {
+      navigate('#/calendrier');
+    }
+  },
+  'toggle-admin': async (el) => {
+    const p = S.profiles.find(x => x.id === el.dataset.id);
+    if (!p) return;
+    if (!confirm(`${p.is_admin?'Rétrograder':'Promouvoir'} ${p.full_name} ?`)) return;
+    const { error } = await sb.from('profiles').update({ is_admin: !p.is_admin }).eq('id', p.id);
+    if (error) return toast(error.message, 'bad');
+    await loadProfiles(); await loadMe(); render();
+  },
+  'toggle-pref': async (el) => {
+    const formation = el.dataset.formation;
+    const slot = el.dataset.slot;
+    const pid = S.me.id;
+    const existing = S.preferences.find(p => p.player_id === pid && p.formation === formation && p.slot === slot);
+    if (existing) {
+      const { error } = await sb.from('player_position_preferences').delete()
+        .eq('player_id', pid).eq('formation', formation).eq('slot', slot);
+      if (error) return toast(error.message, 'bad');
+      S.preferences = S.preferences.filter(p => !(p.player_id === pid && p.formation === formation && p.slot === slot));
+    } else {
+      const row = { player_id: pid, formation, slot };
+      const { error } = await sb.from('player_position_preferences').insert(row);
+      if (error) return toast(error.message, 'bad');
+      S.preferences.push(row);
+    }
+    render();
+  },
+};
+
+// -- Change handlers (inputs) --
+const changeHandlers = {
+  'change-formation': async (el) => {
+    const val = el.value;
+    const { error } = await sb.from('matches').update({ formation: val }).eq('id', S.match.id);
+    if (error) return toast(error.message, 'bad');
+    await loadMatch(S.match.id); render(); initPitchSortable();
+  },
+  'set-num': async (el) => {
+    const v = el.value === '' ? null : Number(el.value);
+    const { error } = await sb.from('profiles').update({ jersey_number: v }).eq('id', el.dataset.id);
+    if (error) return toast(error.message, 'bad');
+    await loadProfiles();
+  },
+  'set-name': async (el) => {
+    const { error } = await sb.from('profiles').update({ full_name: el.value }).eq('id', el.dataset.id);
+    if (error) return toast(error.message, 'bad');
+    await loadProfiles();
+  },
+  'add-supporter': async (el) => {
+    if (!el.value) return;
+    const pid = el.value;
+    const { error } = await sb.from('lineups').insert({
+      match_id: S.match.id, player_id: pid, role: 'supporter', slot: null,
+    });
+    if (error) return toast(error.message, 'bad');
+    el.value = '';
+    await loadMatch(S.match.id); render();
+  },
+};
+
+// -- Rating sliders live update --
+function bindRateSliders() {
+  $$('input.rating-slider').forEach(s => {
+    s.addEventListener('input', () => {
+      const pid = s.dataset.rate;
+      const out = $(`[data-val="${pid}"]`);
+      if (out) out.textContent = Number(s.value).toFixed(1);
+    });
+  });
+}
+
+// =====================================================
+// INIT
+// =====================================================
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  S.session = session;
+  if (!session) {
+    app().innerHTML = viewLogin();
+    return;
+  }
+  await loadMe();
+  await Promise.all([loadProfiles(), loadMatches(), loadPreferences()]);
+  if (isAdmin()) await loadRatingsAll();
+  await checkPendingRatings();
+  render();
+}
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') {
+    S.session = null; S.me = null;
+    location.hash = '#/login';
+    render();
+  }
+});
+
+init();
+</script>
+</body>
+</html>
