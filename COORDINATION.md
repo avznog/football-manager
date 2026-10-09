@@ -19,6 +19,17 @@ a fact here you still leave a dated line in your own Log lane.
 **2026-10-09, evening — read this block first; the lines under it predate the rework and are stale
 where they disagree.**
 
+- **The owner's second backlog (`backlogs/backlog2.md`) has landed**: #189 (the positions picker is the
+  1-2-3-1, twin DC and AIL linked, decision 173), #190 (Mode match leads the match page; a change from
+  a tapped player asks only who comes in, 174–175), #191 (`/stats`: five per list plus « Tout
+  afficher », raw conceded rates, the squad as a table, 176–178). No migration. `docs/ROADMAP.md`
+  `## M9` holds them, and one open item for the owner (a minimum of minutes on the raw rate cards).
+- **CI's end-to-end job cannot pull `postgres:17`** — the owner's Docker Hub pull limit (200 per 6 h)
+  was exhausted on 2026-10-09 evening. By the owner's instruction #189–#191 were merged on a local
+  Playwright run (9/9 on each rebased commit) instead. **The same failure skips `migrate-preview` and
+  `deploy-preview` on `main`, so the preview does not carry #189–#191 yet**: once the limit resets,
+  `gh run rerun --failed` on the latest `main` run of `ci.yml` deploys it. Switching the image to the
+  `public.ecr.aws/docker/library/postgres:17` mirror was offered and not chosen; it is the owner's.
 - **The cahier des charges rework has landed in full.** All thirteen slices, S1–S13 (#174–#186), are
   merged on `main` and deployed to the **preview**. Every issue #160–#172 is closed, and the Project
   « Football-manager » (`gh project view 5 --owner avznog`) holds every merged pull request and every
@@ -40,7 +51,7 @@ where they disagree.**
   on `/joueur/[id]`. Only Lucas has them in production, so six of seven discs read « pas son poste »
   in every seven.
 - **Decision numbers in use**: 145–147 (the plan), 150–153, 155–166, 169–172. 148, 149, 154, 167 and
-  168 were reserved and never used; the next free number is **173**.
+  168 were reserved and never used; 173–178 are backlog 2; the next free number is **179**.
 
 Keep it to these labelled lines, and keep them short. The 200 lines this section replaced were a
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading

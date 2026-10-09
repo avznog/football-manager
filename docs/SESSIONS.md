@@ -5150,3 +5150,24 @@ printed beside its record; a minimum of minutes would be one `filter` if he want
 Files: `lib/stats/{aggregate,impact,format}.ts` and their tests, `app/(app)/stats/page.tsx`,
 `app/(app)/stats/_components/{parts,leaderboard,rate-board,impact,filters,player-list}.tsx`,
 `app/(app)/joueur/_components/stats-card.tsx`, `e2e/happy-path.spec.ts`, `docs/`.
+
+## 2026-10-09 — Backlog 2 merged: three tracks, and a CI that could not pull its database
+
+The owner wrote six remarks in `backlogs/backlog2.md` and asked for subagents to understand them and
+act. Three read-only agents mapped each remark to the code first; three implementing agents then ran
+in parallel worktrees, each with its own freshly migrated and seeded database (`football_bk_t1..t3`,
+dropped afterwards) and port (3101–3103), grouped so no two touched the same source file: the player
+sheet (#189), the match page and game mode (#190), `/stats` (#191). This session reviewed each diff
+and its 390 px screenshots, committed, rebased onto the previous merge and re-ran every gate.
+
+- **The owner's local `football_manager` database is 10 migrations behind** (5 of 15 applied). It
+  was left alone; a scratch database from `createdb` + `db:migrate` + `db:seed` is cheaper than
+  guessing what the owner keeps in it.
+- **Docker Hub's pull limit stopped CI's end-to-end job** at « Initialize containers », before any
+  test. By the owner's decision the three PRs merged on local Playwright runs of the rebased commits
+  (9/9 each). The preview therefore did not deploy; see `COORDINATION.md`.
+- **The only conflicts were the three appended docs**, as every slice appends to `DECISIONS.md`,
+  `ROADMAP.md` and `SESSIONS.md`; reserving decision numbers up front (173 / 174–175 / 176–178) made
+  each one a keep-both. The M9 roadmap heading, created by two agents, merged as one.
+
+Files: `COORDINATION.md`, `docs/SESSIONS.md`.
