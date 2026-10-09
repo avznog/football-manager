@@ -93,7 +93,7 @@ function isProblem(member: LineupPitchMember | undefined): boolean {
 
 function statusLabelOf(member: LineupPitchMember | undefined): string | undefined {
   if (member === undefined) return "hors effectif";
-  if (member.squadRole === null) return "hors feuille de match";
+  if (member.squadRole === null) return "non sélectionné";
   if (member.squadRole === "supporter") return "supporter";
   if (member.isInjured) return "blessé";
   return undefined;

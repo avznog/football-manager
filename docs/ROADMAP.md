@@ -802,9 +802,18 @@ tag during this rework** (decision 146): every item below reaches the preview on
       match sheet; the tallies, the relance message and their labels in `lib/calendar/`; the demo
       season's answers; « disponibilités » in the app description and the « Retirer de l’effectif »
       card. The happy path's availability step became « a player opens the match and is asked
-      nothing ». Migration `0012_curvy_kitty_pryde.sql` drops `match_availability` and
+      nothing ». Migration `0013_known_apocalypse.sql` drops `match_availability` and
       `availability_status`
-- [ ] **S4** · #163 · one formation, `1-2-3-1`, positions GB / DC / MC / AIL / AT
+- [x] **S4** · #163 · one formation, `1-2-3-1`, positions GB / DC / MC / AIL / AT
+      - [x] **S4 `feat/single-formation` — one formation, five positions** (decisions **157**, **158**). The
+            `1-2-3-1` is the only formation: GB, DC × 2, AIL × 2 either side of MC, AT. New position `AIL`
+            « Ailier » replaces `MG`/`MD`; the vocabulary is exactly GB, DC, MC, AIL, AT. Migration
+            `0012_single_formation.sql` inserts `AIL`, rewrites the built-in's two side slots in place, and maps
+            `player_positions` (DG/DD → DC, AG/AD/MG/MD → AIL, MOC → MC). The formation select and the
+            « Postes » mode are gone from the composition editor, the formation select from the game-mode
+            composer, and the « Forme de jeu » select and `?formation=` from the équipe type. The wish picker
+            offers the five codes; its retired-wish chips are gone. The radarlocal importer resolves the two
+            wingers by `x` (160 / 840), dry run verified
 - [x] **S5** · #164 · preferred positions set by coaches only, gone from `/moi` (decisions **163**,
       **164**). `profile:editPositions` is a coach action: a coach edits any player's card on
       `/joueur/[id]`, everybody else — the player himself included — reads it, under « Ce sont les coachs
@@ -813,7 +822,16 @@ tag during this rework** (decision 146): every item below reaches the preview on
       `getCompositionMembers`, `LivePlayer` or the retro roster, nothing on the match sheet. Kept: the
       équipe type (`best-seven-input.ts`) and the squad list on `/equipe`, as information. The picker's
       « non souhaité » became « pas son poste »
-- [ ] **S6** · #165 · the composition page replaces the match sheet
+- [x] **S6** · #165 · the composition page replaces the match sheet, decisions **165** and **166**.
+      `/match/[id]/feuille`, `squad-sheet.tsx`, `setMatchSquad` and its schema, `sheetNextStepFr` and
+      the « Feuille de match vide » gates are gone. The **composition de départ** is the selection:
+      its bench is every player, whoever is placed is titulaire, and a list under the pitch marks
+      everybody else Remplaçant / Supporter / — (a coach who does not play: Supporter / — only).
+      `saveLineup` writes `match_squad` from it in the same transaction (`squadFromComposition`, pure,
+      `lib/composition/squad.ts`), drops the newly unselected and the supporters from the other planned
+      compositions, and refuses a plan at minute 0 or a starting composition without its list. A
+      planned change still draws on the starters and substitutes only. Wording: « non sélectionné »
+      for « hors feuille »; the compositions list names the supporters under the starting seven
 - [x] **S7** · #166 · game mode: But, But encaissé, Changement, Autre; « Sifflet » replaces « Fin »,
       decision **151**. « Autre action » holds CSC, the two penalties, Blessure, Remarque and
       Commentaire; « Changement de poste » left the menu (its flow, `SlotPicker` and its icon are
@@ -847,7 +865,7 @@ tag during this rework** (decision 146): every item below reaches the preview on
             kept to the goal and concede bookkeeping and `accrue`; minutes apportioned so they add up,
             `GB` pinned to `gkMinutes` (decision **160**)
       - [x] `match_player_stats.goals_for_while_on` and the new `match_player_positions`, written by the
-            one writer in one transaction; migration `0012_remarkable_young_avengers.sql`
+            one writer in one transaction; migration `0014_ambiguous_vindicator.sql`
       - [x] `npm run db:refreeze` (`scripts/refreeze-stats.mts`), idempotent, refuses a remote URL without
             `--allow-remote`; run by `ci.yml` `migrate-preview` and `release.yml` `migrate-production`
             right after `db:migrate` (decision **161**). Run on `football_wd`: 2 matches, 24 + 39 rows,
@@ -1936,15 +1954,3 @@ browser could not be told to drop it. Decision **143** has the full account.
       — with a float tolerance, not because the naive `Number.isInteger(score * 10)` is wrong today
       (it holds for all 101 tenths, and the test walks them) but because the half-point version could
       *rely* on `0.5` being exact and this one cannot
-
-## Rework from the cahier des charges — 2026-10-09
-
-- [x] **S4 `feat/single-formation` — one formation, five positions** (decisions **157**, **158**). The
-      `1-2-3-1` is the only formation: GB, DC × 2, AIL × 2 either side of MC, AT. New position `AIL`
-      « Ailier » replaces `MG`/`MD`; the vocabulary is exactly GB, DC, MC, AIL, AT. Migration
-      `0011_single_formation.sql` inserts `AIL`, rewrites the built-in's two side slots in place, and maps
-      `player_positions` (DG/DD → DC, AG/AD/MG/MD → AIL, MOC → MC). The formation select and the
-      « Postes » mode are gone from the composition editor, the formation select from the game-mode
-      composer, and the « Forme de jeu » select and `?formation=` from the équipe type. The wish picker
-      offers the five codes; its retired-wish chips are gone. The radarlocal importer resolves the two
-      wingers by `x` (160 / 840), dry run verified

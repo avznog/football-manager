@@ -1,12 +1,13 @@
 "use server";
 
 /**
- * The match sheet and the compositions.
+ * The compositions, and the selection the starting one carries (decision 165).
  *
  * Same contract as the other action modules: `assertCan()` before anything else (invariant 4), the
  * `teamId` taken from the submitted form and *then* verified, Zod for every field, `revalidatePath`
  * at the end. Permissions come from the two coach actions that already exist —
- * `match:selectSquad` for the sheet, `match:manageLineups` for the compositions.
+ * `match:manageLineups` for every composition, and `match:selectSquad` as well for the starting one,
+ * because saving it is what writes `match_squad`. There is no separate match sheet screen any more.
  *
  * **Nothing here applies a composition.** `lineups.applied_event_id` is never written: a plan is a
  * proposal until the coach confirms it in game mode (invariant 3), and a composition that has been
@@ -18,7 +19,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
-import { lineupSlots, lineups, matchSquad, matches, teamMembers } from "@/db/schema";
+import { lineupSlots, lineups, matchSquad, matches } from "@/db/schema";
 import type { SquadRole } from "@/db/schema";
 import { assertCan } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
@@ -34,17 +35,16 @@ import {
   type PlanSlot,
 } from "./plan";
 import { getCompositionMembers, getFieldedMemberIds, getMatchLineups } from "./queries";
+import { isPlaceable, squadFromComposition } from "./squad";
 import {
   lineupTargetSchema,
+  readBenchMarks,
   readSlotFields,
-  readSquadMarks,
   saveLineupSchema,
-  setMatchSquadSchema,
 } from "./validation";
 
 function revalidateComposition(matchId: string): void {
   revalidatePath(`/match/${matchId}`);
-  revalidatePath(`/match/${matchId}/feuille`);
   revalidatePath(`/match/${matchId}/composition`);
   // Game mode reads the planned compositions to propose them (M4).
   revalidatePath(`/match/${matchId}/jeu`);
@@ -67,117 +67,6 @@ async function findMatch(teamId: string, matchId: string) {
   });
 }
 
-/** Active members of the team — so a crafted form cannot reach into another squad. */
-async function activeMemberIds(teamId: string): Promise<Set<string>> {
-  const rows = await db
-    .select({ id: teamMembers.id })
-    .from(teamMembers)
-    .where(and(eq(teamMembers.teamId, teamId), isNull(teamMembers.leftAt)));
-  return new Set(rows.map((row) => row.id));
-}
-
-/* -------------------------------------------------------------------------- */
-/* The match sheet                                                            */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Titulaire / remplaçant / supporter, for the whole squad in one submit.
- *
- * One round trip for thirteen players: on a phone, thirteen submits are thirteen chances to lose the
- * connection. `"none"` deletes the row — "not selected" and "selected as a supporter" are different
- * facts, and the compositions, the ratings (decision 007) and the statistics all read the
- * difference.
- *
- * A player who has already been on the pitch in a confirmed composition cannot be taken off the
- * sheet: that would contradict a match that has already happened.
- */
-export async function setMatchSquad(_prev: FormState, formData: FormData): Promise<FormState> {
-  const actor = await requireActor();
-
-  const parsed = setMatchSquadSchema.safeParse({
-    teamId: formData.get("teamId"),
-    matchId: formData.get("matchId"),
-    marks: readSquadMarks(formData.entries()),
-  });
-  if (!parsed.success) return toFormState(parsed.error);
-
-  const { teamId, matchId } = parsed.data;
-
-  assertCan(actor, "match:selectSquad", { teamId });
-
-  const match = await findMatch(teamId, matchId);
-  if (!match) return { error: "Ce match n’existe pas dans cette équipe." };
-  if (match.status === "finished") {
-    return { error: "Le match est terminé : la feuille de match ne change plus." };
-  }
-
-  const allowed = await activeMemberIds(teamId);
-  const marks = parsed.data.marks.filter((mark) => allowed.has(mark.teamMemberId));
-
-  const locked = new Set(await getFieldedMemberIds(matchId));
-  const wouldDrop = marks.some(
-    (mark) =>
-      mark.mark !== "starter" && mark.mark !== "substitute" && locked.has(mark.teamMemberId),
-  );
-  if (wouldDrop) {
-    return { error: "Un joueur déjà entré en jeu ne peut pas quitter la feuille de match." };
-  }
-
-  const selected = marks.filter(
-    (mark): mark is { teamMemberId: string; mark: SquadRole } => mark.mark !== "none",
-  );
-  const cleared = marks.filter((mark) => mark.mark === "none").map((mark) => mark.teamMemberId);
-
-  await db.transaction(async (tx) => {
-    if (selected.length > 0) {
-      await tx
-        .insert(matchSquad)
-        .values(
-          selected.map((mark) => ({
-            matchId,
-            teamMemberId: mark.teamMemberId,
-            role: mark.mark,
-          })),
-        )
-        .onConflictDoUpdate({
-          target: [matchSquad.matchId, matchSquad.teamMemberId],
-          // `excluded.role` is the value of the row that collided, so one statement sets a different
-          // role per player instead of one `UPDATE` each.
-          set: { role: sql<SquadRole>`excluded.role` },
-        });
-    }
-
-    if (cleared.length > 0) {
-      // A player leaving the sheet leaves every *planned* composition with him: a `lineup_slots` row
-      // for somebody who is not selected means nothing. Applied compositions are protected above.
-      const planned = await tx
-        .select({ id: lineups.id })
-        .from(lineups)
-        .where(and(eq(lineups.matchId, matchId), isNull(lineups.appliedEventId)));
-
-      if (planned.length > 0) {
-        await tx.delete(lineupSlots).where(
-          and(
-            inArray(
-              lineupSlots.lineupId,
-              planned.map((lineup) => lineup.id),
-            ),
-            inArray(lineupSlots.teamMemberId, cleared),
-          ),
-        );
-      }
-
-      await tx
-        .delete(matchSquad)
-        .where(and(eq(matchSquad.matchId, matchId), inArray(matchSquad.teamMemberId, cleared)));
-    }
-  });
-
-  revalidateComposition(matchId);
-  // Outside any try/catch: `redirect` works by throwing (`docs/NEXTJS16.md` §5).
-  redirect(`/match/${matchId}/feuille?enregistre=1`);
-}
-
 /* -------------------------------------------------------------------------- */
 /* The compositions                                                           */
 /* -------------------------------------------------------------------------- */
@@ -187,8 +76,16 @@ export async function setMatchSquad(_prev: FormState, formData: FormData): Promi
  *
  * Everything happens in one transaction, because a half-written composition is worse than none: the
  * `lineups` row is written — always on the one formation, which also moves an old plan drawn on a
- * retired one onto it — and its slots are replaced. `lineup_slots` is a plain projection of the editor's state, so
- * it is deleted and rewritten rather than diffed — it carries no history, unlike `match_events`.
+ * retired one onto it — and its slots are replaced. `lineup_slots` is a plain projection of the
+ * editor's state, so it is deleted and rewritten rather than diffed — it carries no history, unlike
+ * `match_events`.
+ *
+ * **The starting composition also writes the selection** (decision 165): its seven are the starters,
+ * and the list under its pitch says who is remplaçant and who is supporter — everybody else has no
+ * `match_squad` row. `squadFromComposition` decides the rows; this action only checks, then writes
+ * them in the same transaction as the lineup. A member who leaves the selection, or becomes a
+ * supporter, leaves every *planned* composition with him: a slot for somebody who may not play
+ * means nothing. Applied compositions are protected — their players cannot leave (rule 4).
  */
 export async function saveLineup(_prev: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireActor();
@@ -198,13 +95,26 @@ export async function saveLineup(_prev: FormState, formData: FormData): Promise<
     matchId: formData.get("matchId"),
     lineupId: formData.get("lineupId") || undefined,
     fromMinute: formData.get("fromMinute"),
+    withSquad: formData.get("squad") === "1",
     assignments: readSlotFields(formData.getAll("slot")),
   });
   if (!parsed.success) return toFormState(parsed.error);
 
-  const { teamId, matchId, lineupId, fromMinute } = parsed.data;
+  const { teamId, matchId, lineupId, fromMinute, withSquad } = parsed.data;
 
   assertCan(actor, "match:manageLineups", { teamId });
+  if (withSquad) assertCan(actor, "match:selectSquad", { teamId });
+
+  // Minute 0 is the starting composition, and only its form carries the selection. A plan submitting
+  // 0 would otherwise reach the squad write with no list, and empty the bench of every match.
+  if (withSquad !== (fromMinute === 0)) {
+    return {
+      error:
+        fromMinute === 0
+          ? "La minute 0, c’est la composition de départ : modifie-la plutôt."
+          : "La composition de départ commence à la minute 0.",
+    };
+  }
 
   const match = await findMatch(teamId, matchId);
   if (!match) return { error: "Ce match n’existe pas dans cette équipe." };
@@ -246,24 +156,47 @@ export async function saveLineup(_prev: FormState, formData: FormData): Promise<
   }));
   const slotIds = new Set(formation.slots.map((slot) => slot.id));
 
-  // Only players on the match sheet may be placed (`docs/DATA_MODEL.md`). Checked here as well as in
-  // the editor, so a tab left open cannot save somebody who has since been dropped.
+  // Who may be placed (`isPlaceable`): any player in the starting composition, only the selected
+  // starters and substitutes in a plan. Checked here as well as in the editor, so a tab left open
+  // cannot save somebody who has since been dropped.
   const members = await getCompositionMembers(teamId, matchId);
-  const selectable = new Set(
+  const mode = withSquad ? "initial" : "plan";
+  const placeable = new Set(
     members
-      .filter((member) => member.squadRole === "starter" || member.squadRole === "substitute")
+      .filter((member) => isPlaceable(member, mode))
       .map((member) => member.membershipId),
   );
-  if (parsed.data.assignments.some((pair) => !selectable.has(pair.memberId))) {
+  if (parsed.data.assignments.some((pair) => !placeable.has(pair.memberId))) {
     return {
-      error: "Un joueur de cette composition n’est pas titulaire ou remplaçant sur la feuille.",
+      error: withSquad
+        ? "Un membre placé sur le terrain ne fait pas partie des joueurs de l’équipe."
+        : "Un joueur de cette composition n’est ni titulaire ni remplaçant.",
     };
   }
 
   const assignments = parsed.data.assignments
     .filter((pair) => slotIds.has(pair.slotKey))
     .map((pair) => ({ slotId: pair.slotKey, memberId: pair.memberId }));
-  const blocking = blockingIssues(findPlanIssues({ assignments, slots: planSlots, members }));
+
+  const squad = withSquad
+    ? squadFromComposition({
+        members,
+        starterIds: assignments.map((assignment) => assignment.memberId),
+        marks: readBenchMarks(formData.entries()),
+        lockedIds: new Set(await getFieldedMemberIds(matchId)),
+      })
+    : null;
+  if (squad && !squad.ok) return { error: squad.errorFr };
+
+  // The issues are read against the selection this save will write, not the one it replaces: a man
+  // placed on the starting pitch is a starter from this submit on, not « hors sélection ».
+  const roleAfter = new Map(squad?.ok ? squad.rows.map((row) => [row.teamMemberId, row.role]) : []);
+  const membersAfter = squad?.ok
+    ? members.map((member) => ({ ...member, squadRole: roleAfter.get(member.membershipId) ?? null }))
+    : members;
+  const blocking = blockingIssues(
+    findPlanIssues({ assignments, slots: planSlots, members: membersAfter }),
+  );
   if (blocking.length > 0) return { error: blocking[0].messageFr };
 
   const formationId = formation.id;
@@ -299,6 +232,41 @@ export async function saveLineup(_prev: FormState, formData: FormData): Promise<
           teamMemberId: row.memberId,
         })),
       );
+    }
+
+    if (squad?.ok) {
+      if (squad.rows.length > 0) {
+        await tx
+          .insert(matchSquad)
+          .values(squad.rows.map((row) => ({ matchId, teamMemberId: row.teamMemberId, role: row.role })))
+          .onConflictDoUpdate({
+            target: [matchSquad.matchId, matchSquad.teamMemberId],
+            // `excluded.role` is the value of the row that collided, so one statement sets a
+            // different role per player instead of one `UPDATE` each.
+            set: { role: sql<SquadRole>`excluded.role` },
+          });
+      }
+      if (squad.cleared.length > 0) {
+        await tx
+          .delete(matchSquad)
+          .where(and(eq(matchSquad.matchId, matchId), inArray(matchSquad.teamMemberId, squad.cleared)));
+      }
+
+      // Nobody who may not play stays in a planned change: the unselected and the supporters.
+      const benched = [
+        ...squad.cleared,
+        ...squad.rows.filter((row) => row.role === "supporter").map((row) => row.teamMemberId),
+      ];
+      const otherPlanned = existing
+        .filter((lineup) => !lineup.isApplied && lineup.id !== id)
+        .map((lineup) => lineup.id);
+      if (benched.length > 0 && otherPlanned.length > 0) {
+        await tx
+          .delete(lineupSlots)
+          .where(
+            and(inArray(lineupSlots.lineupId, otherPlanned), inArray(lineupSlots.teamMemberId, benched)),
+          );
+      }
     }
 
     return id;

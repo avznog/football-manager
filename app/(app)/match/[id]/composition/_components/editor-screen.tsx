@@ -13,7 +13,6 @@ import Link from "next/link";
 
 import { CompositionEditor, type EditorMember } from "@/components/composition";
 import { ButtonLink } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { ActiveTeam } from "@/lib/auth/dal";
 import { matchNameFr } from "@/lib/calendar/labels";
@@ -27,7 +26,13 @@ import {
   suggestNextMinute,
 } from "@/lib/composition/plan";
 import { prefillFromPlans, prefillNoticeFr } from "@/lib/composition/prefill";
-import { getCompositionMembers, getMatchLineups, toPlannedLineup } from "@/lib/composition/queries";
+import {
+  getCompositionMembers,
+  getFieldedMemberIds,
+  getMatchLineups,
+  toPlannedLineup,
+} from "@/lib/composition/queries";
+import { isPlaceable } from "@/lib/composition/squad";
 import { getTheFormation } from "@/lib/formation/queries";
 import type { MatchRow } from "@/lib/match/queries";
 
@@ -41,10 +46,11 @@ export type EditorScreenProps = {
 };
 
 export async function EditorScreen({ team, match, lineupId, requestedMinute }: EditorScreenProps) {
-  const [members, lineups, formation] = await Promise.all([
+  const [members, lineups, formation, fielded] = await Promise.all([
     getCompositionMembers(team.id, match.id),
     getMatchLineups(match.id),
     getTheFormation(),
+    getFieldedMemberIds(match.id),
   ]);
 
   const backHref = `/match/${match.id}/composition`;
@@ -114,18 +120,38 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
     );
   }
 
-  const selectable = members.filter(
-    (member) => member.squadRole === "starter" || member.squadRole === "substitute",
-  );
-  if (selectable.length === 0) {
+  /*
+   * The starting composition **is** the selection (decision 165): its pitch draws on every player of
+   * the team, and the list under it marks the remplaçants and the supporters. A planned change draws
+   * on what that selection made — so before there is one, there is nobody to bring on, and the dead
+   * end says where the selection is made now. It used to send the coach to « Remplir la feuille ».
+   */
+  const mode = fromMinute === 0 ? "initial" : "plan";
+  const placeable = members.filter((member) => isPlaceable(member, mode));
+  if (placeable.length === 0) {
+    const initial = plans.find((plan) => plan.fromMinute === 0);
     return shell(
-      <Card title="Feuille de match vide">
-        <EmptyState
-          title="Personne n’est encore retenu"
-          description="Seuls les titulaires et les remplaçants de la feuille de match peuvent être placés sur le terrain."
-          action={<ButtonLink href={`/match/${match.id}/feuille`}>Remplir la feuille</ButtonLink>}
-        />
-      </Card>,
+      <EmptyState
+        title={mode === "initial" ? "Aucun joueur dans l’effectif" : "Personne n’est encore sélectionné"}
+        description={
+          mode === "initial"
+            ? "Invite tes joueurs, puis reviens composer l’équipe."
+            : "Les changements se font entre titulaires et remplaçants : choisis-les d’abord dans la composition de départ."
+        }
+        action={
+          mode === "initial" ? undefined : (
+            <ButtonLink
+              href={
+                initial
+                  ? `/match/${match.id}/composition/${initial.id}`
+                  : `/match/${match.id}/composition/nouvelle?minute=0`
+              }
+            >
+              Composition de départ
+            </ButtonLink>
+          )
+        }
+      />,
     );
   }
 
@@ -154,7 +180,7 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
       ? prefillFromPlans({
           plans,
           minute: fromMinute,
-          placeableMemberIds: selectable.map((member) => member.membershipId),
+          placeableMemberIds: placeable.map((member) => member.membershipId),
           formationIds: [formation.id],
         })
       : null;
@@ -176,21 +202,24 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
     name: member.name,
     jerseyNumber: member.jerseyNumber,
     squadRole: member.squadRole,
+    isPlayer: member.isPlayer,
     isInjured: member.isInjured,
   }));
 
   return shell(
     <CompositionEditor
-        teamId={team.id}
-        matchId={match.id}
-        lineupId={target?.id ?? null}
-        kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
-        members={editorMembers}
-        formation={formation}
-        assignments={assignments}
-        prefillNoticeFr={prefill ? prefillNoticeFr(prefill, nameOfMembers(members)) : []}
-        fromMinute={fromMinute}
-        otherPlans={otherPlans}
+      teamId={team.id}
+      matchId={match.id}
+      lineupId={target?.id ?? null}
+      kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
+      members={editorMembers}
+      formation={formation}
+      assignments={assignments}
+      prefillNoticeFr={prefill ? prefillNoticeFr(prefill, nameOfMembers(members)) : []}
+      fromMinute={fromMinute}
+      selectsSquad={mode === "initial"}
+      lockedMemberIds={fielded}
+      otherPlans={otherPlans}
       totalMinutes={match.periodsCount * match.periodMinutes}
       cancelHref={backHref}
     />,

@@ -9,6 +9,10 @@
  * It shows the starting composition, not a list of pitches: the planned changes are summarised on
  * one line each (« 30ᵉ minute · Ali → Momo »), which is what the coach glances at before opening
  * the editor.
+ *
+ * There is no « Feuille de match » step to send him to any more (decision 165): the starting
+ * composition is where the remplaçants and supporters are marked, so the card's one way in is the
+ * composition itself.
  */
 
 import { LineupPitch } from "@/components/composition";
@@ -37,7 +41,6 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
   ]);
 
   const counts = countSquadRoles(members);
-  const selected = counts.starters + counts.substitutes + counts.supporters;
   const plans = sortPlans(lineups.map(toPlannedLineup));
   const nameOf = nameOfMembers(members);
   /**
@@ -48,26 +51,7 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
    */
   const screen = compositionsScreenFr(match);
 
-  const sheetHref = `/match/${match.id}/feuille`;
   const compositionsHref = `/match/${match.id}/composition`;
-
-  if (selected === 0) {
-    return (
-      <Card title="Composition" as="h2">
-        <EmptyState
-          title={screen.emptySheetFr.title}
-          description={screen.emptySheetFr.description}
-          /* The link stays either way — an empty sheet is worth seeing — but it stops being the
-             primary thing to do on a match whose sheet can no longer be filled. */
-          action={
-            <ButtonLink href={sheetHref} variant={screen.editable ? "primary" : "secondary"}>
-              Feuille de match
-            </ButtonLink>
-          }
-        />
-      </Card>
-    );
-  }
 
   const first = lineups[0];
 
@@ -77,9 +61,9 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
       as="h2"
       description={squadSummaryFr(counts)}
       action={
-        /* « titulaires », the word `SquadSheet` already uses, because this badge counts the *sheet*
-           while the card is titled « Composition ». Bare, it read as the composition's own progress
-           — and on a match with none it sat directly above « Aucune composition », saying « 7 / 7 ». */
+        /* « titulaires », because this badge counts the *selection* while the card is titled
+           « Composition ». Bare, it read as the composition's own progress — and on a match with none
+           it sat directly above « Aucune composition », saying « 7 / 7 ». */
         <Badge variant={counts.starters === 7 ? "success" : "warning"}>
           {counts.starters} / 7 titulaires
         </Badge>
@@ -134,14 +118,13 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
           />
         )}
 
-        <div className="flex flex-wrap gap-2">
-          <ButtonLink href={compositionsHref} variant="secondary" size="sm">
-            Compositions
-          </ButtonLink>
-          <ButtonLink href={sheetHref} variant="ghost" size="sm">
-            Feuille de match
-          </ButtonLink>
-        </div>
+        {first ? (
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href={compositionsHref} variant="secondary" size="sm">
+              Compositions
+            </ButtonLink>
+          </div>
+        ) : null}
       </div>
     </Card>
   );

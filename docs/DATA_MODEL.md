@@ -87,7 +87,7 @@ positions, 7 formations with `team_id is null` and 49 slots, and the composition
 run it, so `/match/<id>/composition` and `/match/<id>/saisie` both said « Les formations types n'ont
 pas été chargées dans la base » and no composition could be made at all. Both seed migrations are
 idempotent and insert-only: `db/reference.ts` stays the single source of truth and `seedReference()`
-still owns every later change to a label or a coordinate (decision 141). `0011_single_formation.sql`
+still owns every later change to a label or a coordinate (decision 141). `0012_single_formation.sql`
 adds `AIL` and rewrites the built-in `1-2-3-1`'s `MG`/`MD` slots to `AIL` in place (same ids), since the
 seeder will not touch slots a composition uses.
 
@@ -140,8 +140,12 @@ players no longer declare whether they are available, and the coach no longer ch
 
 ### `match_squad`
 `(match_id, team_member_id)` unique, `role` (`starter` | `substitute` | `supporter`), `created_at`.
-The match sheet. Only members listed here may rate after the match (decision 007), and only
-`starter`/`substitute` may appear in a lineup.
+The selection — still called « the match sheet » in the code — though there is no sheet screen any
+more (decision 165): it is **written by saving the starting composition**. The seven on its pitch are
+`starter`, the list under the pitch names `substitute` and `supporter`, and every other member has no
+row (« non sélectionné »). A member with `is_player = false` can only be `supporter` (decision 166).
+Only members listed here may rate (decision 159), and only `starter`/`substitute` may appear in a
+planned change. The retro entry (`lib/retro/actions.ts`) still writes starters and substitutes itself.
 
 ### ~~`trainings`, `training_availability`, `training_attendance`~~
 Dropped by migration `0011` (decision 155, 2026-10-09): the team no longer manages trainings in the

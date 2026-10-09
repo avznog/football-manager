@@ -11,7 +11,6 @@
  * *which two teams* to compare, and which of the resulting changes are worth showing.
  */
 
-import { FORMATION_SLOT_COUNT } from "@/db/reference";
 import type { EntryMode, MatchStatus, SquadRole } from "@/db/schema";
 import {
   type LineupDiff,
@@ -45,11 +44,11 @@ export type PlannedLineup = {
   slots: readonly PlanSlot[];
 };
 
-/** Who a plan may put on the pitch, and what the match sheet says about them. */
+/** Who a plan may put on the pitch, and what the selection says about them. */
 export type PlanMember = {
   membershipId: string;
   name: string;
-  /** `null` when the player is not on the match sheet at all. */
+  /** `null` when the player is not selected at all. */
   squadRole: SquadRole | null;
   isInjured: boolean;
 };
@@ -155,22 +154,12 @@ export function newPlanPromptFr(totalMinutes: number): { title: string; descript
   };
 }
 
-/** What the match sheet calls each role. `null` is a real answer: « hors feuille ». */
+/** What the selection calls each role. `null` — no row — is « non sélectionné » (decision 165). */
 export const SQUAD_ROLE_LABELS: Record<SquadRole, string> = {
   starter: "Titulaire",
   substitute: "Remplaçant",
   supporter: "Supporter",
 };
-
-/**
- * « Hors feuille » and not « Non retenu », because `null` in this column means two different things
- * and the app cannot tell them apart: a coach who decided to leave the player out, and a sheet nobody
- * has touched. On a match created a minute ago every one of the thirteen rows is `null` — « Non
- * retenu » states a decision that has not been taken, thirteen times over.
- */
-export function squadRoleLabelFr(role: SquadRole | null): string {
-  return role === null ? "Hors feuille" : SQUAD_ROLE_LABELS[role];
-}
 
 export type SquadCounts = {
   starters: number;
@@ -179,7 +168,7 @@ export type SquadCounts = {
   unselected: number;
 };
 
-/** What counting a match sheet needs of a member: whether he plays, and where he was put. */
+/** What counting the selection needs of a member: whether he plays, and where he was put. */
 export type SheetCandidate = {
   /** `team_members.is_player`: a team can hold a coach, or a manager, who never plays. */
   isPlayer: boolean;
@@ -187,22 +176,22 @@ export type SheetCandidate = {
 };
 
 /**
- * Whether this member belongs on the match sheet at all — the pool the sheet is drawn from.
+ * Whether this member counts in the selection's tally — the players, plus anybody selected.
  *
  * A team can hold members who do not play: a second coach, a manager (`is_player = false`,
- * `docs/DATA_MODEL.md`). They are not candidates for the sheet, and therefore they are not « hors
- * feuille » either — a coach who never plays is not somebody the coach forgot to pick.
+ * `docs/DATA_MODEL.md`). They are not « non sélectionnés » when nobody named them — a coach who never
+ * plays is not somebody the coach forgot to pick — but one marked supporter is counted with the other
+ * supporters (decisions 159 and 165: that is how a non-playing coach gets a vote).
  *
- * The exception is why this is a rule and not a `where` clause: a non-player who *is* on the sheet
- * stays in the pool. Otherwise the one screen that could take him back off would be the one screen
- * that no longer shows him.
+ * The list under the starting pitch shows them all regardless, players and non-players, because it is
+ * the one place a coach can be named supporter.
  */
 export function isSheetCandidate(member: SheetCandidate): boolean {
   return member.isPlayer || member.squadRole !== null;
 }
 
 /**
- * The match sheet in four numbers.
+ * The selection in four numbers.
  *
  * It filters the pool itself rather than trusting the caller to have done it, because that trust is
  * exactly what broke: the match page and the compositions header both handed it the whole squad and
@@ -222,8 +211,8 @@ export function countSquadRoles(members: readonly SheetCandidate[]): SquadCounts
 }
 
 /**
- * The one-line state of the match sheet: « 7 titulaires · 3 remplaçants · 1 supporter · 2 hors
- * feuille ».
+ * The one-line state of the selection: « 7 titulaires · 3 remplaçants · 1 supporter · 2 non
+ * sélectionnés ».
  *
  * Roles with nobody in them are left out rather than printed as a zero — the line is read at a
  * glance on a phone, and « 0 supporter » is noise.
@@ -243,78 +232,15 @@ export function squadSummaryFr(counts: SquadCounts): string {
   if (counts.supporters > 0) {
     parts.push(counts.supporters === 1 ? "1 supporter" : `${counts.supporters} supporters`);
   }
-  // Only once somebody is on the sheet: on an untouched one this would be the whole squad, and the
-  // line already says « Feuille de match vide », which is both shorter and truer — nobody has been
-  // left out of a sheet that does not exist yet.
+  // Only once somebody is selected: on an untouched match this would be the whole squad, and the line
+  // already says « Personne n’est encore sélectionné », which is both shorter and truer — nobody has
+  // been left out of a selection that has not been made.
   if (parts.length > 0 && counts.unselected > 0) {
-    parts.push(`${counts.unselected} hors feuille`);
+    parts.push(
+      counts.unselected === 1 ? "1 non sélectionné" : `${counts.unselected} non sélectionnés`,
+    );
   }
-  return parts.length > 0 ? parts.join(" · ") : "Feuille de match vide";
-}
-
-/**
- * What the « Et maintenant ? » card on the match sheet should say, and where it should point.
- *
- * It used to say « Le groupe est fait : place les sept sur le terrain. » on every sheet, in every
- * state. On a match created a minute ago that is a completed selection nobody has made; on a match
- * played a fortnight ago it is an instruction for a match that is over; and with nine names ticked it
- * names a seven that does not exist. Decision 084, which is decision 083's rule applied to a
- * next-step card: **it describes the form in front of the coach, not a match.**
- *
- * The four cases are the four different pieces of advice, in the order a coach meets them:
- *
- *   - **finished** — nothing to place. The sheet is frozen (`SquadSheet` already says so), so the
- *     card stops giving instructions and offers the recap instead.
- *   - **nobody ticked** — the composition editor would open with an empty bench, so there is no link
- *     at all: the next step is on this screen, above.
- *   - **fewer than seven** — worth saying how many are missing, and worth keeping the link: placing
- *     four while thinking about the fifth is a normal way to work.
- *   - **more than seven** — there are only seven places (`FORMATION_SLOT_COUNT`), and nothing stops a
- *     coach ticking eight. The badge turns amber; this says by how much.
- *
- * `live` is deliberately not a case of its own. A composition prepared during a match is the normal
- * way to plan a change, and invariant 3 means it is still only a proposal.
- */
-export function sheetNextStepFr(
-  counts: SquadCounts,
-  status: MatchStatus,
-): { description: string; cta: "composition" | "recap" | null } {
-  if (status === "finished") {
-    return {
-      description:
-        "Le match est joué : la feuille reste ici pour mémoire. Le résumé dit ce qui s’est passé.",
-      cta: "recap",
-    };
-  }
-  if (counts.starters === 0) {
-    return {
-      description:
-        "Personne n’est encore titulaire. Coche d’abord le groupe ci-dessus : sans titulaire, il " +
-        "n’y a personne à placer sur le terrain.",
-      cta: null,
-    };
-  }
-  if (counts.starters < FORMATION_SLOT_COUNT) {
-    const missing = FORMATION_SLOT_COUNT - counts.starters;
-    return {
-      description:
-        `${counts.starters} titulaire${counts.starters > 1 ? "s" : ""} sur ${FORMATION_SLOT_COUNT} : ` +
-        `il en manque ${missing}. Tu peux déjà placer ${counts.starters > 1 ? "ceux-là" : "celui-là"} ` +
-        "sur le terrain et finir la feuille après.",
-      cta: "composition",
-    };
-  }
-  if (counts.starters > FORMATION_SLOT_COUNT) {
-    const extra = counts.starters - FORMATION_SLOT_COUNT;
-    return {
-      description:
-        `${counts.starters} titulaires cochés pour ${FORMATION_SLOT_COUNT} places : il y en a ` +
-        `${extra} de trop. Repasse${extra > 1 ? "-les en remplaçants" : "-le en remplaçant"} ` +
-        "avant de composer.",
-      cta: "composition",
-    };
-  }
-  return { description: "Le groupe est fait : place les sept sur le terrain.", cta: "composition" };
+  return parts.length > 0 ? parts.join(" · ") : "Personne n’est encore sélectionné";
 }
 
 /**
@@ -390,32 +316,20 @@ export function compositionsScreenFr(match: { status: MatchStatus; entryMode: En
   editable: boolean;
   /** Said once, above the compositions, when they have stopped being plans. */
   frozenNoticeFr: string | null;
-  /**
-   * The link in the header to the match sheet. « modifier la feuille » is a promise the sheet does
-   * not keep once the match is over: `SquadSheet` gets `frozen` and refuses every checkbox.
-   */
-  sheetLinkFr: string;
-  /** Nobody on the match sheet, so there is nobody to place. */
-  emptySheetFr: { title: string; description: string; withCta: boolean };
-  /** Somebody on the sheet, but no composition saved. */
+  /** No composition saved. */
   noPlansFr: { title: string; description: string; withCta: boolean };
 } {
   if (match.status !== "finished") {
     return {
       editable: true,
       frozenNoticeFr: null,
-      sheetLinkFr: "modifier la feuille",
-      emptySheetFr: {
-        title: "Personne n’est encore retenu",
-        description:
-          "Choisis d’abord tes titulaires et tes remplaçants : seuls eux peuvent être placés sur " +
-          "le terrain.",
-        withCta: true,
-      },
       noPlansFr: {
         title: "Le terrain est vide",
+        // The composition de départ is the selection now (decision 165): the sentence says both
+        // halves of the one page, or a coach looks for the sheet that no longer exists.
         description:
-          "Place tes sept joueurs sur la pelouse : tu pourras ensuite planifier les changements.",
+          "Place tes sept joueurs sur la pelouse, puis indique en dessous les remplaçants et les " +
+          "supporters : tu pourras ensuite planifier les changements.",
         withCta: true,
       },
     };
@@ -424,13 +338,6 @@ export function compositionsScreenFr(match: { status: MatchStatus; entryMode: En
   return {
     editable: false,
     frozenNoticeFr: lineupsFrozenFr(match.entryMode),
-    sheetLinkFr: "voir la feuille",
-    emptySheetFr: {
-      title: "Aucune feuille de match",
-      description:
-        "Le match est joué et personne n’a été retenu sur la feuille : il n’y a rien à composer.",
-      withCta: false,
-    },
     noPlansFr: {
       // Not « Aucune composition » again: the card around it is already titled that, and at 390 px the
       // two headings landed one under the other, the same three words twice.
@@ -600,7 +507,7 @@ export type PlanIssue = {
  * Everything worth telling the coach about a composition.
  *
  * The one that matters in practice: a plan written three days ago that puts on a player who has
- * since been dropped from the match sheet. The plan is kept — deleting rows behind the coach's back
+ * since been dropped from the selection. The plan is kept — deleting rows behind the coach's back
  * would be worse — but it is flagged, on the list and in the editor, until it is fixed.
  *
  * Only two things block a save: an incomplete seven and a missing goalkeeper. Everything else is a
@@ -660,7 +567,7 @@ export function findPlanIssues(input: {
       issues.push({
         code: "off-sheet",
         memberId: member.membershipId,
-        messageFr: `${member.name} n’est plus sur la feuille de match.`,
+        messageFr: `${member.name} n’est plus sélectionné.`,
         blocking: false,
       });
     } else if (member.squadRole === "supporter") {

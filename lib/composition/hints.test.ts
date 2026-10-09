@@ -168,6 +168,11 @@ describe("minuteFieldHintFr", () => {
     expect(minuteFieldHintFr(50)).toContain("50 minutes");
     expect(minuteFieldHintFr(60)).not.toContain("50");
   });
+
+  /** A plan may not start at 0 (decision 165), so the hint must not offer it. */
+  it("does not offer minute 0, which is the starting composition's", () => {
+    expect(minuteFieldHintFr(60)).not.toContain("0 pour");
+  });
 });
 
 /**
