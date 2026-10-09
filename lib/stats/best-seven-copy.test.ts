@@ -15,30 +15,29 @@ import { describe, expect, it } from "vitest";
 
 import type { ObservedFigure, ShrinkageReport } from "./best-seven";
 import {
-  CLEAN_SHEET_READINGS_FR,
   CRITERION_PARAM,
   DECLARED_POSTS_FR,
-  DEFAULT_CRITERION,
-  DEFAULT_DIRECTION,
-  DIRECTION_PARAM,
-  DIRECTION_VALUES,
+  DEFAULT_SEVEN,
+  KEEPER_REFUSED_BADGE_FR,
   SEVEN_CONTROL_LABEL_FR,
+  SEVEN_OPTION_FR,
+  SEVEN_RULE_FR,
   aggregationLabelFr,
-  cleanSheetReadingsFr,
   declaredPostsFr,
   emptySlotsFr,
   equipeTypeHref,
   excludedFromSquadFr,
-  formatCriterionValue,
-  goalkeeperShrinkageSentenceFr,
-  noBasisFr,
+  formatSevenFigure,
+  keeperRuleFr,
   observedFigureFr,
   optimumComparisonFr,
   outOfPositionNoteFr,
   parseCompetitionId,
-  parseCriterion,
-  parseDirection,
+  parseSeven,
   resetLabelFr,
+  sevenObservedFr,
+  sevenSmoothingFr,
+  squadMeanStandInShortFr,
   sevenHeadingFr,
   sevenQuestionKey,
   showsCompetitionSelect,
@@ -75,64 +74,46 @@ const observed = (overrides: Partial<ObservedFigure> = {}): ObservedFigure => ({
 /* -------------------------------------------------------------------------- */
 
 describe("reading the query string", () => {
-  it("falls back to the defaults on anything it does not recognise", () => {
-    expect(parseCriterion(undefined)).toBe(DEFAULT_CRITERION);
-    expect(parseCriterion("bidon")).toBe(DEFAULT_CRITERION);
-    expect(parseCriterion(["ratings", "goals"])).toBe("ratings");
-    expect(parseDirection(undefined)).toBe(DEFAULT_DIRECTION);
-    expect(parseDirection("meilleur")).toBe("best");
-    expect(parseDirection("pire")).toBe("worst");
-    expect(parseDirection("PIRE")).toBe("best");
+  it("reads the four sevens, and falls back to the default on anything else", () => {
+    expect(parseSeven("defensive")).toBe("defensive");
+    expect(parseSeven("legende")).toBe("legende");
+    expect(parseSeven("notes")).toBe("notes");
+    expect(parseSeven(["notes", "legende"])).toBe("notes");
+    expect(parseSeven(undefined)).toBe(DEFAULT_SEVEN);
+    expect(parseSeven("bidon")).toBe(DEFAULT_SEVEN);
   });
 
-  it("opens on a criterion every reader can see", () => {
-    // Decision 021 hides a ratings average from a reader who has not voted, so the default must not
-    // be `ratings` or a non-voter's first visit is an empty screen he will read as a bug.
-    expect(DEFAULT_CRITERION).not.toBe("ratings");
+  it("lands an old bookmark on the default seven rather than on an error", () => {
+    // The four values of the criterion select before decision 171.
+    for (const old of ["goals", "assists", "ratings", "cleanSheet"]) {
+      expect(parseSeven(old)).toBe(DEFAULT_SEVEN);
+    }
+    expect(DEFAULT_SEVEN).toBe("offensive");
   });
 
-  it("omits every default from the URL, and round-trips what it keeps", () => {
-    expect(
-      equipeTypeHref({
-        competitionId: null,
-        criterion: DEFAULT_CRITERION,
-        direction: DEFAULT_DIRECTION,
-      }),
-    ).toBe("/stats/equipe-type");
+  it("omits the default from the URL, and round-trips what it keeps", () => {
+    expect(equipeTypeHref({ competitionId: null, seven: DEFAULT_SEVEN })).toBe("/stats/equipe-type");
 
-    const href = equipeTypeHref({
-      competitionId: "c1",
-      criterion: "ratings",
-      direction: "worst",
-    });
+    const href = equipeTypeHref({ competitionId: "c1", seven: "legende" });
     const params = new URLSearchParams(href.split("?")[1]);
     expect(params.get("competition")).toBe("c1");
-    expect(params.get(CRITERION_PARAM)).toBe("ratings");
-    // There is one formation (decision 157), so nothing about it travels in the URL.
-    expect(params.has("formation")).toBe(false);
-    expect(parseDirection(params.get(DIRECTION_PARAM) ?? undefined)).toBe("worst");
+    expect(parseSeven(params.get(CRITERION_PARAM) ?? undefined)).toBe("legende");
+    // No direction any more, and one formation (decision 157): nothing else travels.
+    expect([...params.keys()].sort()).toEqual(["competition", CRITERION_PARAM].sort());
   });
 
   /**
-   * The no-JavaScript path, and the only reason these cases exist.
-   *
-   * The controls are `<select>`s inside a `<form method="get">`, so a browser with no JavaScript submits
-   * **every** name it holds — including the ones the reader left at their default, as `?critere=`.
-   * `equipeTypeHref` never writes an empty value (it omits the key), so nothing else in the app can
-   * produce that URL and no other test would ever visit it. One parser throwing or mistaking `""` for a
-   * real id is a screen that works for everybody except the reader who needs the fallback most.
+   * The no-JavaScript path: the controls are `<select>`s inside a `<form method="get">`, so a browser
+   * with no JavaScript submits every name it holds, including `?critere=` and an old `?sens=`.
    */
   it("reads an empty value as « nothing chosen », on every parameter", () => {
     const competitions = [{ id: "c1" }, { id: "c2" }];
 
-    expect(parseCriterion("")).toBe(DEFAULT_CRITERION);
-    expect(parseDirection("")).toBe(DEFAULT_DIRECTION);
+    expect(parseSeven("")).toBe(DEFAULT_SEVEN);
     expect(parseCompetitionId("", competitions)).toBeNull();
 
-    // And the whole form at once, exactly as a `method="get"` submit of untouched selects arrives.
-    const params = new URLSearchParams("critere=&sens=&competition=");
-    expect(parseCriterion(params.get(CRITERION_PARAM) ?? undefined)).toBe(DEFAULT_CRITERION);
-    expect(parseDirection(params.get(DIRECTION_PARAM) ?? undefined)).toBe(DEFAULT_DIRECTION);
+    const params = new URLSearchParams("critere=&sens=pire&competition=");
+    expect(parseSeven(params.get(CRITERION_PARAM) ?? undefined)).toBe(DEFAULT_SEVEN);
     expect(parseCompetitionId(params.get("competition") ?? undefined, competitions)).toBeNull();
   });
 
@@ -152,16 +133,11 @@ describe("reading the query string", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("keying the pitch to the question", () => {
-  const query: BestSevenQuery = {
-    competitionId: null,
-    criterion: "goals",
-    direction: "best",
-  };
+  const query: BestSevenQuery = { competitionId: null, seven: "offensive" };
 
   it("changes with every value that changes which seven is right", () => {
     const base = sevenQuestionKey(query);
-    expect(sevenQuestionKey({ ...query, criterion: "ratings" })).not.toBe(base);
-    expect(sevenQuestionKey({ ...query, direction: "worst" })).not.toBe(base);
+    expect(sevenQuestionKey({ ...query, seven: "notes" })).not.toBe(base);
     expect(sevenQuestionKey({ ...query, competitionId: "c1" })).not.toBe(base);
   });
 
@@ -221,19 +197,21 @@ describe("the page hands that key to the pitch", () => {
 describe("naming the controls", () => {
   it("labels every select, and tutoies nobody into « vous »", () => {
     const labels = Object.values(SEVEN_CONTROL_LABEL_FR);
-    // Criterion, direction, competition: the shape is not a control any more (decision 157).
-    expect(labels).toHaveLength(3);
+    // Which seven, and the competition: the shape and the direction are gone (decisions 157, 171).
+    expect(labels).toHaveLength(2);
     for (const label of labels) {
       expect(label).not.toMatch(/\bvo(tre|s)\b/i);
       expect(label.length).toBeGreaterThan(0);
     }
   });
 
-  it("spells the direction the way the URL does, so a GET submit round-trips", () => {
-    // The `<option value>`s *are* the query string on the no-JavaScript path: a second spelling of
-    // « pire » in the component would be a filter that silently stops working without JavaScript.
-    expect(parseDirection(DIRECTION_VALUES.worst)).toBe("worst");
-    expect(parseDirection(DIRECTION_VALUES.best)).toBe("best");
+  it("names the four sevens of the cahier, each with its rule", () => {
+    expect(Object.keys(SEVEN_OPTION_FR)).toEqual(["offensive", "defensive", "legende", "notes"]);
+    expect(SEVEN_OPTION_FR.legende).toBe("7 de légende");
+    expect(SEVEN_RULE_FR.offensive).toContain("buts par heure, puis de passes décisives");
+    expect(SEVEN_RULE_FR.defensive).toContain("le moins de buts encaissés");
+    expect(SEVEN_RULE_FR.legende).toContain("de l’attaque vers la défense");
+    expect(SEVEN_RULE_FR.legende).toContain("moyenne des gardiens");
   });
 
   /**
@@ -274,17 +252,44 @@ describe("naming the controls", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("printing a figure", () => {
-  it("writes each criterion in its own scale", () => {
-    expect(formatCriterionValue("goals", 0.75)).toBe("0,75/h");
-    expect(formatCriterionValue("assists", 1)).toBe("1,00/h");
-    expect(formatCriterionValue("ratings", 7.04)).toBe("7,0");
-    // The space before the `%` is the non-breaking one French typography requires, spelled as an
-    // escape so a copy-paste cannot quietly turn it into an ordinary space.
-    expect(formatCriterionValue("cleanSheet", 0.42)).toBe("42 %");
+  it("writes each cell's figure in its own scale", () => {
+    expect(formatSevenFigure("goals", 0.75)).toBe("0,75/h");
+    expect(formatSevenFigure("ratings", 7.04)).toBe("7,0");
+    // A conceded rate per 60 is read as minutes per goal, as on `/stats` (decision 162).
+    expect(formatSevenFigure("keeperConceded", 2.5)).toBe("1 but/24′");
+    expect(formatSevenFigure("outfieldConceded", 0)).toBe("aucun but");
+    expect(formatSevenFigure("impact", 1.24)).toBe("+1,2/h");
+    expect(formatSevenFigure("impact", -0.76)).toBe("−0,8/h");
   });
 
   it("prints a dash, never a zero, for a figure nobody has", () => {
-    expect(formatCriterionValue("goals", null)).toBe("—");
+    expect(formatSevenFigure("goals", null)).toBe("—");
+    expect(formatSevenFigure("impact", null)).toBe("—");
+  });
+
+  it("prints the raw record beside it, and « aucun but encaissé » rather than infinity", () => {
+    const base = { rate: 1, denominatorUnit: "minutes" as const, exposure: 1 };
+    expect(sevenObservedFr("goals", { ...base, numerator: 3, denominator: 240, secondary: 1 })).toBe(
+      "3 buts, 1 passe décisive sur 240′",
+    );
+    expect(
+      sevenObservedFr("goals", { ...base, numerator: 3, denominator: 240, secondary: 1 }, true),
+    ).toBe("3 buts · 1 p.d. · 240′");
+    expect(sevenObservedFr("keeperConceded", { ...base, numerator: 0, denominator: 35 })).toBe(
+      "aucun but encaissé en 35′",
+    );
+    expect(sevenObservedFr("outfieldConceded", { ...base, numerator: 2, denominator: 44 }, true)).toBe(
+      "2 pris en 44′",
+    );
+    expect(sevenObservedFr("impact", { ...base, numerator: 5, denominator: 120, secondary: 2 })).toBe(
+      "+5 / −2 en 120′",
+    );
+    expect(sevenObservedFr("impact", { ...base, numerator: 0, denominator: 0 })).toBeNull();
+  });
+
+  it("says whose average a man with no figure is wearing", () => {
+    expect(squadMeanStandInShortFr("impact")).toBe("moyenne du poste");
+    expect(squadMeanStandInShortFr("goals")).toBe("moyenne de l’équipe");
   });
 
   it("labels the team figure with the number of discs it actually used", () => {
@@ -300,24 +305,6 @@ describe("printing a figure", () => {
   it("carries the denominator beside the raw figure", () => {
     expect(observedFigureFr("ratings", observed())).toBe("9,0 sur 1 match noté");
     expect(observedFigureFr("ratings", observed({ denominator: 4 }))).toBe("9,0 sur 4 matchs notés");
-    expect(
-      observedFigureFr("goals", {
-        rate: 0.75,
-        numerator: 3,
-        denominator: 240,
-        denominatorUnit: "minutes",
-        exposure: 4,
-      }),
-    ).toBe("3 buts sur 240′");
-    expect(
-      observedFigureFr("cleanSheet", {
-        rate: 0.5,
-        numerator: 120,
-        denominator: 240,
-        denominatorUnit: "minutes",
-        exposure: 240,
-      }),
-    ).toBe("120′ sur 240′");
   });
 
   it("says nothing rather than « sur 0 match noté » when the denominator is empty", () => {
@@ -331,18 +318,15 @@ describe("printing a figure", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("the heading", () => {
-  it("stops claiming to be the optimum the moment the reader swaps anybody", () => {
-    expect(sevenHeadingFr("best", false)).toBe("La meilleure équipe");
-    expect(sevenHeadingFr("worst", false)).toBe("La pire équipe");
-    expect(sevenHeadingFr("best", true)).toBe("Ton équipe");
-    expect(sevenHeadingFr("worst", true)).toBe("Ton équipe");
+  it("names the seven, and stops claiming it the moment the reader swaps anybody", () => {
+    expect(sevenHeadingFr("offensive", false)).toBe("La meilleure attaque");
+    expect(sevenHeadingFr("legende", false)).toBe("Le 7 de légende");
+    expect(sevenHeadingFr("defensive", true)).toBe("Ton équipe");
   });
 
   it("keeps the optimum's own figure beside it, and offers the way back", () => {
-    expect(optimumComparisonFr("best", "2,15/h")).toBe("La meilleure équipe : 2,15/h");
-    expect(optimumComparisonFr("worst", "—")).toBe("La pire équipe : —");
-    expect(resetLabelFr("best")).toBe("Revenir à la meilleure");
-    expect(resetLabelFr("worst")).toBe("Revenir à la pire");
+    expect(optimumComparisonFr("notes", "7,2")).toBe("Le meilleur sept aux notes : 7,2");
+    expect(resetLabelFr()).toBe("Revenir au sept proposé");
   });
 
   it("says out loud which two discs a tap moved", () => {
@@ -380,25 +364,42 @@ describe("the heading", () => {
 /* The honesty sentences                                                      */
 /* -------------------------------------------------------------------------- */
 
-describe("honesty 1 — the posts are declarations", () => {
-  it("says the app measures no time per post", () => {
-    expect(DECLARED_POSTS_FR).toContain("déclaré");
-    expect(DECLARED_POSTS_FR).toContain("ne mesure nulle part le temps passé à chaque poste");
-  });
-
-  it("never calls the pire équipe the best at anything", () => {
-    // The whole sentence used to end « qui est le meilleur sur le critère choisi » whatever the
-    // direction, and `?sens=pire` printed it under a seven of the *worst* seven men.
-    expect(declaredPostsFr("best")).toContain("qui est le meilleur sur le critère choisi");
-    expect(declaredPostsFr("worst")).not.toContain("meilleur");
-    expect(declaredPostsFr("worst")).toContain("le moins en avant sur le critère choisi");
-    expect(declaredPostsFr("worst")).toContain(DECLARED_POSTS_FR);
+describe("honesty 1 — the posts are the coach's", () => {
+  it("says the posts are the ones the coach set, primary first", () => {
+    expect(DECLARED_POSTS_FR).toContain("que le coach a indiqués");
+    expect(DECLARED_POSTS_FR).toContain("son poste principal d’abord");
+    expect(declaredPostsFr()).toBe(DECLARED_POSTS_FR);
+    // S12 measures the time per post now: the old sentence denying it would be false.
+    expect(DECLARED_POSTS_FR).not.toContain("ne mesure nulle part");
   });
 
   it("explains a « pas son poste » badge, and says nothing when there is none", () => {
     expect(outOfPositionNoteFr(0)).toBeNull();
     expect(outOfPositionNoteFr(1)).toContain("1 poste est tenu");
     expect(outOfPositionNoteFr(2)).toContain("2 postes sont tenus");
+  });
+});
+
+describe("who may keep goal (decision 172)", () => {
+  it("says who was considered, and in the légende who was refused and against what", () => {
+    expect(keeperRuleFr({ seven: "notes", considered: 3, refused: 0, average: 2 })).toBeNull();
+    expect(keeperRuleFr({ seven: "offensive", considered: 0, refused: 0, average: null })).toContain(
+      "Personne n’a encore de minutes dans les buts",
+    );
+    const offensive = keeperRuleFr({ seven: "offensive", considered: 3, refused: 1, average: 2.5 })!;
+    expect(offensive).toContain("3 joueurs ont joué au goal");
+    // Only the légende refuses below-average keepers.
+    expect(offensive).not.toContain("écarté");
+    const legend = keeperRuleFr({ seven: "legende", considered: 3, refused: 1, average: 2.5 })!;
+    expect(legend).toContain("1 est écarté du 7 de légende");
+    expect(legend).toContain("plus que la moyenne des gardiens, 1 but/24′");
+    expect(KEEPER_REFUSED_BADGE_FR).toBe("écarté du goal");
+  });
+
+  it("states each new seven's smoothing and its one surprising rule", () => {
+    expect(sevenSmoothingFr("offensive")).toContain("départagés par leurs passes décisives");
+    expect(sevenSmoothingFr("legende")).toContain("compté à la moyenne du poste");
+    expect(sevenSmoothingFr("notes")).toBeNull();
   });
 });
 
@@ -491,11 +492,9 @@ describe("honesty 2 — what the shrinkage did", () => {
     ).toBe(4);
   });
 
-  it("names the keepers, not the team, under the keepers' own model", () => {
-    // Decision 011 fits two models and `CLEAN_SHEET_READINGS_FR` promises « les gardiens ne sont
-    // comparés qu’entre eux », so « la moyenne de l’équipe » would name the wrong twelve people.
+  it("names the keepers, not the team, under a keepers' model", () => {
     const keeper = (unmeasurable: ShrinkageReport["unmeasurable"]) =>
-      goalkeeperShrinkageSentenceFr(
+      shrinkageSentenceFr(
         "cleanSheet",
         report({
           unit: "minutes",
@@ -505,28 +504,9 @@ describe("honesty 2 — what the shrinkage did", () => {
           unmeasurable,
         }),
       );
-
-    // Finding 4's own case: no minute was ever attributed to the goal, while the outfielders have a
-    // full season. « Personne n’a de chiffre sur ce critère » would be false here.
-    expect(keeper("noData")).toBe(
-      "Pour le gardien, les minutes sans encaisser dans les buts sont ramenées vers la moyenne des " +
-        "gardiens — sauf qu’il n’y a pas de moyenne : personne n’a de minutes comptées dans les buts, " +
-        "et l’appli ne les compte que si une composition confirmée dit qui gardait.",
-    );
     expect(keeper("onePlayer")).toContain("un seul joueur a gardé les buts");
-    expect(keeper("onePlayer")).toContain("aucun écart entre gardiens");
     expect(keeper("noSpread")).toContain("vers la moyenne des gardiens");
     expect(keeper(null)).toContain("vers la moyenne des gardiens, à hauteur de 300′");
-  });
-
-  it("states the keepers' own model in the same words, and only when there is one", () => {
-    expect(goalkeeperShrinkageSentenceFr("cleanSheet", null)).toBeNull();
-    const sentence = goalkeeperShrinkageSentenceFr(
-      "cleanSheet",
-      report({ unit: "minutes", priorStrength: 90, measured: 90, source: "goalkeeper" }),
-    );
-    expect(sentence).toContain("Pour le gardien");
-    expect(sentence).toContain("à hauteur de 90′");
   });
 });
 
@@ -536,42 +516,24 @@ describe("honesty 3 — a disc showing the squad's figure, not the man's", () =>
     expect(squadMeanStandInFr(-1)).toBeNull();
   });
 
-  it("says how many, and that such a man can be in either seven", () => {
+  it("says how many, and that such a man is neither flattered nor punished", () => {
     // Decision 115 says a no-data player « heads neither the best seven nor the worst », which is true
     // and not the whole truth: he is regularly *in* one of them, at the squad's own average.
     const one = squadMeanStandInFr(1) as string;
     expect(one).toBe(
-      "1 des sept n’a aucun chiffre cette saison sur ce critère : il est affiché à la moyenne de " +
-        "l’équipe, donc ni flatté ni puni pour ne pas avoir joué — il peut donc apparaître dans la " +
-        "meilleure comme dans la pire équipe.",
+      "1 des sept n’a aucun chiffre cette saison à ce poste : il est affiché à la moyenne de " +
+        "l’équipe, donc ni flatté ni puni pour ne pas avoir joué.",
     );
 
     const three = squadMeanStandInFr(3) as string;
     expect(three).toBe(
-      "3 des sept n’ont aucun chiffre cette saison sur ce critère : ils sont affichés à la moyenne de " +
-        "l’équipe, donc ni flattés ni punis pour ne pas avoir joué — ils peuvent donc apparaître dans " +
-        "la meilleure comme dans la pire équipe.",
+      "3 des sept n’ont aucun chiffre cette saison à ce poste : ils sont affichés à la moyenne de " +
+        "l’équipe, donc ni flattés ni punis pour ne pas avoir joué.",
     );
 
     // The count is the denominator of the claim, and rule 2 of `aggregate.ts` forbids one without it.
     expect(one).toContain("1 des sept");
     expect(three).toContain("3 des sept");
-  });
-});
-
-describe("honesty 4 — which invincibilité", () => {
-  it("names both of decision 011's readings, only on the criterion that has two", () => {
-    expect(cleanSheetReadingsFr("cleanSheet")).toBe(CLEAN_SHEET_READINGS_FR);
-    expect(cleanSheetReadingsFr("goals")).toBeNull();
-    expect(CLEAN_SHEET_READINGS_FR).toContain("deux façons de compter l’invincibilité");
-    expect(CLEAN_SHEET_READINGS_FR).toContain("dans les buts sans encaisser");
-    expect(CLEAN_SHEET_READINGS_FR).toContain("sur le terrain sans encaisser");
-  });
-
-  it("never spells it a third way", () => {
-    // The repo already has two spellings of this and `docs/ROADMAP.md` logs that as debt.
-    expect(CLEAN_SHEET_READINGS_FR.toLowerCase()).not.toContain("clean sheet");
-    expect(CLEAN_SHEET_READINGS_FR.toLowerCase()).not.toContain("cage inviolée");
   });
 });
 
@@ -597,10 +559,6 @@ describe("the squad", () => {
     expect(emptySlotsFr(2)).toContain("2 postes restent vides");
   });
 
-  it("says a seven with no basis is a placement, not a ranking", () => {
-    expect(noBasisFr("goals")).toContain("Personne n’a encore de chiffre");
-    expect(noBasisFr("goals")).toContain("placement par postes déclarés");
-  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -610,24 +568,23 @@ describe("the squad", () => {
 describe("the tutoiement (decision 074)", () => {
   it("never uses « vous » or « votre » anywhere in this screen's copy", () => {
     const everything = [
-      declaredPostsFr("best"),
-      declaredPostsFr("worst"),
-      CLEAN_SHEET_READINGS_FR,
+      declaredPostsFr(),
+      ...Object.values(SEVEN_RULE_FR),
+      keeperRuleFr({ seven: "legende", considered: 3, refused: 2, average: 2 }),
+      keeperRuleFr({ seven: "defensive", considered: 0, refused: 0, average: null }),
+      sevenSmoothingFr("offensive"),
+      sevenSmoothingFr("defensive"),
+      sevenSmoothingFr("legende"),
       shrinkageSentenceFr("ratings", report()),
       shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "noData" })),
       shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "onePlayer" })),
       shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "noSpread" })),
       shrinkageSentenceFr("ratings", report({ measured: null, unmeasurable: "noRepeat" })),
-      goalkeeperShrinkageSentenceFr(
-        "cleanSheet",
-        report({ unit: "minutes", measured: null, unmeasurable: "noData", source: "goalkeeper" }),
-      ),
       squadMeanStandInFr(1),
       squadMeanStandInFr(3),
       outOfPositionNoteFr(2),
       excludedFromSquadFr({ departedWithData: 2, nonPlayers: 1 }),
       emptySlotsFr(2),
-      noBasisFr("cleanSheet"),
     ].join(" ");
 
     expect(everything).not.toMatch(/\bvous\b|\bvotre\b|\bvos\b/i);

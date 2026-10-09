@@ -32,20 +32,21 @@ import { usePitchDrag } from "@/components/pitch/usePitchDrag";
 import { Badge, Button, Sheet, cn } from "@/components/ui";
 import { OptionRow } from "@/components/action-sheet";
 import { positionLabelFr } from "@/db/reference";
-import type { BestSevenCriterion, ObservedFigure, SlotFit } from "@/lib/stats/best-seven";
+import type { SlotFit } from "@/lib/stats/best-seven";
 import { aggregateSeven, hasOwnExposure } from "@/lib/stats/best-seven";
 import {
+  KEEPER_REFUSED_BADGE_FR,
   OUT_OF_POSITION_BADGE_FR,
   aggregationLabelFr,
-  formatCriterionValue,
-  observedFigureCompactFr,
-  observedFigureFr,
+  formatSevenFigure,
   optimumComparisonFr,
   resetLabelFr,
   sevenHeadingFr,
+  sevenObservedFr,
+  squadMeanStandInShortFr,
   swapAnnouncementFr,
-  type BestSevenDirection,
 } from "@/lib/stats/best-seven-copy";
+import type { SevenFigure, SevenKind, SevenObserved } from "@/lib/stats/sevens";
 import { adjustedBesideRawFr, formatMinutes } from "@/lib/stats/format";
 
 /* -------------------------------------------------------------------------- */
@@ -77,13 +78,21 @@ export type SevenCell = {
    * zero is the worst mark there is, printed under seven names nobody measured.
    */
   adjusted: number | null;
-  observed: ObservedFigure;
+  observed: SevenObserved;
+  /** What the figure is — each slot of a seven may read a different one (decision 171). */
+  figure: SevenFigure;
+  /** False for a man this seven refuses in this slot: the goal, to one who never kept it (decision 172). */
+  allowed: boolean;
 };
 
 export type SevenPitchProps = {
-  criterion: BestSevenCriterion;
-  direction: BestSevenDirection;
-  aggregation: "sum" | "mean";
+  seven: SevenKind;
+  /**
+   * How the team figure is built, or **null when there is none**. Only the notes seven has one (a mean
+   * of marks out of ten); the three others mix figures slot by slot — goals per hour up front, minutes
+   * per goal conceded in goal — and a total of those would be a number in no unit (decision 171).
+   */
+  aggregation: "sum" | "mean" | null;
   slots: readonly SevenSlotView[];
   candidates: readonly SevenCandidateView[];
   /** `cells[candidateIndex][slotIndex]`, the order `evaluateSquad` returns. */
@@ -100,8 +109,7 @@ export type SevenPitchProps = {
 /* -------------------------------------------------------------------------- */
 
 export function SevenPitch({
-  criterion,
-  direction,
+  seven,
   aggregation,
   slots,
   candidates,
@@ -160,7 +168,8 @@ export function SevenPitch({
   // No second gate here on purpose: `adjusted` is null exactly when the model behind that slot has no
   // squad mean, so the nulls already carry `hasBasis` — per model, which is more than a single flag
   // could say now that `cleanSheet` reads two of them (decision 011).
-  const aggregate = aggregateSeven(values, criterion);
+  // `aggregateSeven` only needs to know sum or mean, and only the notes seven has a team figure.
+  const aggregate = aggregation === null ? null : aggregateSeven(values, "ratings");
 
   // The turf's live rectangle is what turns a finger into a pitch point, so the hook takes the
   // caller's ref rather than owning one (see its header).
@@ -245,26 +254,30 @@ export function SevenPitch({
     <section className="space-y-3">
       <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h2 className="text-lg font-bold tracking-tight text-ink">
-          {sevenHeadingFr(direction, touched)}
+          {sevenHeadingFr(seven, touched)}
         </h2>
-        <p className="text-sm text-ink-muted">
-          {/* `values.length`, not seven: a squad short of men fills fewer slots, and « Total des
-              sept » over five discs is a claim about a team that never took the field. */}
-          {aggregationLabelFr(aggregation, values.length)} ·{" "}
-          <span className="font-semibold text-ink tabular-nums">
-            {formatCriterionValue(criterion, aggregate)}
-          </span>
-        </p>
+        {aggregation !== null ? (
+          <p className="text-sm text-ink-muted">
+            {/* `values.length`, not seven: a squad short of men fills fewer slots, and « Total des
+                sept » over five discs is a claim about a team that never took the field. */}
+            {aggregationLabelFr(aggregation, values.length)} ·{" "}
+            <span className="font-semibold text-ink tabular-nums">
+              {formatSevenFigure("ratings", aggregate)}
+            </span>
+          </p>
+        ) : null}
       </header>
 
       {/* The optimum's own figure, kept on screen the moment the heading stops claiming to be it. */}
       {touched ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2">
           <p className="text-xs text-ink-muted tabular-nums">
-            {optimumComparisonFr(direction, formatCriterionValue(criterion, optimumAggregate))}
+            {aggregation !== null
+              ? optimumComparisonFr(seven, formatSevenFigure("ratings", optimumAggregate))
+              : "Tu as modifié le sept proposé."}
           </p>
           <Button variant="secondary" size="sm" onClick={reset}>
-            {resetLabelFr(direction)}
+            {resetLabelFr()}
           </Button>
         </div>
       ) : null}
@@ -273,7 +286,7 @@ export function SevenPitch({
         <PitchLayout
           slots={pitchSlots}
           kit={kit}
-          pitchLabel={`${sevenHeadingFr(direction, touched)} sur la pelouse`}
+          pitchLabel={`${sevenHeadingFr(seven, touched)} sur la pelouse`}
           renderItem={(slot, content) => {
             const chosenId = assignment[slot.id] ?? null;
             const cell = chosenId ? cellFor(slot.id, chosenId) : null;
@@ -320,7 +333,7 @@ export function SevenPitch({
                 )}
               >
                 {content}
-                {cell ? <DiscFigures criterion={criterion} cell={cell} /> : null}
+                {cell ? <DiscFigures cell={cell} /> : null}
                 {/* Said last, because it is the only part that is not a fact about the slot. An empty
                     slot has nobody to change, so it is worded for what the tap will do there. */}
                 <span className="sr-only">
@@ -338,7 +351,6 @@ export function SevenPitch({
       </p>
 
       <SlotList
-        criterion={criterion}
         slots={slots}
         assignment={assignment}
         candidateById={candidateById}
@@ -350,12 +362,17 @@ export function SevenPitch({
           open
           onClose={() => setOpenSlotId(null)}
           title={`Qui joue ${positionLabelFr(openSlot.positionCode).toLocaleLowerCase("fr-FR")} ?`}
-          description="Choisis un joueur : le total sous la pelouse se recalcule."
+          description={
+            // Only the notes seven has a team figure to recalculate (decision 171).
+            aggregation !== null
+              ? "Choisis un joueur : le total sous la pelouse se recalcule."
+              : "Choisis un joueur : son chiffre à ce poste est affiché sous son nom."
+          }
         >
           <ul className="space-y-2">
             {candidates.map((candidate) => {
               const cell = cellFor(openSlot.slotId, candidate.id);
-              const raw = cell ? observedFigureFr(criterion, cell.observed) : null;
+              const raw = cell ? sevenObservedFr(cell.figure, cell.observed) : null;
               const onPitch = slots.some(
                 (slot) => slot.slotId !== openSlot.slotId && assignment[slot.slotId] === candidate.id,
               );
@@ -367,10 +384,12 @@ export function SevenPitch({
                     selected={assignment[openSlot.slotId] === candidate.id}
                     subtitle={[
                       cell
-                        ? adjustedBesideRawFr(formatCriterionValue(criterion, cell.adjusted), raw)
+                        ? adjustedBesideRawFr(formatSevenFigure(cell.figure, cell.adjusted), raw)
                         : null,
                       formatMinutes(candidate.minutes),
                       cell?.fit === "none" ? OUT_OF_POSITION_BADGE_FR : null,
+                      // Said before the tap: the proposed seven never puts him here, and why.
+                      cell?.allowed === false ? KEEPER_REFUSED_BADGE_FR : null,
                       // Said before the tap, not after: choosing him swaps two discs.
                       onPitch ? "déjà sur la pelouse" : null,
                     ]
@@ -409,14 +428,8 @@ export function SevenPitch({
  * at 12 px, unabbreviated, in the list under the pitch — nothing here is the only statement of
  * anything.
  */
-function DiscFigures({
-  criterion,
-  cell,
-}: {
-  criterion: BestSevenCriterion;
-  cell: SevenCell;
-}) {
-  const raw = observedFigureCompactFr(criterion, cell.observed);
+function DiscFigures({ cell }: { cell: SevenCell }) {
+  const raw = sevenObservedFr(cell.figure, cell.observed, true);
   /**
    * He has no exposure of his own, so the figure above is the **squad's**, printed under his name
    * (rule 2 of `best-seven.ts`: `n = 0` lands him exactly on the mean).
@@ -434,7 +447,7 @@ function DiscFigures({
   return (
     <span className="flex max-w-26 flex-col items-center leading-tight">
       <span className="rounded-full bg-surface/90 px-1.5 text-[0.6875rem] font-bold text-ink tabular-nums">
-        {formatCriterionValue(criterion, cell.adjusted)}
+        {formatSevenFigure(cell.figure, cell.adjusted)}
       </span>
       {raw !== null ? (
         <span className="max-w-full truncate rounded-full bg-surface/80 px-1 text-[0.5625rem] font-medium text-ink-muted tabular-nums">
@@ -450,12 +463,17 @@ function DiscFigures({
            colon is what makes the two lines read as one sentence aloud. */
         <span className="flex max-w-full flex-col items-center rounded-full bg-surface/80 px-1 text-[0.5625rem] font-medium text-ink-muted">
           <span className="max-w-full truncate">aucun chiffre :</span>
-          <span className="max-w-full truncate">moyenne de l’équipe</span>
+          <span className="max-w-full truncate">{squadMeanStandInShortFr(cell.figure)}</span>
         </span>
       ) : null}
       {cell.fit === "none" ? (
         <span className="max-w-full truncate rounded-full bg-surface/90 px-1 text-[0.5625rem] font-semibold text-danger">
           {OUT_OF_POSITION_BADGE_FR}
+        </span>
+      ) : null}
+      {!cell.allowed ? (
+        <span className="max-w-full truncate rounded-full bg-surface/90 px-1 text-[0.5625rem] font-semibold text-danger">
+          {KEEPER_REFUSED_BADGE_FR}
         </span>
       ) : null}
     </span>
@@ -474,13 +492,11 @@ function DiscFigures({
  * a slot nobody could be found for says so in words rather than as an empty target on grass.
  */
 function SlotList({
-  criterion,
   slots,
   assignment,
   candidateById,
   cellFor,
 }: {
-  criterion: BestSevenCriterion;
   slots: readonly SevenSlotView[];
   assignment: Readonly<Record<string, string | null>>;
   candidateById: Map<string, SevenCandidateView>;
@@ -492,7 +508,7 @@ function SlotList({
         const chosenId = assignment[slot.slotId] ?? null;
         const chosen = chosenId ? candidateById.get(chosenId) : undefined;
         const cell = chosenId ? cellFor(slot.slotId, chosenId) : null;
-        const raw = cell ? observedFigureFr(criterion, cell.observed) : null;
+        const raw = cell ? sevenObservedFr(cell.figure, cell.observed) : null;
         return (
           <li key={slot.slotId} className="flex items-center gap-3 px-3 py-2">
             <span className="w-11 shrink-0 text-xs font-semibold text-ink-subtle uppercase">
@@ -517,14 +533,14 @@ function SlotList({
               {cell ? (
                 <>
                   <span className="block text-sm font-semibold text-ink tabular-nums">
-                    {formatCriterionValue(criterion, cell.adjusted)}
+                    {formatSevenFigure(cell.figure, cell.adjusted)}
                   </span>
                   {raw !== null ? <span className="block tabular-nums">{raw}</span> : null}
                   {/* The same fact as the disc's two-line caption, in full: this is the row that never
                       abbreviates. `tabular-nums` deliberately not inherited here — it is a sentence,
                       not a figure. */}
                   {cell.adjusted !== null && !hasOwnExposure(cell.observed) ? (
-                    <span className="block">aucun chiffre : moyenne de l’équipe</span>
+                    <span className="block">aucun chiffre : {squadMeanStandInShortFr(cell.figure)}</span>
                   ) : null}
                 </>
               ) : null}

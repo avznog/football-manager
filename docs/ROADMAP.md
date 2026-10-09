@@ -882,7 +882,15 @@ tag during this rework** (decision 146): every item below reaches the preview on
             shrunk with the existing Gamma–Poisson fit, raw record beside it, « aucun but encaissé »
             instead of ∞; impact per position as two shrunk Poisson rates (decision **162**)
       - [x] Profile card: conceded outfield and its rate, keeper figures, minutes by position
-- [ ] **S13** · #172 · équipe type: offensive, défensive, 7 de légende, notes
+- [x] **S13** · #172 · équipe type: offensive, défensive, 7 de légende, notes
+      - [x] `?critere=` names one of four sevens; old and empty values fall back to `offensive`; `sens`
+            (« la pire ») removed (decision **171**)
+      - [x] Per-slot figures and lexicographic keys in `solveAssignment` (`SquadCell.keys` / `allowed`),
+            built by `lib/stats/sevens.ts` on S12's smoothed rates; goals then assists at the printed
+            tenth; outfield before the goal
+      - [x] Légende: impact per post, AT → AIL → MC → DC → GB as a key order; keeper among those who
+            played in goal, refused below the keepers' average (Q8, decision **172**)
+      - [x] Each disc prints the ranked figure and its raw record; the seven's rule under the title
 
 ## Deployment
 - [x] First-run bootstrap — `npm run db:bootstrap` writes the reference data and the one

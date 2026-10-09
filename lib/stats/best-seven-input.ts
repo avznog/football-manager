@@ -30,7 +30,8 @@
  */
 
 import type { PlayerSeasonStats } from "./aggregate";
-import type { BestSevenCandidate, BestSevenSlot, PositionDeclaration } from "./best-seven";
+import type { BestSevenSlot, PositionDeclaration } from "./best-seven";
+import type { SevenCandidate } from "./sevens";
 
 /**
  * One member's identity and declared posts, in the shape `getSquad` already returns
@@ -53,7 +54,7 @@ export type DeclaredPositions = {
 
 export type BestSevenSquad = {
   /** In `getSquad`'s order; `bestSeven` re-sorts by its own tie-breaks anyway. */
-  candidates: BestSevenCandidate[];
+  candidates: SevenCandidate[];
   /**
    * Members who have a season in this selection but are no longer in the squad. Their goals stay in
    * the season (`aggregate.ts`, rule 8) and they are still not fieldable, so the number is returned
@@ -93,6 +94,10 @@ const NO_SEASON = {
   ratingAverage: null,
   ratingCount: 0,
   ratingVariance: null,
+  outfieldMinutes: 0,
+  concededOutfield: 0,
+  concededWhileGk: 0,
+  positions: [],
 } as const;
 
 /**
@@ -110,7 +115,7 @@ export function toBestSevenSquad(
 
   const candidates = squad
     .filter((member) => member.isPlayer)
-    .map((member): BestSevenCandidate => {
+    .map((member): SevenCandidate => {
       const season = seasonById.get(member.membershipId);
       const figures = season ?? NO_SEASON;
       return {
@@ -139,6 +144,12 @@ export function toBestSevenSquad(
         ratingCount: season?.rating.count ?? 0,
         ratingVariance: season?.rating.variance ?? null,
         declarations: declarationsOf(member.positions),
+        // The figures the cahier's sevens read on top (decisions 171–172): conceded outfield and in
+        // goal, and the season per position for the légende's impact.
+        outfieldMinutes: figures.outfieldMinutes,
+        concededOutfield: figures.concededOutfield,
+        concededWhileGk: figures.concededWhileGk,
+        positions: figures.positions,
       };
     });
 
