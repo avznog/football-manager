@@ -5871,7 +5871,7 @@ existing sweep over every clock state checks against the accessible name.
 ## 157 — One formation, the 1-2-3-1, and five positions: GB, DC, MC, AIL, AT
 
 **2026-10-09** · accepted · supersedes the « a coach can pick or draw any formation » half of decision
-**005** · migration `0011_single_formation.sql` (orchestrator: renumber at merge if needed)
+**005** · migration `0012_single_formation.sql`
 
 The owner's brief (`cahier-des-charges.md`): « il n'y a à partir de maintenant qu'une seule formation →
 1 (GK), 2 (DC × 2), 3 (MC, et les deux ailiers, sans faire de différence), 1 (BU) », and his answer to Q4:
@@ -5958,7 +5958,7 @@ Who may edit the wishes is **unchanged here** (still the player himself); it mov
 decisions 068 and 090**, the « copyable list of non-responders » consequence of **015** (its refusal of
 push and e-mail stands), the availability-answers clause of **098**, and in `docs/PLAN.md` the
 « Je suis dispo » control of screen 2, the availability grid and non-responders list of screen 3, and
-M2's « availability declaration » · migration `0012_curvy_kitty_pryde.sql`
+M2's « availability declaration » · migration `0013_known_apocalypse.sql`
 
 The cahier's cleanup list names two things: « Disponibilité pour le match » and « Message de relance
 pour ceux qui n'ont pas répondu ». The team settles who comes in its group chat, and the app was asking
@@ -6138,7 +6138,7 @@ team_member_id, position_code, minutes, goals_for, goals_against)` with its PK o
 same cascading FKs. Written by `lib/match/finalize.ts` in the same transaction as `match_player_stats`,
 deleted and reinserted on every freeze. `position_code` has no FK to `positions`: the cache keeps the code
 the log had, and the catalogue is changing under it (Q4 replaces MG/MD with `AIL`). Migration
-`0012_remarkable_young_avengers.sql`.
+`0014_ambiguous_vindicator.sql`.
 
 The statistics read it through the same two paths as every other line (`lib/stats/match-lines.ts`): the
 cache when the match is frozen, the reducer when it is not, with a test that the two agree.
@@ -6238,3 +6238,68 @@ reader see it. It loosens as the season fills.
 - one line of minutes by position.
 
 The smoothed figure is a ranking device and lives on `/stats`.
+
+---
+
+## 165 — The starting composition is the selection; there is no match sheet screen
+
+**2026-10-09** · accepted · the cahier des charges, « Feuille de match » and « Composition » ·
+**supersedes** the `/match/[id]/feuille` half of decision **026** (the compositions stay coach-only),
+decision **067** (an untouched sheet's thirteen rows — the rows are gone), decision **084** (the sheet's
+« Et maintenant ? » card) and decision **085**'s « voir / modifier la feuille » link and empty-sheet
+state, and in `docs/PLAN.md` the « selection (titulaire / remplaçant / supporter) » step of screen 3 ·
+keeps **053** (the selection is the coach's intention, never rewritten by the log) and **096**
+(« non sélectionné » counts players)
+
+The owner: « Quand on rentre une feuille de match, pas besoin de faire une feuille de match. À partir de
+maintenant, on place les joueurs sur le terrain, et sur la même page, en bas on peut dire qui est
+supporters / remplaçant. » and « Le reste des joueurs est considéré comme pas sélectionné. »
+
+So the selection is made **once, on the composition de départ**:
+
+- **the pitch is the titulaires.** Its bench is every player of the team, not the sheet's starters and
+  substitutes, because placing a man is what selects him;
+- **under the pitch, every active member** — players and members who never play — with Remplaçant /
+  Supporter / —. A man on the pitch has no control there, only a « Titulaire » badge, so he cannot be
+  both; « — » means no `match_squad` row;
+- **one « Enregistrer »** writes the lineup and the selection in one transaction. `match_squad` stays
+  exactly as it was — game mode, the ratings (159), the statistics and the recap read it unchanged —
+  only its writer moved. The mapping is `squadFromComposition` (`lib/composition/squad.ts`), pure and
+  unit tested, and `saveLineup` asks `match:selectSquad` as well as `match:manageLineups` before it
+  writes the selection;
+- the old sheet's guards move with it: a player already fielded in a confirmed composition cannot leave
+  the selection, and a member who leaves it — or becomes a supporter — is taken out of every planned
+  change, as `setMatchSquad` used to do;
+- **a planned change does not select anybody.** Its bench is still the starters and the substitutes,
+  and it may not start at minute 0: that minute is the starting composition's, whose form carries the
+  list. `saveLineup` refuses either half of the pair without the other (`withSquad`), so a plan cannot
+  wipe the selection by submitting 0. The minute field's hint stopped offering « 0 pour la composition
+  de départ ».
+
+The word on screen is the cahier's: **« non sélectionné »**, where the sheet said « hors feuille »
+(`squadSummaryFr`, the plan warnings, the composition discs). Game mode's own « hors feuille » labels are
+left to the game-mode slices.
+
+**Consequences.** `/match/[id]/feuille` is a 404. The match page's composition card has one way in —
+« Composition de départ », then « Compositions » — and the compositions list says who the supporters are
+under the starting seven. The retro entry is unchanged: it still writes starters and substitutes from the
+form the coach types, and links to nothing that was removed. Deleting the starting composition leaves the
+selection it wrote in place; it is the coach's intention until he saves another.
+
+---
+
+## 166 — A member who does not play can be named supporter, and only that
+
+**2026-10-09** · accepted · completes decision **159**, whose consequence « the sheet screen does not
+offer a member who never plays » it **supersedes** · keeps **096**
+
+Decision 159 gave the vote to the match sheet, and the owner confirmed that a coach rates only if the
+sheet names him — then noted that the old sheet could not name a coach who does not play, so the slice
+rebuilding selection had to. It does: the list under the starting pitch shows every active member, and a
+member with `is_player = false` is offered **Supporter** and **—**, never Remplaçant, and is never on the
+bench strip or the pitch. `squadFromComposition` refuses a non-player placed on the pitch or marked
+remplaçant, in French, so a crafted form fails the same way the screen prevents it.
+
+The tally keeps decision 096's rule: an unnamed non-player is not « non sélectionné » — `isSheetCandidate`
+still counts players, plus anybody selected — so « 9 non sélectionnés » counts the players a coach could
+have picked, and a coach named supporter is counted with the supporters.

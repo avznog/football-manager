@@ -1,7 +1,7 @@
 import "server-only";
 
 /**
- * Reads for the match sheet and the compositions of a match.
+ * Reads for the compositions of a match, and for the selection (`match_squad`) they write.
  *
  * Everything returned is plain and serialisable — the editor is a client component, so no Drizzle
  * row and no `Date` crosses the boundary (`CLAUDE.md`).
@@ -21,7 +21,7 @@ import { getSquad } from "@/lib/team/queries";
 import type { PlanMember, PlanSlot, PlannedLineup } from "./plan";
 
 /* -------------------------------------------------------------------------- */
-/* The match sheet                                                            */
+/* The selection                                                              */
 /* -------------------------------------------------------------------------- */
 
 export type SquadSheetEntry = {
@@ -29,7 +29,7 @@ export type SquadSheetEntry = {
   role: SquadRole;
 };
 
-/** The match sheet as stored: only the members the coach has selected have a row. */
+/** The selection as stored: only the members the coach has selected have a row. */
 export async function getMatchSquad(matchId: string): Promise<SquadSheetEntry[]> {
   return db
     .select({ teamMemberId: matchSquad.teamMemberId, role: matchSquad.role })
@@ -38,7 +38,7 @@ export async function getMatchSquad(matchId: string): Promise<SquadSheetEntry[]>
 }
 
 /**
- * Everyone who could be on the sheet, with what the sheet currently says about them.
+ * Every active member of the team, with what the selection currently says about them.
  *
  * The squad order is `getSquad`'s (coaches first, then by shirt number), which is the order the
  * coach is used to everywhere else in the app. A player with no `match_squad` row gets
@@ -72,9 +72,10 @@ export async function getCompositionMembers(
 /**
  * Everyone who already appears in a composition game mode has confirmed.
  *
- * Such a player cannot be taken off the match sheet: the composition is tied to an event in the
+ * Such a player cannot be taken off the selection: the composition is tied to an event in the
  * append-only log (invariant 1), and dropping him would contradict a match that has happened. The
- * match sheet greys the two segments that would do it, and `setMatchSquad` refuses them outright.
+ * list under the starting pitch greys the two choices that would do it, and `saveLineup` refuses
+ * them outright (`squadFromComposition`, rule 4).
  */
 export async function getFieldedMemberIds(matchId: string): Promise<string[]> {
   const rows = await db

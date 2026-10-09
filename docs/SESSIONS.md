@@ -4745,7 +4745,7 @@ wishes mapped (Q10).
 - **Reference data** (`db/reference.ts`): `POSITION_CODES` = the five; `AIL` on the `MIL` line;
   `BUILTIN_FORMATIONS` = the `1-2-3-1` alone, its side slots `AIL` at x 160 / 840; `DEFAULT_FORMATION_LABEL`
   = `1-2-3-1`; new `THE_FORMATION`. `PREFERRED_*` deleted — every position is a wish (decision 158).
-- **Migration `0011_single_formation.sql`** (custom SQL): insert `AIL`; rewrite the built-in `1-2-3-1`'s
+- **Migration `0012_single_formation.sql`** (custom SQL): insert `AIL`; rewrite the built-in `1-2-3-1`'s
   `MG`/`MD` slots to `AIL` in place; map and collapse `player_positions`. MOC → MC is mine, not the owner's
   (no MOC row on the production restore). Checked on a rolled-back transaction with constructed players
   (DG primary + DD + DC secondary → one DC primary, etc.), then applied to `football_wc`: the restore had
@@ -4772,7 +4772,7 @@ player himself and as the coach, side by side. Screenshots in `audit/track-c/`.
 ## 2026-10-09 — S3 of the cahier rework: match availability and the relance removed (decision 156)
 
 Track B again, same worktree and `football_wb`, on top of S2 (#176). Everything decision 156 lists is
-gone, and migration `0012_curvy_kitty_pryde.sql` drops `match_availability` (5 rows on `football_wb`)
+gone, and migration `0013_known_apocalypse.sql` drops `match_availability` (5 rows on `football_wb`)
 and `availability_status`. Before generating it I checked that `match_availability.status` was the
 enum's only remaining column.
 
@@ -4863,7 +4863,7 @@ impact, `/stats` layout).
   `positionStatsOf` (apportioned minutes, `GB` = `gkMinutes`), `toMatchPlayerPositions`. The changes are
   only in `accrue`, `scoreFor` / `concede` and the output shape. No existing figure moved, and the
   existing tests pass with only the new field added to one `toEqual`.
-- `db/schema.ts` + `0012_remarkable_young_avengers.sql`: `match_player_stats.goals_for_while_on`,
+- `db/schema.ts` + `0014_ambiguous_vindicator.sql`: `match_player_stats.goals_for_while_on`,
   `match_player_positions`. Expect a number collision at merge.
 - `lib/match/finalize.ts` writes both tables in one transaction. `scripts/refreeze-stats.mts` /
   `npm run db:refreeze`, wired after `db:migrate` in `ci.yml` and `release.yml`.
@@ -4886,3 +4886,34 @@ Verified on `football_wd` after `db:migrate` + `db:refreeze`:
 What the data shows, stated in decision 162: with two matches the smoothing dominates, so every
 position's ranked impact is negative and close to the position's mean (the team scored 6 and conceded
 11). The raw records printed beside each figure are what make that readable.
+
+## 2026-10-09 — S6 of the cahier rework: the composition page is the selection (decisions 165–166)
+
+Track B, same worktree and `football_wb` (rebuilt by the coordinator with 0011–0013; `raphael`'s local
+password reset again).
+
+- **Removed**: `/match/[id]/feuille`, `components/composition/squad-sheet.tsx` and its export,
+  `setMatchSquad`, `setMatchSquadSchema` / `readSquadMarks` / `squadMarkSchema`, `squadRoleLabelFr`,
+  `sheetNextStepFr`, the `sheetLinkFr` / `emptySheetFr` halves of `compositionsScreenFr`, the « Feuille
+  de match vide » gates of the editor and the compositions list, and both « Feuille de match » links of
+  the match page's composition card.
+- **New**: `lib/composition/squad.ts` (`squadFromComposition`, `defaultBenchMark`, `benchMarksFor`,
+  `isPlaceable`) with `squad.test.ts`; `readBenchMarks` and a required `withSquad` on `saveLineupSchema`;
+  `saveLineup` writes `match_squad` with the starting composition; the editor's `selectsSquad` mode (whole
+  team on the bench, no minute field, the « Remplaçants et supporters » list under the pitch).
+- **Not touched**, as asked: the bench discs' `primaryPositionCode` labels (Track C's S5).
+- **e2e**: the happy path's sheet step is gone; the coach now places the seven and marks the substitute
+  on the starting composition, and the step asserts no « Feuille de match » link remains, no minute field,
+  no control for a placed player, and « 7 titulaires · 1 remplaçant ». The bench-drop test opens the
+  starting composition directly.
+- **Looked at, 390 px, light and dark, coach `potter` and player `raphael`**: a brand-new match's
+  composition card and compositions list (empty state with « Composition de départ »), the starting
+  composition editor (whole bench, then the list with `admin` — who does not play — offered only Supp. / —
+  and set to Supporter), the saved compositions list (« 7 titulaires · 1 remplaçant · 1 supporter · 9 non
+  sélectionnés »), an existing selection reopened in the editor, a plan at the 30th minute (no list, new
+  hint), and the match page — coach sees the composition card, player sees only « Mode match » and gets a
+  404 on `/composition` (decision 026). Found and fixed on screen: the plan's minute hint still said « 0
+  pour la composition de départ » after minute 0 had been refused.
+- Gates: typecheck, eslint, Vitest 66 files / 1336 tests, Playwright 6/6 on port 3102.
+- Left as is, worth a look: « feuille de match » still names the selection in the ratings wording (« 4 sur
+  8 de la feuille de match ») and in the deletion warning, and game mode still says « hors feuille ».

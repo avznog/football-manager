@@ -1,5 +1,5 @@
 /**
- * Validation for the match sheet and the composition editor.
+ * Validation for the composition editor, and the selection it now carries (decision 165).
  *
  * Pure — no server imports — so it is unit tested directly and the editor can use the same parsers
  * to check itself before submitting. Every message is French: the coach reads them (decision 012).
@@ -15,47 +15,38 @@ import { z } from "zod";
 
 import { FORMATION_SLOT_COUNT } from "@/db/reference";
 
+import type { BenchMark } from "./squad";
+
 /* -------------------------------------------------------------------------- */
-/* The match sheet                                                            */
+/* The selection, below the starting composition                              */
 /* -------------------------------------------------------------------------- */
 
 /**
- * One line of the match sheet.
- *
- * `"none"` is a real answer, not a missing one: it deletes the `match_squad` row. "Not selected"
- * and "selected as a supporter" are different facts, and the statistics and the composition
- * editor both read the difference.
+ * One line of the list under the starting composition's pitch (decision 165): remplaçant, supporter,
+ * or « — ». There is no « titulaire » here — the pitch says who starts — and `"none"` is a real
+ * answer: it means no `match_squad` row.
  */
-export const squadMarkSchema = z.enum(["starter", "substitute", "supporter", "none"], {
-  message: "Choisis titulaire, remplaçant, supporter ou rien.",
-});
-
-export type SquadMark = z.infer<typeof squadMarkSchema>;
-
-/** The whole sheet in one submit — one save on a phone at the side of a pitch. */
-export const setMatchSquadSchema = z.object({
-  teamId: z.uuid(),
-  matchId: z.uuid(),
-  marks: z.array(z.object({ teamMemberId: z.uuid(), mark: squadMarkSchema })),
+export const benchMarkSchema = z.enum(["substitute", "supporter", "none"], {
+  message: "Choisis remplaçant, supporter ou non sélectionné.",
 });
 
 /**
- * Reads the per-player radios of the match sheet, named `role:<membershipId>`.
+ * Reads the per-member radios of that list, named `role:<membershipId>`.
  *
  * Unknown values are skipped rather than defaulted: a value the app did not write is a bug or a
- * forged form, and in both cases leaving the player's current row alone is the safe answer.
+ * forged form. `squadFromComposition` then treats the member as unmarked, which is « — ».
  */
-export function readSquadMarks(
+export function readBenchMarks(
   entries: Iterable<[string, FormDataEntryValue]>,
-): Array<{ teamMemberId: string; mark: SquadMark }> {
-  const marks: Array<{ teamMemberId: string; mark: SquadMark }> = [];
+): Map<string, BenchMark> {
+  const marks = new Map<string, BenchMark>();
 
   for (const [key, value] of entries) {
     if (!key.startsWith("role:")) continue;
     const teamMemberId = key.slice("role:".length);
-    const parsed = squadMarkSchema.safeParse(typeof value === "string" ? value : "");
+    const parsed = benchMarkSchema.safeParse(typeof value === "string" ? value : "");
     if (!parsed.success) continue;
-    marks.push({ teamMemberId, mark: parsed.data });
+    marks.set(teamMemberId, parsed.data);
   }
 
   return marks;
@@ -112,6 +103,12 @@ export const saveLineupSchema = z.object({
   /** Absent when the coach is creating a composition rather than editing one. */
   lineupId: z.uuid().optional(),
   fromMinute: fromMinuteSchema,
+  /**
+   * True when the form is the starting composition's, which carries the selection list under the
+   * pitch. It must be true at minute 0 and false after it (`saveLineup`), so a plan can never wipe
+   * the selection by submitting a minute 0 without a list.
+   */
+  withSquad: z.boolean(),
   assignments: z
     .array(z.object({ slotKey: z.string().min(1), memberId: z.uuid() }))
     .max(FORMATION_SLOT_COUNT, "Il n’y a que 7 postes sur le terrain."),

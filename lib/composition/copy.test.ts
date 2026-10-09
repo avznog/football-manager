@@ -1,5 +1,5 @@
 /**
- * The sentences `compositionsScreenFr` and `sheetNextStepFr` own are written in one place only.
+ * The sentences `compositionsScreenFr` owns are written in one place only.
  *
  * This test exists because of a passing one. `plan.test.ts` asserts « never tells a coach to place
  * seven players in a match that is over », with `not.toContain("Place tes sept joueurs")`, and it was
@@ -27,9 +27,7 @@ import { describe, expect, it } from "vitest";
 const DERIVED_SENTENCES = [
   "Place tes sept joueurs sur la pelouse",
   "tu pourras ensuite planifier les changements",
-  "Choisis d’abord tes titulaires et tes remplaçants",
-  "Le groupe est fait : place les sept sur le terrain",
-  "Choisis tes titulaires, tes remplaçants et tes supporters",
+  "puis indique en dessous les remplaçants et les supporters",
   // And the sentences that are only true of a composition nothing has saved: the pitch of a new
   // composition is pre-filled with the team in force at that minute (decision 106), which is seven
   // discs that look exactly like a plan and are not one.

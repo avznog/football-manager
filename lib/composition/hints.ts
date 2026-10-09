@@ -129,7 +129,9 @@ export function benchDropHintFr({ name, fromPitch }: BenchDropHintInput): string
  * constant: a 2×25 match must not be told it lasts 60 minutes.
  */
 export function minuteFieldHintFr(totalMinutes: number): string {
-  return `0 pour la composition de départ. Le match dure ${totalMinutes} minutes et les minutes sont continues.`;
+  // No « 0 pour la composition de départ » any more: the starting composition has its own form,
+  // which carries the selection (decision 165), and a plan at minute 0 is refused.
+  return `Le match dure ${totalMinutes} minutes et les minutes sont continues.`;
 }
 
 /** Highest minute a composition may start at — `fromMinuteSchema`'s ceiling, in the field's `max`. */

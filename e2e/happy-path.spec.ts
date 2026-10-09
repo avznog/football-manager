@@ -226,39 +226,23 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   });
 
   /* ---------------------------------------------------------------------- */
-  /* The coach picks the squad                                              */
+  /* The starting composition: the seven, and the selection under them      */
   /* ---------------------------------------------------------------------- */
 
-  await test.step("the coach fills the match sheet: seven starters and one substitute", async () => {
+  await test.step("the coach builds the starting composition, and marks one substitute under it", async () => {
     await logout(page);
     await login(page, coach.username, fixture.password);
     await page.goto(matchUrl);
 
-    await page.getByRole("link", { name: "Feuille de match" }).first().click();
-    await expect(page.getByRole("heading", { level: 1, name: "Feuille de match" })).toBeVisible();
-
-    for (const [key] of STARTERS) {
-      await segment(page, `role:${playerOf(fixture, key).membershipId}-starter`).click();
-    }
-    await segment(page, `role:${sub.membershipId}-substitute`).click();
-
-    await page.getByRole("button", { name: "Enregistrer la feuille" }).click();
-
-    await expect(page.getByText("Feuille enregistrée.")).toBeVisible();
-    await expect(page.getByText("7 / 7 titulaires")).toBeVisible();
-  });
-
-  /* ---------------------------------------------------------------------- */
-  /* Compositions: the starting seven, then the change at the 30th minute    */
-  /* ---------------------------------------------------------------------- */
-
-  await test.step("the coach builds the starting composition", async () => {
-    await page.getByRole("link", { name: "Compositions" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Compositions" })).toBeVisible();
-    await expect(page.getByText("Le terrain est vide")).toBeVisible();
-
+    // There is no « Feuille de match » step any more (decision 165): the match page's composition
+    // card goes straight to the starting composition, where the selection is made.
+    await expect(page.getByRole("link", { name: "Feuille de match" })).toHaveCount(0);
     await page.getByRole("link", { name: "Composition de départ" }).click();
-    await expect(page.getByLabel("Minute", { exact: true })).toHaveValue("0");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Composition de départ" }),
+    ).toBeVisible();
+    // Its minute is 0 by definition, so there is no minute to type.
+    await expect(page.getByLabel("Minute", { exact: true })).toHaveCount(0);
 
     for (const [key, slot] of STARTERS) {
       await place(page, playerOf(fixture, key), slot);
@@ -267,11 +251,21 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     // placed, the only thing left to say is that the postes are taken (`benchHintFr`).
     await expect(page.getByText("tous les postes pris")).toBeVisible();
 
+    // A placed player has no control in the list — the pitch says he starts — and cannot be both.
+    const keeper = playerOf(fixture, STARTERS[0][0]);
+    await expect(page.locator(`input[name="role:${keeper.membershipId}"]`)).toHaveCount(0);
+
+    await segment(page, `role:${sub.membershipId}-substitute`).click();
+
     await page.getByRole("button", { name: "Créer la composition" }).click();
 
+    await expect(page.getByRole("heading", { level: 1, name: "Compositions" })).toBeVisible();
     const card = compositionCard(page, "Composition de départ");
     await expect(card).toBeVisible();
     await expect(card.getByText("enregistrée")).toBeVisible();
+    await expect(card.getByText(`Sur le banc : ${sub.displayName}`)).toBeVisible();
+    // The selection the save wrote: seven starters, one substitute, the rest unselected.
+    await expect(page.getByText(/7 titulaires · 1 remplaçant/)).toBeVisible();
   });
 
   await test.step("the coach plans one change at the 30th minute", async () => {
@@ -943,7 +937,6 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 test("le banc est une cible : un joueur glissé dessus quitte le terrain", async ({ page }) => {
   const fixture = provisionFixture();
   const striker = playerOf(fixture, "st");
-  const sub = playerOf(fixture, "sub");
 
   await login(page, fixture.coach.username, fixture.password);
 
@@ -953,15 +946,7 @@ test("le banc est une cible : un joueur glissé dessus quitte le terrain", async
   await page.getByRole("button", { name: "Créer le match" }).click();
   await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
 
-  await page.getByRole("link", { name: "Feuille de match" }).first().click();
-  for (const [key] of STARTERS) {
-    await segment(page, `role:${playerOf(fixture, key).membershipId}-starter`).click();
-  }
-  await segment(page, `role:${sub.membershipId}-substitute`).click();
-  await page.getByRole("button", { name: "Enregistrer la feuille" }).click();
-  await expect(page.getByText("Feuille enregistrée.")).toBeVisible();
-
-  await page.getByRole("link", { name: "Compositions" }).click();
+  // Straight into the starting composition: it is where the selection is made now (decision 165).
   await page.getByRole("link", { name: "Composition de départ" }).click();
 
   // The attacker, not the goalkeeper: his slot is at the far end of the turf, which is the one end
@@ -1017,17 +1002,11 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
   await page.getByRole("button", { name: "Créer le match" }).click();
   await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
 
-  await page.getByRole("link", { name: "Feuille de match" }).first().click();
-  for (const [key] of STARTERS) {
-    await segment(page, `role:${playerOf(fixture, key).membershipId}-starter`).click();
-  }
-  await segment(page, `role:${sub.membershipId}-substitute`).click();
-  await page.getByRole("button", { name: "Enregistrer la feuille" }).click();
-  await expect(page.getByText("Feuille enregistrée.")).toBeVisible();
-
-  await page.getByRole("link", { name: "Compositions" }).click();
+  // The starting composition is the selection (decision 165): the seven placed are the starters, and
+  // the substitute is marked in the list under the pitch.
   await page.getByRole("link", { name: "Composition de départ" }).click();
   for (const [key, slot] of STARTERS) await place(page, playerOf(fixture, key), slot);
+  await segment(page, `role:${sub.membershipId}-substitute`).click();
   await page.getByRole("button", { name: "Créer la composition" }).click();
   await expect(compositionCard(page, "Composition de départ")).toBeVisible();
 

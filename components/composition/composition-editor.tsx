@@ -19,6 +19,15 @@
  * There is one formation (decision 157), so there is nothing to pick and no slot to drag: the seven
  * posts of the `1-2-3-1` are fixed, and the only thing a gesture moves is a player.
  *
+ * ## The starting composition is the selection
+ *
+ * There is no match sheet screen any more (decision 165). In the **composition de départ** the bench
+ * is every player of the team, whoever is placed on the pitch is a titulaire, and a list under the
+ * pitch marks everybody else **Remplaçant**, **Supporter** or **—** — a coach who does not play
+ * included, as a supporter (decision 159). The list is part of this form, so one « Enregistrer » writes
+ * the composition and the selection together. A planned change (`selectsSquad` false) has no list: its
+ * bench is the starters and substitutes that selection made, exactly as before.
+ *
  * ## Three ways to do the same thing
  *
  * 1. **Drag** a player from the bench onto a slot. Dropping on an occupied slot swaps the two;
@@ -78,12 +87,14 @@ import {
   type PitchDragHandle,
   type PitchSlot,
 } from "@/components/pitch";
+import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { saveLineup } from "@/lib/composition/actions";
 import {
   assignmentsSignature,
@@ -114,6 +125,14 @@ import {
   planTitleFr,
   type PlannedLineup,
 } from "@/lib/composition/plan";
+import {
+  BENCH_MARK_LABELS,
+  benchMarksFor,
+  defaultBenchMark,
+  isPlaceable,
+  roleOfMark,
+  type BenchMark,
+} from "@/lib/composition/squad";
 import { abbreviateName } from "@/lib/pitch/names";
 import { nearestSlot, orderShape, shapeFromRows, shapeLabel } from "@/lib/formation/shape";
 
@@ -128,8 +147,10 @@ export type EditorMember = {
   membershipId: string;
   name: string;
   jerseyNumber: number | null;
-  /** `null` = not on the match sheet. Such a player is never offered, only flagged. */
+  /** `null` = not selected. In a planned change such a player is never offered, only flagged. */
   squadRole: SquadRole | null;
+  /** A member who does not play is never placed; in the starting composition he may be a supporter. */
+  isPlayer: boolean;
   isInjured: boolean;
 };
 
@@ -163,6 +184,13 @@ export type CompositionEditorProps = {
    */
   prefillNoticeFr?: readonly string[];
   fromMinute: number;
+  /**
+   * True for the starting composition: the bench is every player, the minute is 0 and not editable,
+   * and the list of remplaçants and supporters is shown under the pitch and saved with it.
+   */
+  selectsSquad: boolean;
+  /** Players already fielded in a confirmed composition: they cannot leave the selection. */
+  lockedMemberIds?: readonly string[];
   /**
    * Every *other* composition of the match. Used to deduce the changes this one implies and to
    * refuse a minute that is already taken — both live, as the minute field changes.
@@ -246,6 +274,19 @@ export function CompositionEditor(props: CompositionEditorProps) {
   const [announcement, setAnnouncement] = useState("");
   /** True while a player lifted off the turf is held over the dock: the bench is the drop target. */
   const [overDock, setOverDock] = useState(false);
+  /**
+   * The list under the starting pitch, one mark per member, kept even for a member who is on the
+   * pitch right now: take him off and his row comes back with what it said, instead of a default.
+   */
+  const initialMarks = useMemo(
+    () =>
+      Object.fromEntries(
+        members.map((member) => [member.membershipId, defaultBenchMark(member)] as const),
+      ) as Record<string, BenchMark>,
+    [members],
+  );
+  const [marks, setMarks] = useState<Record<string, BenchMark>>(initialMarks);
+  const locked = useMemo(() => new Set(props.lockedMemberIds ?? []), [props.lockedMemberIds]);
 
   const pitchRef = useRef<HTMLDivElement | null>(null);
   /**
@@ -258,9 +299,25 @@ export function CompositionEditor(props: CompositionEditorProps) {
   /** The bench strip's description — the count, which the strip itself no longer prints. */
   const benchHintId = useId();
 
+  /**
+   * The members as this form will leave them: in the starting composition, a man on the pitch is a
+   * titulaire and the others are what the list says — so the pitch's warnings (« inscrit comme
+   * supporter », « n’est plus sélectionné ») describe the save, not the selection it replaces.
+   */
+  const effective = useMemo<readonly EditorMember[]>(() => {
+    if (!props.selectsSquad) return members;
+    const onPitch = new Set(assignments.map((assignment) => assignment.memberId));
+    return members.map((member) => ({
+      ...member,
+      squadRole: onPitch.has(member.membershipId)
+        ? "starter"
+        : roleOfMark(marks[member.membershipId] ?? "none"),
+    }));
+  }, [members, assignments, marks, props.selectsSquad]);
+
   const byId = useMemo(
-    () => new Map(members.map((member) => [member.membershipId, member])),
-    [members],
+    () => new Map(effective.map((member) => [member.membershipId, member])),
+    [effective],
   );
   const nameOf = useMemo(() => nameOfMembers(members), [members]);
 
@@ -278,20 +335,34 @@ export function CompositionEditor(props: CompositionEditorProps) {
     [shape],
   );
 
-  /** Only players on the sheet are offered. Someone already placed stays visible, flagged. */
+  /**
+   * Who the bench offers (`isPlaceable`): every player in the starting composition, the selected
+   * starters and substitutes in a planned change. Someone already placed stays visible, flagged.
+   */
   const selectable = useMemo(
-    () =>
-      members.filter(
-        (member) => member.squadRole === "starter" || member.squadRole === "substitute",
-      ),
-    [members],
+    () => members.filter((member) => isPlaceable(member, props.selectsSquad ? "initial" : "plan")),
+    [members, props.selectsSquad],
   );
-  const bench = benchOf(selectable, assignments);
-  const starters = bench.filter((member) => member.squadRole === "starter");
-  const substitutes = bench.filter((member) => member.squadRole === "substitute");
+  const bench = benchOf(selectable, assignments).map(
+    (member) => byId.get(member.membershipId) ?? member,
+  );
+  /*
+   * The strip is two groups with a rule between them. In a plan: the starters left off, then the
+   * substitutes. In the starting composition: the remplaçants the list names first — the men the
+   * coach is choosing between — then every other player.
+   */
+  const [firstGroup, secondGroup] = props.selectsSquad
+    ? [
+        bench.filter((member) => member.squadRole === "substitute"),
+        bench.filter((member) => member.squadRole !== "substitute"),
+      ]
+    : [
+        bench.filter((member) => member.squadRole === "starter"),
+        bench.filter((member) => member.squadRole === "substitute"),
+      ];
   const freeSlots = shape.filter((slot) => memberInSlot(assignments, slot.key) === null).length;
 
-  const issues = findPlanIssues({ assignments, slots: planSlots, members });
+  const issues = findPlanIssues({ assignments, slots: planSlots, members: effective });
   const blocking = issues.filter((issue) => issue.blocking);
   const warnings = issues.filter((issue) => !issue.blocking);
 
@@ -305,7 +376,12 @@ export function CompositionEditor(props: CompositionEditorProps) {
    * not a decision to retitle the card « Composition de départ ».
    */
   const minute = parseMinute(fromMinute);
-  const minuteError = minuteFieldErrorFr(fromMinute);
+  // Minute 0 is the starting composition, whose form carries the selection; a plan may not take it.
+  const minuteError =
+    minuteFieldErrorFr(fromMinute) ??
+    (!props.selectsSquad && minute === 0
+      ? "La minute 0, c’est la composition de départ : choisis une minute du match."
+      : null);
   const titleMinute = minute ?? props.fromMinute;
 
   const previous = planInForceBefore(props.otherPlans, titleMinute, props.lineupId);
@@ -313,9 +389,13 @@ export function CompositionEditor(props: CompositionEditorProps) {
   const minuteClash =
     minute !== null && props.otherPlans.some((plan) => plan.fromMinute === minute);
 
+  const marksChanged =
+    props.selectsSquad &&
+    members.some((member) => marks[member.membershipId] !== initialMarks[member.membershipId]);
   const dirty =
     assignmentsSignature(assignments) !== assignmentsSignature(props.assignments) ||
-    fromMinute !== String(props.fromMinute);
+    fromMinute !== String(props.fromMinute) ||
+    marksChanged;
 
   const canSave =
     !pending &&
@@ -454,6 +534,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
   function resetEverything() {
     setAssignments([...props.assignments]);
     setFromMinute(String(props.fromMinute));
+    setMarks(initialMarks);
     setSelection(null);
     setAnnouncement("Modifications annulées.");
   }
@@ -526,6 +607,14 @@ export function CompositionEditor(props: CompositionEditorProps) {
       <input type="hidden" name="teamId" value={props.teamId} />
       <input type="hidden" name="matchId" value={props.matchId} />
       {props.lineupId ? <input type="hidden" name="lineupId" value={props.lineupId} /> : null}
+      {/* The starting composition carries the selection list; `saveLineup` refuses a minute 0 without
+          it and a list after it, so neither can wipe the other. */}
+      {props.selectsSquad ? (
+        <>
+          <input type="hidden" name="squad" value="1" />
+          <input type="hidden" name="fromMinute" value="0" />
+        </>
+      ) : null}
       {sortAssignments(assignments, shape).map((assignment) => (
         <input
           key={assignment.slotId}
@@ -550,7 +639,10 @@ export function CompositionEditor(props: CompositionEditorProps) {
       ) : null}
 
       {/* --- the minute ---
-          No formation here any more: there is one (decision 157), and the pitch below is it. */}
+          No formation here any more: there is one (decision 157), and the pitch below is it. Not in
+          the starting composition either: its minute is 0 by definition, and the page's own title
+          already says « Composition de départ ». */}
+      {props.selectsSquad ? null : (
       <Card title={planTitleFr({ fromMinute: titleMinute, isInitial: titleMinute === 0 })}>
         {/* Half the card's width, as it was beside the old formation select: a minute needs no more,
             and a 326 px number field reads as a text box. */}
@@ -597,6 +689,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
           ) : null}
         </div>
       </Card>
+      )}
 
       {/* --- the pitch --- */}
       <Card title="Terrain">
@@ -692,6 +785,21 @@ export function CompositionEditor(props: CompositionEditorProps) {
         warningsFr={warnings.map((issue) => issue.messageFr)}
       />
 
+      {/* --- who else is selected: the starting composition only (decision 165) --- */}
+      {props.selectsSquad ? (
+        <SquadList
+          members={members}
+          onPitch={new Set(assignments.map((assignment) => assignment.memberId))}
+          marks={marks}
+          locked={locked}
+          disabled={pending}
+          onChange={(memberId, mark) => {
+            setMarks((current) => ({ ...current, [memberId]: mark }));
+            setAnnouncement(`${nameOf(memberId)} : ${BENCH_MARK_LABELS[mark].full.toLocaleLowerCase("fr-FR")}.`);
+          }}
+        />
+      ) : null}
+
       {/* --- the dock: the bench and the confirm button, both always on screen --- */}
       <div ref={dockRef} className={cn(DOCK_CLASS, benchDropHint !== null && DOCK_TARGET_CLASS)}>
         {/* The dock carries the players and the buttons, and nothing else. The two status lines that
@@ -738,7 +846,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
           {benchHintFr({ benchCount: bench.length, freeSlots })}
         </p>
 
-        {/* The bench itself: one strip, titulaires then remplaçants, scrolling sideways when there
+        {/* The bench itself: one strip in two groups (see `firstGroup`), scrolling sideways when there
             are more than the five that fit. `benchPlayerLabelFr` is what says which is which to a
             screen reader, since the strip carries it by order alone. */}
         {bench.length > 0 ? (
@@ -747,27 +855,29 @@ export function CompositionEditor(props: CompositionEditorProps) {
             aria-describedby={benchHintId}
             className="flex snap-x gap-2 overflow-x-auto overscroll-x-contain pb-1"
           >
-            {starters.map((member) => (
+            {firstGroup.map((member) => (
               <BenchDisc
                 key={member.membershipId}
                 member={member}
                 kit={kit}
                 selected={selection?.kind === "member" && selection.id === member.membershipId}
                 disabled={pending}
+                quiet={props.selectsSquad}
                 gesture={gesture}
                 onKeyDown={onPlayerKeyDown}
               />
             ))}
-            {starters.length > 0 && substitutes.length > 0 ? (
+            {firstGroup.length > 0 && secondGroup.length > 0 ? (
               <li aria-hidden className="my-1 w-px shrink-0 self-stretch bg-border/70" />
             ) : null}
-            {substitutes.map((member) => (
+            {secondGroup.map((member) => (
               <BenchDisc
                 key={member.membershipId}
                 member={member}
                 kit={kit}
                 selected={selection?.kind === "member" && selection.id === member.membershipId}
                 disabled={pending}
+                quiet={props.selectsSquad}
                 gesture={gesture}
                 onKeyDown={onPlayerKeyDown}
               />
@@ -821,6 +931,11 @@ type BenchDiscProps = {
   kit: KitColors;
   selected: boolean;
   disabled: boolean;
+  /**
+   * In the starting composition the bench is the whole team, so « non sélectionné » under a disc is
+   * the normal case and not a warning: only an injury is flagged there.
+   */
+  quiet: boolean;
   gesture: PitchDragHandle<Carried>;
   onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, memberId: string) => void;
 };
@@ -844,7 +959,7 @@ type BenchDiscProps = {
  * else. A sideways swipe pans and we get a `pointercancel` (writing nothing, which is right — the
  * coach was scrolling); a lift towards the turf, or a tap, stays with our pointer capture.
  */
-function BenchDisc({ member, kit, selected, disabled, gesture, onKeyDown }: BenchDiscProps) {
+function BenchDisc({ member, kit, selected, disabled, quiet, gesture, onKeyDown }: BenchDiscProps) {
   return (
     <li className="shrink-0 snap-start">
       <button
@@ -870,7 +985,7 @@ function BenchDisc({ member, kit, selected, disabled, gesture, onKeyDown }: Benc
           primaryColor={kit.primaryColor}
           secondaryColor={kit.secondaryColor}
           variant={member.isInjured ? "unavailable" : selected ? "selected" : "normal"}
-          statusLabel={statusLabelOf(member)}
+          statusLabel={quiet ? (member.isInjured ? "blessé" : undefined) : statusLabelOf(member)}
           size="md"
           showName={false}
         />
@@ -886,6 +1001,83 @@ function BenchDisc({ member, kit, selected, disabled, gesture, onKeyDown }: Benc
 }
 
 /* -------------------------------------------------------------------------- */
+/* The selection list                                                         */
+/* -------------------------------------------------------------------------- */
+
+type SquadListProps = {
+  /** Every active member, in squad order — players and members who never play. */
+  members: readonly EditorMember[];
+  onPitch: ReadonlySet<string>;
+  marks: Readonly<Record<string, BenchMark>>;
+  locked: ReadonlySet<string>;
+  disabled: boolean;
+  onChange: (memberId: string, mark: BenchMark) => void;
+};
+
+/**
+ * Remplaçant / Supporter / — for every member of the team, under the starting pitch (decision 165).
+ *
+ * A man on the pitch has no control: his row says « Titulaire », which is the pitch's to say, so he
+ * cannot be made a titulaire and something else. A member who does not play is offered only
+ * Supporter and —. A player already fielded in a confirmed composition may not leave the selection,
+ * so his two other choices are greyed — `saveLineup` refuses them anyway.
+ *
+ * Native radios, named `role:<membershipId>`, so the list submits with the composition and works
+ * without JavaScript; `readBenchMarks` is their only reader.
+ */
+function SquadList({ members, onPitch, marks, locked, disabled, onChange }: SquadListProps) {
+  return (
+    <Card
+      title="Remplaçants et supporters"
+      description="Les joueurs sur le terrain sont titulaires. Les autres : remplaçant, supporter, ou non sélectionné (—)."
+      flush
+    >
+      <ul className="divide-y divide-border/60">
+        {members.map((member) => {
+          const placed = onPitch.has(member.membershipId);
+          const isLocked = locked.has(member.membershipId);
+          return (
+            <li key={member.membershipId} className="space-y-1.5 px-4 py-2.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="w-7 shrink-0 text-right font-mono text-sm font-semibold text-ink-muted tabular-nums">
+                  {member.jerseyNumber ?? "—"}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+                  {member.name}
+                </span>
+                {member.isPlayer ? null : <Badge variant="neutral">ne joue pas</Badge>}
+                {member.isInjured ? <Badge variant="danger">Blessé</Badge> : null}
+                {placed ? <Badge variant="success">Titulaire</Badge> : null}
+              </div>
+              {placed ? null : (
+                <SegmentedControl<BenchMark>
+                  name={`role:${member.membershipId}`}
+                  legend={`${member.name} : remplaçant, supporter ou non sélectionné`}
+                  value={marks[member.membershipId] ?? "none"}
+                  onChange={(mark) => onChange(member.membershipId, mark)}
+                  disabled={disabled}
+                  options={benchMarksFor(member).map((mark) => ({
+                    value: mark,
+                    tone: mark === "substitute" ? "accent" : mark === "supporter" ? "warning" : "neutral",
+                    disabled: isLocked && mark !== "substitute",
+                    label: (
+                      <>
+                        <span aria-hidden="true">{BENCH_MARK_LABELS[mark].short}</span>
+                        <span className="sr-only">{BENCH_MARK_LABELS[mark].full}</span>
+                      </>
+                    ),
+                  }))}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Small helpers                                                              */
 /* -------------------------------------------------------------------------- */
 
@@ -895,7 +1087,7 @@ function offSheet(member: EditorMember | undefined): boolean {
 
 function statusLabelOf(member: EditorMember | undefined): string | undefined {
   if (member === undefined) return "hors effectif";
-  if (member.squadRole === null) return "hors feuille de match";
+  if (member.squadRole === null) return "non sélectionné";
   if (member.squadRole === "supporter") return "supporter";
   if (member.isInjured) return "blessé";
   return undefined;

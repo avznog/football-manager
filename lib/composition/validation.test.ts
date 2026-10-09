@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   fromMinuteSchema,
+  readBenchMarks,
   readSlotFields,
-  readSquadMarks,
   saveLineupSchema,
 } from "./validation";
 
@@ -12,29 +12,33 @@ const KARIM = "22222222-2222-4222-8222-222222222222";
 const TEAM = "33333333-3333-4333-8333-333333333333";
 const MATCH = "44444444-4444-4444-8444-444444444444";
 
-describe("readSquadMarks", () => {
-  it("reads the whole sheet in one pass", () => {
+describe("readBenchMarks", () => {
+  it("reads the whole list under the pitch in one pass", () => {
     const form = new FormData();
     form.set("matchId", MATCH);
-    form.set(`role:${HUGO}`, "starter");
+    form.set(`role:${HUGO}`, "substitute");
     form.set(`role:${KARIM}`, "supporter");
 
-    expect(readSquadMarks(form.entries())).toEqual([
-      { teamMemberId: HUGO, mark: "starter" },
-      { teamMemberId: KARIM, mark: "supporter" },
-    ]);
+    expect(readBenchMarks(form.entries())).toEqual(
+      new Map([
+        [HUGO, "substitute"],
+        [KARIM, "supporter"],
+      ]),
+    );
   });
 
-  it("keeps « none » — the answer that removes a player from the sheet", () => {
+  it("keeps « none » — the answer that leaves a player unselected", () => {
     const form = new FormData();
     form.set(`role:${HUGO}`, "none");
-    expect(readSquadMarks(form.entries())).toEqual([{ teamMemberId: HUGO, mark: "none" }]);
+    expect(readBenchMarks(form.entries())).toEqual(new Map([[HUGO, "none"]]));
   });
 
-  it("skips a value the app would never have written", () => {
+  /** « Titulaire » is the pitch's to say: the list never offers it, so a form claiming it is forged. */
+  it("skips « starter » and any value the app would never have written", () => {
     const form = new FormData();
-    form.set(`role:${HUGO}`, "capitaine");
-    expect(readSquadMarks(form.entries())).toEqual([]);
+    form.set(`role:${HUGO}`, "starter");
+    form.set(`role:${KARIM}`, "capitaine");
+    expect(readBenchMarks(form.entries())).toEqual(new Map());
   });
 });
 
@@ -76,6 +80,7 @@ describe("saveLineupSchema", () => {
     teamId: TEAM,
     matchId: MATCH,
     fromMinute: "30",
+    withSquad: false,
     assignments: [{ slotKey: "slot-1", memberId: HUGO }],
   };
 
@@ -83,6 +88,10 @@ describe("saveLineupSchema", () => {
     const parsed = saveLineupSchema.safeParse(valid);
     expect(parsed.success).toBe(true);
     expect(parsed.success && parsed.data.fromMinute).toBe(30);
+  });
+
+  it("needs to be told whether the form carries the selection", () => {
+    expect(saveLineupSchema.safeParse({ ...valid, withSquad: undefined }).success).toBe(false);
   });
 
   it("refuses a player id that is not a membership", () => {

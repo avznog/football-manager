@@ -18,8 +18,6 @@ import {
   planInForceBefore,
   planTitleFr,
   sortPlans,
-  sheetNextStepFr,
-  squadRoleLabelFr,
   squadSummaryFr,
   suggestNextMinute,
   type PlanMember,
@@ -287,7 +285,7 @@ describe("findPlanIssues", () => {
       {
         code: "off-sheet",
         memberId: "momo",
-        messageFr: "Momo n’est plus sur la feuille de match.",
+        messageFr: "Momo n’est plus sélectionné.",
         blocking: false,
       },
     ]);
@@ -360,7 +358,7 @@ describe("nameOfMembers", () => {
   });
 });
 
-describe("the match sheet in words", () => {
+describe("the selection in words", () => {
   const sheet = [
     { isPlayer: true, squadRole: "starter" as const },
     { isPlayer: true, squadRole: "starter" as const },
@@ -385,7 +383,7 @@ describe("the match sheet in words", () => {
    */
   it("summarises the sheet the way a coach reads it, and accounts for everybody", () => {
     expect(squadSummaryFr(countSquadRoles(sheet))).toBe(
-      "2 titulaires · 1 remplaçant · 1 supporter · 1 hors feuille",
+      "2 titulaires · 1 remplaçant · 1 supporter · 1 non sélectionné",
     );
   });
 
@@ -406,7 +404,7 @@ describe("the match sheet in words", () => {
 
     expect(countSquadRoles(squad).unselected).toBe(2);
     expect(squadSummaryFr(countSquadRoles(squad))).toBe(
-      "7 titulaires · 3 remplaçants · 1 supporter · 2 hors feuille",
+      "7 titulaires · 3 remplaçants · 1 supporter · 2 non sélectionnés",
     );
   });
 
@@ -450,95 +448,22 @@ describe("the match sheet in words", () => {
       "1 titulaire",
     );
     expect(squadSummaryFr({ starters: 1, substitutes: 0, supporters: 0, unselected: 9 })).toBe(
-      "1 titulaire · 9 hors feuille",
+      "1 titulaire · 9 non sélectionnés",
     );
   });
 
   /**
-   * An untouched sheet is not thirteen players left out — it is a sheet nobody has filled. « Feuille
-   * de match vide » is shorter and truer than « 13 hors feuille », so the tally is dropped entirely
-   * when there is nothing else on the line.
+   * An untouched selection is not thirteen players left out — it is a selection nobody has made.
+   * « Personne n’est encore sélectionné » is truer than « 13 non sélectionnés », so the tally is
+   * dropped entirely when there is nothing else on the line.
    */
   it("says so when nothing has been decided", () => {
     expect(squadSummaryFr(countSquadRoles([{ isPlayer: true, squadRole: null }]))).toBe(
-      "Feuille de match vide",
+      "Personne n’est encore sélectionné",
     );
     expect(squadSummaryFr({ starters: 0, substitutes: 0, supporters: 0, unselected: 13 })).toBe(
-      "Feuille de match vide",
+      "Personne n’est encore sélectionné",
     );
-  });
-
-  it("names every role, and the absence of one", () => {
-    expect(squadRoleLabelFr("starter")).toBe("Titulaire");
-    expect(squadRoleLabelFr("substitute")).toBe("Remplaçant");
-    expect(squadRoleLabelFr("supporter")).toBe("Supporter");
-    expect(squadRoleLabelFr(null)).toBe("Hors feuille");
-  });
-});
-
-describe("sheetNextStepFr", () => {
-  const counts = (starters: number) => ({
-    starters,
-    substitutes: 0,
-    supporters: 0,
-    unselected: 13 - starters,
-  });
-
-  it("does not say the group is made on a sheet nobody has touched", () => {
-    const step = sheetNextStepFr(counts(0), "scheduled");
-
-    expect(step.description).not.toContain("Le groupe est fait");
-    expect(step.description).toContain("Personne n’est encore titulaire");
-  });
-
-  it("offers no composition link when there would be nobody to place", () => {
-    expect(sheetNextStepFr(counts(0), "scheduled").cta).toBeNull();
-  });
-
-  it("says how many titulaires are missing, and still lets the coach start placing", () => {
-    const step = sheetNextStepFr(counts(4), "scheduled");
-
-    expect(step.description).toContain("4 titulaires sur 7");
-    expect(step.description).toContain("il en manque 3");
-    expect(step.cta).toBe("composition");
-  });
-
-  it("agrees in number for a single titulaire", () => {
-    const step = sheetNextStepFr(counts(1), "scheduled");
-
-    expect(step.description).toContain("1 titulaire sur 7");
-    expect(step.description).toContain("celui-là");
-    expect(step.description).not.toContain("ceux-là");
-  });
-
-  it("says the group is made only when seven are ticked", () => {
-    expect(sheetNextStepFr(counts(7), "scheduled").description).toBe(
-      "Le groupe est fait : place les sept sur le terrain.",
-    );
-  });
-
-  /** Nothing caps the starters, so nine of them is reachable — and « place les sept » was a lie. */
-  it("says by how much a sheet is over seven, rather than naming a seven that does not exist", () => {
-    const step = sheetNextStepFr(counts(9), "scheduled");
-
-    expect(step.description).toContain("9 titulaires cochés pour 7 places");
-    expect(step.description).toContain("2 de trop");
-    expect(step.description).toContain("Repasse-les en remplaçants");
-    expect(step.description).not.toContain("place les sept");
-  });
-
-  it("stops giving instructions once the match is played, whatever the sheet says", () => {
-    for (const starters of [0, 4, 7, 9]) {
-      const step = sheetNextStepFr(counts(starters), "finished");
-
-      expect(step.description).toContain("Le match est joué");
-      expect(step.description).not.toContain("place");
-      expect(step.cta).toBe("recap");
-    }
-  });
-
-  it("treats a live match like one still to compose: invariant 3 makes a plan a proposal", () => {
-    expect(sheetNextStepFr(counts(7), "live").cta).toBe("composition");
   });
 });
 
@@ -555,8 +480,13 @@ describe("compositionsScreenFr", () => {
     expect(screen.frozenNoticeFr).toBeNull();
     expect(screen.noPlansFr.title).toBe("Le terrain est vide");
     expect(screen.noPlansFr.withCta).toBe(true);
-    expect(screen.emptySheetFr.withCta).toBe(true);
-    expect(screen.sheetLinkFr).toBe("modifier la feuille");
+  });
+
+  /** Decision 165: the starting composition is the selection, so its empty state names both halves. */
+  it("tells a coach that the remplaçants and supporters are chosen on the same page", () => {
+    expect(compositionsScreenFr(scheduled).noPlansFr.description).toContain(
+      "les remplaçants et les supporters",
+    );
   });
 
   /** Planning the 40th minute during the 20th is the point of the screen; invariant 3 keeps it a plan. */
@@ -570,12 +500,8 @@ describe("compositionsScreenFr", () => {
 
       expect(screen.editable).toBe(false);
       expect(screen.noPlansFr.withCta).toBe(false);
-      expect(screen.emptySheetFr.withCta).toBe(false);
       expect(screen.noPlansFr.description).not.toContain("Place tes sept joueurs");
       expect(screen.noPlansFr.description).not.toContain("planifier");
-      expect(screen.emptySheetFr.description).not.toContain("Choisis d’abord");
-      // The sheet itself is `frozen` on a finished match, so « modifier » is a promise it breaks.
-      expect(screen.sheetLinkFr).toBe("voir la feuille");
     }
   });
 

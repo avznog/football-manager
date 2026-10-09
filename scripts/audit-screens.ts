@@ -159,7 +159,6 @@ async function discover(): Promise<{ coach: string; player: string; targets: Tar
       { name: "match-saisi-apres", path: `/match/${retro.id}`, audience: "everyone" },
       { name: "match-nouveau", path: "/match/nouveau", audience: "coach" },
       { name: "match-modifier", path: `/match/${scheduled.id}/modifier`, audience: "coach" },
-      { name: "feuille", path: `/match/${scheduled.id}/feuille`, audience: "coach" },
       { name: "compositions", path: `/match/${played.id}/composition`, audience: "coach" },
       { name: "composition", path: `/match/${played.id}/composition/${lineup.id}`, audience: "coach" },
       { name: "composition-nouvelle", path: `/match/${scheduled.id}/composition/nouvelle`, audience: "coach" },
