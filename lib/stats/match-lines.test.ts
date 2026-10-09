@@ -10,6 +10,7 @@ import {
   type MatchStatLine,
   linesFromCache,
   linesFromLog,
+  reduceLog,
   matchesNeedingReduction,
   resolveMatchStatLines,
 } from "./match-lines";
@@ -168,6 +169,7 @@ describe("the two paths agree", () => {
       "concededWhileOn",
       "gkCleanMinutes",
       "concededWhileGk",
+      "goalsForWhileOn",
       "squadRole",
     ];
     // `computedAt` is the only column of the table that is not a statistic, so a line has every
@@ -276,5 +278,43 @@ describe("resolveMatchStatLines", () => {
 
     expect(resolved.lines).toEqual([]);
     expect(resolved.emptyMatchIds).toEqual(["m9"]);
+  });
+});
+
+describe("the per-position lines (decision 160)", () => {
+  it("come back from the cache exactly as the reduction produced them", () => {
+    const reduced = reduceLog("m1", MATCH_LOG);
+    const resolved = resolveMatchStatLines({
+      matchIds: ["m1"],
+      cached: freeze(reduced.lines),
+      cachedPositions: reduced.positions.map((row) => ({ ...row })),
+    });
+    expect(resolved.positions).toEqual(reduced.positions);
+  });
+
+  it("come from the log when the match is not frozen, and add up to the minutes", () => {
+    const resolved = resolveMatchStatLines({
+      matchIds: ["m1"],
+      cached: [],
+      logs: new Map([["m1", MATCH_LOG]]),
+    });
+    expect(resolved.positions.length).toBeGreaterThan(0);
+    for (const line of resolved.lines) {
+      const minutes = resolved.positions
+        .filter((row) => row.teamMemberId === line.teamMemberId)
+        .reduce((total, row) => total + row.minutes, 0);
+      expect(minutes, line.teamMemberId).toBe(line.minutes);
+    }
+  });
+
+  it("ignore a cached position row of a match the cache does not hold", () => {
+    const resolved = resolveMatchStatLines({
+      matchIds: ["m1"],
+      cached: [],
+      cachedPositions: [
+        { matchId: "m1", teamMemberId: "x", positionCode: "MC", minutes: 9, goalsFor: 0, goalsAgainst: 0 },
+      ],
+    });
+    expect(resolved.positions).toEqual([]);
   });
 });

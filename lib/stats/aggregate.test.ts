@@ -61,6 +61,7 @@ function line(matchId: string, teamMemberId: string, extra: Partial<MatchStatLin
     concededWhileOn: 0,
     gkCleanMinutes: 0,
     concededWhileGk: 0,
+    goalsForWhileOn: 0,
     squadRole: null,
     ...extra,
   } satisfies MatchStatLine;
@@ -689,5 +690,83 @@ describe("leaderboards", () => {
       ],
     });
     expect(stats.topScorers.map((entry) => entry.teamMemberId)).toEqual(["b", "a"]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Decisions 160–162: goals for while on, outfield conceded, positions         */
+/* -------------------------------------------------------------------------- */
+
+describe("the figures of decision 162", () => {
+  const stats = season({
+    members: [member("hugo", "Hugo"), member("karim", "Karim")],
+    matches: [match("m1"), match("m2")],
+    lines: [
+      // Hugo: 30′ in goal conceding 2, then 30′ outfield conceding 1.
+      line("m1", "hugo", {
+        minutes: 60,
+        gkMinutes: 30,
+        concededWhileOn: 3,
+        concededWhileGk: 2,
+        goalsForWhileOn: 2,
+      }),
+      line("m1", "karim", { minutes: 60, concededWhileOn: 3, goalsForWhileOn: 2 }),
+      line("m2", "karim", { minutes: 40, concededWhileOn: 0, goalsForWhileOn: 1 }),
+    ],
+    positions: [
+      { matchId: "m1", teamMemberId: "hugo", positionCode: "GB", minutes: 30, goalsFor: 1, goalsAgainst: 2 },
+      { matchId: "m1", teamMemberId: "hugo", positionCode: "DC", minutes: 30, goalsFor: 1, goalsAgainst: 1 },
+      // Two wing codes, two catalogues: one « Ailier » row.
+      { matchId: "m1", teamMemberId: "karim", positionCode: "MG", minutes: 60, goalsFor: 2, goalsAgainst: 3 },
+      { matchId: "m2", teamMemberId: "karim", positionCode: "AIL", minutes: 40, goalsFor: 1, goalsAgainst: 0 },
+      // A match outside the filter is ignored like every other line.
+      { matchId: "m9", teamMemberId: "karim", positionCode: "AT", minutes: 60, goalsFor: 9, goalsAgainst: 0 },
+    ],
+  });
+  const hugo = playerNamed(stats.players, "hugo");
+  const karim = playerNamed(stats.players, "karim");
+
+  it("splits conceded on the pitch into outfield and goal by subtraction", () => {
+    expect(hugo.outfieldMinutes).toBe(30);
+    expect(hugo.concededOutfield).toBe(1);
+    expect(hugo.concededWhileGk).toBe(2);
+  });
+
+  it("sums goals for while on across the season", () => {
+    expect(karim.goalsForWhileOn).toBe(3);
+  });
+
+  it("groups the positions at read time, in team-sheet order", () => {
+    expect(hugo.positions.map((p) => p.group)).toEqual(["GB", "DC"]);
+    expect(karim.positions).toEqual([{ group: "AIL", minutes: 100, goalsFor: 3, goalsAgainst: 3 }]);
+  });
+
+  it("ranks who conceded most outfield, and carries the minutes beside it", () => {
+    expect(
+      stats.topConcededOutfield.map((entry) => [entry.teamMemberId, entry.value, entry.count]),
+    ).toEqual([
+      ["karim", 3, 100],
+      ["hugo", 1, 30],
+    ]);
+  });
+
+  it("fits the keeper rate on the keepers alone", () => {
+    expect(stats.keeperConcededRate.considered).toBe(1);
+    expect(stats.keeperConcededRate.entries[0]).toMatchObject({
+      teamMemberId: "hugo",
+      minutes: 30,
+      conceded: 2,
+      rawMinutesPerGoal: 15,
+    });
+  });
+
+  it("builds the impact tables from the grouped positions", () => {
+    const wing = stats.impact.find((position) => position.group === "AIL")!;
+    expect(wing.entries.map((entry) => entry.teamMemberId)).toEqual(["karim"]);
+  });
+
+  it("ranks minutes, minutes in goal and clean minutes", () => {
+    expect(stats.topMinutes[0]).toMatchObject({ teamMemberId: "karim", value: 100 });
+    expect(stats.topGkMinutes.map((entry) => entry.teamMemberId)).toEqual(["hugo"]);
   });
 });

@@ -4853,3 +4853,36 @@ Charles's); the timeline line « Changement — Entrent : Clément, Lucas — So
 for the coach (with « Annuler ») and the player (without, and his discs are not buttons); then, after
 the whistle, the recap's Déroulé showing the same line to both. That match is now finished in
 `football_wa`.
+
+## 2026-10-09 — S12: the statistics data, rates and impact per position (Track D)
+
+Issue #171. Decisions **160** (reducer + storage), **161** (`db:refreeze` and CI) and **162** (rates,
+impact, `/stats` layout).
+
+- `lib/match/reducer.ts`: `goalsForWhileOn`, `positions` per player (`PlayerPositionStats`),
+  `positionStatsOf` (apportioned minutes, `GB` = `gkMinutes`), `toMatchPlayerPositions`. The changes are
+  only in `accrue`, `scoreFor` / `concede` and the output shape. No existing figure moved, and the
+  existing tests pass with only the new field added to one `toEqual`.
+- `db/schema.ts` + `0012_remarkable_young_avengers.sql`: `match_player_stats.goals_for_while_on`,
+  `match_player_positions`. Expect a number collision at merge.
+- `lib/match/finalize.ts` writes both tables in one transaction. `scripts/refreeze-stats.mts` /
+  `npm run db:refreeze`, wired after `db:migrate` in `ci.yml` and `release.yml`.
+- `lib/stats/match-lines.ts`: `MatchPositionLine`, `reduceLog`, `resolveMatchStatLines` carries
+  positions.
+- `lib/stats/positions.ts` (the one grouping function) and `lib/stats/impact.ts` (conceded-rate boards,
+  impact per position, both on `fitShrinkage`). `lib/stats/aggregate.ts` gains the season fields and the
+  boards, and `lib/stats/format.ts` the French copy.
+- `/stats` regrouped into Attaque · Défense · Gardiens · Temps de jeu · Impact par poste · Notes. New
+  `rate-board.tsx` and `impact.tsx`; « Encaissés » added to the squad list rows. The profile card
+  (`joueur/_components/stats-card.tsx`) gains outfield / keeper conceded figures and minutes by position.
+
+Verified on `football_wd` after `db:migrate` + `db:refreeze`:
+- both imported matches satisfy every invariant (Σ position minutes = minutes; GB = `gk_minutes`;
+  Σ goals for / against = score × 7; 420′ per match).
+- `/stats` and Nicolas's profile looked at in light and dark at 390 px as `potter` (coach) and `benoit`
+  (player) in one pass. The screens are identical for the two roles: no role branch, and the profile card
+  is pixel-identical.
+
+What the data shows, stated in decision 162: with two matches the smoothing dominates, so every
+position's ranked impact is negative and close to the position's mean (the team scored 6 and conceded
+11). The raw records printed beside each figure are what make that readable.

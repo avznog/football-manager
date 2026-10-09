@@ -81,6 +81,10 @@ jobs:
             exit 1
           fi
           npm run db:migrate
+          # Re-freeze every finished match, so a column a migration just added is filled from the
+          # log rather than left at its default (decision 161). Idempotent: the one writer replaces
+          # each match's cached rows wholesale. `--allow-remote` because here the remote is the target.
+          npm run db:refreeze -- --allow-remote
 
   # The preview deployment — `dev.7orteils.bgonzva.fr` — issued here because `vercel.json` has turned
   # Vercel's Git integration off for every branch. Issuing it ourselves is the only way to put it

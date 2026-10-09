@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   NO_VALUE_FR,
   appearancesLineFr,
+  concededRecordFr,
   formatDecimal,
+  formatSignedDecimal,
+  impactRecordFr,
+  minutesPerGoalFr,
   formatMinutes,
   formatPercent,
   formatRating,
@@ -179,3 +183,23 @@ describe("pendingRatingsNoteFr", () => {
   });
 });
 
+
+describe("the rate and impact copy (decision 162)", () => {
+  it("states minutes per goal as a whole number of minutes", () => {
+    expect(minutesPerGoalFr(23.6)).toBe("1 but toutes les 24 min");
+    expect(minutesPerGoalFr(0.2)).toBe("1 but toutes les 1 min");
+  });
+
+  it("says « aucun but encaissé » rather than infinity", () => {
+    expect(concededRecordFr(0, 35)).toBe("aucun but encaissé en 35′");
+    expect(concededRecordFr(1, 20)).toBe("1 encaissé en 20′");
+    expect(concededRecordFr(3, 72)).toBe("3 encaissés en 72′");
+  });
+
+  it("signs an impact, and never prints « −0,0 »", () => {
+    expect(formatSignedDecimal(1.24)).toBe("+1,2");
+    expect(formatSignedDecimal(-0.76)).toBe("−0,8");
+    expect(formatSignedDecimal(-0.04)).toBe("0,0");
+    expect(impactRecordFr(5, 2, 120)).toBe("+5 / −2 en 120′");
+  });
+});

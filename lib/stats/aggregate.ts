@@ -43,6 +43,17 @@
  *    season table that silently loses a player who scored in September is wrong
  *    (`docs/DATA_MODEL.md`).
  *
+ * 10. **Conceded on the pitch is split, outfield and goal** (decision 162). `concededWhileOn` counts
+ *    every goal conceded while he was on, in goal or not, so the outfield figure is
+ *    `concededWhileOn − concededWhileGk` over `minutes − gkMinutes` — exact, because the reducer
+ *    increments both counters in the same `concede()`. Clean minutes are **not** split that way: the
+ *    keeper's clean clock restarts when he takes the gloves, so a subtraction would be wrong, and the
+ *    screen keeps `cleanMinutes` as the all-pitch figure it has always been.
+ *
+ * 11. **Positions are grouped at read time** (`positions.ts`, decision 162): the cache keeps the
+ *    slot's code, the season files it under one of five groups, and a code outside them is counted in
+ *    the total minutes and filed nowhere.
+ *
  * 9. **A season of ratings is a run of per-match means, not a bag of notes** (decision 137). The
  *    notes of one match collapse to one figure — the figure the whole team reads on that recap — and
  *    the season average is the mean of those. A match with fewer than `MIN_NOTES_FOR_MEAN` notes
@@ -53,7 +64,15 @@ import type { SquadRole } from "@/db/schema";
 
 import { MIN_NOTES_FOR_MEAN } from "@/lib/rating/aggregate";
 import { meanOfNotes } from "@/lib/rating/published";
-import type { MatchStatLine } from "./match-lines";
+import {
+  concededRateBoard,
+  impactByPosition,
+  type ConcededRateBoard,
+  type PositionImpact,
+  type PositionSeason,
+} from "./impact";
+import type { MatchPositionLine, MatchStatLine } from "./match-lines";
+import { positionGroupOf, positionGroupRank } from "./positions";
 
 /* -------------------------------------------------------------------------- */
 /* Inputs                                                                     */
@@ -107,6 +126,8 @@ export type SeasonInput = {
   /** Finished matches, already filtered by competition. */
   matches: readonly StatsMatch[];
   lines: readonly MatchStatLine[];
+  /** Per-position lines for the same matches (decision 160). Optional: no positions, no impact. */
+  positions?: readonly MatchPositionLine[];
   squad: readonly SquadAppearanceRow[];
   /**
    * The notes of the matches whose means are **out** — and of no others. `lib/stats/ratings.ts`
@@ -191,6 +212,14 @@ export type PlayerSeasonStats = {
   /** Minutes on the pitch with the sheet still unbroken, every player (decision 011). */
   cleanMinutes: number;
   concededWhileOn: number;
+  /** Goals for while he was on the pitch, in goal or not (decision 160). */
+  goalsForWhileOn: number;
+  /** `minutes − gkMinutes`: his time on the pitch outside the goal (rule 10). */
+  outfieldMinutes: number;
+  /** `concededWhileOn − concededWhileGk`: conceded while he was on the pitch outside the goal. */
+  concededOutfield: number;
+  /** His season per position group, in team-sheet order (rule 11). */
+  positions: PositionSeason[];
   rating: PlayerRating;
   /** False for a member who appears nowhere in this filtered season. */
   hasData: boolean;
@@ -248,6 +277,20 @@ export type SeasonStats = {
   topRated: LeaderboardEntry[];
   /** Players who spent time in goal, best clean-sheet record first. */
   keepers: PlayerSeasonStats[];
+  /** Most goals conceded while on the pitch outside the goal — « qui a pris combien » (rule 10). */
+  topConcededOutfield: LeaderboardEntry[];
+  /** Most goals conceded in goal, with the minutes in goal beside it. */
+  topConcededGk: LeaderboardEntry[];
+  /** « 1 but encaissé toutes les X min », outfield, shrunk (decision 162). */
+  outfieldConcededRate: ConcededRateBoard;
+  /** The same for time in goal, fitted on the keepers alone. */
+  keeperConcededRate: ConcededRateBoard;
+  /** Minutes on the pitch, in goal, and with the sheet unbroken. */
+  topMinutes: LeaderboardEntry[];
+  topGkMinutes: LeaderboardEntry[];
+  topCleanMinutes: LeaderboardEntry[];
+  /** The best at each position by smoothed goal difference per 60 (decision 162, Q7). */
+  impact: PositionImpact[];
   /** True when not one match or rating survives the filter. */
   isEmpty: boolean;
   /**
@@ -330,6 +373,8 @@ type Accumulator = {
   concededWhileGk: number;
   cleanMinutes: number;
   concededWhileOn: number;
+  goalsForWhileOn: number;
+  positions: Map<string, PositionSeason>;
   /** matchId → the notes this player received in it. Collapsed to one mean per match at the end. */
   notesByMatch: Map<string, number[]>;
 };
@@ -352,6 +397,8 @@ function newAccumulator(member: StatsMember): Accumulator {
     concededWhileGk: 0,
     cleanMinutes: 0,
     concededWhileOn: 0,
+    goalsForWhileOn: 0,
+    positions: new Map(),
     notesByMatch: new Map(),
   };
 }
@@ -412,11 +459,26 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     acc.gkMinutes += line.gkMinutes;
     acc.gkCleanMinutes += line.gkCleanMinutes;
     acc.concededWhileGk += line.concededWhileGk;
+    acc.goalsForWhileOn += line.goalsForWhileOn;
 
     if (line.gkMinutes > 0) {
       acc.appearances.goalkeeper += 1;
       if (line.concededWhileGk === 0) acc.gkCleanSheets += 1; // rule 5
     }
+  }
+
+  /* ---- positions (rule 11) ---------------------------------------------- */
+
+  for (const row of input.positions ?? []) {
+    if (!matchIds.has(row.matchId)) continue;
+    const group = positionGroupOf(row.positionCode);
+    if (group === null) continue;
+    const acc = accumulatorFor(row.teamMemberId);
+    const season = acc.positions.get(group) ?? { group, minutes: 0, goalsFor: 0, goalsAgainst: 0 };
+    season.minutes += row.minutes;
+    season.goalsFor += row.goalsFor;
+    season.goalsAgainst += row.goalsAgainst;
+    acc.positions.set(group, season);
   }
 
   /* ---- ratings ----------------------------------------------------------- */
@@ -478,6 +540,12 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
         concededWhileGk: acc.concededWhileGk,
         cleanMinutes: acc.cleanMinutes,
         concededWhileOn: acc.concededWhileOn,
+        goalsForWhileOn: acc.goalsForWhileOn,
+        outfieldMinutes: acc.minutes - acc.gkMinutes,
+        concededOutfield: acc.concededWhileOn - acc.concededWhileGk,
+        positions: [...acc.positions.values()].sort(
+          (a, b) => positionGroupRank(a.group) - positionGroupRank(b.group),
+        ),
         rating: {
           average: average(matchMeans),
           count: matchMeans.length,
@@ -576,6 +644,50 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
         a.displayName.localeCompare(b.displayName, "fr"),
     );
 
+  const topConcededOutfield = leaderboard(players, {
+    valueOf: (player) => player.concededOutfield,
+    // More minutes for the same total is the better record, so it is the tie-break the other way.
+    tieBreak: (player) => -player.outfieldMinutes,
+    countOf: (player) => player.outfieldMinutes,
+  });
+  const topConcededGk = leaderboard(players, {
+    valueOf: (player) => player.concededWhileGk,
+    tieBreak: (player) => -player.gkMinutes,
+    countOf: (player) => player.gkMinutes,
+  });
+  const outfieldConcededRate = concededRateBoard(
+    players.map((player) => ({
+      ...memberOf(player),
+      minutes: player.outfieldMinutes,
+      count: player.concededOutfield,
+    })),
+  );
+  const keeperConcededRate = concededRateBoard(
+    players.map((player) => ({
+      ...memberOf(player),
+      minutes: player.gkMinutes,
+      count: player.concededWhileGk,
+    })),
+  );
+  const topMinutes = leaderboard(players, {
+    valueOf: (player) => player.minutes,
+    tieBreak: (player) => player.matchesPlayed,
+    countOf: (player) => player.matchesPlayed,
+  });
+  const topGkMinutes = leaderboard(players, {
+    valueOf: (player) => player.gkMinutes,
+    tieBreak: (player) => player.appearances.goalkeeper,
+    countOf: (player) => player.appearances.goalkeeper,
+  });
+  const topCleanMinutes = leaderboard(players, {
+    valueOf: (player) => player.cleanMinutes,
+    tieBreak: (player) => -player.minutes,
+    countOf: (player) => player.minutes,
+  });
+  const impact = impactByPosition(
+    players.map((player) => ({ ...memberOf(player), positions: player.positions })),
+  );
+
   const isEmpty = team.played === 0 && input.lines.length === 0 && input.ratings.length === 0;
 
   return {
@@ -585,6 +697,14 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     topAssists,
     topRated,
     keepers,
+    topConcededOutfield,
+    topConcededGk,
+    outfieldConcededRate,
+    keeperConcededRate,
+    topMinutes,
+    topGkMinutes,
+    topCleanMinutes,
+    impact,
     isEmpty,
     pendingRatingMatches: input.pendingRatingMatches ?? 0,
   };
@@ -639,6 +759,15 @@ export function sortPlayers(
   key: PlayerSortKey,
 ): PlayerSeasonStats[] {
   return [...players].sort(comparePlayers(key));
+}
+
+function memberOf(player: PlayerSeasonStats) {
+  return {
+    teamMemberId: player.teamMemberId,
+    displayName: player.displayName,
+    jerseyNumber: player.jerseyNumber,
+    hasLeft: player.hasLeft,
+  };
 }
 
 type LeaderboardSpec = {

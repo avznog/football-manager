@@ -14,6 +14,7 @@
  */
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireTeamContext } from "@/lib/auth/dal";
@@ -26,6 +27,7 @@ import {
   equipeTypeHref,
 } from "@/lib/stats/best-seven-copy";
 import {
+  formatMinutes,
   formatRating,
   matchCount,
   pendingRatingMatchesNoteFr,
@@ -40,9 +42,11 @@ import {
   SORT_PARAM,
   type StatsQuery,
 } from "./_components/filters";
+import { ImpactByPosition } from "./_components/impact";
 import { Keepers } from "./_components/keepers";
 import { Leaderboard } from "./_components/leaderboard";
 import { PlayerList } from "./_components/player-list";
+import { RateBoard } from "./_components/rate-board";
 import { TeamSummary } from "./_components/team-summary";
 
 export const metadata = { title: "Stats" };
@@ -173,8 +177,10 @@ function SeasonCards({
         </span>
       </Link>
 
-      <div className="space-y-4">
-        <h2 className="text-base font-semibold text-ink">Classements</h2>
+      {/* Grouped the way the cahier lists them — Attaque · Défense · Gardiens · Temps de jeu · Impact par
+          poste — then the notes, then the whole squad. One giant table does not fit a phone; five short
+          sections with a heading each do (decision 162). */}
+      <Section title="Attaque">
         <Leaderboard
           title="Meilleurs buteurs"
           entries={stats.topScorers}
@@ -192,6 +198,72 @@ function SeasonCards({
           valueLabel={(entry) => plural(entry.value, "passe décisive", "passes décisives")}
           emptyMessage="Aucune passe décisive saisie sur cette sélection. Elle est optionnelle au moment du but."
         />
+      </Section>
+
+      <Section title="Défense">
+        <Leaderboard
+          title="Buts encaissés sur le terrain"
+          description="Joueur de champ : les buts pris pendant qu’il jouait, hors temps au goal"
+          entries={stats.topConcededOutfield}
+          valueLabel={(entry) => plural(entry.value, "but")}
+          countLabel={(entry) => `en ${formatMinutes(entry.count)}`}
+          emptyMessage="Aucun but encaissé sur cette sélection pendant qu’un joueur de champ était sur le terrain."
+        />
+        <RateBoard
+          title="Le moins de buts encaissés"
+          description="Joueur de champ : 1 but encaissé toutes les X minutes sur le terrain"
+          board={stats.outfieldConcededRate}
+          emptyMessage="Aucun but encaissé sur cette sélection : il n’y a pas de rythme à classer."
+        />
+      </Section>
+
+      <Section title="Gardiens">
+        <RateBoard
+          title="Le moins de buts encaissés au goal"
+          description="Gardien : 1 but encaissé toutes les X minutes dans les buts"
+          board={stats.keeperConcededRate}
+          emptyMessage="Aucun but encaissé dans les buts sur cette sélection, ou personne n’y a joué."
+        />
+        <Leaderboard
+          title="Buts encaissés au goal"
+          entries={stats.topConcededGk}
+          valueLabel={(entry) => plural(entry.value, "but")}
+          countLabel={(entry) => `en ${formatMinutes(entry.count)} au goal`}
+          emptyMessage="Aucun but encaissé dans les buts sur cette sélection."
+        />
+        <Keepers keepers={stats.keepers} />
+      </Section>
+
+      <Section title="Temps de jeu">
+        <Leaderboard
+          title="Minutes jouées"
+          entries={stats.topMinutes}
+          valueLabel={(entry) => formatMinutes(entry.value)}
+          countLabel={(entry) => matchCount(entry.count)}
+          emptyMessage="Personne n’a encore de minutes sur cette sélection."
+        />
+        <Leaderboard
+          title="Minutes au goal"
+          entries={stats.topGkMinutes}
+          valueLabel={(entry) => formatMinutes(entry.value)}
+          countLabel={(entry) => matchCount(entry.count)}
+          emptyMessage="Personne n’a encore joué dans les buts sur cette sélection."
+        />
+        <Leaderboard
+          title="Minutes d’invincibilité"
+          description="Minutes sur le terrain sans que l’équipe encaisse, gardien compris"
+          entries={stats.topCleanMinutes}
+          valueLabel={(entry) => formatMinutes(entry.value)}
+          countLabel={(entry) => `sur ${formatMinutes(entry.count)} jouées`}
+          emptyMessage="Personne n’a encore de minutes sans encaisser sur cette sélection."
+        />
+      </Section>
+
+      <Section title="Impact par poste">
+        <ImpactByPosition impact={stats.impact} />
+      </Section>
+
+      <Section title="Notes">
         <Leaderboard
           title="Meilleures notes"
           /* « à partir de 3 matchs notés », not « 3 notes » (decision 137). A season average is the
@@ -213,18 +285,23 @@ function SeasonCards({
           // owes the reader the same sentence about them. Same words, one source.
           note={pendingRatingMatchesNoteFr(stats.pendingRatingMatches) ?? undefined}
         />
-      </div>
+      </Section>
 
       <PlayerList
         players={sortPlayers(stats.players, query.sort)}
         query={query}
         pendingRatingMatches={stats.pendingRatingMatches}
       />
-
-      <div className="space-y-4">
-        <h2 className="text-base font-semibold text-ink">Détail</h2>
-        <Keepers keepers={stats.keepers} />
-      </div>
     </>
+  );
+}
+
+/** One of the page's sections: a heading and its cards. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <h2 className="text-base font-semibold text-ink">{title}</h2>
+      {children}
+    </section>
   );
 }

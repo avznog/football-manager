@@ -18,6 +18,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -486,10 +487,43 @@ export const matchPlayerStats = pgTable(
      */
     gkCleanMinutes: integer().notNull().default(0),
     concededWhileGk: integer().notNull().default(0),
+    /**
+     * Goals our team scored while he was on the pitch, his own included (decision 160). With
+     * `concededWhileOn` it is his goal difference on the pitch. Zero on a row frozen before the column
+     * existed until `npm run db:refreeze` replays the match (decision 161).
+     */
+    goalsForWhileOn: integer().notNull().default(0),
     squadRole: squadRole(),
     computedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique("match_player_stats_unique").on(t.matchId, t.teamMemberId)],
+);
+
+/**
+ * One player's match at one position: minutes, and goals for and against while he held it (decision
+ * 160). A **cache**, exactly like `match_player_stats` and written by the same writer
+ * (`lib/match/finalize.ts`) in the same transaction, deleted and reinserted on every re-freeze. The
+ * position is the slot's `position_code` as it was in the log — `GB` its own, `MG`/`MD`/`AIL` kept
+ * apart here and grouped only for display (`lib/stats/positions.ts`).
+ *
+ * Invariants: per player and match, `Σ minutes = match_player_stats.minutes` and the `GB` row's
+ * minutes `= gk_minutes`, except for time in a slot outside the catalogue, which has no row.
+ */
+export const matchPlayerPositions = pgTable(
+  "match_player_positions",
+  {
+    matchId: uuid()
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    teamMemberId: uuid()
+      .notNull()
+      .references(() => teamMembers.id, { onDelete: "cascade" }),
+    positionCode: text().notNull(),
+    minutes: integer().notNull().default(0),
+    goalsFor: integer().notNull().default(0),
+    goalsAgainst: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.matchId, t.teamMemberId, t.positionCode] })],
 );
 
 /* -------------------------------------------------------------------------- */

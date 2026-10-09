@@ -30,6 +30,7 @@ import {
   type PlannedLineup,
   type SquadEntry,
   reduceMatch,
+  toMatchPlayerPositions,
   toMatchPlayerStats,
 } from "@/lib/match/reducer";
 
@@ -63,7 +64,23 @@ export type MatchStatLine = {
   concededWhileOn: number;
   gkCleanMinutes: number;
   concededWhileGk: number;
+  /** Goals for while he was on the pitch (decision 160). */
+  goalsForWhileOn: number;
   squadRole: SquadRole | null;
+};
+
+/**
+ * One player's match at one position — a row of `match_player_positions` plus nothing (decision 160).
+ * Same two paths as the line: the cache when the match is frozen, the reducer when it is not, and the
+ * same contract — **the cache holds `toMatchPlayerPositions(reduceMatch(...))`, column for column**.
+ */
+export type MatchPositionLine = {
+  matchId: string;
+  teamMemberId: string;
+  positionCode: string;
+  minutes: number;
+  goalsFor: number;
+  goalsAgainst: number;
 };
 
 /** A row of `match_player_stats`, as the query layer reads it. */
@@ -105,6 +122,14 @@ export function linesFromCache(rows: readonly CachedStatRow[]): MatchStatLine[] 
  * forward between two renders.
  */
 export function linesFromLog(matchId: string, input: MatchLogInput): MatchStatLine[] {
+  return reduceLog(matchId, input).lines;
+}
+
+/** Both caches' worth of rows from one reduction: the lines and the per-position lines. */
+export function reduceLog(
+  matchId: string,
+  input: MatchLogInput,
+): { lines: MatchStatLine[]; positions: MatchPositionLine[] } {
   const state = reduceMatch(input.events, input.lineups ?? [], {
     slots: input.slots ?? null,
     squad: input.squad ?? null,
@@ -112,9 +137,21 @@ export function linesFromLog(matchId: string, input: MatchLogInput): MatchStatLi
     periodMinutes: input.periodMinutes ?? null,
   });
 
-  return toMatchPlayerStats(state)
-    .map((player) => ({ matchId, ...player }))
-    .sort(byMatchThenMember);
+  return {
+    lines: toMatchPlayerStats(state)
+      .map((player) => ({ matchId, ...player }))
+      .sort(byMatchThenMember),
+    positions: toMatchPlayerPositions(state)
+      .map((row) => ({ matchId, ...row }))
+      .sort(byMatchMemberPosition),
+  };
+}
+
+function byMatchMemberPosition(a: MatchPositionLine, b: MatchPositionLine): number {
+  return (
+    byMatchThenMember(a as unknown as MatchStatLine, b as unknown as MatchStatLine) ||
+    (a.positionCode < b.positionCode ? -1 : a.positionCode > b.positionCode ? 1 : 0)
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -138,6 +175,8 @@ export function matchesNeedingReduction(
 
 export type ResolvedStatLines = {
   lines: MatchStatLine[];
+  /** Per-position lines, from the same source as `lines` match by match (decision 160). */
+  positions: MatchPositionLine[];
   /** Matches whose numbers came from the log. Empty once M4 has frozen every match. */
   reducedMatchIds: string[];
   /** Matches with neither a cache nor a log — an empty event log, most likely. */
@@ -153,10 +192,17 @@ export type ResolvedStatLines = {
 export function resolveMatchStatLines(input: {
   matchIds: readonly string[];
   cached: readonly CachedStatRow[];
+  /** `match_player_positions` for the same matches; read only where `cached` has the match. */
+  cachedPositions?: readonly MatchPositionLine[];
   logs?: ReadonlyMap<string, MatchLogInput> | null;
 }): ResolvedStatLines {
   const wanted = new Set(input.matchIds);
   const lines: MatchStatLine[] = [];
+  const positions: MatchPositionLine[] = [];
+  const cachedMatchIds = new Set(input.cached.map((row) => row.matchId));
+  for (const row of input.cachedPositions ?? []) {
+    if (wanted.has(row.matchId) && cachedMatchIds.has(row.matchId)) positions.push({ ...row });
+  }
   const reducedMatchIds: string[] = [];
   const emptyMatchIds: string[] = [];
 
@@ -170,9 +216,16 @@ export function resolveMatchStatLines(input: {
       emptyMatchIds.push(matchId);
       continue;
     }
-    lines.push(...linesFromLog(matchId, log));
+    const reduced = reduceLog(matchId, log);
+    lines.push(...reduced.lines);
+    positions.push(...reduced.positions);
     reducedMatchIds.push(matchId);
   }
 
-  return { lines: lines.sort(byMatchThenMember), reducedMatchIds, emptyMatchIds };
+  return {
+    lines: lines.sort(byMatchThenMember),
+    positions: positions.sort(byMatchMemberPosition),
+    reducedMatchIds,
+    emptyMatchIds,
+  };
 }
