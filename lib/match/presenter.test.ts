@@ -519,6 +519,22 @@ describe("the timeline", () => {
     expect(byClientId.get("c3")?.canVoid).toBe(true);
   });
 
+  it("treats a composition game mode re-applied at 0′ as the starting one (decision 153)", () => {
+    const edited = STARTING_SEVEN.map((slot) =>
+      slot.memberId === "julien" ? { ...slot, memberId: "momo" } : slot,
+    );
+    const events = log([
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: { ...lineupPayload(STARTING_SEVEN, "l"), auto: true } },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: { ...lineupPayload(edited, "l"), auto: true } },
+    ]);
+    const state = reduceLive(live(events, { match: { ...live([]).match, status: "scheduled" } }), [], T0);
+    const byClientId = new Map(timelineLines(state, index).map((line) => [line.clientEventId, line]));
+
+    expect(byClientId.get("c2")).toMatchObject({ title: "Composition de départ", canVoid: false });
+    expect(byClientId.get("c2")?.detail).toBe("Entre : Momo — Sort : Julien");
+    expect(state.players.find((player) => player.memberId === "julien")?.playedMatch).toBe(false);
+  });
+
   it("strikes a voided event through instead of dropping it (invariant 1)", () => {
     const withVoid = log([
       ...KICKED_OFF,
@@ -817,6 +833,12 @@ describe("the planned-composition prompt", () => {
     const watching = emptyPitchFr({ hasLineups: true, isProposed: true, canOperate: false });
     expect(watching.description).toContain("l’opérateur");
     expect(watching.description).not.toContain("votre");
+    // Before the kick-off, what he waits for is the operator opening game mode (decision 153).
+    expect(watching.description).toContain("dès que l’opérateur ouvre le mode match");
+    expect(
+      emptyPitchFr({ hasLineups: true, isProposed: true, canOperate: false, started: true })
+        .description,
+    ).toContain("attend la confirmation de l’opérateur");
 
     // Saved, not proposed — a plan for the 30th minute, say. Still not « aucune composition ».
     expect(emptyPitchFr({ hasLineups: true, isProposed: false, canOperate: true })).toMatchObject({

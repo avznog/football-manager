@@ -1460,6 +1460,97 @@ describe("at an identical reading, facts come before pitch events (decision 147)
   });
 });
 
+describe("two compositions at 0′ before the kick-off (decision 153)", () => {
+  // Game mode applied Wednesday's seven on opening, then Saturday's after the coach edited the plan:
+  // Julien is replaced by Momo, and Hugo hands the gloves to Samir — all before a ball is kicked.
+  const saturday = {
+    ...STARTING_ELEVEN,
+    [SLOT.gb]: "samir",
+    [SLOT.dg]: "hugo",
+    [SLOT.at]: "momo",
+  };
+  const events = log([
+    { type: "LINEUP_APPLIED", min: 0, period: 1, payload: { ...lineupPayload(STARTING_ELEVEN, "l-initial"), auto: true } },
+    { type: "LINEUP_APPLIED", min: 0, period: 1, payload: { ...lineupPayload(saturday, "l-initial"), auto: true } },
+    { type: "KICKOFF", min: 0, period: 1 },
+    { type: "PERIOD_END", min: 30, period: 1 },
+    { type: "KICKOFF", min: 30, period: 2 },
+    { type: "PERIOD_END", min: 60, period: 2 },
+    { type: "FINAL_WHISTLE", min: 60, period: 2 },
+  ]);
+
+  it("leaves no phantom starter behind", () => {
+    const state = reduceMatch(events, [], CONFIG);
+    const julien = playerState(state, "julien")!;
+    expect(julien).toMatchObject({
+      startedMatch: false,
+      playedMatch: false,
+      minutes: 0,
+      spells: [],
+      positionSpells: [],
+    });
+    // Hugo started — in defence, and was never a goalkeeper: his zero-length spell in goal is gone.
+    expect(playerState(state, "hugo")).toMatchObject({
+      startedMatch: true,
+      wasGoalkeeper: false,
+      gkMinutes: 0,
+      minutes: 60,
+      positionCode: "DG",
+    });
+    expect(playerState(state, "hugo")?.positionSpells.map((spell) => spell.positionCode)).toEqual(["DG"]);
+    expect(playerState(state, "samir")).toMatchObject({ wasGoalkeeper: true, gkMinutes: 60, startedMatch: true });
+    expect(playerState(state, "momo")).toMatchObject({ startedMatch: true, minutes: 60 });
+    expect(state.anomalies).toEqual([]);
+  });
+
+  it("replaces the seven cleanly: a later plan does not call Julien « déjà sorti »", () => {
+    const state = reduceMatch(events.slice(0, 3), [
+      { id: "l-30", fromMinute: 30, slots: [{ slotId: SLOT.at, memberId: "julien" }] },
+    ], CONFIG);
+    expect(state.plannedLineups[0].flags).toEqual([]);
+  });
+
+  it("treats both as the starting composition, so neither can be annulled", () => {
+    const state = reduceMatch(events, [], CONFIG);
+    expect(state.timeline.filter((entry) => entry.type === "LINEUP_APPLIED").map((entry) => entry.startingLineup)).toEqual([true, true]);
+  });
+
+  it("moves no minute: the same match with one composition at 0′ freezes the same rows", () => {
+    const once = log([
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(saturday, "l-initial") },
+      ...events.slice(2).map((event) => ({
+        type: event.type,
+        min: event.minute,
+        period: event.period,
+      })),
+    ]);
+    const rows = (state: ReturnType<typeof reduceMatch>) =>
+      toMatchPlayerStats(state);
+    expect(rows(reduceMatch(events, [], CONFIG))).toEqual(rows(reduceMatch(once, [], CONFIG)));
+  });
+});
+
+describe("a finished match proposes nothing", () => {
+  it("drops the prompt of a plan nobody applied once the whistle has gone", () => {
+    const events = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+      { type: "PERIOD_END", min: 30, period: 1 },
+      { type: "FINAL_WHISTLE", min: 30, period: 1 },
+    ]);
+    const plan: PlannedLineup[] = [
+      {
+        id: "l-10",
+        fromMinute: 10,
+        slots: Object.entries({ ...STARTING_ELEVEN, [SLOT.at]: "momo" }).map(([slotId, memberId]) => ({ slotId, memberId })),
+      },
+    ];
+    const live = reduceMatch(events.slice(0, 2), plan, { ...CONFIG, nowMs: T0 + 15 * MIN });
+    expect(live.pendingLineup?.lineupId).toBe("l-10");
+    expect(reduceMatch(events, plan, CONFIG).pendingLineup).toBeNull();
+  });
+});
+
 function minutesOfPlayer(player: { memberId: string; playedMs: number; gkMs: number; cleanMs: number }) {
   return [player.memberId, player.playedMs, player.gkMs, player.cleanMs];
 }

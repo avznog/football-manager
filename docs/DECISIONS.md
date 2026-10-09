@@ -6303,3 +6303,74 @@ remplaçant, in French, so a crafted form fails the same way the screen prevents
 The tally keeps decision 096's rule: an unnamed non-player is not « non sélectionné » — `isSheetCandidate`
 still counts players, plus anybody selected — so « 9 non sélectionnés » counts the players a coach could
 have picked, and a coach named supporter is counted with the supporters.
+
+## 153 — The starting composition is applied when game mode opens, and stays editable until the kick-off
+
+**2026-10-09** · accepted · **supersedes invariant 3 of `CLAUDE.md` and decision 006 for the starting
+composition only** — every later plan is still proposed and waits · implements the owner's Q9
+(decision 145) · no migration
+
+The cahier: « Mode match : Par défaut la compo principale est appliquée. » The owner (Q9): as soon as
+game mode opens, written by a coach or the operator, never by a viewer. `CLAUDE.md`'s invariant 3 now
+says exactly that.
+
+### When
+
+`autoLineupToApply` (`lib/match/auto-lineup.ts`, pure, tested) answers on every render of game mode and
+a `useEffect` writes what it answers, at most once per version per mount. It answers only when all
+hold: the viewer operates the match (`can()` on the server, which `appendMatchEvents` re-checks); the
+match is recorded live; no period has kicked off; a starting composition exists (`isInitial`, else
+minute 0); the pitch is not already that seven; and **every pitch event in the log — confirmed or
+still on the device — is one it wrote**. A coach's own arrangement before the kick-off (the composer,
+« Ajuster », a change) stops it for good, annulled or not: an annulment is still somebody's decision
+about the pitch. A match that kicked off on another phone with nobody on the pitch keeps the prompt.
+A viewer is told so: « La composition ci-dessus entre sur le terrain dès que l’opérateur ouvre le mode
+match », on the card and under the empty pitch.
+
+### What it writes, and why twice is once
+
+One `LINEUP_APPLIED { lineupId, slots, auto: true }`, stamped `{ period 1, minute 0, clockMs 0 }`
+whatever the wall clock says. Its `client_event_id` is derived — `deterministicUuid` over the match,
+the plan and its seven sorted by slot, in a new neutral `lib/match/ids.ts` that the retro sheet's
+`retroSubmissionId` now delegates to. `EnqueueInput.clientEventId` lets game mode supply it; the
+outbox upserts by it and the server's `on conflict do nothing` keeps one row, so two phones opening at
+once write one event (the e2e opens two tabs and finds one line). An edited plan is a different seven,
+hence a different id, hence a new event at 0′.
+
+**The mark is a payload field, `auto: true`, not an id prefix.** A `client_event_id` must be a uuid,
+so a prefix would have to be smuggled into the hash's bits and could not be read back without
+recomputing it; the field is readable in `psql` and in the log, costs no migration (the column is
+`jsonb` and the schemas are additive), and the strict schema still refuses anything but `true`.
+
+### It does not freeze the composition
+
+An applied composition is locked against editing (`lineups.applied_event_id`, decision 006), and
+opening game mode on Wednesday must not lock Saturday's seven. So `appendMatchEvents` does **not** set
+`applied_event_id` for an automatic application; the composition stays editable and deletable until
+the kick-off, and the next opening re-applies the edited version. **The kick-off freezes it**: the
+batch that carries a `KICKOFF` points the composition at the last automatic application still
+standing (`autoLineupToLock`), and from there it is history like any other. The reducer already
+decides « applied » from the log (decision 150), so game mode proposes nothing meanwhile.
+
+### Two compositions at 0′ leave no phantom starter
+
+The second application replaces players the first one put on, at the same reading. The reducer used
+to give each of them a zero-length spell — so the man replaced on Thursday counted as a starter, as a
+player of the match, as « déjà sorti » for the next plan, and as a goalkeeper if that was his slot.
+`leavePitch` now drops a spell that ends at the instant it began (and its posts, and recomputes
+`wasGoalkeeper`, and leaves `everLeftPitch` alone), and `moveTo` drops a post held for no time. Both
+accrued nothing, so no frozen minute moves; the reducer test checks the two-snapshot log freezes the
+same `match_player_stats` rows as a one-snapshot one.
+
+### Annulling it
+
+An automatic application is a starting composition for decision 150: `TimelineEntry.startingLineup` is
+true for it as well as for the one that filled the pitch, so neither the first nor a re-applied
+version has « Annuler », and a crafted `VOID` of one is refused with the same 409. The timeline calls
+both « Composition de départ ».
+
+### And the stale prompt
+
+`pendingLineup` is now null on a finished match: a plan nobody applied was still proposed over a
+frozen match (« Composition prévue à la 10’ … rien ne change avant la confirmation de l’opérateur »),
+which slice S7 found.

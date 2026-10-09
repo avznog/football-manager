@@ -41,6 +41,7 @@ import {
   voidsStartingLineup,
   type IngestSuccess,
 } from "./ingest";
+import { autoLineupToLock, isAutoLineupPayload } from "./auto-lineup";
 import { getMatchEvents } from "./live";
 
 export type AppendFailure = {
@@ -398,12 +399,32 @@ async function applyEffects(
       .where(eq(matches.id, matchId));
   }
 
+  // The kick-off freezes the composition game mode applied on its own (decision 153): until now it
+  // stayed editable, from here on it is history like any other applied composition.
+  if (effects.startsMatch) {
+    const lock = autoLineupToLock(await getMatchEvents(matchId));
+    if (lock) {
+      await db
+        .update(lineups)
+        .set({ appliedEventId: lock.eventId })
+        .where(
+          and(
+            eq(lineups.id, lock.lineupId),
+            eq(lineups.matchId, matchId),
+            isNull(lineups.appliedEventId),
+          ),
+        );
+    }
+  }
+
   if (effects.appliedLineupIds.length === 0) return;
 
   const idByClientEventId = new Map(stored.map((row) => [row.clientEventId, row.id]));
 
   for (const event of events) {
     if (event.type !== "LINEUP_APPLIED") continue;
+    // Not an automatic one: it leaves the composition editable until the kick-off (above).
+    if (isAutoLineupPayload(event.type, event.payload)) continue;
     const lineupId = (event.payload as { lineupId?: string | null } | undefined)?.lineupId;
     if (!lineupId) continue;
     const eventId = idByClientEventId.get(event.clientEventId);

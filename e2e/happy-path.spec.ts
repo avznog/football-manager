@@ -320,12 +320,38 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   /** One line of « Déroulé du match », found by something it says. */
   const logLine = (text: string) => timelineLine(page, text);
 
-  await test.step("game mode opens with the composition proposed, not applied", async () => {
+  await test.step("a player opening game mode writes nothing", async () => {
+    // Decision 153: the starting composition is applied when game mode opens — by whoever operates
+    // the match, never by somebody watching it. The player sees it proposed and the pitch empty, and
+    // a reload proves nothing reached the server on his behalf.
+    await logout(page);
+    await login(page, striker.username, fixture.password);
+    await page.goto(`${matchUrl}/jeu`);
+    await expect(clock).toHaveText("00:00");
+    await expect(promptCard(page, "Composition de départ")).toHaveCount(0);
+    await expect(page.getByText("Personne n’est encore sur le terrain.")).toBeVisible();
+    await expect(
+      page.getByText("La composition ci-dessus entre sur le terrain dès que l’opérateur ouvre le mode match."),
+    ).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("Personne n’est encore sur le terrain.")).toBeVisible();
+    await expect(onPitch).toHaveCount(0);
+    await logout(page);
+    await login(page, coach.username, fixture.password);
+    await page.goto(matchUrl);
+  });
+
+  await test.step("game mode opens with the starting composition already applied, once", async () => {
     // Fix the browser's clock before the page loads: from here on, match time is ours to set.
     await page.clock.setFixedTime(t0);
 
-    await page.getByRole("link", { name: `← ${OPPONENT}` }).click();
-    await page.getByRole("link", { name: "Ouvrir le mode match" }).click();
+    // Two tabs at once — the coach's phone and an assistant's, both opening before the kick-off.
+    // Both write the same event, derived from the plan, and the log keeps one (invariant 6).
+    const other = await page.context().newPage();
+    await Promise.all([
+      page.getByRole("link", { name: "Ouvrir le mode match" }).click(),
+      other.goto(`${matchUrl}/jeu`),
+    ]);
 
     await expect(scoreboard).toBeVisible();
     await expect(clock).toHaveText("00:00");
@@ -335,22 +361,20 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     // football term, because WCAG 2.5.3 wants the word on the button to be a word of what it announces.
     await expect(page.getByRole("button", { name: KICKOFF_NAME, exact: true })).toBeVisible();
 
-    // Invariant 3, before a single event exists: the composition is on screen as a proposal, and
-    // the pitch is empty until the coach confirms it.
-    const prompt = promptCard(page, "Composition de départ");
-    await expect(prompt).toContainText(
-      "Proposée, pas appliquée : rien ne change avant ta confirmation.",
-    );
-    // The empty pitch says why it is empty, and it is not « aucune composition enregistrée » — one is
-    // saved and is on screen right above this line. That copy is what this assertion used to pin.
-    await expect(page.getByText("Personne n’est encore sur le terrain.")).toBeVisible();
-    await expect(page.getByText("attend ta confirmation")).toBeVisible();
-    await expect(page.getByText("Aucune composition enregistrée.")).toHaveCount(0);
-    await expect(onPitch).toHaveCount(0);
-
-    await prompt.getByRole("button", { name: "Appliquer" }).click();
-
+    // No « Appliquer » for the starting seven: they are on the pitch already, on both tabs.
     await expect(onPitch).toBeVisible();
+    await expect(pitch(other, "Joueurs sur le terrain")).toBeVisible();
+    await expect(promptCard(page, "Composition de départ")).toHaveCount(0);
+    await expect(page.getByText(PENDING_MARKER)).toHaveCount(0);
+    await expect(other.getByText(PENDING_MARKER)).toHaveCount(0);
+    await other.close();
+
+    // The server's log, not either tab's state: one line, at 0’, and it cannot be annulled.
+    await page.reload();
+    const starting = logLine("Composition de départ");
+    await expect(starting).toHaveCount(1);
+    await expect(starting).toContainText("0’");
+    await expect(starting.getByRole("button", { name: "Annuler" })).toHaveCount(0);
     for (const [key, slot] of STARTERS) {
       const player = playerOf(fixture, key);
       await expect(
@@ -1015,9 +1039,8 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
   await page.clock.setFixedTime(t0);
   await page.getByRole("link", { name: `← ${OPPONENT}` }).click();
   await page.getByRole("link", { name: "Ouvrir le mode match" }).click();
-  await promptCard(page, "Composition de départ")
-    .getByRole("button", { name: "Appliquer" })
-    .click();
+  // The starting seven are applied by opening game mode (decision 153).
+  await expect(pitch(page, "Joueurs sur le terrain")).toBeVisible();
   await page.getByRole("button", { name: KICKOFF_NAME, exact: true }).click();
   // TERRAIN is gone from the bar: « Changement » with nobody in and nobody out is the same pitch.
   await expect(page.getByRole("button", { name: "TERRAIN" })).toHaveCount(0);

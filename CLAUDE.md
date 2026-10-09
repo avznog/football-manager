@@ -58,8 +58,9 @@ travaillez ».
    clean-sheet minutes. `lib/match/reducer.ts` is the only place that computes it, and it is a
    **pure function** — no database access, no `Date.now()`, no randomness. This is what makes it
    testable, and it is the most important file in the repo.
-3. **A planned composition is never applied automatically.** In game mode the app proposes it,
-   pre-filled, and waits for the coach to confirm.
+3. **Only the starting composition is applied automatically**, when an operator opens game mode
+   before the kick-off — never by a viewer (decision 153). Every later plan is proposed, pre-filled,
+   and waits for the coach to confirm.
 4. **Every mutation goes through `can()`** in `lib/auth/can.ts`. No ad-hoc permission checks
    scattered in route handlers or actions.
 5. **A user with no team sees nothing** but the "join a team" screen. Enforced in the layout guard.
