@@ -1,5 +1,96 @@
 # Football Manager — plan de conception
 
+## Rework from the cahier des charges — 2026-10-09
+
+**This section is the current plan; everything below it is the original design, kept because it
+explains why the app is shaped the way it is.** Where the two disagree, this section wins, and each
+point it changes is recorded as a decision (145 onwards) rather than edited out of the text below.
+
+After two real matches the owner wrote **[`cahier-des-charges.md`](../cahier-des-charges.md)** (repo
+root, French): a review of the whole product. It asks for a GitHub Project holding all the work, then a
+rework that **removes** what the team does not use — trainings, availability, the reminder message, the
+separate match sheet, every formation but one, position changes, preferred positions on the profile —
+and **rebuilds** game mode around unpaired group changes and tap-a-player actions, restricts who may
+rate, gives preferred positions to coaches only, and rebuilds the statistics and the équipe type around
+goals, assists and goals conceded. It also reports one bug.
+
+**Line 1 of the cahier is a working rule, not a feature:** ask the owner when in doubt rather than
+improvise; and **no production tag during this rework** — everything lands on `main` and the preview
+(`dev.7orteils.bgonzva.fr`), which is « latest ». Production stays on `v1.0.0-beta.10` (decision 146).
+
+### Where the work is tracked
+
+The GitHub Project **« Football-manager »** (`gh project view 5 --owner avznog`) holds every merged pull
+request as **Done** and one issue per slice below, labelled `cahier-des-charges`. A slice's issue moves
+to *In progress* when its branch is pushed; its pull request says `Closes #<issue>`, so the merge lands
+it in *Done*. **Read the board before starting work on another machine** (decision 146).
+
+### The owner's answers
+
+| # | Question | Answer |
+|---|---|---|
+| Q1 | Past work on the board | the merged pull requests themselves, as Done cards — no issues written after the fact |
+| Q2 | Tagging | **no production tag** for now; preview only |
+| Q3 | Where the plan lives | here + `docs/ROADMAP.md` + one issue per slice |
+| Q4 | Positions | exactly **GB, DC, MC, AIL, AT** — a new « Ailier » `AIL` replaces `MG`/`MD`: two slots, one position |
+| Q5 | Trainings and availability data | **drop the tables** (production holds 0 trainings, 5 answers) |
+| Q6 | A position swap with nobody coming on | through **« Changement » with 0 in / 0 out**, ending on the drag & drop pitch |
+| Q7 | Statistics | **ratings stay** (a fourth équipe type, the notes leaderboard); **impact at a position = goal difference while he played there, per 60′, smoothed** |
+| Q8 | The légende goalkeeper | refused if **worse than the squad's average keeper** (goals conceded per 60′ in goal, smoothed) |
+| Q9 | The starting composition | applied **as soon as game mode opens**, by a coach or operator — never by a viewer |
+| Q10 | Old preferred positions | **mapped**: `DG`/`DD` → `DC`; `AG`/`AD`/`MG`/`MD` → `AIL`; `GB`/`MC`/`AT` unchanged |
+
+### What this plan decided on the owner's latitude
+
+The cahier invites a better idea in one place (« si tu as une meilleure manière, fais donc ») and is
+silent in others. These are the choices taken, each recorded as a decision:
+
+- **A goal conceded just before a change counts against the players who were on** — not by moving the
+  change to the next minute, which invents a minute nobody played, but by one ordering rule in the
+  reducer: at an identical clock reading, facts come before pitch events, segment by segment between
+  clock events. Live stamps are millisecond-precise, so the goal tapped first already wins; the rule is
+  for minute-granular entries (decision 147).
+- **A group change is one `LINEUP_APPLIED`**: the whole pitch after the change, stamped at the reading
+  of the ACTION tap. Who goes in and out is a step of the screen; the event says where everybody
+  stands, so positions are always known, and the reducer already turns a snapshot into leave / move /
+  enter. No new event type, no migration, and the paired `SUBSTITUTION`s already in production keep
+  reducing exactly as they do (decision 147).
+- **Applying the composition on open must not freeze it.** Until kick-off, a composition that was only
+  applied automatically stays editable and game mode re-applies the newer version. A re-composition by
+  hand in game mode wins and stops the automatic one. This rides slice S9.
+- **Who may be rated is unchanged** — minutes > 0, never yourself. Only who may *rate* changes.
+- **Non-negotiable invariant 3 of `CLAUDE.md`** (« a planned composition is never applied
+  automatically ») is superseded by Q9. The decision and the change to `CLAUDE.md` ride slice S9, so the
+  rule changes in the same pull request as the behaviour.
+
+### The slices, in order
+
+One branch, one pull request, squash-merged on green CI. Several run at once in separate worktrees; the
+grouping exists because they would otherwise edit the same files.
+
+| Slice | Issue | What |
+|---|---|---|
+| S1 `fix/void-starting-lineup` | #160 | « appliquer la compo → annuler → le terrain a disparu »: voiding the starting composition empties the pitch for good |
+| S2 `feat/remove-trainings` | #161 | trainings, attendance and their statistics; tables dropped |
+| S3 `feat/remove-availability` | #162 | match availability and the « relance » message; table and enum dropped |
+| S4 `feat/single-formation` | #163 | one formation, `1-2-3-1`, with `AIL`; the picker and custom shapes go; old wishes mapped |
+| S5 `feat/coach-positions` | #164 | preferred positions set by coaches only, off `/moi`, used by statistics only |
+| S6 `feat/composition-sheet` | #165 | the composition page is the only selection step: the pitch, then remplaçant / supporter / — below |
+| S7 `feat/game-mode-menu` | #166 | four actions — But, But encaissé, Changement, Autre; « Sifflet » replaces « Fin » |
+| S8 `feat/group-changes` | #167 | unpaired group changes ending on the drag & drop pitch, the ordering rule, tap a player to act |
+| S9 `feat/auto-apply-composition` | #168 | the starting composition applied when game mode opens |
+| S10 `feat/post-match-changes` | #169 | adding a change after the match, refused when it is not realistic |
+| S11 `feat/rating-eligibility` | #170 | only starters, substitutes and supporters of that match may rate |
+| S12 `feat/stats-data` | #171 | goals for while on, minutes per position; the stats and rankings the cahier lists; impact per position |
+| S13 `feat/equipe-type` | #172 | offensive, défensive, « 7 de légende », notes — on the coach's positions and the one formation |
+
+The detail of each slice is in its issue. Every slice meets the definition of done in `CLAUDE.md`; the
+role-dependent screens of this rework (composition, `/joueur/[id]` positions, notation, game mode) are
+looked at as coach and as player in one pass.
+
+---
+
+
 ## Context
 
 Benjamin coaches a 7-a-side football team and currently manages the season by hand

@@ -5557,3 +5557,91 @@ earns its place differently. The half-point test could *rely* on `0.5` being exa
 happens to hold, so the next person to widen the scale to hundredths, or to route a `numeric` through
 a different parser, gets a predicate that still asks « is this a tenth, give or take the float »
 instead of one that was true by luck.
+
+## 145 — The cahier des charges is the plan, and these are its answers
+
+**2026-10-09** · accepted · scope of the rework; each slice records what it supersedes in its own entry
+
+After two real matches the owner wrote `cahier-des-charges.md`, a review of the whole product, and it
+replaces the plan the repository was following (whose last two pieces, the remarks and the ratings
+rebuild, had shipped). The top section of `docs/PLAN.md` is now the plan; the original design below it
+stays, as the record of why things are shaped the way they are.
+
+The cahier left ten questions open, and the owner answered them before anything was built. They are
+recorded here because each one forecloses a reading a later session could otherwise take:
+
+- **positions are exactly GB, DC, MC, AIL, AT.** « AT × 2 (gauche et droite, mais ne pas faire de
+  différence, ce sont les ailiers) » is one position in two slots, so it gets one code, `AIL` « Ailier »,
+  rather than the two side codes the app has, which would have stated a difference the owner said not
+  to make. Old wishes are **mapped**, not wiped: `DG`/`DD` → `DC`; `AG`/`AD`/`MG`/`MD` → `AIL`;
+- **the trainings and availability tables are dropped**, not hidden. Production holds no training and
+  five availability answers; a dead table is a trap for the next session, and a dump is taken first;
+- **a position swap with nobody coming on goes through « Changement » with nobody in or out**, ending on
+  the same drag & drop pitch as any change. « Supprimer les changements de postes » removes the separate
+  action, not the possibility;
+- **ratings stay in the statistics** — a fourth équipe type and the notes leaderboard — beside the three
+  the cahier describes;
+- **« pour chaque poste, qui est le meilleur en terme d'impact »** means the goal difference while he
+  played that position — goals scored minus goals conceded with him there — per 60 minutes, smoothed
+  toward the squad so ten minutes cannot top the list;
+- **« ne pas mettre quelqu'un de trop nul au goal »** in the « 7 de légende » means: no keeper whose goals
+  conceded per 60 minutes in goal is worse than the squad's average keeper;
+- **« par défaut la compo principale est appliquée »** means as soon as game mode opens, written by a
+  coach or operator and never by a viewer. That reverses non-negotiable invariant 3 of `CLAUDE.md`; the
+  entry superseding it, and the change to `CLAUDE.md`, ride the slice that changes the behaviour, so the
+  rule and the code move in the same pull request.
+
+Who may **be rated** does not change — minutes > 0, never yourself. The cahier only changes who may
+**rate**.
+
+## 146 — No production tag during the rework; the Project is where work is tracked
+
+**2026-10-09** · accepted · suspends the *use* of decision 119's tag, not its mechanism
+
+Line 1 of the cahier: « No tagging in production allowed, we are only working in main, so "latest" on
+the image ». Asked what that meant, the owner chose **stop shipping production for now**. So for the
+duration of this rework nothing cuts a tag — no session ever did, and the owner will not either —
+every slice lands on `main`, CI migrates the **preview** database and deploys `dev.7orteils.bgonzva.fr`,
+and production stays on `v1.0.0-beta.10`. `release.yml` is untouched: the day the owner decides to ship,
+a tag works exactly as decision 119 describes. A version bump is pointless until then and none is made.
+
+The consequence a session must not miss: **migrations pile up on preview.** Several slices drop tables
+or rewrite reference data, and production will take all of them in one tag. Each one has to be correct
+against a production-shaped database, which is why every slice runs its migration first on a local
+restore of production rather than on the demo season.
+
+The same line asks for a GitHub Project « so we can see the project working » and for sessions on
+several computers. The Project « Football-manager » (number 5 under `avznog`) now holds every merged pull
+request as *Done* — the pull requests themselves, not issues written after the fact — and one issue per
+slice of the rework, labelled `cahier-des-charges`. A slice's issue goes to *In progress* when its branch
+is pushed, and its pull request says `Closes #<issue>`. **The board is the first thing to read on another
+machine**, before `COORDINATION.md`'s Log: it says what is in flight without anyone keeping prose up to
+date.
+
+## 147 — A change is a snapshot of the pitch, and at the same instant facts come first
+
+**2026-10-09** · accepted · how slices S8 and S10 record changes; no new event type and no migration
+
+The cahier wants changes unpaired — « je dis que 4 personnes rentrent et 4 personnes sortent, sans dire
+que X remplace Y » — then confirmed on a drag & drop pitch, effective at the minute the ACTION button was
+pressed, several at once, and with every player's position known at every moment.
+
+**A change is recorded as one `LINEUP_APPLIED`**: the whole pitch after it, stamped with the clock
+reading of the ACTION tap, which is how game-mode flows already stamp (`openFlow`'s `tappedAtMs`). Who
+goes in and who goes out is a step of the screen that pre-arranges the pitch; the event says where
+everybody stands. The reducer already turns a snapshot into leave, then move, then enter, and goalkeeper
+minutes follow the `GB` slot, so positions are known by construction. A new event carrying `outIds`,
+`inIds` *and* slots was rejected: the slots and the previous pitch already imply who went in and out, so
+it would store the same fact twice and need a rule for when the two disagree — and cost an
+`ALTER TYPE`. The paired `SUBSTITUTION`s already in production are untouched and reduce exactly as before.
+
+**A goal conceded just before a change counts against the players who were on.** The owner proposed
+recording the change a minute later, and said a better way was welcome. Moving the change invents a
+minute: the player going off is credited with one he did not play, and the player coming on loses it.
+Instead the reducer orders events at an **identical** clock reading so that facts come before pitch
+events, within each segment between clock events — so « fin de période → changements → coup d'envoi »
+at a break keeps its order. Live stamps are millisecond-precise and the goal tapped first already comes
+first; the rule is for the minute-granular entries — a change added after the match, a retro sheet —
+where today the order of entry decides. Before it merges, the logs in production are checked for a pitch
+event recorded before a fact at the same reading, which is the only way the rule could change a
+stored figure.

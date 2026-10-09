@@ -16,6 +16,22 @@ appended to and never edited.** Those are the two halves of the protocol, and th
 interchangeable: this section says what is *true now*, the Log says what *happened*. So when you change
 a fact here you still leave a dated line in your own Log lane.
 
+**2026-10-09 — read this block first; the lines under it predate the rework and are stale where they
+disagree.**
+
+- **The plan is the top section of `docs/PLAN.md`**, from the owner's `cahier-des-charges.md` (decision
+  145). **The board is the GitHub Project « Football-manager »** (`gh project view 5 --owner avznog`):
+  every merged pull request as *Done*, one issue per slice (#160–#172, label `cahier-des-charges`). Read
+  it before starting anything on another machine (decision 146).
+- **No production tag during the rework** (decision 146). Production stays on `v1.0.0-beta.10`;
+  everything lands on `main` and reaches the preview only. Migrations pile up on preview, so every one is
+  run first on a local restore of production.
+- **Several slices run at once, in separate worktrees under `.claude/worktrees/`**, merged from the
+  owner's machine. Reserved decision numbers so nobody collides: **145–149** the plan, **150–154**
+  game mode (S1, S7–S10), **155–156** removals (S2, S3), **157–158** positions (S4, S5), **159**
+  ratings (S11). Each worktree has its own local database (`football_wa`…`football_wd`, clones of the
+  production restore) and its own port (**3101–3104**); **3000 is the owner's**.
+
 Keep it to these labelled lines, and keep them short. The 200 lines this section replaced were a
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
 it. If a line takes more than a few seconds to correct, it will rot too.
@@ -980,6 +996,12 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   to the wrong subject) and a fixture docblock promising « 4 membres sur 11 » where the screen honestly
   says **14**. `npm test` 1436/65, `test:e2e` 5, eslint silent, typecheck clean, `db:reset` clean. No
   migration. **Nothing is shipped**; `package.json` is still `1.0.0-beta.6`.
+
+- **2026-10-09 · owner's machine · `docs/cahier-plan`** — The owner's `cahier-des-charges.md` is the
+  new plan (decisions 145–147, top of `docs/PLAN.md`, `## M8` in the roadmap). Filled the Project with
+  all 158 merged pull requests as *Done* and opened one issue per slice, #160–#172. Four slices running
+  in parallel worktrees — S1, S2, S4, S11 — each with its own database and port (block at the top of
+  `## NOW`). No tag: decision 146.
 
 ### From the other machine
 
