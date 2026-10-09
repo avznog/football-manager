@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   NO_VALUE_FR,
   appearancesLineFr,
+  concededEveryFr,
+  concededRateFr,
   concededRecordFr,
   formatDecimal,
   formatSignedDecimal,
   impactRecordFr,
-  minutesPerGoalFr,
   formatMinutes,
   formatPercent,
   formatRating,
@@ -184,16 +185,30 @@ describe("pendingRatingsNoteFr", () => {
 });
 
 
-describe("the rate and impact copy (decision 162)", () => {
-  it("states minutes per goal as a whole number of minutes", () => {
-    expect(minutesPerGoalFr(23.6)).toBe("1 but toutes les 24 min");
-    expect(minutesPerGoalFr(0.2)).toBe("1 but toutes les 1 min");
+describe("the rate and impact copy (decisions 162 and 177)", () => {
+  it("states the raw rate as a whole number of minutes, never below one", () => {
+    expect(concededEveryFr(72, 3)).toBe("toutes les 24′");
+    expect(concededEveryFr(71, 3)).toBe("toutes les 24′");
+    expect(concededEveryFr(1, 5)).toBe("toutes les 1′");
+    expect(concededEveryFr(35, 0)).toBe("jamais");
   });
 
-  it("says « aucun but encaissé » rather than infinity", () => {
+  it("prints the ranked rate over the record it is, never infinity", () => {
+    expect(concededRateFr(3, 120)).toEqual({
+      rate: "1 but toutes les 40′",
+      record: "3 buts encaissés en 120′",
+    });
+    expect(concededRateFr(1, 20)).toEqual({
+      rate: "1 but toutes les 20′",
+      record: "1 but encaissé en 20′",
+    });
+    expect(concededRateFr(0, 35)).toEqual({ rate: "aucun but encaissé", record: "en 35′" });
+  });
+
+  it("says « aucun but encaissé » in the record rather than infinity", () => {
     expect(concededRecordFr(0, 35)).toBe("aucun but encaissé en 35′");
-    expect(concededRecordFr(1, 20)).toBe("1 encaissé en 20′");
-    expect(concededRecordFr(3, 72)).toBe("3 encaissés en 72′");
+    expect(concededRecordFr(1, 20)).toBe("1 but encaissé en 20′");
+    expect(concededRecordFr(3, 72)).toBe("3 buts encaissés en 72′");
   });
 
   it("signs an impact, and never prints « −0,0 »", () => {

@@ -16,6 +16,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   appearancesLineFr,
+  concededEveryFr,
   formatMinutes,
   formatRating,
   matchCount,
@@ -85,8 +86,8 @@ export async function PlayerStatsCard({
         />
       </FigureGrid>
 
-      {/* His own record outfield and in goal (decision 162): raw, because this card is about him and
-          the smoothed figure is a ranking device that lives on `/stats`. */}
+      {/* His own record outfield and in goal (decision 162), raw — the same figure `/stats` ranks him
+          on since decision 177, worded by the same `concededEveryFr`. */}
       {player.outfieldMinutes > 0 ? (
         <FigureGrid className="mt-3">
           <Figure
@@ -97,7 +98,7 @@ export async function PlayerStatsCard({
           />
           <Figure
             label="Un but pris"
-            value={everyFr(player.outfieldMinutes, player.concededOutfield)}
+            value={concededEveryFr(player.outfieldMinutes, player.concededOutfield)}
             tone="muted"
           />
           <Figure label="Sans encaisser" value={formatMinutes(player.cleanMinutes)} tone="muted" />
@@ -112,7 +113,7 @@ export async function PlayerStatsCard({
             value={player.concededWhileGk}
             hint={
               player.concededWhileGk > 0
-                ? everyFr(player.gkMinutes, player.concededWhileGk)
+                ? concededEveryFr(player.gkMinutes, player.concededWhileGk)
                 : undefined
             }
             tone="muted"
@@ -144,9 +145,4 @@ export async function PlayerStatsCard({
       {pendingNote !== null ? <Note>{pendingNote}</Note> : null}
     </Card>
   );
-}
-
-/** « toutes les 24′ », or « jamais » for a man who conceded nothing — never ∞ (decision 162). */
-function everyFr(minutes: number, conceded: number): string {
-  return conceded === 0 ? "jamais" : `toutes les ${formatMinutes(Math.round(minutes / conceded))}`;
 }

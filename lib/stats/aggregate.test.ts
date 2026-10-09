@@ -665,7 +665,7 @@ describe("sorting the table", () => {
 });
 
 describe("leaderboards", () => {
-  it(`show at most ${LEADERBOARD_SIZE} rows and nobody on zero`, () => {
+  it(`rank everybody eligible, past the ${LEADERBOARD_SIZE} shown first, and nobody on zero`, () => {
     const stats = season({
       members: Array.from({ length: 8 }, (_, index) => member(`p${index}`, `Joueur ${index}`)),
       matches: [match("m1")],
@@ -674,7 +674,10 @@ describe("leaderboards", () => {
       ),
     });
 
-    expect(stats.topScorers).toHaveLength(LEADERBOARD_SIZE);
+    // Seven scorers: the screen shows five and folds two under « Tout afficher » (decision 176), so
+    // the ranking itself must not stop at five.
+    expect(stats.topScorers.length).toBeGreaterThan(LEADERBOARD_SIZE);
+    expect(stats.topScorers.map((entry) => entry.value)).toEqual([7, 6, 5, 4, 3, 2, 1]);
     // p0 scored none and is therefore not in a scorers' chart at all.
     expect(stats.topScorers.map((entry) => entry.teamMemberId)).not.toContain("p0");
     expect(stats.topScorers[0]).toMatchObject({ teamMemberId: "p7", value: 7 });
@@ -750,14 +753,24 @@ describe("the figures of decision 162", () => {
     ]);
   });
 
-  it("fits the keeper rate on the keepers alone", () => {
-    expect(stats.keeperConcededRate.considered).toBe(1);
+  it("rates the keepers on their minutes in goal alone, raw", () => {
+    expect(stats.keeperConcededRate.entries).toHaveLength(1);
     expect(stats.keeperConcededRate.entries[0]).toMatchObject({
       teamMemberId: "hugo",
       minutes: 30,
       conceded: 2,
-      rawMinutesPerGoal: 15,
+      minutesPerGoal: 15,
     });
+  });
+
+  it("rates the outfield on outfield minutes, and lists everybody who has them", () => {
+    expect(
+      stats.outfieldConcededRate.entries.map((entry) => [entry.teamMemberId, entry.conceded, entry.minutes]),
+    ).toEqual([
+      // 3 in 100′ is fewer per minute than 1 in 30′.
+      ["karim", 3, 100],
+      ["hugo", 1, 30],
+    ]);
   });
 
   it("builds the impact tables from the grouped positions", () => {

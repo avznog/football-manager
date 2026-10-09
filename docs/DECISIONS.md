@@ -6632,3 +6632,87 @@ menu's « Changement » with nobody tapped — « Qui sort ? » multi, « Qui en
 a row of « Qui peut entrer » still opens that flow with the player ticked as coming in. The tile's hint
 stays « il sort, qui entre ». The post-match « Ajouter un changement » (decision 169) asks for the minute
 first and has no subject, so it is untouched.
+
+## 176 — Every ranked list on `/stats` shows five, and « Tout afficher » the rest
+
+**2026-10-09** · accepted · the owner's second backlog (`backlogs/backlog2.md`) · **supersedes** decision
+**162**'s « three names per position » for the impact per position · no migration
+
+The owner: « En dessous de chaque liste (meilleurs buteurs, meilleurs passeurs, etc) il faut qu'il y ait un
+petit bouton pour tout afficher. On présente par défaut les 5 meilleurs, mais on peut tout afficher. »
+
+- **The rankings are no longer cut in `lib/stats/`.** `leaderboard()` in `aggregate.ts` stopped slicing to
+  `LEADERBOARD_SIZE`, `concededRateBoard` and `impactByPosition` lost their `size` argument, and
+  `RATE_BOARD_SIZE` and `IMPACT_SIZE` are gone. Every list carries everybody eligible, in order;
+  `LEADERBOARD_SIZE` (5) is now only how many rows the screen shows before the fold.
+- **One component folds them all**: `RankedRows` in `app/(app)/stats/_components/parts.tsx`, used by
+  `Leaderboard`, `RateBoard` and each position of `ImpactByPosition`. It renders the first five, then —
+  only when there are more — a native `<details>` whose small `<summary>` reads « Tout afficher (N) », N
+  being the whole list, and « Afficher les 5 premiers » once open. One component, so the lists cannot
+  drift on how many they show or how a rank is written.
+- **No JavaScript** (decisions 100 and 116): the server sends the whole ranking and `<details>` opens on
+  its own. The folded rows are a second `<ol start="6">`, so the ranks run on across the split for the
+  eye and for a screen reader, and opening the fold renumbers nobody.
+- **The impact per position shows five too**, as the owner said five for every list. The heading's « N
+  joueurs à ce poste », which only existed because the list was cut, is gone: the summary says it.
+- Who is eligible is unchanged: nobody on zero in a leaderboard, the `MIN_RATED_MATCHES` floor for the
+  notes, minutes > 0 for the rates and the impact. The keepers card is not a ranking and is not folded.
+
+## 177 — « Le moins de buts encaissés » is ranked on the real figure
+
+**2026-10-09** · accepted · the owner's second backlog · **supersedes the « 1 but encaissé toutes les X
+min » half of decision 162** (« the rate is ranked after shrinking » and its note) · keeps 162's
+populations (outfield and goal apart) and leaves the impact per position, and the équipe type's own
+conceded keys (`sevens.ts`), smoothed
+
+The owner: « Pour les stats d'invincibilité (le moins de buts encaissés, le plus de buts encaissés), je
+veux uniquement les vraies valeurs : le nombre de buts par rapport au nombre de minutes sur le terrain. »
+
+- **No shrinkage on the two rate cards** (outfield, and in goal). `concededRateBoard` ranks by raw
+  `conceded / minutes` ascending, compared as `a.conceded × b.minutes − b.conceded × a.minutes` so two
+  equal rates compare equal; then **more minutes first**, so among the men who conceded nothing a whole
+  clean match ranks above five clean minutes, and among equal rates the longer record leads; then the
+  name. `ConcededRateEntry.minutesPerGoal` is the raw figure, null for a clean record; the board no
+  longer carries a model, and the card's note on what the smoothing weighs is gone, since nothing is
+  left to explain.
+- **What a row says**: « 1 but toutes les 40′ » over « 3 buts encaissés en 120′ », or « aucun but
+  encaissé » over « en 35′ » — never ∞. The words come from `lib/stats/format.ts`: `concededRateFr`, built
+  on `concededEveryFr`, which is the profile card's former local `everyFr` moved there so a player reads
+  the same rate about himself on `/joueur` and on `/stats` (it now also never prints « toutes les 0′ »).
+  `minutesPerGoalFr` is removed; `concededRecordFr` now says « buts encaissés » in full, which the
+  équipe type's long record shares.
+- **A card is empty only when nobody has minutes there.** Before, a squad that had conceded nothing had
+  « no rate to rank »; now it is a list of « aucun but encaissé ».
+- **The totals** (« Buts encaissés sur le terrain », « Buts encaissés au goal ») were already raw counts
+  with their minutes beside them, and are unchanged.
+- **The cost, stated plainly**: on the demo season Rayan (1 goal in 60′) heads the outfield card over
+  Thomas (8 in 324′). That is the real figure, and the record printed beside it lets the reader weigh it.
+  Decision 162 refused a minimum-minutes gate for the reason decision 115 gives; if the owner wants one
+  now, it is one `filter` in `concededRateBoard`.
+
+## 178 — The squad on `/stats` is a table, sorted by its column headers
+
+**2026-10-09** · accepted · the owner's second backlog · reverses the « not a table » of the squad list
+(`player-list.tsx`, from M5) · keeps `?tri=` and its four keys
+
+The owner: « pour le tableau final avec minutes, buts, passe dec et note, il faudrait faire un tableau,
+de sorte que l'on puisse comparer très rapidement. »
+
+- **A real `<table>`**, modelled on the recap's `minutes-table.tsx`: `Joueur | Min | Buts | Passes |
+  Note`, a `<th scope="row">` per player with `PlayerIdentity` (jersey, name truncated, « parti »),
+  right-aligned `tabular-nums` figures, and a screen-reader caption. **Never the two-letter abbreviation
+  for « passes décisives »**, for the reason `minutes-table.tsx` gives. It fits 390 px with no horizontal
+  scroll: the name column takes what the four numbers leave (`w-full max-w-0`) and truncates.
+- **Only those four figures.** A comparison is read down a column, and the block list's fourteen
+  figures were the reason it could not be a table. « Matchs » and « Encaissés », the roles line (« 6
+  matchs sur la feuille · … ») and the discipline line leave this card: the roles and discipline are on
+  the player's profile, the conceded figures in Défense and Gardiens above.
+- **The headers are the sort**, replacing the `SortTabs` row: each sortable header is a plain link to
+  `statsHref({ ...query, sort })` with `scroll={false}`, so it works with no JavaScript, survives a
+  reload, and keeps the competition filter. The active column has `aria-sort="descending"` on its
+  `<th>`, a visible ↓ (laid out on every header so no column changes width), and its figures a shade
+  stronger; the others are coloured as links. Every sort is still descending, best first.
+- **A dash, not a zero, for a man with no match record** (`aggregate.ts`, rule 1); a real zero is
+  printed, lighter. The note is `formatRating` with « N notés » under it — matches whose mean he
+  received (decision 137) — and a dash when there is none. `pendingRatingMatchesNoteFr` stays under the
+  table.

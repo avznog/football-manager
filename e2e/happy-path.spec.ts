@@ -913,6 +913,33 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(page.getByRole("heading", { level: 1, name: "Calendrier" })).toBeVisible();
   });
 
+  await test.step("the season: five per list, the rest folded, and a table sorted by its headers", async () => {
+    // Decisions 176 and 178. Eight men played, so « Minutes jouées » shows five and folds three — and
+    // the fold is a native `<details>`, which is why closed rows are not in the accessibility tree.
+    await page.goto("/stats");
+    const minutes = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: "Minutes jouées", exact: true }) })
+      .last();
+    await expect(minutes.getByRole("listitem")).toHaveCount(5);
+    await minutes.getByText(`Tout afficher (${PLAYED.length})`).click();
+    await expect(minutes.getByRole("listitem")).toHaveCount(PLAYED.length);
+    // The ranks run on across the fold rather than starting again at 1.
+    await expect(minutes.locator("ol[start='6'] > li").first()).toContainText("6");
+
+    // The column header is the sort: a plain link to `?tri=`, announced with `aria-sort`.
+    const table = page.getByRole("table");
+    await table.getByRole("link", { name: "Trier par buts" }).click();
+    await expect(page).toHaveURL(/[?&]tri=goals/);
+    await expect(table.getByRole("columnheader", { name: "Trié par buts" })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    const top = table.getByRole("row").nth(1);
+    await expect(top.getByRole("rowheader")).toContainText(striker.displayName);
+    await expect(top.getByRole("cell").nth(1)).toHaveText("1");
+  });
+
   /*
    * Last on purpose. A comment exists to be read after the match — decision 114's whole
    * justification is « the sentence that explains a scoreline three weeks later » — and the recap is

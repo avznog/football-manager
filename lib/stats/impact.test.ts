@@ -34,39 +34,41 @@ describe("shrunkPer60", () => {
   });
 });
 
-describe("concededRateBoard", () => {
+describe("concededRateBoard (decision 177: raw)", () => {
   const board = concededRateBoard([
-    // Five clean minutes: the raw figure is « aucun but », and it must not head the table.
     { ...member("cameo"), minutes: 5, count: 0 },
     { ...member("rock"), minutes: 300, count: 2 },
     { ...member("sieve"), minutes: 300, count: 15 },
+    { ...member("clean"), minutes: 60, count: 0 },
+    // The same rate as rock, one goal every 150′, over half the minutes.
+    { ...member("half"), minutes: 150, count: 1 },
     { ...member("bench"), minutes: 0, count: 0 },
   ]);
+  const order = board.entries.map((entry) => entry.teamMemberId);
 
-  it("ranks the long, good record above five clean minutes", () => {
-    expect(board.entries.map((entry) => entry.teamMemberId)).toEqual(["rock", "cameo", "sieve"]);
+  it("ranks on the real figure: nothing conceded first, then the fewest goals per minute", () => {
+    expect(order).toEqual(["clean", "cameo", "rock", "half", "sieve"]);
   });
 
-  it("never prints infinity: the raw figure is null, the ranked one a number", () => {
-    const cameo = board.entries.find((entry) => entry.teamMemberId === "cameo")!;
-    expect(cameo.rawMinutesPerGoal).toBeNull();
-    expect(Number.isFinite(cameo.minutesPerGoal)).toBe(true);
+  it("puts the longer record first among equal rates, clean ones included", () => {
+    expect(order.indexOf("clean")).toBeLessThan(order.indexOf("cameo"));
+    expect(order.indexOf("rock")).toBeLessThan(order.indexOf("half"));
   });
 
-  it("keeps the raw figure beside the ranked one", () => {
+  it("carries the raw minutes per goal, and null rather than infinity for a clean record", () => {
     const rock = board.entries.find((entry) => entry.teamMemberId === "rock")!;
-    expect(rock.rawMinutesPerGoal).toBe(150);
-    // Shrunk towards the squad, so fewer minutes per goal than his own 150.
-    expect(rock.minutesPerGoal).toBeLessThan(150);
+    expect(rock).toMatchObject({ minutes: 300, conceded: 2, minutesPerGoal: 150 });
+    expect(board.entries.find((entry) => entry.teamMemberId === "cameo")!.minutesPerGoal).toBeNull();
   });
 
-  it("leaves out a man with no minutes, and counts who was considered", () => {
-    expect(board.considered).toBe(3);
+  it("leaves out a man with no minutes, and cuts nobody else", () => {
+    expect(order).not.toContain("bench");
+    expect(order).toHaveLength(5);
   });
 
-  it("is empty when nobody conceded at all: there is no rate to rank", () => {
+  it("lists a squad that conceded nothing, rather than an empty card", () => {
     const clean = concededRateBoard([{ ...member("a"), minutes: 60, count: 0 }]);
-    expect(clean.entries).toEqual([]);
+    expect(clean.entries).toMatchObject([{ teamMemberId: "a", conceded: 0, minutesPerGoal: null }]);
   });
 });
 
@@ -107,7 +109,7 @@ describe("impactByPosition", () => {
 
   it("keeps the raw difference and the minutes beside the ranked figure", () => {
     expect(dc.entries[0]).toMatchObject({ minutes: 600, goalsFor: 20, goalsAgainst: 10, rawPer60: 1 });
-    expect(dc.considered).toBe(3);
+    expect(dc.entries).toHaveLength(3);
   });
 
   it("puts a man alone at a position on the position's own figures", () => {
