@@ -4672,3 +4672,32 @@ Files: `db/schema.ts`, `db/migrations/0011_*` and `meta/`, `db/seed.ts`, `lib/ca
 small comment fixes, `docs/{DECISIONS,DATA_MODEL,PLAN,ROADMAP,SESSIONS}.md`; deleted
 `app/(app)/entrainements/`, `lib/training/`, `app/(app)/stats/_components/attendance.tsx`,
 `e2e/attendance.spec.ts`.
+
+## 2026-10-09 — S11: the match sheet rates, the unselected do not (Track D)
+
+The cahier's « Notes » line: « Peuvent noter : tous les titulaires, tous les remplaçants, et tous les
+supporters. Les joueurs non sélectionnés ne peuvent pas noter. » Decision 139 had given every member a
+vote; decision **159** narrows it to the match sheet, plus anybody who played (so the rated are never
+refused as raters).
+
+- `lib/rating/progress.ts`: `SquadEntry`, `RATER_ROLES`, `eligibleRaterIds`, `mayRateMatch`, and the
+  coach's tally moved here from `queries.ts` as the pure `tallyOf(directory, eligibleIds, raterIds)`.
+- `submitRatings` reads `match_squad` and refuses an unselected member before inserting.
+- `getNotationView` gains `eligible` / `sheetEmpty`; `getRatingResults` empties the set of an ineligible
+  reader and feeds the tally the eligible ids.
+- Notation screen: « Tu n’étais pas sur la feuille de ce match » (or « Personne n’est sur la feuille de ce
+  match » for a match with no sheet) in place of the form; the match page's duty card needs
+  `notation.eligible`; the recap tally reads « N sur M de la feuille de match ».
+- `can()` unchanged (the sheet is data); its comments say where the data half lives.
+- e2e happy path: denominator 9 → 8 (the non-playing coach is on no sheet), four silent instead of five,
+  and a new step: the coach sees the explanation and no « Noter les joueurs ».
+- `db/seed.ts`: the comments about « 4 membres sur 14 » restated as « 4 sur 12 de la feuille de match ».
+
+Looked at on `football_wd`, 390 px, light and dark, in one pass: Léo C (supporter, Galacticos) gets the
+duty card and the form with « Tu étais supporter sur ce match… »; Benoît (not selected, FC Hexagone) gets
+« Après le match » with only « Voir le résumé », the explanation on `/notation`, and no tally or rating
+button on the recap; Benjamin (coach) reads « 90 notes, 10 sur 12 de la feuille de match » on the
+published recap and, with the means hidden for the shot and restored after, « 10 sur 12 de la feuille de
+match ont noté. Pas encore de note de Benjamin, Léo C. » — the two supporters, no unselected name.
+
+Consequence for the owner: a **non-playing coach no longer rates**, because the sheet never offers him.

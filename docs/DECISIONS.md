@@ -5751,3 +5751,59 @@ next slice of the rework removes availability as well, and the enum goes with it
 **Consequences.** Nothing in the database refers to a training any more; a dump taken before the
 migration is the only record. Re-introducing trainings would be a new feature, not a revert: the
 migration has no way back, by design of `db:migrate`.
+
+## 159 — The match sheet rates: starters, substitutes and supporters, and nobody it does not name
+
+**2026-10-09** · accepted · **supersedes rule 1 of decision 139** (« who may rate: any member of the
+team ») and nothing else of it · keeps 139's coach-only switch, its « nothing ever closes », and 137's
+`minutes > 0` rule for who may be **rated**
+
+The owner's brief (`cahier-des-charges.md`, « Notes »): « Peuvent noter : tous les titulaires, tous les
+remplaçants, et tous les supporters. Les joueurs non sélectionnés ne peuvent pas noter. » Decision 139 had
+given a vote to every member, the unselected and the non-playing coach included; this takes it back from
+the people the sheet does not name.
+
+**The rule.** A member may rate a match if he has a `match_squad` row for it as `starter`, `substitute` or
+`supporter` — **or if the log has him playing in it**. The second clause is a corner kept so the rule
+cannot contradict itself: a late arrival put on without the sheet being corrected has minutes, so he is
+*rated*, and what he was is a starter or a substitute whatever the sheet forgot. Leaving him out would
+make him the one man who is judged and may not judge. The three roles are spelled out (`RATER_ROLES`)
+rather than read as « has a row », so that a fourth role added to the enum gets a vote only by somebody
+deciding it should.
+
+**Where it lives.** `can(actor, "rating:submit")` stays the permission and is unchanged: it has no data,
+and the sheet is data. The predicate is `mayRateMatch(sheet, played, membershipId)` in
+`lib/rating/progress.ts`, pure, next to `ratingTargetsFor`, and every caller asks both:
+
+- `submitRatings` refuses an unselected member with « Tu n’étais pas sur la feuille de ce match : seuls les
+  titulaires, les remplaçants et les supporters le notent. » before any insert — a crafted form fails;
+- `getNotationView` returns `eligible: false` with an empty set, and the notation screen shows « Tu
+  n’étais pas sur la feuille de ce match » instead of the form;
+- the match page's « Après le match » duty card is not shown to him (`notation.eligible`), and the recap's
+  « À toi de noter » follows from his empty set;
+- the coach's tally counts **eligible active members** on both sides of the fraction, and « Pas encore de
+  note de … » names only them. The wording moved with the denominator: « 10 sur 12 de la feuille de match
+  ont noté », not « 10 membres sur 18 », so a coach reading 12 next to a squad of 18 is told why.
+
+**A match with no sheet has no raters** (unless somebody played in it): there is nothing to prove anybody
+was there, and « everybody » for it would be decision 139 back through the gap. The notation screen says so
+about the match — « Personne n’est sur la feuille de ce match » — rather than about the reader. Both
+matches imported from the old app (Galacticos de Balard 22/09, FC Hexagone 29/09) do carry a sheet, twelve
+rows each, and every note already on file in them came from a starter or a substitute.
+
+**Consequences, stated.**
+
+- **A non-playing coach no longer rates.** The sheet screen does not offer a member who never plays
+  (`isSheetCandidate`), so he cannot be named a supporter and has no vote. A coach who plays and is on the
+  sheet rates like anybody else. **The owner confirmed this reading on 2026-10-09** — a coach rates only
+  if he is on the sheet — and confirmed the other one too: **a member the log has playing rates** even if
+  the sheet forgot him. So the slice that rebuilds selection (S6) must let a coach be marked supporter;
+  that is where his vote comes back, not here.
+- **A note already given stays** if the sheet later stops naming its author: a note is final (decision
+  137), and it stays in the mean. It no longer counts in the tally, which is about people to chase.
+- The e2e fixture's coach never plays, so the happy path's denominator went from nine to eight and it now
+  asserts that he is shown the explanation and no form.
+
+Files: `lib/rating/progress.ts`, `lib/rating/actions.ts`, `lib/rating/queries.ts`, `lib/auth/can.ts`
+(comments), `app/(app)/match/[id]/page.tsx`, `app/(app)/match/[id]/notation/page.tsx`,
+`app/(app)/match/[id]/recap/page.tsx`, `app/(app)/match/[id]/recap/_components/ratings-panel.tsx`.

@@ -65,15 +65,21 @@ import {
   type RatingRecord,
 } from "./aggregate";
 import {
+  eligibleRaterIds,
   hasPlayed,
+  mayRateMatch,
   playedMemberIds,
   ratingProgress,
   ratingTargetsFor,
+  tallyOf,
   type PlayedEntry,
+  type RaterTally,
   type RatingProgress,
 } from "./progress";
 import { meansAreVisible } from "./published";
 import { buildRecap, type MatchRecap, type RecapMember } from "./recap";
+
+export type { RaterTally, SilentMember } from "./progress";
 
 /* -------------------------------------------------------------------------- */
 /* Small reads                                                                */
@@ -82,9 +88,9 @@ import { buildRecap, type MatchRecap, type RecapMember } from "./recap";
 /**
  * A row of `match_squad`: who the coach named, and as what.
  *
- * It used to be `lib/rating/progress.ts`'s type, because the sheet decided who rated. It no longer
- * does — the log does (decision 137) — so the sheet is back to being what it always was: the
- * selection, read by the recap for « qui était là » and by the reducer for the squad.
+ * The sheet decides who **rates** (decision 159: starters, substitutes, supporters — `mayRateMatch`),
+ * and the log decides who is **rated** (decision 137). Read by the recap for « qui était là », by the
+ * reducer for the squad, and by every rating read and write for the vote.
  */
 export type SheetEntry = {
   teamMemberId: string;
@@ -238,14 +244,23 @@ export type NotationView = {
    */
   meansVisible: boolean;
   /**
-   * He played, which no longer decides whether he is asked (decision 139: everybody is) and still
-   * decides two things: he is in the list of rated men, so his own list is one name shorter, and the
-   * screen greets a man who was on the pitch differently from one who watched.
+   * He may rate this match: he was on its sheet as a starter, a substitute or a supporter, or he
+   * played in it (`mayRateMatch`, decision 159). False for a member who was not selected — and for
+   * everybody on a match with no sheet nobody played in. When false, `targets` is empty and `progress`
+   * is the empty set: the screen explains instead of offering a form.
+   */
+  eligible: boolean;
+  /** This match has no sheet at all, so the refusal is about the match rather than about him. */
+  sheetEmpty: boolean;
+  /**
+   * He played, which does not decide whether he is asked (the sheet does) and still decides two
+   * things: he is in the list of rated men, so his own list is one name shorter, and the screen greets
+   * a man who was on the pitch differently from one who watched.
    */
   played: boolean;
-  /** How he was listed, or null if he was not on the sheet at all. Supporters rate too now. */
+  /** How he was listed, or null if he was not on the sheet at all. */
   sheetRole: SquadRole | null;
-  /** Everybody he may note: who played, minus himself. Starters first, then by shirt. */
+  /** Everybody he may note: who played, minus himself. Starters first, then by shirt. Empty if he may not rate. */
   targets: RatingTarget[];
   progress: RatingProgress;
 };
@@ -286,14 +301,15 @@ export async function getNotationView(input: {
   const minutesOf = new Map(played.map((entry) => [entry.teamMemberId, entry.minutes]));
 
   const viewerPlayed = hasPlayed(played, input.membershipId);
-  const requiredIds = ratingTargetsFor(played, input.membershipId);
+  // Decision 159: no vote, no set. The same predicate `submitRatings` refuses with.
+  const eligible = mayRateMatch(sheet, played, input.membershipId);
+  const requiredIds = eligible ? ratingTargetsFor(played, input.membershipId) : [];
 
   /*
-   * His own notes, and nobody else's — gated on his having a membership and nothing more. It used to
-   * require `viewerPlayed` too, which meant a supporter was shown an empty form; decision 139 asks him
-   * for notes, so he has a set and may already have sent part of it.
+   * His own notes, and nobody else's — gated on his having a vote. A supporter has one and may already
+   * have sent part of his set.
    */
-  const mine = input.membershipId ? await getMyRatings(match.id, input.membershipId) : [];
+  const mine = eligible && input.membershipId ? await getMyRatings(match.id, input.membershipId) : [];
   const myScoreOf = new Map(mine.map((row) => [row.ratedMemberId, row.score]));
 
   const byMembership = new Map(directory.map((member) => [member.membershipId, member]));
@@ -317,6 +333,8 @@ export async function getNotationView(input: {
     match,
     finished: match.status === "finished",
     meansVisible: meansOut(match),
+    eligible,
+    sheetEmpty: sheet.length === 0,
     played: viewerPlayed,
     sheetRole: input.membershipId ? roleOf.get(input.membershipId) ?? null : null,
     targets,
@@ -387,31 +405,6 @@ export type ManOfTheMatchView = {
   members: { memberId: string; displayName: string; jerseyNumber: number | null }[];
   averageLabel: string;
   tied: boolean;
-};
-
-/** One member who has sent no note at all for this match. Coach only. */
-export type SilentMember = {
-  memberId: string;
-  displayName: string;
-};
-
-/**
- * How many people have spoken, and who has not — **the coach's alone**, and the one thing he has to go
- * on when he decides whether the means are worth showing yet.
- *
- * It replaces `owing` / `raterTotal`, whose denominator was « the players with minutes » because they
- * were the people publication waited for. Nothing waits for anybody now, and anybody in the team may
- * rate (decision 139), so the denominator is **the active members** — the coach included, since he
- * rates too — and « who has not finished his set » collapses to « who has sent nothing », because the
- * form posts a whole set at once.
- */
-export type RaterTally = {
-  /** Active members who have sent at least one note. */
-  raterCount: number;
-  /** Active members: everybody entitled to rate. */
-  memberTotal: number;
-  /** The ones who have sent nothing, by name, in the directory's order. */
-  silent: SilentMember[];
 };
 
 type RatingResultsCommon = {
@@ -491,15 +484,19 @@ export async function getRatingResults(input: {
     byMembership.get(memberId)?.displayName ?? "Joueur inconnu";
   const roleOf = new Map(sheet.map((entry) => [entry.teamMemberId, entry.role]));
 
+  // `can()` is the permission and the sheet is the data (decision 159): both must say yes.
+  const mayRate = input.canSubmit && mayRateMatch(sheet, played, input.membershipId);
   const progress = ratingProgress({
-    requiredIds: input.canSubmit ? ratingTargetsFor(played, input.membershipId) : [],
+    requiredIds: mayRate ? ratingTargetsFor(played, input.membershipId) : [],
     submittedIds: mine.map((row) => row.ratedMemberId),
   });
 
   const common: RatingResultsCommon = {
     progress,
     canSeeNotes: input.canSeeNotes,
-    tally: input.canSeeNotes ? tallyOf(directory, raterIds) : null,
+    tally: input.canSeeNotes
+      ? tallyOf(directory, eligibleRaterIds(sheet, played), raterIds)
+      : null,
     // The switch, and which way it points. `rating:publish` answers both: it is one permission over one
     // column, and splitting it in two would let the two drift (`lib/auth/can.ts`).
     canPublish: input.canPublish && !published,
@@ -559,28 +556,6 @@ export async function getRatingResults(input: {
     players,
     manOfTheMatch: toManOfTheMatchView(manOfTheMatch(aggregate), nameOf, byMembership),
     ratingCount: input.canSeeNotes ? aggregate.ratingCount : 0,
-  };
-}
-
-/**
- * Who has sent notes, out of everybody who could, and who has not.
- *
- * **Active members only**, on both sides of the fraction: a member who has left is not going to rate,
- * so counting him would give the coach a denominator that can never be reached, and naming him would
- * ask him to. His notes, if he sent any before leaving, are still in the mean — this is a tally of
- * people to chase, not of notes received, and `ratingCount` is the other one.
- */
-function tallyOf(directory: readonly DirectoryMember[], raterIds: readonly string[]): RaterTally {
-  const rated = new Set(raterIds);
-  const active = directory.filter((member) => !member.hasLeft);
-  const silent = active.filter((member) => !rated.has(member.membershipId));
-  return {
-    raterCount: active.length - silent.length,
-    memberTotal: active.length,
-    silent: silent.map((member) => ({
-      memberId: member.membershipId,
-      displayName: member.displayName,
-    })),
   };
 }
 

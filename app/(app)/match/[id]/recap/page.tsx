@@ -103,7 +103,8 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
    * Invariant 4: every one of these is an answer from `can()` and none of them is a role read here.
    * The three are genuinely three: `rating:submit` is self-scoped and true for every member, the
    * non-playing coach included (decision 139), while `rating:readNotes` and `rating:publish` are the
-   * coach's alone.
+   * coach's alone. Whether *this match's sheet* names him is decision 159's data half, and
+   * `getRatingResults` applies it: a member who was not selected comes back with an empty set.
    */
   const canSubmit = can(actor, "rating:submit", { teamId: team.id });
   const results = await getRatingResults({
@@ -120,7 +121,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
    * inside (decision 139 deleted it) and the means being out does not stop him, so the publication state
    * has dropped out of this expression entirely. What is left is his permission and whether this match
    * has anybody to rate — `progress.requiredCount` is 0 for a match nobody played, and 0 for a reader
-   * who may not rate, which is why both of those cases need no clause of their own.
+   * who may not rate or was not on the sheet, which is why those cases need no clause of their own.
    */
   const mayRate = canSubmit && results !== null && results.progress.requiredCount > 0;
 
@@ -162,7 +163,7 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
         <Card title="À toi de noter" as="h2" className="border-accent/40 bg-accent/10">
           <div className="space-y-3">
             {/* « qui était sur le terrain », not « avec toi »: the reader may not have been on it — a
-                supporter rates too now (decision 139). */}
+                supporter on the sheet rates too (decisions 139 and 159). */}
             <p className="text-sm text-ink-muted">
               Une note pour chaque joueur qui était sur le terrain. L’équipe lira une moyenne par
               joueur, jamais ta note à toi.

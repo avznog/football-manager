@@ -125,12 +125,13 @@ export function RatingsPanel({
   return (
     <Card
       title="Les notes"
-      /* The coach alone gets a denominator, and it is now **the members** rather than the players with
-         minutes: everybody may rate (decision 139), so « 23 notes, 5 membres sur 11 » is the state of the
-         collection. `tally` is null for every other reader. */
+      /* The coach alone gets a denominator, and it is **the match sheet** rather than the players with
+         minutes or the whole team: its starters, substitutes and supporters are who may rate (decision
+         159), so « 23 notes, 5 sur 12 de la feuille de match » is the state of the collection. `tally`
+         is null for every other reader. */
       description={
         results.tally
-          ? `${pluralize(results.ratingCount, "note")}, ${results.tally.raterCount} membre${results.tally.raterCount > 1 ? "s" : ""} sur ${results.tally.memberTotal}.` +
+          ? `${pluralize(results.ratingCount, "note")}, ${tallyFractionFr(results.tally)}.` +
             (rated.length === 0
               ? ` Aucune moyenne n’est sortie : il en faut ${MIN_NOTES_FOR_MEAN} sur un même joueur.`
               : "")
@@ -163,8 +164,9 @@ export function RatingsPanel({
  *
  * The coach is told **who** has sent nothing, by name: he is the one who can go and ask, and the
  * alternative is a button that shows the means « sans les séries qui manquent » without saying whose. The
- * denominator is the active members, not the players with minutes, because that is who may rate now
- * (decision 139).
+ * denominator is the match sheet — its starters, substitutes and supporters — not the players with
+ * minutes and not the whole team, because that is who may rate (decision 159). Nobody who was not
+ * selected is named: he cannot rate, and asking him to would be asking for a refusal.
  *
  * Everybody else is told that the coach decides, and nothing else. Not « quand tout le monde aura
  * noté » — that was decision 137's rule and it published matches by itself; a reader waiting for the
@@ -190,12 +192,21 @@ function pendingDescriptionFr(
   if (tally && tally.silent.length > 0) {
     const names = tally.silent.map((member) => member.displayName).join(", ");
     return (
-      `${tally.raterCount} membre${tally.raterCount > 1 ? "s" : ""} sur ${tally.memberTotal} ${tally.raterCount > 1 ? "ont" : "a"} noté. ` +
+      `${tallyFractionFr(tally)} ${tally.raterCount > 1 ? "ont" : "a"} noté. ` +
       `Pas encore de note de ${names}. ${decides}${mine}`
     );
   }
 
   return `${decides}${mine}`;
+}
+
+/**
+ * « 5 sur 12 de la feuille de match » — who has spoken, out of whom. Named after the sheet rather than
+ * « membres », because the denominator is not the team any more (decision 159) and a coach reading
+ * « 12 » next to a squad of 18 is owed the reason.
+ */
+function tallyFractionFr(tally: { raterCount: number; memberTotal: number }): string {
+  return `${tally.raterCount} sur ${tally.memberTotal} de la feuille de match`;
 }
 
 function PlayerRow({ player }: { player: RatedPlayer }) {
