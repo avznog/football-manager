@@ -803,7 +803,14 @@ tag during this rework** (decision 146): every item below reaches the preview on
       nothing ». Migration `0012_curvy_kitty_pryde.sql` drops `match_availability` and
       `availability_status`
 - [ ] **S4** · #163 · one formation, `1-2-3-1`, positions GB / DC / MC / AIL / AT
-- [ ] **S5** · #164 · preferred positions set by coaches only, gone from `/moi`
+- [x] **S5** · #164 · preferred positions set by coaches only, gone from `/moi` (decisions **163**,
+      **164**). `profile:editPositions` is a coach action: a coach edits any player's card on
+      `/joueur/[id]`, everybody else — the player himself included — reads it, under « Ce sont les coachs
+      qui indiquent les postes. ». `/moi` no longer prints them. Compositions and game mode no longer read
+      them: no position code on the bench discs, no `primaryPositionCode` / `positionCodes` in
+      `getCompositionMembers`, `LivePlayer` or the retro roster, nothing on the match sheet. Kept: the
+      équipe type (`best-seven-input.ts`) and the squad list on `/equipe`, as information. The picker's
+      « non souhaité » became « pas son poste »
 - [ ] **S6** · #165 · the composition page replaces the match sheet
 - [x] **S7** · #166 · game mode: But, But encaissé, Changement, Autre; « Sifflet » replaces « Fin »,
       decision **151**. « Autre action » holds CSC, the two penalties, Blessure, Remarque and

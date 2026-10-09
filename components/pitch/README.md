@@ -236,7 +236,7 @@ the same.
 
 The player profile picker: the five positions of `POSITIONS` — `GB DC MC AIL AT`, the posts of the
 one formation (decisions 157 and 158) — as tappable targets on the turf.
-Each tap cycles **non souhaité → secondaire → principal → non souhaité**, i.e.
+Each tap cycles **pas son poste → secondaire → principal → pas son poste**, i.e.
 `player_positions.preference` (no row / `secondary` / `primary`).
 
 There used to be a narrower « preferred » list and a row of removable chips for wishes on a code

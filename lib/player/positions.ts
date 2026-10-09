@@ -3,7 +3,7 @@
  * picker is controlled by, plus the French wording used in lists and accessible names.
  *
  * **Pure** — no database, no React. The division of labour with `lib/pitch/preferences.ts` is
- * deliberate: that module owns the *tap cycle* (non souhaité → secondaire → principal) and this
+ * deliberate: that module owns the *tap cycle* (pas son poste → secondaire → principal) and this
  * one owns the *storage shape* and the words. Neither invents a second rule.
  *
  * At most one `primary` per member (`docs/DATA_MODEL.md`). That invariant is enforced here, on

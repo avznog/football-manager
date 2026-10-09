@@ -177,7 +177,6 @@ export async function EditorScreen({ team, match, lineupId, requestedMinute }: E
     jerseyNumber: member.jerseyNumber,
     squadRole: member.squadRole,
     isInjured: member.isInjured,
-    primaryPositionCode: member.primaryPositionCode,
   }));
 
   return shell(

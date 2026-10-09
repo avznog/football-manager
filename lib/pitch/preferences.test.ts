@@ -71,6 +71,6 @@ describe("preferenceLabelFr", () => {
   it("is in French, for accessible labels", () => {
     expect(preferenceLabelFr("primary")).toBe("poste principal");
     expect(preferenceLabelFr("secondary")).toBe("poste secondaire");
-    expect(preferenceLabelFr(undefined)).toBe("poste non souhaité");
+    expect(preferenceLabelFr(undefined)).toBe("pas son poste");
   });
 });

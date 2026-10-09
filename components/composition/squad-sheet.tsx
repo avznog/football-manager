@@ -39,7 +39,6 @@ export type SheetMember = {
   /** Carried so `countSquadRoles` can leave a non-playing coach out of « hors feuille » itself. */
   isPlayer: boolean;
   isInjured: boolean;
-  primaryPositionLabelFr: string | null;
 };
 
 export type SquadSheetProps = {
@@ -198,7 +197,6 @@ function MemberIdentity({ member }: { member: SheetMember }) {
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold text-ink">{member.name}</span>
         <span className="flex flex-wrap items-center gap-1 text-xs text-ink-muted">
-          {member.primaryPositionLabelFr ? <span>{member.primaryPositionLabelFr}</span> : null}
           {member.isInjured ? <Badge variant="danger">Blessé</Badge> : null}
         </span>
       </span>

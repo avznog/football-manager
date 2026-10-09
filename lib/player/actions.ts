@@ -90,9 +90,9 @@ function revalidateMember(memberId: string): void {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Replaces a player's wishes wholesale with what the picker posted.
+ * Replaces a player's preferred positions wholesale with what the coach's picker posted.
  *
- * Delete-then-insert rather than a diff: the set is at most eleven rows, it has no history to
+ * Delete-then-insert rather than a diff: the set is at most five rows, it has no history to
  * preserve, and one transaction is easier to reason about than three statements that have to
  * agree on the "at most one primary" invariant.
  */
@@ -111,8 +111,8 @@ export async function updatePlayerPositions(
   if (!parsed.success) return toFormState(parsed.error);
   const { teamId, memberId, primary, secondary } = parsed.data;
 
-  // Not `assertCanActFor`: there is no coach fallback here. A player's wishes are the player's, so
-  // `profile:editPositions` — self-only — is the whole check.
+  // The coach's, and only the coach's (decision 163): `profile:editPositions` is a coach action, so a
+  // player is refused here even for his own row. The team scope of `memberId` is `findActiveMember`'s.
   assertCan(actor, "profile:editPositions", { teamId, targetMemberId: memberId });
 
   const member = await findActiveMember(teamId, memberId);
@@ -126,8 +126,9 @@ export async function updatePlayerPositions(
   // Only the write is guarded. The schema parse and `assertCan` stay outside on purpose:
   // a malformed form is already a `FormState` the picker can render, and a `ForbiddenError` must
   // keep reaching the error boundary rather than being flattened into a polite French sentence —
-  // somebody trying to edit a teammate's wishes is a bug or an attack, not a failed save, and we
-  // want it loud and visible in the logs exactly as it is today.
+  // somebody without the permission posting them is a bug or an attack, not a failed save, and we
+  // want it loud and visible in the logs exactly as it is today. Since decision 163 that includes a
+  // player posting his own: the form is no longer rendered for him, so a post from him is forged.
   try {
     await db.transaction(async (tx) => {
       await tx.delete(playerPositions).where(eq(playerPositions.teamMemberId, memberId));
@@ -154,7 +155,7 @@ export async function updatePlayerPositions(
       memberId,
       positionCodes: rows.map((row) => row.code),
     });
-    return { error: "Tes postes n’ont pas été enregistrés. Réessaie." };
+    return { error: "Les postes n’ont pas été enregistrés. Réessaie." };
   }
 
   revalidateMember(memberId);

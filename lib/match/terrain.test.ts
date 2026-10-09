@@ -60,7 +60,6 @@ const player = (
   jerseyNumber: null,
   isInjured: false,
   squadRole: "starter",
-  positionCodes: [],
   isPlayer: true,
   ...extra,
 });

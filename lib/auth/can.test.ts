@@ -69,7 +69,6 @@ describe("can — players", () => {
   });
 
   it("may act on themselves", () => {
-    expect(can(player, "profile:editPositions", { teamId: TEAM })).toBe(true);
     expect(can(player, "profile:editShirtName", { teamId: TEAM })).toBe(true);
     expect(can(player, "injury:declare", { teamId: TEAM })).toBe(true);
     expect(can(player, "rating:submit", { teamId: TEAM })).toBe(true);
@@ -84,10 +83,19 @@ describe("can — players", () => {
 
   it("may not act on somebody else", () => {
     const other = { teamId: TEAM, targetMemberId: "m-someone-else" };
-    expect(can(player, "profile:editPositions", other)).toBe(false);
     expect(can(player, "profile:editShirtName", other)).toBe(false);
     expect(can(player, "injury:declare", other)).toBe(false);
     expect(can(player, "rating:submit", other)).toBe(false);
+  });
+
+  it("cannot set any player's preferred positions, his own included (decision 163)", () => {
+    expect(can(player, "profile:editPositions", { teamId: TEAM })).toBe(false);
+    expect(can(player, "profile:editPositions", { teamId: TEAM, targetMemberId: "m-player" })).toBe(
+      false,
+    );
+    expect(
+      can(player, "profile:editPositions", { teamId: TEAM, targetMemberId: "m-someone-else" }),
+    ).toBe(false);
   });
 
   it("explicitly targeting their own membership is allowed", () => {
@@ -147,12 +155,28 @@ describe("can — coaches", () => {
   });
 
   it("who does not play has nothing to declare for themselves", () => {
-    // A non-playing coach has no position preferences of their own. `rating:submit` is the one
-    // exception and has its own test above.
-    expect(can(coach, "profile:editPositions", { teamId: TEAM })).toBe(false);
+    // A non-playing coach has nothing to declare for himself. `rating:submit` is the one exception
+    // and has its own test above.
     // Not a maillot, so not a flocage. He still reaches a player's through `member:update`.
     expect(can(coach, "profile:editShirtName", { teamId: TEAM })).toBe(false);
     expect(can(coach, "member:update", { teamId: TEAM, targetMemberId: "m-player" })).toBe(true);
+  });
+});
+
+describe("can — preferred positions are the coach's (decision 163)", () => {
+  it("lets a coach set any player's, playing himself or not", () => {
+    for (const who of [coach, playerCoach]) {
+      expect(
+        can(who, "profile:editPositions", { teamId: TEAM, targetMemberId: "m-player" }),
+      ).toBe(true);
+      expect(can(who, "profile:editPositions", { teamId: TEAM })).toBe(true);
+    }
+  });
+
+  it("stops at his own team", () => {
+    expect(
+      can(coach, "profile:editPositions", { teamId: OTHER_TEAM, targetMemberId: "m-player" }),
+    ).toBe(false);
   });
 });
 
