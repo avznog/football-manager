@@ -4609,3 +4609,33 @@ as soon as game mode opens — and the change to `CLAUDE.md` rides the slice tha
 
 Files: `docs/PLAN.md`, `docs/ROADMAP.md`, `docs/DECISIONS.md` (145–147), `COORDINATION.md`,
 `docs/SESSIONS.md`.
+
+## 2026-10-09 — S1: the starting composition can no longer be annulled (decision 150)
+
+The owner's one reported bug: « Il a fait appliquer la compo → il a fait ignorer la compo → le
+terrain a disparu ». Diagnosed in the code, then fixed in three places and tested in three files.
+
+- `lib/match/reducer.ts` — `TimelineEntry.startingLineup`, true on the active `LINEUP_APPLIED` that
+  found the pitch empty and filled it. « Applied » for a planned composition is now
+  `appliedIds.has(lineup.id)` alone: the `|| Boolean(lineup.appliedEventId)` that kept a voided plan
+  applied for ever is gone. Equivalence checked on the `football_wa` restore (see decision 150).
+- `lib/match/presenter.ts` — `canVoid` is false for that line, so `EventTimeline` shows no
+  « Annuler » on it. The existing flag was extended rather than a `voidable` added beside it.
+- `lib/match/ingest.ts` — `voidsStartingLineup` (pure, asks the reducer) and
+  `INGEST_ERRORS.startingLineup`. `lib/match/append.ts` refuses such a `VOID` with a 409 in both
+  `appendMatchEvents` and `amendMatchEvents`, checking only events new to the log so a retry is still
+  answered.
+- Tests: `reducer.test.ts` (which line is the starting one, and a voided later plan is pending
+  again while it is not before the `VOID`), `presenter.test.ts` (`canVoid` false on the starting
+  composition, true on a later one), `ingest.test.ts` (`voidsStartingLineup`).
+
+**Looked at, 390 px, light and dark, coach and player in one pass**, on the restore's scheduled
+match « Bayern Barbecue Club »: applied the composition from the prompt, then posted a kick-off and a
+later change (Charles → Clément at 5′) through `/api/match-events`. The coach's timeline shows
+« Annuler » on the 5′ change and on the kick-off, and none on the 0′ « Composition appliquée »; the
+player's shows no « Annuler » anywhere, as before. A crafted `VOID` of the starting composition got
+`409` with the French message. That match is now live in `football_wa` with those three events —
+a private clone, left as it is.
+
+Files: `lib/match/{reducer,presenter,ingest,append}.ts`, `lib/match/{reducer,presenter,ingest}.test.ts`,
+`docs/{DECISIONS,ROADMAP,SESSIONS}.md`.

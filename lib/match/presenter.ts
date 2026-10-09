@@ -603,7 +603,13 @@ export type TimelineLine = {
   voided: boolean;
   /** Still in the outbox: no `match_events.id` yet, so it cannot be annulled. */
   pending: boolean;
-  /** Offer « annuler »: a voidable type, not already voided, and confirmed by the server. */
+  /**
+   * Offer « annuler »: a voidable type, not already voided, confirmed by the server, and not the
+   * starting composition. Annulling the `LINEUP_APPLIED` that put the seven on an empty pitch left
+   * game mode with no pitch at all (decision 150), so that one line has no « Annuler »; a later
+   * composition or TERRAIN change keeps it, since one `VOID` there puts the pitch back as it was.
+   * `appendMatchEvents` refuses the same `VOID` if it is crafted by hand.
+   */
   canVoid: boolean;
   /** The event a `VOID` entry annuls, for the « annulation de … » line. */
   voidsEventId: string | null;
@@ -639,7 +645,7 @@ export function timelineLines(
           : null,
         voided: entry.voided,
         pending: isPending,
-        canVoid: canBeVoided(entry.type) && !entry.voided && !isPending,
+        canVoid: canBeVoided(entry.type) && !entry.voided && !isPending && !entry.startingLineup,
         voidsEventId: entry.voidsEventId,
       };
     });

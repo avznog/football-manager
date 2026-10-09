@@ -275,6 +275,13 @@ export type TimelineEntry = {
   voidedByEventId: string | null;
   /** Set on a `VOID` entry itself: the event it annuls. */
   voidsEventId: string | null;
+  /**
+   * True on the active `LINEUP_APPLIED` that put players on an **empty** pitch: the starting
+   * composition. It may not be annulled (decision 150) — voiding it leaves nobody on the pitch, and
+   * no later event can put the match back together. Every later `LINEUP_APPLIED` is false here: one
+   * `VOID` on it simply puts the pitch back as it was (`lib/match/terrain.ts`).
+   */
+  startingLineup: boolean;
   /** Whom the entry is about, so the UI can splice in names without re-reading the payload. */
   actors: readonly TimelineActor[];
   /**
@@ -790,6 +797,7 @@ export function reduceMatch(
     const actors: TimelineActor[] = [];
     let scoreAfter: TimelineEntry["scoreAfter"] = null;
     let invalidPayload = false;
+    let startingLineup = false;
 
     const parsed = parseMatchEventPayload(event.type, event.payload);
     if (!parsed.ok) {
@@ -959,6 +967,8 @@ export function reduceMatch(
                 );
               }
             }
+            // Read before anybody moves: an empty pitch that this event fills is the kick-off seven.
+            startingLineup = pitch.size === 0 && diff.comingOn.length > 0;
             for (const memberId of diff.goingOff) leavePitch(memberId, clockMs);
             for (const change of diff.positionChanges) {
               moveTo(change.memberId, change.toSlotId, clockMs);
@@ -1024,6 +1034,7 @@ export function reduceMatch(
       voided,
       voidedByEventId: voidedBy.get(event.id) ?? null,
       voidsEventId: event.type === "VOID" ? (event.voidsEventId ?? null) : null,
+      startingLineup,
       actors,
       note,
       remarkKind,
@@ -1103,7 +1114,15 @@ export function reduceMatch(
   const plannedLineups: PlannedLineupState[] = [...lineups]
     .sort((a, b) => a.fromMinute - b.fromMinute || (a.id < b.id ? -1 : 1))
     .map((lineup) => {
-      const applied = appliedIds.has(lineup.id) || Boolean(lineup.appliedEventId);
+      /*
+       * From the log alone. `lineups.applied_event_id` is written once, by the first event that
+       * carried this plan's id, and never cleared — so trusting it here meant a plan whose
+       * application had been annulled stayed « applied » for ever and its prompt never came back.
+       * The column is only ever written for a `LINEUP_APPLIED` whose payload names the plan, which
+       * is exactly what pushes into `appliedIds`, so for every log with no `VOID` on such an event
+       * the two agree; they differ only where the column is wrong (decision 150).
+       */
+      const applied = appliedIds.has(lineup.id);
       const diff = diffLineups(currentAssignments(), lineup.slots, { slots: config.slots });
       const flags: PlannedLineupFlag[] = [];
       for (const { memberId } of lineup.slots) {

@@ -501,6 +501,24 @@ describe("the timeline", () => {
     expect(byClientId.get("c1")?.canVoid).toBe(true);
   });
 
+  it("offers no « annuler » on the starting composition, and keeps it on a later one (decision 150)", () => {
+    // « Il a fait appliquer la compo → il a fait ignorer la compo → le terrain a disparu. »
+    const later = STARTING_SEVEN.map((slot) =>
+      slot.memberId === "julien" ? { ...slot, memberId: "momo" } : slot,
+    );
+    const withChange = log([
+      ...KICKED_OFF,
+      { type: "LINEUP_APPLIED", min: 20, payload: lineupPayload(later, "l-later") },
+    ]);
+    const state = reduceLive(live(withChange), [], T0 + 25 * MIN);
+    const byClientId = new Map(
+      timelineLines(state, index).map((line) => [line.clientEventId, line]),
+    );
+
+    expect(byClientId.get("c2")).toMatchObject({ title: "Composition appliquée", canVoid: false });
+    expect(byClientId.get("c3")?.canVoid).toBe(true);
+  });
+
   it("strikes a voided event through instead of dropping it (invariant 1)", () => {
     const withVoid = log([
       ...KICKED_OFF,

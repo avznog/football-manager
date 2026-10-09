@@ -5645,3 +5645,65 @@ first; the rule is for the minute-granular entries — a change added after the 
 where today the order of entry decides. Before it merges, the logs in production are checked for a pitch
 event recorded before a fact at the same reading, which is the only way the rule could change a
 stored figure.
+
+## 150 — The starting composition cannot be annulled; « applied » is read from the log
+
+**2026-10-09** · accepted · narrows « every confirmed event can be annulled » in game mode (decision
+003 stands for every other line) · no migration
+
+The owner's report, from the cahier des charges: « Il a fait appliquer la compo → il a fait ignorer
+la compo → le terrain a disparu. » Two defects made that one sentence, and both are fixed.
+
+### 1. The `LINEUP_APPLIED` that filled an empty pitch has no « Annuler »
+
+Game mode offered « Annuler » on every confirmed line, the starting composition included. Voiding it
+made the reducer skip the only event that had put anybody on the pitch, so game mode had nobody to
+draw and showed the empty state instead of the pitch. The retro screens already refused it
+(`isAmendableEventType`, « a voided composition leaves goals scored by nobody »); game mode did not.
+
+**Which line it is.** `reduceMatch` marks `TimelineEntry.startingLineup` on the active
+`LINEUP_APPLIED` that found the pitch **empty** and put players on it — read just before anybody
+moves. That is the starting composition by what it does rather than by when it happened: it covers
+the composition confirmed before the kick-off, one confirmed a second after a kick-off tapped too
+early, and one re-confirmed on a pitch an older build had already emptied. Every later
+`LINEUP_APPLIED` — a second composition before the kick-off, a planned change, a TERRAIN reshuffle —
+is not marked and keeps its « Annuler », because one `VOID` there puts the pitch back exactly as it
+was (`lib/match/terrain.ts`). Defining it as « at `clockMs` 0 » or « before the first `KICKOFF` »
+was considered and rejected: both refuse the harmless void of a second pre-kick-off composition, and
+both allow the harmful one after a kick-off tapped before the composition.
+
+**Where it is enforced.** Three places, one rule:
+
+- `timelineLines` folds it into `canVoid`, which is the flag `EventTimeline` already reads to show
+  « Annuler ». No second flag: `canVoid` *is* « may this line be annulled », and a `voidable` beside
+  it would be two booleans that can disagree;
+- `appendMatchEvents` refuses a crafted `VOID` aimed at that event with a **409**, which the outbox
+  treats as permanent and shows to the coach: « La composition de départ ne s’annule pas : pour
+  changer l’équipe sur le terrain, fais un changement. » The decision is the pure
+  `voidsStartingLineup` in `lib/match/ingest.ts`, which asks `reduceMatch` rather than re-reading the
+  log (invariant 2). Only events **new** to the log are checked, so a retry of a batch that was
+  accepted before this rule existed is answered, not refused (invariant 6);
+- `amendMatchEvents` applies the same check, for a crafted POST that bypasses the retro screens.
+
+**Not changed:** a `VOID` already in a log still reduces as before. A match that lost its pitch this
+way is recovered by part 2, not by rewriting anything (invariant 1).
+
+### 2. A plan counts as applied only while the log says so
+
+`reduceMatch` treated a planned composition as applied when the log held an active `LINEUP_APPLIED`
+naming it **or** `lineups.applied_event_id` was set. The column is written once, by the first event
+that names the plan, and never cleared — so after a `VOID` the plan stayed « applied » for ever and
+its prompt never came back. The `|| Boolean(lineup.appliedEventId)` is gone: the log alone decides.
+
+The two were checked to agree on everything except the bug. The column is written in two places
+(`appendMatchEvents`' effects and `db/seed.ts`), both only for a `LINEUP_APPLIED` whose payload names
+the plan — exactly what the reducer collects. On the `football_wa` restore of production, both
+lineups with `applied_event_id` point at a non-voided `LINEUP_APPLIED` naming the same lineup, no such
+event lacks the column, and no `LINEUP_APPLIED` has ever been voided.
+
+**The column is kept.** The composition screen (`isApplied`, and the guard that stops an applied
+composition from being edited or deleted) and `lib/stats/formation-usage.ts` read it, and decision
+006's « the link records what happened » still holds for them. What it no longer does is overrule the
+log in game mode. A later plan whose application was annulled is therefore proposed again in game
+mode while its composition screen still shows it as applied; reconciling those is not this decision's
+job, and nobody can reach that state for the starting composition any more.

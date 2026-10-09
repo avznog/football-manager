@@ -774,7 +774,13 @@ tag during this rework** (decision 146): every item below reaches the preview on
 
 - [x] **The board** — the 158 merged pull requests added to the Project as *Done*; one issue per slice
       below, labelled `cahier-des-charges` (#160–#172)
-- [ ] **S1** · #160 · voiding the starting composition makes the pitch disappear
+- [x] **S1** · #160 · voiding the starting composition makes the pitch disappear (« appliquer la
+      compo → l’annuler → le terrain a disparu »), decision **150**. The `LINEUP_APPLIED` that filled an empty pitch
+      (`TimelineEntry.startingLineup`) has no « Annuler » in game mode, and `appendMatchEvents` /
+      `amendMatchEvents` refuse a crafted `VOID` of it with a 409 the outbox shows. A later
+      composition keeps « Annuler ». The reducer decides « applied » from the log alone, so a plan
+      whose application was voided is proposed again; `lineups.applied_event_id` is kept for the
+      composition screen and the formation stats
 - [ ] **S2** · #161 · remove trainings (tables dropped)
 - [ ] **S3** · #162 · remove match availability and the reminder message (table and enum dropped)
 - [ ] **S4** · #163 · one formation, `1-2-3-1`, positions GB / DC / MC / AIL / AT

@@ -17,6 +17,7 @@
  */
 
 import { MAX_MINUTE, type MatchEventInput } from "./events";
+import { type MatchEventRecord, reduceMatch } from "./reducer";
 
 /* -------------------------------------------------------------------------- */
 /* Preparation                                                                */
@@ -180,7 +181,38 @@ export const INGEST_ERRORS = {
   notFound: "Ce match n’existe pas dans cette équipe.",
   finished: "Ce match est terminé : les corrections passent par une modification du match.",
   malformed: "Ces actions sont invalides et n’ont pas été enregistrées.",
+  startingLineup:
+    "La composition de départ ne s’annule pas : pour changer l’équipe sur le terrain, fais un changement.",
 } as const;
+
+/**
+ * Does this batch annul the starting composition? Decision 150.
+ *
+ * The `LINEUP_APPLIED` that put the seven on an empty pitch is the one event whose `VOID` the
+ * timeline cannot undo: the reducer skips it, nobody is on the pitch, game mode has no pitch to
+ * draw, and nothing in the log can put the match back together. The timeline offers no « Annuler »
+ * on that line (`timelineLines`); this is the same rule for a crafted POST.
+ *
+ * Which line that is comes from `reduceMatch` (`TimelineEntry.startingLineup`) rather than from a
+ * second reading of the log here — invariant 2: who is on the pitch is derived in one place.
+ * `log` is the match's events as stored, `incoming` the ones this batch would add; only `VOID`s
+ * among the latter are looked at, so a retried batch whose `VOID` is already in the log is not
+ * refused for the annulment it is merely replaying.
+ */
+export function voidsStartingLineup(
+  log: readonly MatchEventRecord[],
+  incoming: readonly MatchEventInput[],
+): boolean {
+  const targets = new Set(
+    incoming
+      .filter((event) => event.type === "VOID" && event.voidsEventId)
+      .map((event) => event.voidsEventId as string),
+  );
+  if (targets.size === 0) return false;
+  return reduceMatch(log).timeline.some(
+    (entry) => entry.startingLineup && targets.has(entry.eventId),
+  );
+}
 
 /**
  * A sanity ceiling on a single POST. `matchEventBatchSchema` already caps the array at 200; this
