@@ -6,7 +6,7 @@ export type SegmentTone = "accent" | "success" | "danger" | "warning" | "neutral
 
 export type SegmentOption<T extends string> = {
   value: T;
-  /** French label, e.g. « Dispo », « Pas dispo », « Peut-être ». */
+  /** French label, e.g. « Titulaire », « Remplaçant », « Supporter ». */
   label: ReactNode;
   /** Colour of the selected segment. Defaults to the app accent. */
   tone?: SegmentTone;

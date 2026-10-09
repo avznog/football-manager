@@ -270,10 +270,11 @@ Mobile-first, a bottom tab bar on phones (Calendrier · Équipe · Stats · Moi)
 
 1. **Connexion / rejoindre** — login, join via invite code, set password.
 2. **Calendrier** — chronological list of matches and trainings, next event pinned at the top
-   with a big "Je suis dispo / pas dispo" control. Past events show the score.
+   with a big "Je suis dispo / pas dispo" control *(removed, decision 156)*. Past events show the score.
 3. **Match (à venir)** — opponent, kick-off, venue, competition; availability grid for the whole
    squad; for the coach: selection (titulaire / remplaçant / supporter), compositions, and the
-   list of players who haven't answered.
+   list of players who haven't answered. *(Availability grid and non-responders list removed,
+   decision 156.)*
 4. **Éditeur de composition** — the turf pitch. Players are dragged from a bench strip onto
    slots; dropping a player on an occupied slot swaps them. A formation picker at the top, and a
    "créer une formation" mode that drags the empty slots themselves. The coach can add further

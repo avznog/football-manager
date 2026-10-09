@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     template: "%s · Football Manager",
   },
   description:
-    "Gère ton équipe de football à 7 : calendrier, disponibilités, feuille de match, compositions, mode match en direct et statistiques.",
+    "Gère ton équipe de football à 7 : calendrier, feuille de match, compositions, mode match en direct et statistiques.",
   applicationName: "Football Manager",
   // Installability (decision 015: a PWA manifest, but no service worker and no push).
   appleWebApp: {

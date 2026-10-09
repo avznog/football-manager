@@ -2,12 +2,11 @@
  * The French vocabulary of the calendar, in one place.
  *
  * Hardcoded French with no i18n layer (decision 012). Keeping the strings here rather than inline
- * in the JSX means « Peut-être » is spelled the same on the pinned card, the match page and the
- * WhatsApp reminder — and that a typo is fixed once.
+ * in the JSX means « à l’extérieur » is spelled the same on the pinned card, the match page and the
+ * statistics — and that a typo is fixed once.
  */
 
-import type { SegmentOption } from "@/components/ui";
-import type { AvailabilityStatus, EntryMode, MatchStatus } from "@/db/schema";
+import type { EntryMode, MatchStatus } from "@/db/schema";
 
 /**
  * There is no competition label map here any more, and that is decision 107.
@@ -67,22 +66,6 @@ export function entryModeBadgeFr(mode: EntryMode, options: { recorded: boolean }
 export const RETRO_MINUTES_NOTE =
   "Ce match a été saisi après coup : les actions sans minute précise ont été placées au mieux, donc les temps de jeu sont approximatifs. Le score et les buts, eux, sont exacts.";
 
-export const AVAILABILITY_LABELS: Record<AvailabilityStatus, string> = {
-  yes: "Dispo",
-  no: "Pas dispo",
-  maybe: "Peut-être",
-};
-
-/**
- * The three segments of the availability control, in the order the owner wrote them:
- * **dispo / pas dispo / peut-être**. `SegmentedControl` was built for exactly this.
- */
-export const AVAILABILITY_OPTIONS: readonly SegmentOption<AvailabilityStatus>[] = [
-  { value: "yes", label: "Dispo", tone: "success" },
-  { value: "no", label: "Pas dispo", tone: "danger" },
-  { value: "maybe", label: "Peut-être", tone: "warning" },
-];
-
 /** « à domicile » / « à l’extérieur ». */
 export function venueSideLabel(isHome: boolean): string {
   return isHome ? "à domicile" : "à l’extérieur";
@@ -105,7 +88,7 @@ export function venueSideShortLabel(isHome: boolean): string {
  *
  * Every screen that prints an opponent's name inside a sentence goes through here, so the app cannot
  * say « contre » about a match played at the opponent's ground — which it did, on `/stats`, in game
- * mode's final whistle and in the availability control's own label.
+ * mode's final whistle and in the (since removed, decision 156) availability control's own label.
  */
 export function matchNameFr(opponentName: string, isHome: boolean): string {
   return `${isHome ? "contre" : "à"} ${opponentName}`;
@@ -134,25 +117,6 @@ export function venuePhraseFr(isHome: boolean, venue: string | null): string {
  */
 export function venueFieldHintFr(isHome: boolean): string {
   return isHome ? "Le terrain où tu reçois." : "Le terrain de l’adversaire.";
-}
-
-/**
- * The first line of the WhatsApp reminder: « Étoile du Parc (championnat) · à l’extérieur, Stade du
- * Parc ».
- *
- * The message is pasted into a group of a dozen players who are deciding whether to come, and the
- * question right behind « dispo ? » is *where*. It used to carry the opponent, the competition and
- * the kick-off, and nothing at all about the ground — the one thing the app knows that the group
- * chat does not.
- */
-export function matchReminderTitleFr(match: {
-  opponentName: string;
-  competitionFr: string;
-  isHome: boolean;
-  venue: string | null;
-}): string {
-  const competition = match.competitionFr.toLocaleLowerCase("fr-FR");
-  return `${match.opponentName} (${competition}) · ${venuePhraseFr(match.isHome, match.venue)}`;
 }
 
 /**
@@ -198,35 +162,6 @@ export function resultLetter(goalsFor: number, goalsAgainst: number): "V" | "N" 
   if (goalsFor > goalsAgainst) return "V";
   if (goalsFor < goalsAgainst) return "D";
   return "N";
-}
-
-/**
- * « 13 réponses sur 13 joueurs » — how far round the squad the question has got.
- *
- * The denominator is named because « 11 sur 13 » alone leaves a coach guessing what the 13 counts. Here it is the players the question was put to, which
- * is the squad, and not the size of the match sheet.
- */
-export function availabilityCountFr(answered: number, total: number): string {
-  return `${pluralize(answered, "réponse")} sur ${pluralize(total, "joueur")}`;
-}
-
-/**
- * The same line once the event has happened: « Avant le match · 11 réponses sur 13 joueurs ».
- *
- * A list of who *said* they would come outlives the question it answered, and on a past event it is
- * the only thing on the screen that is no longer actionable — « Sans réponse : 2 » about a match
- * that finished on Sunday is not a list to chase, it is a record. Naming the moment is what keeps a
- * reader from taking it for the present tense, and the pages that show it put the card *below* what
- * actually happened (decision 068).
- */
-export function availabilitySubtitleFr(
-  answered: number,
-  total: number,
-  past: "match" | null,
-): string {
-  const count = availabilityCountFr(answered, total);
-  if (past === null) return count;
-  return `Avant le match · ${count}`;
 }
 
 /** A plural `s` only when it is needed: `pluralize(1, "joueur")` → « 1 joueur ». */

@@ -791,7 +791,17 @@ tag during this rework** (decision 146): every item below reaches the preview on
             demo season's four sessions and `e2e/attendance.spec.ts`. Migration `0011_calm_giant_girl.sql`
             drops `training_attendance`, `training_availability` and `trainings`; `availability_status` stays
             for `match_availability` until S3. Match availability is untouched
-- [ ] **S3** · #162 · remove match availability and the reminder message (table and enum dropped)
+- [x] **S3** · #162 · remove match availability and the reminder message (table and enum dropped),
+      decision **156**. `setMatchAvailability` and its schemas, `getMatchAnswers` /
+      `getTeamMatchAnswers`, the answers count in the deletion warning, `availability:declare`; the
+      « Ta réponse » card, the availability grid and the « relancer » card on `/match/[id]`; the
+      Dispo / Pas dispo / Peut-être control, the « 1 dispo · 16 sans réponse » line and the answer
+      badge on the calendar (the pinned card now ends on « Voir le match »); the answer badge on the
+      match sheet; the tallies, the relance message and their labels in `lib/calendar/`; the demo
+      season's answers; « disponibilités » in the app description and the « Retirer de l’effectif »
+      card. The happy path's availability step became « a player opens the match and is asked
+      nothing ». Migration `0012_curvy_kitty_pryde.sql` drops `match_availability` and
+      `availability_status`
 - [ ] **S4** · #163 · one formation, `1-2-3-1`, positions GB / DC / MC / AIL / AT
 - [ ] **S5** · #164 · preferred positions set by coaches only, gone from `/moi`
 - [ ] **S6** · #165 · the composition page replaces the match sheet

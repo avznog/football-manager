@@ -10,16 +10,11 @@ import Link from "next/link";
 
 import { formatDate, formatShortWeekday, formatTime } from "@/lib/calendar/time";
 import type { CalendarEvent } from "@/lib/calendar/timeline";
-import {
-  AvailabilityBadge,
-  PastMatchResult,
-  matchSubtitle,
-  matchTitle,
-} from "./event-parts";
+import { PastMatchResult, matchSubtitle, matchTitle } from "./event-parts";
 
 export type EventRowProps = {
   event: CalendarEvent;
-  /** Upcoming rows show the viewer's answer; past rows show the result instead. */
+  /** Past rows show the result; upcoming rows end on the fixture. */
   variant: "upcoming" | "past";
 };
 
@@ -27,7 +22,7 @@ export function EventRow({ event, variant }: EventRowProps) {
   const startsAt = new Date(event.startsAt);
   // A match already played is opened to be *read*, not organised: the score is right there on the
   // row, so the thing the tap is asking for is the recap — who scored, who played, the notes. The
-  // recap links back to the match page for anyone who came for the availability grid instead.
+  // recap links back to the match page for anyone who came for the sheet or the compositions.
   const href = variant === "past" ? `/match/${event.id}/recap` : `/match/${event.id}`;
   const title = matchTitle(event);
   const subtitle = matchSubtitle(event);
@@ -56,11 +51,7 @@ export function EventRow({ event, variant }: EventRowProps) {
           ) : null}
         </span>
 
-        {variant === "past" ? (
-          <PastMatchResult match={event} />
-        ) : variant === "upcoming" ? (
-          <AvailabilityBadge status={event.myAvailability} />
-        ) : null}
+        {variant === "past" ? <PastMatchResult match={event} /> : null}
       </Link>
     </li>
   );

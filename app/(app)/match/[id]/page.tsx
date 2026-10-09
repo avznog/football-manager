@@ -1,9 +1,9 @@
 /**
- * A match: when, where, who is available, and who still owes an answer.
+ * A match: when, where, and what can be done with it.
  *
- * Readable by every member of the team. Editing is coach-only and goes through `can()`; declaring
- * availability is every player for themselves, which `setMatchAvailability` enforces — a coach
- * cannot answer on somebody's behalf (`docs/DATA_MODEL.md`).
+ * Readable by every member of the team. Editing is coach-only and goes through `can()`. It used to
+ * lead with « Ta réponse » and the squad's availability grid, and the coach's « relancer » message;
+ * all three went with availability (decision 156).
  *
  * `params` is a Promise in Next 16 and `PageProps<"/match/[id]">` comes from `next typegen`
  * (`docs/NEXTJS16.md`). A match id from another team is a 404: `getMatch` scopes its query by
@@ -30,25 +30,18 @@ import { requireTeamContext } from "@/lib/auth/dal";
 import {
   entryModeBadgeFr,
   MATCH_STATUS_LABELS,
-  matchNameFr,
-  matchReminderTitleFr,
   periodsLabel,
   resultLabel,
   scoreLineFr,
   venueSideLabel,
 } from "@/lib/calendar/labels";
-import { capitalizeFirst, formatDay, formatTime, formatWhen } from "@/lib/calendar/time";
-import { buildReminderMessage, tallyAvailability, type Responder } from "@/lib/calendar/timeline";
+import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import { reopenMatch } from "@/lib/match/actions";
-import { getMatch, getMatchAnswers, getMatchScore, hasMatchEvents } from "@/lib/match/queries";
+import { getMatch, getMatchScore, hasMatchEvents } from "@/lib/match/queries";
 import { ratingInvitationFr } from "@/lib/rating/labels";
 import { getNotationView } from "@/lib/rating/queries";
-import { getSquad } from "@/lib/team/queries";
 import { FinishMatchCard } from "./_components/finish-match-card";
 import { CompositionCard } from "./composition/_components/composition-card";
-import { AvailabilityControl } from "../../calendrier/_components/availability-control";
-import { AvailabilityGrid } from "../../calendrier/_components/availability-grid";
-import { ReminderCard } from "../../calendrier/_components/reminder-card";
 
 export async function generateMetadata({ params }: PageProps<"/match/[id]">) {
   const [{ team }, { id }] = await Promise.all([requireTeamContext(), params]);
@@ -62,9 +55,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   const match = await getMatch(team.id, id);
   if (!match) notFound();
 
-  const [answers, squad, score, logged] = await Promise.all([
-    getMatchAnswers(match.id),
-    getSquad(team.id),
+  const [score, logged] = await Promise.all([
     // A scheduled match has nothing in its log yet, so do not even ask.
     match.status === "scheduled" ? Promise.resolve(null) : getMatchScore(match.id),
     /*
@@ -97,12 +88,6 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   // `score === null` is this page's own test for "not one event was ever recorded", used again by
   // the « Saisir le match » card below: with no log there is no entry to label.
   const entryBadge = entryModeBadgeFr(match.entryMode, { recorded: score !== null });
-
-  const players: Responder[] = squad
-    .filter((member) => member.isPlayer)
-    .map((member) => ({ membershipId: member.membershipId, displayName: member.displayName }));
-  const tally = tallyAvailability(players, answers);
-  const notes = new Map(answers.map((answer) => [answer.teamMemberId, answer.note]));
 
   const isCoach = can(actor, "match:update", { teamId: team.id });
   // Typing a match up, or rewriting it days later, is the coach's — not the match operator's
@@ -140,23 +125,6 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   const mayFinish = mayAmend && match.status !== "finished" && !logged;
   /** The kick-off has come round. Only the card's placement and its extra sentence depend on it. */
   const played = kickoff.getTime() <= now.getTime();
-  const declarable = team.isPlayer && match.status === "scheduled";
-  const myAnswer =
-    answers.find((answer) => answer.teamMemberId === team.membershipId)?.status ?? null;
-
-  const reminder = buildReminderMessage({
-    // The group chat is being asked « dispo ? », and the next question is always *where*: the side
-    // and the pitch travel with the opponent's name (`matchReminderTitleFr`). The competition is
-    // the team's own label now (decision 107); the function lowercases it.
-    title: matchReminderTitleFr({
-      opponentName: match.opponentName,
-      competitionFr: match.competitionLabel,
-      isHome: match.isHome,
-      venue: match.venue,
-    }),
-    when: formatWhen(kickoff, now),
-    pending: tally.pending,
-  });
 
   return (
     <div className="space-y-6">
@@ -219,39 +187,13 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
       </header>
 
       {/* A match already played, with nothing in its log, is on this page for exactly one reason:
-          the coach is here to type it up (decision 121). So it leads — above the availability grid
-          and the « relancer » message, which are both a record of a question that closed. The same
-          argument the comment below makes for moving « Après le match » up. */}
+          the coach is here to type it up (decision 121). So it leads. */}
       {mayFinish && played ? (
         <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff={false} />
       ) : null}
 
-      {declarable ? (
-        <Card title="Ta réponse" description="Un seul appui. Tu peux changer d’avis jusqu’au coup d’envoi.">
-          <AvailabilityControl
-            teamId={team.id}
-            matchId={match.id}
-            value={myAnswer}
-            legend={`Ta disponibilité pour le match ${matchNameFr(match.opponentName, match.isHome)}`}
-          />
-        </Card>
-      ) : null}
-
-      {/* Before the kick-off this is the question of the day, so it leads. Afterwards it is a record
-          of something nobody can change, and it was pushing « Après le match » — the one thing a
-          player still has to do, and the one that expires at the next kick-off (decision 007) —
-          nine hundred pixels down a phone. It moves to the bottom, below. */}
-      {match.status === "scheduled" ? (
-        <AvailabilityGrid tally={tally} notes={notes} selfMembershipId={team.membershipId} />
-      ) : null}
-
-      {/* Nothing left to chase once the match has kicked off. */}
-      {isCoach && match.status === "scheduled" ? (
-        <ReminderCard message={reminder} pending={tally.pending.length} />
-      ) : null}
-
       {/* The match sheet and the compositions are the coach's job (`docs/PLAN.md`, screen 3): a
-          player sees the availability grid above and nothing else. */}
+          player does not see them here. */}
       {isCoach ? <CompositionCard team={team} match={match} /> : null}
 
       {/* The reading half of the match, once it is **over**: the recap for everybody, and the rating
@@ -310,8 +252,8 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
       ) : null}
 
       {/* The second of the two slots `mayFinish` can fill: a fixture still to come. Low on the page,
-          because closing one before its kick-off is a rare deliberate act and must not push « Ta
-          réponse » and the composition down the screen. */}
+          because closing one before its kick-off is a rare deliberate act and must not push the
+          composition down the screen. */}
       {mayFinish && !played ? (
         <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff />
       ) : null}
@@ -376,18 +318,6 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
             </ButtonLink>
           </div>
         </Card>
-      )}
-
-      {/* Last, once the match has started: who had said what is worth keeping — Mehdi's « en
-          déplacement ce week-end » is why he is not in the log — but it is history, and `past` is
-          what stops the card asking a question that closed at the kick-off. */}
-      {match.status === "scheduled" ? null : (
-        <AvailabilityGrid
-          tally={tally}
-          notes={notes}
-          selfMembershipId={team.membershipId}
-          past="match"
-        />
       )}
     </div>
   );

@@ -69,7 +69,6 @@ describe("can — players", () => {
   });
 
   it("may act on themselves", () => {
-    expect(can(player, "availability:declare", { teamId: TEAM })).toBe(true);
     expect(can(player, "profile:editPositions", { teamId: TEAM })).toBe(true);
     expect(can(player, "profile:editShirtName", { teamId: TEAM })).toBe(true);
     expect(can(player, "injury:declare", { teamId: TEAM })).toBe(true);
@@ -85,7 +84,6 @@ describe("can — players", () => {
 
   it("may not act on somebody else", () => {
     const other = { teamId: TEAM, targetMemberId: "m-someone-else" };
-    expect(can(player, "availability:declare", other)).toBe(false);
     expect(can(player, "profile:editPositions", other)).toBe(false);
     expect(can(player, "profile:editShirtName", other)).toBe(false);
     expect(can(player, "injury:declare", other)).toBe(false);
@@ -94,7 +92,7 @@ describe("can — players", () => {
 
   it("explicitly targeting their own membership is allowed", () => {
     expect(
-      can(player, "availability:declare", { teamId: TEAM, targetMemberId: "m-player" }),
+      can(player, "profile:editShirtName", { teamId: TEAM, targetMemberId: "m-player" }),
     ).toBe(true);
   });
 });
@@ -149,9 +147,8 @@ describe("can — coaches", () => {
   });
 
   it("who does not play has nothing to declare for themselves", () => {
-    // A non-playing coach has no availability or position preferences of their own. `rating:submit` is
-    // the one exception and has its own test above.
-    expect(can(coach, "availability:declare", { teamId: TEAM })).toBe(false);
+    // A non-playing coach has no position preferences of their own. `rating:submit` is the one
+    // exception and has its own test above.
     expect(can(coach, "profile:editPositions", { teamId: TEAM })).toBe(false);
     // Not a maillot, so not a flocage. He still reaches a player's through `member:update`.
     expect(can(coach, "profile:editShirtName", { teamId: TEAM })).toBe(false);
@@ -162,7 +159,7 @@ describe("can — coaches", () => {
 describe("can — player-coach", () => {
   it("gets both permission sets", () => {
     expect(can(playerCoach, "match:selectSquad", { teamId: TEAM })).toBe(true);
-    expect(can(playerCoach, "availability:declare", { teamId: TEAM })).toBe(true);
+    expect(can(playerCoach, "profile:editShirtName", { teamId: TEAM })).toBe(true);
     expect(can(playerCoach, "rating:submit", { teamId: TEAM })).toBe(true);
   });
 });
@@ -197,7 +194,7 @@ describe("can — no membership", () => {
 
   it("reaches nothing at all", () => {
     expect(can(stranger, "team:read", { teamId: TEAM })).toBe(false);
-    expect(can(stranger, "availability:declare", { teamId: TEAM })).toBe(false);
+    expect(can(stranger, "profile:editShirtName", { teamId: TEAM })).toBe(false);
     expect(can(stranger, "match:create", { teamId: TEAM })).toBe(false);
     expect(can(stranger, "team:create", { teamId: TEAM })).toBe(false);
   });

@@ -15,7 +15,7 @@
 import type { MatchStatus, TeamRole } from "@/db/schema";
 
 export type ActorMembership = {
-  /** `team_members.id` — the identity that owns goals, availability, ratings… */
+  /** `team_members.id` — the identity that owns goals, ratings, injuries… */
   membershipId: string;
   teamId: string;
   role: TeamRole;
@@ -71,7 +71,6 @@ export type Action =
    */
   | "rating:publish"
   // Self-scoped
-  | "availability:declare"
   | "profile:editPositions"
   /**
    * The flocage — the name printed on the shirt. Self-scoped, unlike the **number**, which stays a
@@ -140,7 +139,6 @@ const COACH_ACTIONS = new Set<Action>([
  * in both sets.
  */
 const SELF_ACTIONS = new Set<Action>([
-  "availability:declare",
   "profile:editPositions",
   "profile:editShirtName",
   "injury:declare",

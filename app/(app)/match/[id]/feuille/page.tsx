@@ -7,8 +7,8 @@
  * happen. The page is coach-only, the action checks `match:selectSquad` again, and neither trusts
  * the other.
  *
- * The availability each player declared is shown next to his name — choosing a group without it
- * means opening two screens side by side, which is exactly what this app exists to stop.
+ * It used to show each player's declared availability next to his name; availability is gone
+ * (decision 156), and so is the badge.
  */
 
 import { notFound } from "next/navigation";
@@ -25,7 +25,7 @@ import { MATCH_STATUS_LABELS, venuePhraseFr } from "@/lib/calendar/labels";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
 import { countSquadRoles, isSheetCandidate, sheetNextStepFr } from "@/lib/composition/plan";
 import { getCompositionMembers, getFieldedMemberIds } from "@/lib/composition/queries";
-import { getMatch, getMatchAnswers } from "@/lib/match/queries";
+import { getMatch } from "@/lib/match/queries";
 
 export async function generateMetadata({ params }: PageProps<"/match/[id]/feuille">) {
   const [{ team }, { id }] = await Promise.all([requireTeamContext(), params]);
@@ -47,13 +47,10 @@ export default async function MatchSheetPage({
   const match = await getMatch(team.id, id);
   if (!match) notFound();
 
-  const [members, answers, fielded] = await Promise.all([
+  const [members, fielded] = await Promise.all([
     getCompositionMembers(team.id, match.id),
-    getMatchAnswers(match.id),
     getFieldedMemberIds(match.id),
   ]);
-
-  const availability = new Map(answers.map((answer) => [answer.teamMemberId, answer.status]));
 
   // Coaches who never play are not offered, but one already on the sheet stays visible: dropping a
   // row behind the coach's back would be worse than showing it. The rule is `isSheetCandidate`'s,
@@ -71,7 +68,6 @@ export default async function MatchSheetPage({
       primaryPositionLabelFr: member.primaryPositionCode
         ? positionLabelFr(member.primaryPositionCode)
         : null,
-      availability: availability.get(member.membershipId) ?? null,
     }));
 
   const kickoff = new Date(match.kickoffAt);

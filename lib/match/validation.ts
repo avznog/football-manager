@@ -91,19 +91,5 @@ export const updateMatchSchema = z.object({
 
 export const matchTargetSchema = z.object({ teamId: z.uuid(), matchId: z.uuid() });
 
-export const availabilityStatusSchema = z.enum(["yes", "no", "maybe"], {
-  message: "Choisis dispo, pas dispo ou peut-être.",
-});
-
-/** A note is how a player says « je finis le boulot à 10h » without a phone call. */
-export const availabilityNoteSchema = optionalText(140, "Ce commentaire est trop long.");
-
-export const matchAvailabilitySchema = z.object({
-  teamId: z.uuid(),
-  matchId: z.uuid(),
-  status: availabilityStatusSchema,
-  note: availabilityNoteSchema,
-});
-
 export type CreateMatchInput = z.infer<typeof createMatchSchema>;
 export type UpdateMatchInput = z.infer<typeof updateMatchSchema>;

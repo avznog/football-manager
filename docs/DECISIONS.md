@@ -5949,3 +5949,46 @@ could clear a stored wish on a code the picker no longer offered; the migration 
 the five codes, and the readers drop any code outside the vocabulary, so the row could never render.
 
 Who may edit the wishes is **unchanged here** (still the player himself); it moves to the coach in S5.
+
+---
+
+## 156 — Match availability and the relance message are removed, table and enum
+
+**2026-10-09** · accepted · owner decision Q5 of the cahier des charges (decision 145) · **supersedes
+decisions 068 and 090**, the « copyable list of non-responders » consequence of **015** (its refusal of
+push and e-mail stands), the availability-answers clause of **098**, and in `docs/PLAN.md` the
+« Je suis dispo » control of screen 2, the availability grid and non-responders list of screen 3, and
+M2's « availability declaration » · migration `0012_curvy_kitty_pryde.sql`
+
+The cahier's cleanup list names two things: « Disponibilité pour le match » and « Message de relance
+pour ceux qui n'ont pas répondu ». The team settles who comes in its group chat, and the app was asking
+the same question a second time. Q5 says drop the data rather than hide the feature: production holds
+five answers, and a table nothing reads is a trap for the next session.
+
+What goes:
+
+- the write path — `setMatchAvailability`, `matchAvailabilitySchema` and its two field schemas, and the
+  `availability:declare` action in `can()`. The self-scoped tests that used it as their example now use
+  `profile:editShirtName`, so the self-scope rule keeps its coverage;
+- the reads — `getMatchAnswers`, `getTeamMatchAnswers`, and the answers count `getMatchDeletionHolds`
+  fed to the « Supprimer » card, which now counts the sheet and the compositions only;
+- on `/match/[id]`: « Ta réponse », the availability grid (before and after the kick-off — decision 068's
+  ordering has nothing left to order) and the coach's « Relancer ceux qui n'ont pas répondu » card;
+- on `/calendrier`: the « Dispo / Pas dispo / Peut-être » control on the pinned card, the « 1 dispo · 16
+  sans réponse » line, and the answer badge at the end of every upcoming row. The pinned card is a
+  reading card now — when, against whom, where, the live score once there is one — and ends on one
+  full-width « Voir le match ». `getCalendar` no longer takes the viewer, because nothing on the
+  calendar depends on who reads it;
+- on the match sheet, the « Dispo / Pas dispo / Peut-être / Sans réponse » badge beside each name. The
+  sheet itself stays until the composition page replaces it (S6);
+- in `lib/calendar/`: the counts, the tally, `answersLineFr`, the relance card's wording and
+  `buildReminderMessage`, and the labels only they used;
+- « disponibilités » from the app's description (`app/layout.tsx`, `app/manifest.ts`) and from the
+  « Retirer de l'effectif » card, which promised a player he would lose something that no longer exists.
+
+Decision 090's rule — an intention and a fact do not share words — loses both of its subjects with this
+entry and 155. « Déjà passé » (decision 088) and the rest of decision 098 stand.
+
+**Consequences.** The enum `availability_status` is dropped in the same migration, after the table that
+held its last column. The happy path no longer has a step in which two players answer; it has a player
+opening the match and finding nothing that asks him to declare anything.

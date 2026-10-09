@@ -134,9 +134,9 @@ on `/equipe`, which offers archiving instead (decisions 098 and 100). Every read
 alongside the id (`competitionLabel`), so a rename propagates to the calendar, the match pages and
 `/stats` with nothing to invalidate.
 
-### `match_availability`
-`(match_id, team_member_id)` unique, `status` (`yes` | `no` | `maybe`), `note`, `updated_at`.
-Written by the player themselves; a coach may not answer on their behalf.
+### ~~`match_availability`~~
+Dropped by migration `0012`, together with the `availability_status` enum (decision 156, 2026-10-09):
+players no longer declare whether they are available, and the coach no longer chases answers.
 
 ### `match_squad`
 `(match_id, team_member_id)` unique, `role` (`starter` | `substitute` | `supporter`), `created_at`.
@@ -145,7 +145,8 @@ The match sheet. Only members listed here may rate after the match (decision 007
 
 ### ~~`trainings`, `training_availability`, `training_attendance`~~
 Dropped by migration `0011` (decision 155, 2026-10-09): the team no longer manages trainings in the
-app. The `availability_status` enum they shared with `match_availability` is kept for the latter.
+app. The `availability_status` enum they shared with `match_availability` went with the latter in
+`0012` (decision 156).
 
 ### `injuries`
 `id`, `team_member_id`, `started_on`, `expected_return_on`, `note`, `declared_by`, `resolved_on`.

@@ -54,7 +54,6 @@ import {
   injuries,
   lineupSlots,
   lineups,
-  matchAvailability,
   matchEvents,
   matchPlayerStats,
   matchSquad,
@@ -818,7 +817,6 @@ async function seedDemo(): Promise<void> {
     ],
     substitutes: ["momo", "yanis", "ali", "fabien"],
     supporters: ["brice"],
-    unavailable: [{ username: "mehdi", note: "En déplacement ce week-end." }],
     log: (push) => {
       push("GOAL_FOR", 9, { scorerId: m("julien"), assistId: m("karim") });
       push("FOUL", 27, { memberId: m("nico") });
@@ -882,17 +880,6 @@ async function seedDemo(): Promise<void> {
       createdBy: admin.id,
     })
     .returning({ id: matches.id });
-
-  await db.insert(matchAvailability).values([
-    ...["karim", "hugo", "julien", "momo", "thomas", "nico", "samir", "leo", "yanis"].map((u) => ({
-      matchId: next.id,
-      teamMemberId: m(u),
-      status: "yes" as const,
-    })),
-    { matchId: next.id, teamMemberId: m("ali"), status: "maybe" as const, note: "Je finis le boulot à 10h." },
-    { matchId: next.id, teamMemberId: m("brice"), status: "no" as const, note: "Cheville." },
-    // mehdi and fabien have not answered — on purpose.
-  ]);
 
   const starters = ["hugo", "samir", "thomas", "nico", "leo", "karim", "julien"];
   const substitutes = ["momo", "yanis", "ali"];
@@ -1048,8 +1035,6 @@ type PlayedMatchSpec = {
   substitutes: readonly string[];
   /** On the sheet, may not rate and may not be rated (decisions 007 / 022). */
   supporters?: readonly string[];
-  /** Declared unavailable — on no sheet, but their answer is on the match page. */
-  unavailable?: ReadonlyArray<{ username: string; note?: string }>;
   /**
    * The events between the kick-off and the final whistle; both of those, the initial
    * `LINEUP_APPLIED` and the closing `PERIOD_END` are added here so no fixture can forget them.
@@ -1107,20 +1092,6 @@ async function seedPlayedMatch(spec: PlayedMatchSpec): Promise<void> {
       matchId: match.id,
       teamMemberId: m(u),
       role: "supporter" as const,
-    })),
-  ]);
-
-  await db.insert(matchAvailability).values([
-    ...[...starterNames, ...spec.substitutes, ...supporters].map((u) => ({
-      matchId: match.id,
-      teamMemberId: m(u),
-      status: "yes" as const,
-    })),
-    ...(spec.unavailable ?? []).map((entry) => ({
-      matchId: match.id,
-      teamMemberId: m(entry.username),
-      status: "no" as const,
-      note: entry.note ?? null,
     })),
   ]);
 

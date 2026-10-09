@@ -426,13 +426,19 @@ describe("the tutoiement, over the whole tree (decision 074)", () => {
     // rather than one short of nine. A floor of 8 would have made deleting two files from `db/` a
     // failure reporting that a directory was hidden, which is a lie about a legitimate edit — and the
     // per-root floors, not the slack-carrying total, are what actually catch a skipped subtree.
-    expect(files.length).toBeGreaterThanOrEqual(225);
+    //
+    // **2026-10-09**: the rework from the cahier des charges deletes whole features — trainings,
+    // availability, every formation but one, the match sheet — and took the count to 80 under `app/`,
+    // 47 under `components/`, 86 under `lib/` and 9 under `db/`, 222 in all, with `app/` sitting exactly
+    // on its old floor. Lowered to sit under those counts again, with room for the sheet's own deletion
+    // still to come; a hidden `(jeu)` (game mode) or `[id]` is still far below every one of them.
+    expect(files.length).toBeGreaterThanOrEqual(205);
     const perRoot = new Map(
       ROOTS.map((root) => [root, sourceFiles(join(process.cwd(), root)).length]),
     );
-    expect(perRoot.get("app")).toBeGreaterThanOrEqual(80);
+    expect(perRoot.get("app")).toBeGreaterThanOrEqual(72);
     expect(perRoot.get("components")).toBeGreaterThanOrEqual(42);
-    expect(perRoot.get("lib")).toBeGreaterThanOrEqual(84);
+    expect(perRoot.get("lib")).toBeGreaterThanOrEqual(80);
     expect(perRoot.get("db")).toBeGreaterThanOrEqual(5);
     for (const root of ROOTS) {
       expect(files.some((path) => path.includes(`${root}/`))).toBe(true);

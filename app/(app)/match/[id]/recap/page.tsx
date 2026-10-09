@@ -14,7 +14,7 @@
  * team has read can be taken back.
  *
  * This lives at its own route rather than inside `/match/[id]`: the match page is the *organising*
- * page — availability, composition, game mode — and this is the *reading* page, with a different
+ * page — sheet, composition, game mode — and this is the *reading* page, with a different
  * shape, a different mood, and a different set of people coming to it.
  */
 
