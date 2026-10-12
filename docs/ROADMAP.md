@@ -2061,10 +2061,10 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       **`dev.7orteils.bgonzva.fr`**, the deployed preview, as the coach `leo`. Screenshots in
       `audit/rebuild/` — which `.gitignore` excludes, like every other `audit/` capture, so they are
       local and the readings above are the record
-- [ ] **Open for the owner · the eleven side-swap lines.** Keeping the paper's wings means a man who
-      changes side produces a slot change the Déroulé prints as « X → AIL » or « X → DC » for a man who
-      already held that position (11 lines: 1 · 6 · 4). Decision 179 names the one-rule alternative;
-      the call is his
+- [x] **The eleven side-swap lines — answered in the presenter, not in the log** (issue #201, decision
+      **181**). Not 179's one-rule alternative: the log keeps the paper's wings, and `pitchEventFr`
+      stops calling a slot change a change of post. 11 lines before (1 · 6 · 4), 0 after, counted on
+      the three rebuilt matches both times
 - [ ] **Open for the owner · production.** Decision 179 is preview-only by its own guard. The
       rehearsal is now done and reversible; running it on production is his word plus a code change
 
@@ -2098,3 +2098,17 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       (`cleanSharePercentFr`). `cleanMinutes / minutes` and `gkCleanMinutes / gkMinutes`, never the
       difference of the two: `aggregate.test.ts` pins the hour that proves the subtraction wrong.
       The ranking stays on the minutes, so six clean minutes at 100 % cannot head the card
+
+- [x] **B3.1 · the Déroulé names the post of every arrival, and stops inventing position changes**
+      (issue #201, decision **181**). « Entrent : Clément (AIL), Lucas (DC) — Sortent : … » in game
+      mode's timeline and in the recap, one helper for both (`pitchEventFr`, decision 152); and a move
+      is reported only when the `positionCode` differs, which silences the eleven side-swap lines and
+      leaves everything derived untouched. An event whose every move is a side swap says « Changement
+      de côté » rather than « Changement de poste » over a blank line. Unit tests on the helper,
+      including a real change and a side swap in the same event
+- [x] **B3.2 · every composition of the match, as blocks at the bottom of the recap** (issue #202,
+      decision **182**). `MatchState.compositions` — one snapshot per applied `LINEUP_APPLIED`, from
+      the reducer, pure — drawn by `compositions-strip.tsx` on the shared `PitchLayout`: the minute in
+      big type, the seven in the 1-2-3-1, « Hors du terrain : … », in a snapping horizontal strip with
+      a trailing spacer so the last of twelve snaps like the first. Looked at at 390 px in both themes
+      on all three matches (10 · 11 · 12 blocks), coach and player side by side in one pass

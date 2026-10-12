@@ -464,3 +464,100 @@ describe("buildRecap — the supporter on the sheet", () => {
     expect(tail).toEqual(["ali", "gerard"]);
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* The blocks (decision 182)                                                  */
+/* -------------------------------------------------------------------------- */
+
+describe("buildRecap — the compositions at the bottom", () => {
+  /** The same catalogue, with the coordinates the reducer has no use for. */
+  const PITCH_SLOTS = [
+    { id: SLOT.gb, formationId: "f1", positionCode: "GB", x: 500, y: 60, sort: 1 },
+    { id: SLOT.dc, formationId: "f1", positionCode: "DC", x: 500, y: 250, sort: 2 },
+    { id: SLOT.mc1, formationId: "f1", positionCode: "MC", x: 300, y: 540, sort: 3 },
+    { id: SLOT.mc2, formationId: "f1", positionCode: "MC", x: 700, y: 540, sort: 4 },
+    { id: SLOT.at, formationId: "f1", positionCode: "AT", x: 500, y: 850, sort: 5 },
+  ];
+
+  const CHANGED = { ...STARTERS, [SLOT.at]: "momo" };
+  const events = log([
+    { type: "KICKOFF", min: 0, period: 1 },
+    { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTERS) },
+    { type: "LINEUP_APPLIED", min: 34, period: 2, payload: lineupPayload(CHANGED) },
+    { type: "FINAL_WHISTLE", min: 60, period: 2 },
+  ]);
+  const blocks = buildRecap(reduceMatch(events, [], CONFIG), MEMBERS, {
+    slots: PITCH_SLOTS,
+  }).compositions;
+
+  it("gives one block per composition, in the order they happened", () => {
+    expect(blocks.map((block) => block.minuteLabel)).toEqual(["0’", "34’"]);
+    expect(blocks.map((block) => block.kindLabel)).toEqual([
+      "Composition de départ",
+      "Changement",
+    ]);
+    expect(blocks.map((block) => block.startingLineup)).toEqual([true, false]);
+  });
+
+  it("draws every slot of the formation, each with the player who stood in it", () => {
+    expect(blocks[0].slots.map((slot) => [slot.positionCode, slot.player?.name])).toEqual([
+      ["GB", "Hugo Leclerc"],
+      ["DC", "Nico Perrin"],
+      ["MC", "Léo Martin"],
+      ["MC", "Karim Benali"],
+      ["AT", "Julien Marchal"],
+    ]);
+    // The change, and only the change: Momo for Julien up front, the other four untouched.
+    expect(blocks[1].slots.at(-1)?.player).toMatchObject({
+      id: "momo",
+      name: "Momo Diarra",
+      jerseyNumber: 11,
+    });
+  });
+
+  it("keeps the slot's coordinates, so the block can be drawn", () => {
+    expect(blocks[0].slots[0]).toMatchObject({ id: SLOT.gb, x: 500, y: 60 });
+  });
+
+  it("names who was off the pitch at that moment, supporters excluded", () => {
+    const squad = [...SQUAD, { teamMemberId: "gerard", role: "supporter" as const }];
+    const members = [
+      ...MEMBERS,
+      { memberId: "gerard", displayName: "Gérard Simon", jerseyNumber: null },
+    ];
+    const withSupporter = buildRecap(reduceMatch(events, [], { slots: SLOTS, squad }), members, {
+      slots: PITCH_SLOTS,
+    }).compositions;
+
+    expect(withSupporter[0].offPitch.map((player) => player.memberId)).toEqual(["momo", "ali"]);
+    expect(withSupporter[0].offPitchLabel).toBe("Hors du terrain : Momo Diarra, Ali Cherif");
+    // Julien has just come off, so the second block has him among them and Momo on the pitch.
+    expect(withSupporter[1].offPitch.map((player) => player.memberId)).toEqual(["julien", "ali"]);
+    // And a supporter is nobody's substitute: decision 087's heading, and this list, leave him out.
+    expect(
+      withSupporter.every((block) =>
+        block.offPitch.every((player) => player.memberId !== "gerard"),
+      ),
+    ).toBe(true);
+  });
+
+  it("draws no block at all without a slot catalogue, rather than piling seven discs in the middle", () => {
+    expect(buildRecap(reduceMatch(events, [], CONFIG), MEMBERS).compositions).toEqual([]);
+  });
+
+  it("ignores a composition whose application was annulled (invariant 1)", () => {
+    const annulled = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTERS) },
+      { type: "LINEUP_APPLIED", min: 34, period: 2, payload: lineupPayload(CHANGED) },
+      { type: "VOID", min: 35, period: 2, voids: 3 },
+    ]);
+    const only = buildRecap(reduceMatch(annulled, [], CONFIG), MEMBERS, {
+      slots: PITCH_SLOTS,
+    }).compositions;
+
+    // The Déroulé keeps the struck-through line — a correction stays visible (decision 003) — but a
+    // pitch that was never on the pitch is not a composition the match went through.
+    expect(only.map((block) => block.minuteLabel)).toEqual(["0’"]);
+  });
+});

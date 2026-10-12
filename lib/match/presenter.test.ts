@@ -531,7 +531,7 @@ describe("the timeline", () => {
     const byClientId = new Map(timelineLines(state, index).map((line) => [line.clientEventId, line]));
 
     expect(byClientId.get("c2")).toMatchObject({ title: "Composition de départ", canVoid: false });
-    expect(byClientId.get("c2")?.detail).toBe("Entre : Momo — Sort : Julien");
+    expect(byClientId.get("c2")?.detail).toBe("Entre : Momo (AT) — Sort : Julien");
     expect(state.players.find((player) => player.memberId === "julien")?.playedMatch).toBe(false);
   });
 
@@ -571,7 +571,7 @@ describe("the timeline", () => {
     // Unpaired, the way it was entered (decision 147), and the move says where he went.
     expect(timelineLines(state, index)[0]).toMatchObject({
       title: "Changement",
-      detail: "Entrent : Yanis, Momo — Sortent : Léo, Julien — Poste : Karim → AT",
+      detail: "Entrent : Yanis (MC), Momo (MC) — Sortent : Léo, Julien — Poste : Karim → AT",
     });
   });
 
@@ -593,6 +593,82 @@ describe("the timeline", () => {
     expect(timelineLines(state, index)[0]).toMatchObject({
       title: "Changement de poste",
       detail: "Postes : Julien → MC, Karim → AT",
+    });
+  });
+
+  /* ---- The post of an arrival, and the side swap that is not a move (decision 181) ---- */
+
+  it("names the post every arrival takes", () => {
+    // The owner's words: « we need to see the positions of the players coming in ». Momo walks into
+    // the left of midfield and Yanis into goal, and « Momo, Yanis entrent » said neither.
+    const reshuffled = [
+      { slotId: SLOT.gb, memberId: "yanis" },
+      { slotId: SLOT.dg, memberId: "samir" },
+      { slotId: SLOT.dc, memberId: "thomas" },
+      { slotId: SLOT.dd, memberId: "nico" },
+      { slotId: SLOT.mc1, memberId: "momo" },
+      { slotId: SLOT.mc2, memberId: "karim" },
+      { slotId: SLOT.at, memberId: "julien" },
+    ];
+    const events = log([
+      ...KICKED_OFF,
+      { type: "LINEUP_APPLIED", min: 40, period: 2, payload: lineupPayload(reshuffled) },
+    ]);
+    const state = reduceLive(live(events), [], T0 + 45 * MIN);
+
+    expect(timelineLines(state, index)[0]).toMatchObject({
+      title: "Changement",
+      detail: "Entrent : Yanis (GB), Momo (MC) — Sortent : Hugo, Léo",
+    });
+  });
+
+  it("does not report a side swap as a position change (decision 181)", () => {
+    // Léo and Karim exchange the two `MC` slots. Both are midfielders, before and after: the Déroulé
+    // printing « Léo → MC » about a man who was already a milieu was inventing a change. Nobody is
+    // in or out either, so there is nothing left to report — and the title says that, rather than
+    // « Changement de poste » over a blank line.
+    const sidesSwapped = STARTING_SEVEN.map((entry) =>
+      entry.slotId === SLOT.mc1
+        ? { ...entry, memberId: "karim" }
+        : entry.slotId === SLOT.mc2
+          ? { ...entry, memberId: "leo" }
+          : entry,
+    );
+    const events = log([
+      ...KICKED_OFF,
+      { type: "LINEUP_APPLIED", min: 40, period: 2, payload: lineupPayload(sidesSwapped) },
+    ]);
+    const state = reduceLive(live(events), [], T0 + 45 * MIN);
+    const line = timelineLines(state, index)[0];
+
+    expect(line).toMatchObject({ title: "Changement de côté", detail: null });
+    expect(line.title).not.toBe("Changement de poste");
+  });
+
+  it("keeps a real position change in an event that also holds a side swap", () => {
+    // Both at once, which is the case the three rebuilt matches are full of: Julien goes from AT to
+    // the left of midfield (a post he did not hold) while Léo and Karim exchange wings on their way
+    // (the same post, twice). One line, one move reported.
+    const mixed = [
+      { slotId: SLOT.gb, memberId: "hugo" },
+      { slotId: SLOT.dg, memberId: "samir" },
+      { slotId: SLOT.dc, memberId: "thomas" },
+      { slotId: SLOT.dd, memberId: "nico" },
+      { slotId: SLOT.mc1, memberId: "karim" },
+      { slotId: SLOT.mc2, memberId: "julien" },
+      { slotId: SLOT.at, memberId: "leo" },
+    ];
+    const events = log([
+      ...KICKED_OFF,
+      { type: "LINEUP_APPLIED", min: 40, period: 2, payload: lineupPayload(mixed) },
+    ]);
+    const state = reduceLive(live(events), [], T0 + 45 * MIN);
+
+    // Léo AT is the move; Karim mc2 → mc1 and Julien AT → mc2 … careful: Julien's is `AT → MC`, a
+    // real change, and Karim's is `MC → MC`, a side swap. Léo goes `MC → AT`. Two of three printed.
+    expect(timelineLines(state, index)[0]).toMatchObject({
+      title: "Changement de poste",
+      detail: "Postes : Julien → MC, Léo → AT",
     });
   });
 
@@ -626,7 +702,7 @@ describe("the timeline", () => {
     ]);
     const state = reduceLive(live(events), [], T0 + 45 * MIN);
 
-    expect(timelineLines(state, index)[0].detail).toBe("Entre : Momo — Sort : Julien");
+    expect(timelineLines(state, index)[0].detail).toBe("Entre : Momo (AT) — Sort : Julien");
   });
 
   it("reads a comment's own words as its detail", () => {

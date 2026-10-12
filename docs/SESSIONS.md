@@ -5563,3 +5563,54 @@ Files: `lib/stats/format.ts`, `lib/stats/format.test.ts`, `lib/stats/aggregate.t
 `app/(app)/stats/page.tsx`, `app/(app)/stats/_components/keepers.tsx`,
 `app/(app)/joueur/_components/stats-card.tsx`, `docs/DECISIONS.md`, `docs/ROADMAP.md`,
 `docs/SESSIONS.md`.
+
+## 2026-10-12, track A of the third backlog — the Déroulé tells the truth about posts, and the recap shows every composition
+
+Two issues from `backlogs/backlog3.md`, both of which exist only because of the rebuild: the owner's
+paper sheets record the whole seven at each change, so for the first time the app has a composition
+history and a post for every arrival. Worked on a local clone of the preview database (`football_wa`,
+76 events over three matches, 10 · 11 · 12 compositions).
+
+**B3.1 (#201, decision 181) — one helper, two halves.** `pitchEventFr` is read by game mode's
+timeline *and* the recap's Déroulé (decision 152), so both were fixed at once:
+
+- **an arrival carries the post he takes**: « Entrent : Clément (AIL), Lucas (DC) — Sortent : … ».
+  Departures carry nothing — the post a man takes is news, the post he vacates is on the line above.
+  The starting composition gets it too, which is where it reads best: « Entrent : Léo M (GB), Lucas
+  (DC), Nicolas (DC), Benjamin (AIL), Thomas (MC), Pierre (AIL), Samuel (AT) »;
+- **a side swap is no longer a position change.** `TimelineActor` now carries `fromPositionCode`
+  beside `positionCode` on a `moved` actor, and a move is printed only when the two codes differ.
+  **Counted before and after on the three matches: 11 side-swap lines → 0**, and no real move lost —
+  Galacticos' 51′ went from four `Postes` to three, FC Hexagone's 54′ from four to one.
+
+The case the rule creates was decided rather than left blank: an event whose *every* move is a side
+swap says **« Changement de côté »** with no detail, because « Changement de poste » over an empty
+line would be « 7 changements » in miniature. None exists in the three matches — the one whose moves
+are all swaps also has arrivals — so the branch is for the first one that does.
+
+**B3.2 (#202, decision 182) — the blocks.** `MatchState.compositions`, one snapshot per *applied*
+`LINEUP_APPLIED`, recorded by the reducer as it replays (invariant 2: nobody else gets to decide who
+was on the pitch). `buildCompositions` in `lib/rating/recap.ts` adds names and coordinates, which is
+why `loadSlotCatalogue` now also selects `x`, `y` and `formation_id`. The strip is a Server Component
+over the shared `PitchLayout` — no second way to draw a pitch — with `snap-x snap-mandatory`, 272 px
+panes, the minute in big type, « 3 / 12 », « Hors du terrain : … », and **a trailing 80 px spacer** so
+the twelfth block snaps to the left edge like the first instead of sitting half a pane in beside its
+predecessor's counter. That last one was found by looking, not by a test.
+
+**What was looked at.** All three recaps and the three game-mode timelines, 390 px, light and dark,
+coach `potter` and player `raphael`, screenshots in `audit/b3a/` (git-ignored). The two roles were
+read **side by side in one pass**, as `CLAUDE.md` requires: the card has no role branch and the two
+arms are pixel-identical, which is the point — a composition is not privileged. The strip was also
+captured scrolled to its end, which is how the missing spacer showed up.
+
+Gates: `npm run typecheck`, `npx eslint app components lib e2e db scripts proxy.ts proxy.test.ts`,
+`npm test` (70 files, 1458 tests — 8 new over `presenter.test.ts` and `recap.test.ts`), and
+`E2E_PORT=3101 npm run test:e2e` (9 passed), with one new step in the happy path asserting the strip
+on the real screen: the chain runs from the reducer through a query that fetches coordinates the
+reducer throws away, and a broken link anywhere in it renders as a card that is simply absent.
+
+Files: `lib/match/reducer.ts`, `lib/match/presenter.ts`, `lib/match/presenter.test.ts`,
+`lib/match/reducer.test.ts`, `lib/rating/recap.ts`, `lib/rating/recap.test.ts`,
+`lib/rating/queries.ts`, `app/(app)/match/[id]/recap/page.tsx`,
+`app/(app)/match/[id]/recap/_components/compositions-strip.tsx`, `e2e/happy-path.spec.ts`,
+`docs/DECISIONS.md` (181, 182), `docs/ROADMAP.md`, `docs/SESSIONS.md`.

@@ -761,13 +761,28 @@ function describeActorsFr(
  * A group change is one `LINEUP_APPLIED` (decision 147), so the event type says nothing about what
  * happened; the actors the reducer derived from the diff do:
  *
- * - it filled an empty pitch → « Composition de départ », and the seven who walked on;
- * - somebody went on or off → « Changement », « Entrent : Yanis, Momo — Sortent : Léo, Julien »,
- *   with any position moves after them;
+ * - it filled an empty pitch → « Composition de départ », and the seven who walked on, each with
+ *   the post he takes;
+ * - somebody went on or off → « Changement », « Entrent : Clément (AIL), Lucas (DC) — Sortent :
+ *   Léo, Julien », with any position moves after them;
  * - only moves → « Changement de poste », « Postes : Karim → AT, Julien → MC »;
+ * - only side swaps → « Changement de côté », no detail. See below.
  * - no actors at all → « Changement », no detail. That is an annulled change (the reducer derives
  *   nothing from a voided event, so the struck-through line still says what it was) or a
  *   re-confirmation of the pitch as it stood.
+ *
+ * **An arrival carries his post in parentheses** — the owner's own words: « we need to see the
+ * positions of the players coming in ». The seven of a composition are not interchangeable and
+ * « Clément entre » answered none of the question a reader actually has. Departures carry nothing:
+ * the post a man takes is news, the post he vacated is already on the line above.
+ *
+ * **A side swap is not a position change** (decision 181). The two `AIL` slots are one position and
+ * so are the two `DC` slots (decision 157, « ne pas faire de différence »), so a player crossing
+ * between them changed slot, not post — and « Pierre → AIL » about a man who was an ailier a second
+ * ago was the Déroulé inventing a change. The rule is the position **code**: a move is reported when
+ * the code differs, and dropped when it does not. That is also why an event whose every move is a
+ * side swap gets a title of its own rather than « Changement de poste » over an empty detail: the
+ * coach did move people, and nothing he did changed anybody's post.
  *
  * In and out are listed unpaired, because that is how they were entered: « on s'en fiche de savoir
  * qui remplace qui ».
@@ -780,12 +795,21 @@ export function pitchEventFr(
 
   const of = (role: string) => entry.actors.filter((actor) => actor.role === role);
   const names = (role: string) => of(role).map((actor) => nameOf(actor.memberId));
-  const moves = of("moved").map((actor) =>
+  // « Clément (AIL) ». No parentheses for a slot the catalogue does not know: an empty pair of them
+  // would read as a post the app failed to print rather than as one it never had.
+  const arrivals = of("in").map((actor) =>
+    actor.positionCode ? `${nameOf(actor.memberId)} (${actor.positionCode})` : nameOf(actor.memberId),
+  );
+  const changedPost = of("moved").filter(
+    (actor) => !actor.fromPositionCode || actor.fromPositionCode !== actor.positionCode,
+  );
+  const sideSwaps = of("moved").length - changedPost.length;
+  const moves = changedPost.map((actor) =>
     actor.positionCode ? `${nameOf(actor.memberId)} → ${actor.positionCode}` : nameOf(actor.memberId),
   );
 
   const parts = [
-    labelledFr("Entre", "Entrent", names("in")),
+    labelledFr("Entre", "Entrent", arrivals),
     labelledFr("Sort", "Sortent", names("out")),
     labelledFr("Poste", "Postes", moves),
   ].filter((part): part is string => part !== null);
@@ -794,6 +818,7 @@ export function pitchEventFr(
   if (entry.startingLineup) return { title: "Composition de départ", detail };
   if (of("in").length > 0 || of("out").length > 0) return { title: "Changement", detail };
   if (moves.length > 0) return { title: "Changement de poste", detail };
+  if (sideSwaps > 0) return { title: "Changement de côté", detail };
   return { title: "Changement", detail };
 }
 

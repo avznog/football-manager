@@ -6868,6 +6868,80 @@ The result: 29 rows over 15 members, every post of the 1-2-3-1 with several decl
 (`GB` 4, `DC` 6, `MC` 6, `AIL` 9, `AT` 4), and **« pas son poste » gone from all three sevens** —
 0 badges where there were 6 of 7.
 
+## 181 — A move is reported when the *position code* changes, and never for a swap of sides
+
+**2026-10-12** · accepted · answers the declared cost of decision 179 · applies 157 · issue #201 ·
+`lib/match/presenter.ts`, `lib/match/reducer.ts` · no migration
+
+Decision 179 declared a cost and left the owner a choice. The rebuilt sheets record which side a man
+stood on, so the `AIL (left)` → `AIL (right)` of a block is a change of **slot**, and `pitchEventFr`
+printed it as a change of **post**: « Postes : Nicodème → DC, Lucas → DC, Pierre → AIL, Édouard →
+AIL », in which only Pierre had actually changed anything. **Eleven such lines** across the three
+matches (1 · 6 · 4), counted again here before and after.
+
+179's own alternative was to smooth the sides away *in the log* — prefer the slot a player already
+holds, and only then the paper's side. **That is not what was done, and it is the better outcome:**
+the paper is the record and the side is what the paper says, so the log keeps it, and the sentence
+that was wrong is fixed where it was wrong. The rule is one line:
+
+> **Report a move only when the `positionCode` differs.** The two `AIL` slots are one position and so
+> are the two `DC` (decision 157, « ne pas faire de différence »), so a player crossing between them
+> has not changed post, and the Déroulé has nothing to say about him.
+
+`TimelineActor` therefore carries `fromPositionCode` beside `positionCode` on its `moved` actors —
+the comparison needs both, and the reducer is the only thing that knows either. Nothing derived moves
+a millimetre: `match_player_positions` is keyed on `position_code`, so minutes, goals for and against
+and keeper spells are identical, which is exactly what 179 promised.
+
+**The one case this creates, and what it says.** A change whose *every* move is a side swap now has
+nothing to report, and « Changement de poste » over a blank line would be the « 7 changements » lie in
+miniature. It gets a title of its own, **« Changement de côté »**, with no detail: the coach did move
+people, and nothing he did changed anybody's post. Naming the side is not a breach of 157 — the
+`PositionPicker` has always said « Ailier gauche » in its own labels — because the side is not being
+turned into a *position*. There is no such event in the three rebuilt matches (the one whose moves are
+all swaps also has arrivals, so it stays « Changement »); the branch exists so that the first one is
+not a blank.
+
+## 182 — Every composition of the match, as blocks under the recap
+
+**2026-10-12** · accepted · needs decisions 147 and 179 · issue #202 ·
+`lib/match/reducer.ts`, `lib/rating/recap.ts`, `app/(app)/match/[id]/recap/` · no migration
+
+« We need to have, on the bottom, the blocks with all the compositions that happened during the
+match. Maybe put them in a horizontal scroll or swipe. » **« Blocks » is the owner's word**, from the
+paper sheets the season was rebuilt off: one drawn pitch per change, in a column down the page.
+
+**This was impossible until a fortnight ago.** A paired substitution tells you two names and never
+the other five, so there was no composition history to show. Decision 147 made a group change one
+`LINEUP_APPLIED` snapshot of the whole seven, and 179's rebuild made every change in the record one
+— so the sequence of compositions *is* the sequence of those events, exactly, with nothing to infer.
+
+**The sequence lives in the reducer** (`MatchState.compositions`), recorded as it replays the log.
+Invariant 2 puts the pitch in one place, and a reader re-deriving « who was on at the 34th minute »
+from the timeline's actors would be a second definition of the pitch. A voided event never reaches
+that branch, so an annulled change contributes no block — the Déroulé keeps its struck-through line
+(decision 003), but a pitch that was never on the pitch is not a composition the match went through.
+Names and coordinates are added in `lib/rating/recap.ts`, which is why `loadSlotCatalogue` now also
+selects `x`, `y` and `formation_id`: the reducer reads three fields of those rows and ignores the rest.
+
+**Twelve panes on a 390 px screen was the constraint, and it is what rules out a column.** Bayern has
+twelve; twelve 400 px pitches stacked is five screens of scroll under a recap that already carries a
+timeline and a minutes table, and nobody would reach the ratings. So: a `snap-x snap-mandatory` strip,
+272 px per pane — the width `lineup-prompt.tsx` draws its proposed seven at, so the names are the size
+they are in game mode — full-bleed through the card's padding so the next block peeks over the right
+edge and says *there is more that way* without a word, and a trailing 80 px spacer so the **last**
+block can snap to the left edge like every other one. Nothing is on hover (decision 072).
+
+On each pane: the **minute in the big type**, because that is what tells twelve near-identical pitches
+apart; « Composition de départ » / « Changement » as its caption; « 3 / 12 », the only thing on screen
+that says how far along the strip you are; the seven in the 1-2-3-1 on the shared `PitchLayout`; and
+**« Hors du terrain : … »** below. Not « Sur le banc » — decision 087 struck that heading off a list of
+thirteen where ten were on no bench, and a man who has just gone off injured is not on one either.
+Supporters are left out of it entirely: they were never off the pitch, they were never on it.
+
+The card has **no role branch at all**, deliberately: a composition is not privileged, and coach and
+player read the identical strip.
+
 ## 184 — A rate is printed under the figure it is ranked on, and never without its denominator
 
 **2026-10-12** · accepted · the owner's third backlog (#204, #205, #206) · presentation only: no

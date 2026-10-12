@@ -49,7 +49,6 @@ import {
   users,
 } from "@/db/schema";
 import type { SquadRole } from "@/db/schema";
-import type { SlotInfo } from "@/lib/match/lineup";
 import { getMatch, type MatchRow } from "@/lib/match/queries";
 import {
   reduceMatch,
@@ -77,7 +76,7 @@ import {
   type RatingProgress,
 } from "./progress";
 import { meansAreVisible } from "./published";
-import { buildRecap, type MatchRecap, type RecapMember } from "./recap";
+import { buildRecap, type MatchRecap, type RecapMember, type RecapSlot } from "./recap";
 
 export type { RaterTally, SilentMember } from "./progress";
 
@@ -667,12 +666,18 @@ async function loadLineups(matchId: string): Promise<PlannedLineup[]> {
  *
  * A few dozen rows. Fetching them all beats resolving which formations the log happens to mention —
  * a `POSITION_CHANGE` can move a player into a slot of a formation no composition ever used.
+ *
+ * `x`, `y` and `formationId` are along for the recap's blocks (decision 182), which draw each
+ * composition on a pitch; the reducer reads only the three fields of `SlotInfo` and ignores them.
  */
-async function loadSlotCatalogue(teamId: string): Promise<SlotInfo[]> {
+async function loadSlotCatalogue(teamId: string): Promise<RecapSlot[]> {
   return db
     .select({
       id: formationSlots.id,
+      formationId: formationSlots.formationId,
       positionCode: formationSlots.positionCode,
+      x: formationSlots.x,
+      y: formationSlots.y,
       sort: formationSlots.sort,
     })
     .from(formationSlots)
@@ -697,10 +702,14 @@ export async function getMatchRecap(input: {
   const match = await getMatch(input.teamId, input.matchId);
   if (!match) return null;
 
-  const [state, directory, sheet] = await Promise.all([
+  // The catalogue twice over — `loadMatchState` reads it as `SlotInfo` for the reducer, and the
+  // blocks need the coordinates it drops. A few dozen rows, fetched in parallel; threading it out of
+  // the loader would make four other callers carry a value none of them wants.
+  const [state, directory, sheet, slots] = await Promise.all([
     loadMatchState(match, input.nowMs ?? Date.now()),
     getTeamDirectory(match.teamId),
     getMatchSheet(match.id),
+    loadSlotCatalogue(match.teamId),
   ]);
 
   const members: RecapMember[] = directory.map((member) => ({
@@ -709,5 +718,5 @@ export async function getMatchRecap(input: {
     jerseyNumber: member.jerseyNumber,
   }));
 
-  return { match, recap: buildRecap(state, members), sheet };
+  return { match, recap: buildRecap(state, members, { slots }), sheet };
 }
