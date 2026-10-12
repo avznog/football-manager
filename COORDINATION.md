@@ -59,11 +59,12 @@ where they disagree.**
   local restore of production: the result is byte-identical to preview across seven fingerprints.
   `scripts/rebuild-matches.mts` and `scripts/assign-positions-from-play.mts` are the other route, and
   both refuse production by name on purpose — running either there is the owner's deliberate act.
-- **The super admin's production password is trivially weak and must be rotated** (the owner said what
-  it is; it is deliberately not written here, because this repository is public). That account is a
-  coach of the team and can read and rewrite every team in the instance, and the app is on a public
-  URL. `docs/SESSIONS.md` has also been naming a candidate super-admin password in plain text for
-  weeks, which is its own problem.
+- **CLOSED, and do not re-propose it: the owner will not rotate the super admin's password.** He was
+  told what it costs — the account is a coach of the team, it can read and rewrite every team in the
+  instance, and the app is on a public URL — and decided on **2026-10-12** not to. Issue #208 is closed
+  « not planned ». This is the same kind of standing answer as decision 132's three closed proposals:
+  raising it again is not diligence, it is nagging. The password itself is deliberately written
+  nowhere in this repository, which is public.
 - **The cahier des charges rework has landed in full.** All thirteen slices, S1–S13 (#174–#186), are
   merged on `main` and deployed to the **preview**. Every issue #160–#172 is closed, and the Project
   « Football-manager » (`gh project view 5 --owner avznog`) holds every merged pull request and every
