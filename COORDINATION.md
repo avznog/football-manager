@@ -24,12 +24,22 @@ where they disagree.**
   a tapped player asks only who comes in, 174–175), #191 (`/stats`: five per list plus « Tout
   afficher », raw conceded rates, the squad as a table, 176–178). No migration. `docs/ROADMAP.md`
   `## M9` holds them, and one open item for the owner (a minimum of minutes on the raw rate cards).
-- **CI's end-to-end job cannot pull `postgres:17`** — the owner's Docker Hub pull limit (200 per 6 h)
-  was exhausted on 2026-10-09 evening. By the owner's instruction #189–#191 were merged on a local
-  Playwright run (9/9 on each rebased commit) instead. **The same failure skips `migrate-preview` and
-  `deploy-preview` on `main`, so the preview does not carry #189–#191 yet**: once the limit resets,
-  `gh run rerun --failed` on the latest `main` run of `ci.yml` deploys it. Switching the image to the
-  `public.ecr.aws/docker/library/postgres:17` mirror was offered and not chosen; it is the owner's.
+- **CI's end-to-end job could not pull `postgres:17`** on 2026-10-09 (the owner's Docker Hub limit),
+  so #189–#191 were merged on a local Playwright run. **That is resolved and the note that the preview
+  does not carry them is wrong**: the #192 push ran green at 21:36 and its `deploy preview` deployed
+  `874d475`, which contains all three. Every `main` run since has been green. Switching to the
+  `public.ecr.aws/docker/library/postgres:17` mirror was offered and not chosen; it stays the owner's.
+- **The preview database is now a copy of production** (2026-10-12, at the owner's request, so he can
+  test against real data). What preview held — the demo season « AS Dimanche » — is in
+  `db/snapshots/preview-20261012.sql`, **redacted**: no password hashes, no `sessions` rows, because
+  this repository is public. `db/snapshots/README.md` has the rule. So **preview now shows « Les 7
+  orteils de la main », and the old preview logins are gone**; its users are production's.
+- **Run migrations against Neon's direct endpoint, not `-pooler`.** `pg_restore` sets `search_path` to
+  `''` for its session (line 16 of any `pg_dump`), the pooler handed that connection to the next
+  client, and `0011`'s unqualified `DROP TABLE "training_attendance"` then failed on a table that was
+  plainly there. Drop `-pooler` from the host and it works; the app is unaffected because Drizzle
+  qualifies every table with its schema. Preview is at **15 migration rows** (through `0014`) with
+  `db:refreeze` run; production is still at **11** (through `0010`).
 - **The cahier des charges rework has landed in full.** All thirteen slices, S1–S13 (#174–#186), are
   merged on `main` and deployed to the **preview**. Every issue #160–#172 is closed, and the Project
   « Football-manager » (`gh project view 5 --owner avznog`) holds every merged pull request and every
@@ -1028,6 +1038,12 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   (#174–#186), preview deployed, board complete and dated. Four agents ran in parallel worktrees, each
   with its own clone of the production restore and its own port; this machine committed, rebased,
   renumbered migrations and merged. Worktrees, branches and per-track databases removed. No tag.
+
+- **2026-10-12 · owner's machine · `docs/preview-is-production`** — Reviewed #188–#192 (gates green
+  on `main`: 1449 tests). Dumped preview, committed it redacted (#193), restored production over
+  preview and applied `0011`–`0014` + `db:refreeze`. Transcribed the owner's three paper match sheets
+  into `backlogs/matches-1-3.md`; they carry positions and minutes but **no date, opponent or score**,
+  and matches 1 and 2 record no goals at all, so nothing can be imported until the owner fills those in.
 
 ### From the other machine
 
