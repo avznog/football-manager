@@ -1,0 +1,1164 @@
+{
+ "_note": "Verified blocks from backlogs/matches-1-3.md (owner-verified 2026-10-12). Slots use the app's five position codes; AIL left/right are the two winger slots of the 1-2-3-1 and are the SAME position (decision 157).",
+ "matches": [
+  {
+   "key": "galacticos",
+   "opponent": "Galacticos de Balard",
+   "kickoff": "2026-09-22",
+   "sheet": "game1.jpeg",
+   "expectedScore": {
+    "for": 3,
+    "against": 9
+   },
+   "keepGoalsFromExistingLog": true,
+   "blocks": [
+    {
+     "minute": 0,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Samuel"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Benjamin"
+      },
+      {
+       "slot": "MC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "GB",
+       "player": "Léo M"
+      }
+     ]
+    },
+    {
+     "minute": 11,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Rémi"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Benoît"
+      },
+      {
+       "slot": "MC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Léo M"
+      },
+      {
+       "slot": "DC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 20,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Rémi"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Charles"
+      },
+      {
+       "slot": "MC",
+       "player": "Benjamin"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Léo M"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 30,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Benoît"
+      },
+      {
+       "slot": "MC",
+       "player": "Pierre"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "GB",
+       "player": "Thomas"
+      }
+     ]
+    },
+    {
+     "minute": 36,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Benjamin"
+      },
+      {
+       "slot": "MC",
+       "player": "Pierre"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "GB",
+       "player": "Thomas"
+      }
+     ]
+    },
+    {
+     "minute": 40,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Samuel"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Benjamin"
+      },
+      {
+       "slot": "MC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Rémi"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Léo M"
+      },
+      {
+       "slot": "GB",
+       "player": "Lucas"
+      }
+     ]
+    },
+    {
+     "minute": 47,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Samuel"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Charles"
+      },
+      {
+       "slot": "MC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Rémi"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Léo M"
+      },
+      {
+       "slot": "GB",
+       "player": "Lucas"
+      }
+     ]
+    },
+    {
+     "minute": 48,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Samuel"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Charles"
+      },
+      {
+       "slot": "MC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Léo M"
+      },
+      {
+       "slot": "GB",
+       "player": "Lucas"
+      }
+     ]
+    },
+    {
+     "minute": 51,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Samuel"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "MC",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "GB",
+       "player": "Léo M"
+      }
+     ]
+    },
+    {
+     "minute": 56,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Rémi"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "MC",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "GB",
+       "player": "Léo M"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "hexagone",
+   "opponent": "FC Hexagone",
+   "kickoff": "2026-09-29",
+   "sheet": "game2.jpeg",
+   "expectedScore": {
+    "for": 3,
+    "against": 2
+   },
+   "keepGoalsFromExistingLog": true,
+   "blocks": [
+    {
+     "minute": 0,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Samuel"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Clément"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "GB",
+       "player": "Lucas"
+      }
+     ]
+    },
+    {
+     "minute": 11,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Édouard"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "GB",
+       "player": "Lucas"
+      }
+     ]
+    },
+    {
+     "minute": 18,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Édouard"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "GB",
+       "player": "Lucas"
+      }
+     ]
+    },
+    {
+     "minute": 22,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Samuel"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Charles"
+      },
+      {
+       "slot": "MC",
+       "player": "Édouard"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "GB",
+       "player": "Lucas"
+      }
+     ]
+    },
+    {
+     "minute": 26,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Samuel"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Charles"
+      },
+      {
+       "slot": "MC",
+       "player": "Édouard"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "GB",
+       "player": "Lucas"
+      }
+     ]
+    },
+    {
+     "minute": 30,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "MC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Maxime"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 37,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Clément"
+      },
+      {
+       "slot": "MC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Maxime"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 40,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Édouard"
+      },
+      {
+       "slot": "MC",
+       "player": "Nicolas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 48,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Pierre"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Édouard"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 52,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Pierre"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Édouard"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Clément"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 54,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Édouard"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "bayern",
+   "opponent": "Bayern Barbecue Club",
+   "kickoff": "2026-10-06",
+   "sheet": "game3.jpeg",
+   "expectedScore": {
+    "for": 2,
+    "against": 5
+   },
+   "keepGoalsFromExistingLog": false,
+   "goalsFor": [
+    {
+     "minute": 32,
+     "scorer": "Pierre",
+     "assist": null
+    },
+    {
+     "minute": 58,
+     "scorer": "Pierre",
+     "assist": "Benjamin",
+     "uncertain": "minute could read 53"
+    }
+   ],
+   "goalsAgainst": [
+    {
+     "minute": 14
+    },
+    {
+     "minute": 29
+    },
+    {
+     "minute": 36
+    },
+    {
+     "minute": 46,
+     "uncertain": "could read 56"
+    },
+    {
+     "minute": 56
+    }
+   ],
+   "blocks": [
+    {
+     "minute": 0,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Benjamin"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 10,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Rémi"
+      },
+      {
+       "slot": "MC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "DC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 19,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Benjamin"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Clément"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Thomas"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucien"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 30,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Rémi"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 37,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Clément"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 39,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Benjamin"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Clément"
+      },
+      {
+       "slot": "MC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 45,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Clément"
+      },
+      {
+       "slot": "MC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 47,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Clément"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 50,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Rémi"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Thomas"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 55,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Benjamin"
+      },
+      {
+       "slot": "MC",
+       "player": "Pierre"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Rémi"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 57,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Benjamin"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "MC",
+       "player": "Thomas"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Rémi"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "DC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    },
+    {
+     "minute": 59,
+     "slots": [
+      {
+       "slot": "AT",
+       "player": "Charles"
+      },
+      {
+       "slot": "AIL (left)",
+       "player": "Thomas"
+      },
+      {
+       "slot": "MC",
+       "player": "Maxime"
+      },
+      {
+       "slot": "AIL (right)",
+       "player": "Pierre"
+      },
+      {
+       "slot": "DC",
+       "player": "Lucas"
+      },
+      {
+       "slot": "DC",
+       "player": "Nicodème"
+      },
+      {
+       "slot": "GB",
+       "player": "Samuel"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

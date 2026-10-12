@@ -5268,3 +5268,105 @@ of seven discs because production has coach-set positions for one player only.
 Two preview accounts were given a known password so the deployed app could be walked at all —
 production's hashes came with the restore. That is a write to preview and nowhere else; the scratch
 script that did it refused any host but the preview endpoint and was deleted.
+
+## 2026-10-12, later still — the three paper logs are rebuilt on the preview
+
+The owner decided the first three matches' event logs should be **rebuilt** from the sheets he had
+just verified, on the preview database, as the rehearsal for production. `scripts/rebuild-matches.mts`
+does it, and **decision 179** is the entry that lets it delete events at all — a scripted,
+preview-only exception to invariant 1, not an amendment of it. `CLAUDE.md`'s invariant is untouched on
+purpose.
+
+**Why appending was not the way, which is the part worth keeping.** Decision 169 *does* make a pure
+position move expressible after the match, so the shape was never the problem. Two other things were,
+and they compound: the starting composition cannot be voided (decision 150), so the one event whose
+slots are wrong at 0′ is exactly the one that cannot be replaced; and the thirty-six stored
+substitutions carry **wrong** slots rather than missing ones, so a correction does not remove a claim,
+it stacks a second one beside it at the same minute about the same player. A log that says two things
+is not a record, and `match_player_positions` would be derived from it.
+
+**What the rebuild asserts before it writes a row**, because a script that rewrites history has to
+prove its result rather than report it:
+
+- the derived score equals the known score — 3–9, 3–2, 2–5 — or it aborts;
+- **all 33 blocks**, replayed through `reduceMatch` up to each block's own event, put exactly the
+  seven players the paper drew at exactly those posts. Ten, eleven and twelve, and not one needed the
+  assertion weakened. This is the check the whole job exists for and it is asked of the **reducer**,
+  not of the payload the script just wrote;
+- `Σ match_player_positions.minutes = match_player_stats.minutes` and the `GB` row `= gk_minutes`,
+  per player, on the frozen tables;
+- `retroLogIssuesFr` finds no blocking anomaly — in fact `state.anomalies` is empty for all three;
+- every event also has to satisfy `matchEventInputSchema`, the strict one the ingestion API uses,
+  even though nothing came from a browser.
+
+**The goalkeeper split is the thing that was wrong and is now right.** Match 1 comes out Léo M
+0′→11′, Samuel 11′→30′, Thomas 30′→40′, Lucas 40′→51′, Léo M 51′→end, and **Nicolas has zero
+goalkeeper minutes** where the stored log gave him thirty. Match 2 is Lucas 0′→30′ then Samuel
+30′→end, against a stored Lucas 52′ and Nicodème 8′. Over the three matches: Samuel 109′, Lucas 41′,
+Léo M 20′, Thomas 10′ — 180′ for three 60′ matches, which is the cheapest check there is and it
+holds.
+
+**Two orderings were traps and both are `orderMatchEvents`', not this script's.** The list is built in
+its natural order, handed to that function, and the result asserted to be a **fixed point** of it — so
+the rule of decisions 147 and 152 is delegated rather than restated. Galacticos' 60′ goal conceded
+lands before the 60′ `PERIOD_END` and the `FINAL_WHISTLE`; the 30′ block is the second-half restart
+and sits after the period-2 kick-off, because `periodOfClockMs` gives a boundary to the period that is
+*starting* — which is also why the 30′ `PERIOD_END` carries `period: 1` explicitly. Benoît's 36′
+injury lands before the 36′ change that takes him off, for the same reason.
+
+**What it does not touch, stated because the brief was explicit about it.** `ratings` — 200 rows
+across matches 1 and 2 — and `ratings_published_at`, both unchanged. Every `match_squad` row the paper
+does not name is left exactly as it is, so Léo C survives as a supporter of all three matches and
+Benjamin and Nicolas of one each; ratings eligibility depends on that table (decision 159). The
+rebuild writes `starter` for the 0′ seven and `substitute` for everyone else the paper names, and on
+all three matches that turned out to be what the rows already said. Bayern's five later planned
+compositions stay unapplied, which is true: the log applies only the initial one. Bayern's
+`entry_mode` is left `live` and matches 1 and 2 stay `retro` — a label and nothing else (decision
+013).
+
+**Every `PAUSE` and `RESUME` was dropped, and that is a judgement.** Bayern held two pairs (4′ and
+10′) and a stray `PAUSE` at **91′** from a match nobody whistled off. The paper's minutes assume
+continuous play; a 91′ pause in a 2×30 match is an artefact of the tab being left open, and keeping
+the pairs would shorten every minute the sheets state.
+
+**Idempotent, and checked by running it twice.** Every synthesised row's `id` and `client_event_id`
+are `deterministicUuid` of the match, the index and the content; every fact read back out of the old
+log keeps its own `id`, `client_event_id`, `occurred_at`, `recorded_at` and `created_by`, so a real
+recorded event survives the rebuild with its identity and only its `seq` changes. The second
+`--commit` left all three digests byte-identical, `recorded_at` included.
+
+**One cosmetic cost, found on screen and not by a test, and left for the owner.** The sheets record
+which *side* a man stood on and the rebuild keeps it, but the two `AIL` and the two `DC` are one
+position each (157/158) — so a man who swaps sides produces a slot change and `pitchEventFr` prints it
+as a move. « 54′ Changement — … Postes : Nicodème → DC, Lucas → DC, Pierre → AIL, Édouard → AIL », in
+which only Pierre's is a change of position. **Eleven lines across the three matches** (1 · 6 · 4).
+Nothing derived moves — `match_player_positions` is keyed on `position_code` — so this is a sentence
+on a screen and not a wrong figure. It is in `docs/ROADMAP.md` as an open item with the one-rule
+alternative; it was not silently fixed, because the side is what the paper says and the brief asked
+for the blocks to be reproduced slot for slot.
+
+**The preview password in the brief was stale, and the detour is worth recording.** `leo` /
+`preview-check-2026` is **refused by `dev.7orteils.bgonzva.fr`** — tried on `leo`, `potter`, `lucas`
+and `admin` — because preview carries production's hashes since the restore. Setting one would have
+been working around a secret (standing rule 8), so it was not done: the preview database was **cloned
+into a local throwaway** instead (`npm run db:migrate` on an empty database, then a table-by-table
+`\copy` from the **direct** endpoint, row counts equal on all nineteen tables) and walked on a dev
+server started from a *copy* of the checkout, because the owner's own dev server already holds port
+3000 and this directory's `.next`. The owner then said every password is `motdepasse`, and **every
+screen below was re-read on the deployed preview**, which is what the captures in `audit/rebuild/`
+are; the two runs agree, page text length for page text length, and four of the twenty-two captures
+are byte-identical. `.gitignore` excludes `/audit/`, like every other capture in this repository, so
+the screenshots are local and these readings are the record.
+
+Read on screen, on `dev.7orteils.bgonzva.fr` as the coach `leo`, 390 px, light and dark: each recap's Déroulé with its « Changement » lines and
+their « Postes : … », the 60′ goal conceded before the 60′ fin de période, the injury before the
+change, the « Temps de jeu » table with four `GB` badges on match 1 and Nicolas without one, the
+supporters still at 0′, and `/stats` → **Gardiens**, now Thomas (aucun but encaissé en 10′), Samuel
+(1 toutes les 14′, 8 en 109′), Léo M (1 toutes les 10′, 2 en 20′) and Lucas (1 toutes les 7′, 6 en
+41′). One pre-existing sentence is now less true than it was and was not introduced here: the retro
+notice on matches 1 and 2 says « les actions sans minute précise ont été placées au mieux, donc les
+temps de jeu sont approximatifs », and after the rebuild every minute is the paper's.
+
+`npm run typecheck`, `npx eslint scripts` and `npm test` (1449 tests, 70 files) all pass. No
+migration. Files: `scripts/rebuild-matches.mts`, `docs/DECISIONS.md` (179), `docs/ROADMAP.md`,
+`docs/SESSIONS.md`, `audit/rebuild/*.png`.

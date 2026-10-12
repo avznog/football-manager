@@ -6716,3 +6716,107 @@ de sorte que l'on puisse comparer très rapidement. »
   printed, lighter. The note is `formatRating` with « N notés » under it — matches whose mean he
   received (decision 137) — and a dash when there is none. `pendingRatingMatchesNoteFr` stays under the
   table.
+
+## 179 — A rebuild from a verified paper record is a scripted exception to invariant 1
+
+**2026-10-12** · accepted · the owner's explicit decision for one job · **suspends invariant 1 for
+three matches on the preview database only** · does not amend the invariant · no migration
+
+The owner's three handwritten sheets (`backlogs/matches-1-3.md`, verified by him on 2026-10-12) are
+the only record of **where every player stood, minute by minute**, in the season's first three
+matches. The stored logs have **no `POSITION_CHANGE` at all, in any match**: the RadarLocal import
+recorded substitutions as pairs with no position and gave each arrival the slot of the man he
+replaced. So match 1 records two goalkeepers where the paper has four, and `gk_minutes`,
+`gk_clean_minutes`, `conceded_while_gk`, the « Gardiens » section of `/stats` and the goalkeeper slot
+of every équipe type all rest on that.
+
+**`match_events` is append-only (invariant 1, decision 003), and the owner has decided that these
+three logs are rebuilt rather than corrected.** `scripts/rebuild-matches.mts` does it: per match, in
+one transaction, delete `match_events`, `match_player_stats` and `match_player_positions`, null
+`lineups.applied_event_id`, insert the new log, then `finalizeMatchById`.
+
+### Why appending could not do it
+
+Decision 169 does make a pure position move expressible after the match — « Ajouter un changement »
+accepts nobody in and nobody out — so the question was never whether the *shape* could be appended.
+Two things make appending the wrong instrument here, and they compound:
+
+- **The starting composition cannot be voided** (decision 150). It is the event that put anybody on
+  the pitch at all, and voiding it leaves the reducer with an empty pitch and no later event able to
+  put the match back together. So the one event whose slots are wrong at 0′ is exactly the one that
+  cannot be replaced.
+- **The stored substitutions carry wrong slots**, not missing ones. Every one of them asserts a
+  position the arrival did not take. A correction appended on top does not remove that assertion: it
+  stacks a second claim beside it, and the log then holds the inherited-slot substitution *and* the
+  correction, at the same minute, about the same player. Thirty-six such pairs across two matches is
+  not a readable history — and `match_player_positions` would be derived from a log that says two
+  things.
+
+**Rebuilding is the honest answer when the record being written down is better than the record
+stored, and the stored one is wrong rather than incomplete.** That is the whole of the exception, and
+it is deliberately narrow.
+
+### What keeps it from becoming a habit
+
+- **Preview only.** The script refuses any `DATABASE_URL` that is not the Neon preview endpoint or a
+  localhost one, and refuses the production endpoint **by name**. Running it against production is
+  not a flag away; it is a code change plus this decision being superseded. It also refuses a
+  `-pooler` host, for the reason `COORDINATION.md` gives.
+- **Scripted, not typed.** No screen in the application deletes an event and none is being added.
+  `lib/match/append.ts` is still the only writer the app itself has, and it still never updates or
+  deletes.
+- **Dry run by default**, `--commit` to write, and the target database printed with the password
+  redacted first.
+- **It proves its own result before it writes.** The derived score has to equal the known score; the
+  reducer, replayed up to each block's own event, has to have exactly the seven players the paper
+  drew, at exactly those posts, for **all 33 blocks**; `Σ match_player_positions.minutes` has to equal
+  `match_player_stats.minutes` and the `GB` row has to equal `gk_minutes`, per player; and
+  `retroLogIssuesFr` has to find no blocking anomaly. Any of those failing aborts before a row moves.
+- **Idempotent.** Every synthesised row's `id` and `client_event_id` are `deterministicUuid` of the
+  match, the index and the content, and every fact read back out of the old log keeps its own `id`,
+  `client_event_id`, `occurred_at`, `recorded_at` and `created_by`. A second `--commit` writes a log
+  identical column for column, which the script prints as a digest and compares.
+
+### What the new log says, and what it does not touch
+
+- **The facts come out of the existing log, never from the paper.** The sheets record almost no goals
+  and production's logs are the truth for them. Matches 1 and 2 keep all of theirs — three goals, nine
+  and two conceded, Benoît's 36′ injury — and a real recorded event therefore survives the rebuild
+  with its own identity, only its `seq` changing.
+- **Match 3 (Bayern) is the exception, and only for its goals.** It was still `live` with no goal at
+  all, so its 2–5 comes from the sheet; its real `REMARK` 1′, `COMMENT` 3′ and `REMARK` 21′ are kept
+  like any other fact. It ends `finished`.
+- **Every `PAUSE` and `RESUME` is dropped**, which is a judgement and is stated here rather than
+  hidden. Bayern held two pairs (4′, 10′) and a stray `PAUSE` at **91′** from a match nobody whistled
+  off. The paper's minutes assume continuous play; a 91′ pause in a 2×30 match is an artefact of the
+  tab being left open, and keeping the pairs would shorten every minute the sheets state.
+- **A block is one `LINEUP_APPLIED` carrying the whole pitch** (decision 147). The reducer turns a
+  snapshot into leave / move / enter, so a goalkeeper change and a pure position move need no new
+  event type. The 0′ block is the starting composition and names the match's own `lineups` row —
+  asserted first to hold the same men at the same position codes.
+- **The order at an identical reading is `orderMatchEvents`'** (147, and 152's exception for the
+  segment that first fills the pitch), reused rather than reimplemented: the list is built in its
+  natural order, handed to that function, and the result asserted to be a fixed point of it. That is
+  what puts Galacticos' 60′ `GOAL_AGAINST` before the 60′ `PERIOD_END`, and Benoît's 36′ injury before
+  the change that takes him off.
+- **`ratings` and `ratings_published_at` are not touched.** The 200 notes of matches 1 and 2 survive,
+  published as they were. `match_squad` writes `starter` for the 0′ seven and `substitute` for every
+  other man the paper names, and **leaves every row it does not name exactly as it is** — which is how
+  production's supporters (Léo C on all three, Benjamin and Nicolas on one each) survive a rebuild
+  that never mentions them. Ratings eligibility depends on that table (decision 159).
+
+### The one declared cost: the paper's wings are kept, and the timeline reads them as moves
+
+The two `AIL` and the two `DC` are one position each (decisions 157/158), but the sheets do record
+which side a man stood on, so the rebuild keeps it: `AIL (left)` → the `AIL` at `x=160`, `AIL (right)`
+→ `x=840`, the two `DC` of a block in written order → `x=330` then `x=670`. **A man who swaps sides
+between two blocks therefore produces a slot change, and `pitchEventFr` prints it as a move**: « 54′
+Changement — … Postes : Nicodème → DC, Lucas → DC, Pierre → AIL, Édouard → AIL », in which only
+Pierre's is a change of *position*. It happens **11 times** across the three matches (1 · 6 · 4), and
+nothing derived depends on it: `match_player_positions` is keyed on `position_code`, so the minutes,
+the goals for and against and the keeper spells are identical either way.
+
+It is kept rather than smoothed away because the paper is the record and the side is what the paper
+says. **The alternative is one rule and is left to the owner**: within each twin pair, prefer the slot
+the player already holds, and only then the paper's side. That would silence all eleven lines and
+would mean the log no longer carries a wing the app does not model anyway.
