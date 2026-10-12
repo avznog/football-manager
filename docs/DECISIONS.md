@@ -6820,3 +6820,50 @@ It is kept rather than smoothed away because the paper is the record and the sid
 says. **The alternative is one rule and is left to the owner**: within each twin pair, prefer the slot
 the player already holds, and only then the paper's side. That would silence all eleven lines and
 would mean the log no longer carries a wing the app does not model anyway.
+
+## 180 — The coach's preferred positions are filled in from where each player actually played
+
+**2026-10-12** · accepted · applies decision 163 (positions are the coach's) and reads the record
+decision 179 rebuilt · preview only · `scripts/assign-positions-from-play.mts` · no migration
+
+Preferred positions are not decoration. The équipe type places a player only at a post he has been
+given — primary before secondary — and badges every other disc « pas son poste » (decision 171).
+Production held wishes for **one of eighteen members**, so six of seven discs in every seven read
+« pas son poste » and the three sevens were a placement by figures wearing the wrong labels.
+
+Nobody was going to type eighteen cards by hand, and after the rebuild there was no need to:
+`match_player_positions` now says how many minutes each player spent at each post, which is exactly
+what the owner's paper sheets recorded and what nothing in the app knew before. He asked for the cards
+to be filled « as if the coach assigned those per player ».
+
+**The rule, which he chose between three:**
+
+- **primary** is the post with the most minutes — at most one per member, which `docs/DATA_MODEL.md`
+  already requires;
+- **secondary** is every other post worth **at least a tenth of that player's own minutes**. His own
+  total, not the season's, so a man who played twice is judged on his two matches. It keeps the real
+  second posts and drops four incidental spells: Pierre at `AT` (6′) and `MC` (12′), Charles at `MC`
+  (9′), Maxime at `DC` (4′);
+- a member with **no recorded minutes gets no row**, which is how « pas son poste » is stored. Raphaël,
+  Léo C and the super admin today.
+
+Ties break on `POSITION_CODES` order so a re-run cannot depend on the order rows come back in. None
+exists today — Thomas came closest, `MC` 32′ against `DC` 30′, and the owner confirmed the rule should
+decide it rather than his memory.
+
+**Why this is believable rather than merely convenient.** Lucas is the one member who already carried
+wishes a human had set: `DC` primary, `GB` and `MC` secondary. The rule derives precisely that from his
+minutes, and the script checks it and prints the agreement. One case is not a proof, but it is the only
+case available, and it would have been a warning if it had disagreed.
+
+The script is **convergent, not write-once**: every run recomputes from the record and replaces the
+rows of the members it is about, so running it after the next match updates the cards instead of
+duplicating them. Members it has nothing to say about are never touched.
+
+**Preview only.** It refuses production by name, for the reason that makes this entry a decision rather
+than a chore: these are the coach's opinions about his players, and a script filling them in on the
+instance the team reads is the owner's call to make deliberately, not a side effect of a rehearsal.
+
+The result: 29 rows over 15 members, every post of the 1-2-3-1 with several declared candidates
+(`GB` 4, `DC` 6, `MC` 6, `AIL` 9, `AT` 4), and **« pas son poste » gone from all three sevens** —
+0 badges where there were 6 of 7.
