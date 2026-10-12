@@ -5614,3 +5614,81 @@ Files: `lib/match/reducer.ts`, `lib/match/presenter.ts`, `lib/match/presenter.te
 `lib/rating/queries.ts`, `app/(app)/match/[id]/recap/page.tsx`,
 `app/(app)/match/[id]/recap/_components/compositions-strip.tsx`, `e2e/happy-path.spec.ts`,
 `docs/DECISIONS.md` (181, 182), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-10-12 — The real notes land on preview, and the fabrication of decision 145 is retired
+
+**Decision 188.** The owner recovered the per-note rows from `info-radarlocal` — the thing Supabase's
+RLS had withheld when matches 1 and 2 were imported — and they are now on preview in place of what
+decision 145 had put there.
+
+**What was there, and why it had to go rather than be added to.** 200 rows in which every note about a
+player is the same number, each attributed to a named teammate who never gave it: the owner had only
+the final means, and asked that they be recorded « comme si tout le monde avait mis la moyenne ». The
+published mean was right. The coach's per-note panel — the one place an individual note is ever shown
+(decision 137), and behind it the man of the match and the notes seven — was invented line by line.
+Adding the real rows was not an option: `ratings_unique(match_id, rater_member_id, rated_member_id)`
+is the same key for both, and the survivor would have been whichever got there first.
+
+**`scripts/import-ratings.mts`**, run against preview, dry run then `--commit` then `--commit` again.
+342 notes, 111 / 110 / **121** — the third is Bayern Barbecue Club, which had no note at all in this
+database because the owner had no mean for it. Per match, in one transaction: delete, insert.
+`matches.ratings_published_at` is never read for writing, so Galacticos stays published and **Bayern's
+121 notes are in and invisible, to the coach too, until he presses « Sortir les moyennes »**.
+
+**The thing worth recording: the hand-typed means were right.** Each of the twenty-one the owner typed
+equals the mean of the real notes to the rounding of the second decimal, largest discrepancy **0,0045**
+(Pierre at Hexagone, 7,4545 against 7,45). So no published mean moves, the one-decimal figure stored
+for each player is unchanged, and the man of the match of Galacticos is still Pierre at 6,5 — now on
+ten real notes between 4,0 and 9,5 rather than eleven identical columns. That is also why nobody
+noticed for six days: the figure every reader sees was true, and only the authors were fictional. The
+script checks the stored fabrication against its own copy of `RATING_MEANS` **before** deleting it, so
+the comparison is against a statement rather than against whatever happened to be in the table.
+
+**Three counts the fabrication got wrong, and the real record explains all three.** Benoît has 11 notes
+at Galacticos where the other ten have 10 — injured at 36′, he gave none himself, so he is the only man
+rated by all ten players *and* by Léo C. Hexagone's players are rated by 11 people, not 9: its raters
+include Benjamin and Léo C, supporters with no minute, who have a vote under decision 159 and whom a
+fabrication derived from who *played* could not see. And Léo C rates all three matches and is rated in
+none, which is 159 and 137 agreeing.
+
+**The two checks the app itself makes are asked of the app.** Every rated player has `minutes > 0`
+(decision 137) and every rater is eligible (decision 159), the second through `eligibleRaterIds` from
+`lib/rating/progress.ts` rather than through a restatement of it. All 342 pass; one failure would have
+written nothing, because a note the app would refuse is a finding for the owner and not a thing to
+force in. Two eligible men sent nothing and are reported rather than filled in: Benoît at Galacticos,
+Nicolas at Bayern.
+
+**Names.** `OLD_TO_TARGET_DISPLAY_NAME` moved out of `scripts/import-radarlocal.mts` into
+`scripts/radarlocal-names.mts`, which both importers now import — the first script calls `main()` at
+module load, so it cannot be imported, and a second copy of that table is the one drift here that could
+not fail loudly: **« Léo C » and « Léo M » are two different men.** This export spells five names
+shorter than `profiles.full_name` does (« Léo COACH », « Léo M », « Maxime », « Thomas », « Nicodème »),
+so `EXPORT_ALIASES` declares those five, pointing at the *key* of the shared table. Nothing is
+inferred — « Léo M » is a prefix of « Léo Montpre » and « Léo » of both Léos, which is why guessing is
+refused rather than merely avoided. « Alexis CHARRIER » maps to nobody and is asserted to rate nobody
+and be rated by nobody; `profiles.json` has him, and he gave no note.
+
+**Safety and idempotency.** The guard is `scripts/rebuild-matches.mts`'s, tested by running all three
+arms: production refused **by name** (`ep-gentle-cherry`), a host that is neither preview nor localhost
+refused, a `-pooler` host refused, and dry run until `--commit`. The old note `id` becomes `ratings.id`
+and an existing row's `created_at` is read before the delete and carried over, so the second `--commit`
+reported « 342 supprimées, 342 insérées, 342 created_at repris » with the fingerprint at
+**`b9229c86789fb489`** before and after. **Production still holds the fabrication** — applying this
+there is the owner's deliberate act, like the rest of the rebuild.
+
+**What was looked at.** The deployed preview, `https://dev.7orteils.bgonzva.fr`, coach `leo`, 390 px,
+light and dark: the Galacticos recap with the notes panel open on Pierre, Thomas, Benoît, Charles and
+Benjamin — ten different authors with nine different numbers under each mean, « Léo C (toi) » among
+them — the man of the match, and the Bayern recap showing « Les moyennes ne sont pas encore sorties ·
+12 sur 13 de la feuille de match ont noté. Pas encore de note de Nicolas » with the « Sortir les
+moyennes » button and no note visible. Screenshots in `audit/ratings-import/` (git-ignored). **One
+correction to the brief**: `leo`'s password on preview is `motdepasse`, not `preview-check-2026`; the
+first failed and the second worked, so nothing was reset.
+
+Gates: `npm run typecheck`, `npx eslint app components lib e2e db scripts proxy.ts proxy.test.ts`,
+`npm test` (70 files, 1473 tests). No end-to-end run: nothing in the app changed, only rows in the
+preview database and two scripts that no page imports.
+
+Files: `scripts/import-ratings.mts` (new), `scripts/radarlocal-names.mts` (new),
+`scripts/import-radarlocal.mts` (the table moved out), `docs/DECISIONS.md` (188), `docs/ROADMAP.md`,
+`docs/SESSIONS.md`.

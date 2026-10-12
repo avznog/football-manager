@@ -7065,3 +7065,139 @@ The exclusion is stated with its count in `excludedFromSquadFr`, first of the th
 only one about a man the reader **expected** to see: a name in his squad list, absent from both the pitch
 and the picker. He is absent from the picker too, deliberately — a seven the reader hand-edits is still
 this screen's claim about a season, and « Ton équipe » sits under the same paragraph.
+
+## 188 — The real individual notes replace the « as if everyone had put the mean » fabrication
+
+**2026-10-12** · accepted · the owner has recovered the per-note rows from the old app ·
+`scripts/import-ratings.mts`, `scripts/radarlocal-names.mts`, `audit/radarlocal-ratings/ratings.json` ·
+no migration · **preview only**
+
+Decision 145 answered a problem that no longer exists. When the season's first matches were imported
+from `info-radarlocal`, Supabase's row-level security let only **Benjamin's own twenty notes** out of
+the old database. The owner had the final per-player **means** and nothing else, so he asked that they
+be recorded « comme si tout le monde avait mis la moyenne », and `RATING_MEANS` in
+`scripts/import-radarlocal.mts` did exactly that: 200 rows in which every note about a player is the
+same number, each one attributed to a named teammate.
+
+The RLS problem is solved and the real rows are out — **342 notes across three matches**. So the
+fabrication is **retired**, and this entry supersedes 145's ratings paragraph and nothing else of it.
+
+### What it fixes
+
+- **Named authors who never gave that score.** The fabrication did not say « moyenne 4,2 »; it said
+  « Pierre a mis 4,2, Samuel a mis 4,2, Lucas a mis 4,2 », about a match in which the real notes run
+  from 3,0 to 6,0. The figure was right and every author was wrong, which is the worst shape a
+  falsehood can take in this app: nothing on the screen looks odd.
+- **The coach's per-note panel**, which is the one place an individual note is ever shown (decision
+  137) and was therefore the one screen whose every line was invented. It now reads « 6,0 Pierre ·
+  5,0 Benjamin · 5,0 Charles · 5,0 Lucas · 4,5 Rémi … » under Benoît's 4,2 — ten different people
+  with nine different numbers.
+- **The man of the match and the notes seven**, which rest on the notes rather than on the mean. The
+  man of the match of Galacticos does not move — Pierre, 6,5 — but it now rests on ten real notes
+  instead of eleven identical columns, and a tie between two fabricated means was decided by nothing.
+- **A third match that had no notes at all.** Bayern Barbecue Club (06/10) was never in `RATING_MEANS`
+  because the owner had no mean for it; it now has its **121** notes.
+
+### What it validates: the owner's hand-typed means were right
+
+This is worth recording, because it was not guaranteed and it is the reason nobody noticed. The means
+he typed by hand are the means the real notes produce, **to the rounding of the second decimal** — the
+precision he wrote them at. Every one of the twenty-one, checked by the script before it wrote
+anything:
+
+**Galacticos de Balard** (11 players, 111 notes)
+
+| player | notes | real mean | typed |
+| --- | --- | --- | --- |
+| Pierre | 10 | 6,5000 | 6,50 |
+| Samuel | 10 | 4,5000 | 4,50 |
+| Thomas | 10 | 4,5000 | 4,50 |
+| Lucas | 10 | 4,4500 | 4,45 |
+| Benoît | 11 | 4,1818 | 4,18 |
+| Charles | 10 | 4,0500 | 4,05 |
+| Benjamin | 10 | 4,0000 | 4,00 |
+| Rémi | 10 | 3,9000 | 3,90 |
+| Nicolas | 10 | 3,8000 | 3,80 |
+| Clément | 10 | 3,6500 | 3,65 |
+| Léo M | 10 | 3,5500 | 3,55 |
+
+**FC Hexagone** (10 players, 110 notes)
+
+| player | notes | real mean | typed |
+| --- | --- | --- | --- |
+| Pierre | 11 | 7,4545 | 7,45 |
+| Lucien | 11 | 7,2727 | 7,27 |
+| Maxime | 11 | 7,0909 | 7,09 |
+| Nicolas | 11 | 7,0909 | 7,09 |
+| Samuel | 11 | 6,5000 | 6,50 |
+| Édouard | 11 | 6,4091 | 6,41 |
+| Lucas | 11 | 6,3182 | 6,32 |
+| Nicodème | 11 | 6,2273 | 6,23 |
+| Charles | 11 | 5,7273 | 5,73 |
+| Clément | 11 | 5,3182 | 5,32 |
+
+**Bayern Barbecue Club** (11 players, 121 notes) has no typed column to compare: Pierre 5,4545 ·
+Lucien 5,1818 · Charles 4,7273 · Nicodème 4,5909 · Thomas 4,5909 · Samuel 4,4091 · Lucas 4,3182 ·
+Benjamin 4,0455 · Maxime 3,8182 · Rémi 3,2727 · Clément 2,6364.
+
+The largest discrepancy is **0,0045** (Pierre at Hexagone, 7,4545 against 7,45) and every one of them
+is the second decimal being rounded. So the fabrication **told the truth about the mean and lied about
+everything else** — and the one-decimal figure stored for it (4,2 for Benoît's 4,1818) is the figure
+the real notes give too. No published mean moves. That is the whole of why this went unnoticed for six
+days.
+
+### Three counts that did not match the fabrication, and the real one is right
+
+- **Benoît has 11 notes at Galacticos where the other ten players have 10.** He was injured at the
+  36th minute, gave no note himself, and so is the one man rated by all ten players *and* by Léo C —
+  the others are rated by nine players plus Léo C. The fabrication gave everybody 10, flatly.
+- **Hexagone's players are rated by 11 people, not 9.** Its raters include two men with no minute in
+  it: Benjamin and Léo C, both supporters on the sheet, both entitled to a vote under decision 159.
+  The fabrication could not see them, because it derived its raters from who played.
+- **Léo C rates all three matches and is rated in none**, which is decision 159 and 137 working as
+  intended: a supporter watched the same hour and keeps his vote, and a man with no minute has no
+  performance to be judged on.
+
+### What the script may not do
+
+`scripts/import-ratings.mts` **replaces** rather than adds, because the two cannot coexist:
+`ratings_unique(match_id, rater_member_id, rated_member_id)` is the same key for a real note and for
+the fabricated one about the same pair, and the survivor would be whichever got there first. So, per
+match, in one transaction: delete, insert.
+
+It does **not** touch `matches.ratings_published_at`. Galacticos was published and stays published;
+Hexagone and Bayern were not and stay hidden. **Bayern's 121 notes are therefore in the database and
+invisible**, including to the coach, until he presses « Sortir les moyennes » — publishing is his
+switch and never a script's (decisions 139, 145, 180).
+
+It refuses to insert a note the app itself would refuse, and **reports rather than repairs**: every
+rated player must have `minutes > 0` for that match (decision 137) and every rater must be eligible
+under decision 159, both answered by calling `lib/rating/progress.ts` rather than by restating it. All
+342 rows pass; had one failed, nothing would have been written. The old app's own note `id` becomes
+`ratings.id` and an existing row's `created_at` is carried over, so a second `--commit` leaves the
+table byte-identical — which it does, fingerprint `b9229c86789fb489` before and after.
+
+And it is **preview-only**, by the same guard as `scripts/rebuild-matches.mts` (decision 179): it
+refuses `ep-gentle-cherry` by name, refuses any host that is neither the preview endpoint nor
+localhost, refuses a `-pooler` host, and is a dry run until `--commit`. Production's notes are still
+the fabrication, and bringing this to production is the owner's deliberate act, like every other part
+of the rebuild.
+
+### `OLD_TO_TARGET_DISPLAY_NAME` moves, and five aliases join it
+
+The name table is now `scripts/radarlocal-names.mts`, imported by both importers, because a second
+copy of it would be the one piece of drift in this repository that could not fail loudly: **« Léo C »
+and « Léo M » are two different men**, and a mapping that swapped them would attribute one man's notes
+to the other with every count and every mean still adding up.
+
+This export does not spell its names the way `profiles.full_name` does, though. Five arrive shortened
+— « Léo COACH » for « Leo COACH », « Léo M » for « Léo Montpre », « Maxime » for « Maxime Goulard »,
+« Thomas » for « Thomas Brunet », « Nicodème » for « Nicodème (gronaldo) » — and they are declared in
+`EXPORT_ALIASES`, pointing at the key of the shared table rather than at a `display_name`, so the
+pairing still happens in exactly one place. **Nothing is inferred**: no prefix match, no edit
+distance. « Léo M » *is* a prefix of « Léo Montpre », and « Léo » of both Léos, which is precisely why
+guessing is refused rather than merely avoided. An unknown name, an alias that duplicates a key, or two
+names landing on one member all abort before a row is written.
+
+« Alexis CHARRIER » still maps to nobody, and the script asserts what the old `profiles.json` shows:
+he is in the old database, he is an admin of it, and he gives no note and receives none.

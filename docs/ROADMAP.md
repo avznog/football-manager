@@ -2112,3 +2112,25 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       big type, the seven in the 1-2-3-1, « Hors du terrain : … », in a snapping horizontal strip with
       a trailing spacer so the last of twelve snaps like the first. Looked at at 390 px in both themes
       on all three matches (10 · 11 · 12 blocks), coach and player side by side in one pass
+
+- [x] **The real individual notes replace the « as if everyone had put the mean » fabrication**
+      (decision **188**). `scripts/import-ratings.mts` writes the 342 notes the owner recovered from
+      the old app, per match in one transaction, **preview only** and behind the guard of decision 179
+      (`ep-gentle-cherry` refused by name, no `-pooler`, dry run until `--commit`): Galacticos 111,
+      Hexagone 110, and **121 for Bayern Barbecue Club, which had none at all**. It replaces rather
+      than adds, because `ratings_unique` is the same key for a real note and for the fabricated one
+      about the same pair. The 200 fabricated rows — every note about a player identical, attributed
+      to teammates who never gave that score — are gone, and the coach's per-note panel is the screen
+      that was wrong and is now right. The owner's hand-typed means **reconcile to the second
+      decimal** with the notes that produce them (largest discrepancy 0,0045), so no published mean
+      moves and the man of the match of Galacticos is still Pierre at 6,5 — now on ten real notes.
+      `ratings_published_at` is untouched: **Bayern's notes are in and hidden** until the coach presses
+      « Sortir les moyennes ». `OLD_TO_TARGET_DISPLAY_NAME` moved to `scripts/radarlocal-names.mts` so
+      both importers read one table, with five declared aliases for the shortened names this export
+      uses. Both checks the app itself makes — minutes for every rated player (137), eligibility for
+      every rater (159) — pass for all 342 rows, asked of `lib/rating/progress.ts` rather than
+      restated. Idempotent: the old note `id` is the row's `id` and `created_at` is carried over, so a
+      second `--commit` leaves the fingerprint at `b9229c86789fb489`. Looked at at 390 px in both
+      themes on the deployed preview, Galacticos published and Bayern hidden
+      (`audit/ratings-import/`). **Production still holds the fabrication**; applying this there is
+      the owner's deliberate act
