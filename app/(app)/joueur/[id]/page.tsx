@@ -223,9 +223,14 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
 
       {canRemove && !isSelf && !profile.isLastCoach ? (
         <Card title={removal.titleFr} description={removal.descriptionFr}>
-          {/* A plain form, as with « Supprimer ce match »: no confirmation dialog to get wrong, and
-              it works without JavaScript. `removeMember` sets `left_at` and sends the coach back to
-              the squad list — this page would be a 404 on the next render. */}
+          {/* A plain form: no confirmation dialog to get wrong, and it works without JavaScript.
+              `removeMember` sets `left_at` and sends the coach back to the squad list — this page
+              would be a 404 on the next render.
+
+              It used to say « as with « Supprimer ce match » », and that is no longer the shape of
+              the other one: deleting a match destroys a déroulé and a dozen people's notes, so it
+              got a confirmation screen of its own (decision 191). Removing a member keeps every row
+              he is in — it is reversible in a way a deletion is not — so it stays one tap. */}
           <form action={removeMember}>
             <input type="hidden" name="teamId" value={team.id} />
             <input type="hidden" name="memberId" value={profile.membershipId} />

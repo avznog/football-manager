@@ -135,7 +135,7 @@ export async function submitRetroMatch(
           "Ce match a déjà un déroulé : les corrections se font action par action, plus bas sur cette page.",
       };
     }
-    redirect(`/match/${matchId}/recap`);
+    redirect(`/match/${matchId}`);
   }
 
   // The formation the starters were placed in, taken from the log's own catalogue so a crafted form
@@ -186,7 +186,7 @@ export async function submitRetroMatch(
     .set({ entryMode: "retro" })
     .where(and(eq(matches.id, matchId), eq(matches.teamId, teamId)));
 
-  redirect(`/match/${matchId}/recap?saisie=1`);
+  redirect(`/match/${matchId}?saisie=1`);
 }
 
 /**

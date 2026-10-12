@@ -68,7 +68,7 @@ export type SubmitRatingsState =
 function revalidateRatings(matchId: string): void {
   revalidatePath(`/match/${matchId}`);
   revalidatePath(`/match/${matchId}/notation`);
-  revalidatePath(`/match/${matchId}/recap`);
+  revalidatePath(`/match/${matchId}`);
   // The season's « meilleure moyenne » moves with every note.
   revalidatePath("/stats");
 }
@@ -170,7 +170,7 @@ export async function submitRatings(
 
   if (progress.complete) {
     // Outside any try/catch: `redirect` works by throwing (`docs/NEXTJS16.md` §5).
-    redirect(`/match/${match.id}/recap`);
+    redirect(`/match/${match.id}`);
   }
 
   return {

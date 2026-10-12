@@ -4,6 +4,7 @@ import { periodOfClockMs, periodsConfig } from "@/lib/match/clock";
 import type { MatchEventType } from "@/lib/match/events";
 import type { SlotInfo } from "@/lib/match/lineup";
 import { reduceMatch, type MatchEventRecord, type MatchReducerConfig } from "@/lib/match/reducer";
+import { concededRateLineFr } from "@/lib/stats/format";
 import { buildRecap, UNKNOWN_MEMBER_NAME, type RecapMember } from "./recap";
 
 /* -------------------------------------------------------------------------- */
@@ -367,8 +368,59 @@ describe("buildRecap — minutes played", () => {
   it("carries the shirt number and the goalkeeper's clean minutes", () => {
     const hugo = players.find((player) => player.memberId === "hugo");
     expect(hugo).toMatchObject({ jerseyNumber: 1, wasGoalkeeper: true, minutes: 60 });
-    // Conceded at 24’, so 24 minutes of clean sheet in goal.
+    // Conceded at 24’, so 24 minutes of clean sheet in goal. **No screen prints this figure any
+    // more** (decision 189); it is the reducer's and is carried, not shown.
     expect(hugo?.gkCleanMinutes).toBe(24);
+  });
+
+  /*
+   * The two figures the « Temps de jeu » panel gained with decision 189. Both are the reducer's and
+   * are asserted here because the panel reads *these* fields: a line carrying `gkCleanMinutes` and
+   * not `gkMinutes` is what it had, and « 24′ sans encaisser » with no total to be a part of is the
+   * defect that started the issue.
+   */
+  it("carries the minutes in goal, not only the clean ones", () => {
+    expect(players.find((player) => player.memberId === "hugo")?.gkMinutes).toBe(60);
+    // Nobody else wore the gloves, and 0 is what keeps the line off their rows.
+    expect(players.find((player) => player.memberId === "julien")?.gkMinutes).toBe(0);
+    expect(players.find((player) => player.memberId === "momo")?.gkMinutes).toBe(0);
+  });
+
+  it("counts the goals taken while a man was on the pitch, in goal or outfield", () => {
+    const of = (memberId: string) =>
+      players.find((player) => player.memberId === memberId)?.concededWhileOn;
+
+    /*
+     * Two goals against in this log: one at 24’ and Nico's own goal at 51’, which counts against the
+     * men on the pitch exactly like any other (the reducer's own rule).
+     *
+     * Hugo played the whole hour **in goal**, and his figure is 2 rather than 0 — « goal included »
+     * is the owner's phrase and this is where it is decided: the rate on the panel is over his whole
+     * time on the turf, not over the outfield half of it.
+     */
+    expect(of("hugo")).toBe(2);
+    expect(of("julien")).toBe(2);
+    // On at 55’, after both: a rate is only about the minutes a man was there for.
+    expect(of("momo")).toBe(0);
+    // Never came on. The panel prints no rate at all for him — a division over no minutes.
+    expect(of("ali")).toBe(0);
+  });
+
+  it("feeds the one sentence the panel prints, and the owner's wording for a clean one", () => {
+    // The formatter is `/stats`'s, so a player reads the same sentence about himself on both screens
+    // (decision 189). Pinned here because the panel is a Server Component and Vitest collects
+    // nothing under `app/`.
+    const hugo = players.find((player) => player.memberId === "hugo");
+    const momo = players.find((player) => player.memberId === "momo");
+
+    expect(concededRateLineFr(hugo?.concededWhileOn ?? 0, hugo?.minutes ?? 0)).toBe(
+      "1 but toutes les 30′ sur 60′",
+    );
+    // « Aucun but encaissé en 5′ » once the panel capitalises it: the owner's choice, never ∞ and
+    // never a division.
+    expect(concededRateLineFr(momo?.concededWhileOn ?? 0, momo?.minutes ?? 0)).toBe(
+      "aucun but encaissé en 5′",
+    );
   });
 
   it("names an unknown member rather than showing a raw id", () => {

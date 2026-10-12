@@ -59,6 +59,31 @@ export function meansAreVisible(publishedAtMs: number | null): boolean {
 }
 
 /**
+ * May **this reader** be shown the figures at all? The coach, always; everybody else once the means
+ * are out.
+ *
+ * Decision 190, and it is the owner's sentence: « at any moment, the coach sees the ratings of every
+ * one — basically, as if the ratings were released. » Publication stays exactly what it was for the
+ * **team** (`meansAreVisible` above, untouched, and `matches.ratings_published_at` is still the one
+ * column the coach writes); what changes is that his own screen no longer waits for his own switch.
+ *
+ * Two things this deliberately is **not**:
+ *
+ * - **not a second permission.** `isCoach` is `can(actor, "rating:readNotes", …)` passed in by the
+ *   caller — the permission that already means « the individual notes and the counts are his »
+ *   (decision 137). A reader entitled to every note and refused the mean of those same notes was the
+ *   state this entry ends; keying the new rule on a *new* action would have let the two drift;
+ * - **not a loosening of the three-note floor.** `MIN_NOTES_FOR_MEAN` still applies to him, and
+ *   decision 137's reason survives this change intact: the floor is about the **figure**, not about
+ *   the reader, and the coach is not deprived because he has the notes themselves. A mean of two
+ *   notes is not a verdict for anybody, and a coach shown one the team will never be shown would be
+ *   reading a number that does not exist.
+ */
+export function meansAreReadable(publishedAtMs: number | null, isCoach: boolean): boolean {
+  return isCoach || meansAreVisible(publishedAtMs);
+}
+
+/**
  * The mean of the notes a player was given, or null when there are none.
  *
  * Rounded to one decimal, because `score` is `numeric(3,1)` and a mean of halves can need more: four

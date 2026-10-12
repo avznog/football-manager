@@ -115,8 +115,29 @@ export type RecapPlayerLine = {
   startedMatch: boolean;
   playedMatch: boolean;
   wasGoalkeeper: boolean;
-  /** Minutes spent in goal without conceding — the clean-sheet figure of a 7-a-side keeper. */
+  /**
+   * Minutes spent in goal. In a 7-a-side team where the gloves go round — four keepers in one of the
+   * season's first three matches (decision 179) — « il a joué 60′ » and « il en a passé 20 au but »
+   * are two different facts about the same afternoon, and until decision 189 the panel stated only
+   * the first.
+   */
+  gkMinutes: number;
+  /**
+   * Minutes spent in goal without conceding.
+   *
+   * **No screen prints this any more.** The « Temps de jeu » panel did — « 24′ sans encaisser » — and
+   * the owner has had « minutes d'invincibilité » removed from the statistics as meaningless; a
+   * stretch of minutes with nothing conceded in it is that same quantity under another name, so the
+   * line went with it (decision 189). The field stays because it is the reducer's own figure, frozen
+   * in `match_player_stats` and asserted there; what changed is what a reader is shown.
+   */
   gkCleanMinutes: number;
+  /**
+   * Goals the team took while he was on the pitch, **in goal or outfield**. The numerator of the
+   * conceded rate the panel prints (decision 189): the owner asked for « goal taken included », so
+   * this is the whole of his time on the turf and not the keeper half of it.
+   */
+  concededWhileOn: number;
   /** « 60’ », or « 0’ » for an unused substitute. */
   minutesLabel: string;
 };
@@ -537,7 +558,9 @@ export function buildPlayerLines(
         startedMatch: player.startedMatch,
         playedMatch: player.playedMatch,
         wasGoalkeeper: player.wasGoalkeeper,
+        gkMinutes: player.gkMinutes,
         gkCleanMinutes: player.gkCleanMinutes,
+        concededWhileOn: player.concededWhileOn,
         minutesLabel: `${player.minutes}’`,
       };
     })

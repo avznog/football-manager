@@ -75,7 +75,7 @@ import {
   type RaterTally,
   type RatingProgress,
 } from "./progress";
-import { meansAreVisible } from "./published";
+import { meansAreReadable, meansAreVisible } from "./published";
 import { buildRecap, type MatchRecap, type RecapMember, type RecapSlot } from "./recap";
 
 export type { RaterTally, SilentMember } from "./progress";
@@ -150,9 +150,12 @@ export async function getTeamDirectory(teamId: string): Promise<DirectoryMember[
  * module behind it: nothing closes the notation any more, so a « window » had one state.
  */
 function meansOut(match: { ratingsPublishedAt: string | null }): boolean {
-  return meansAreVisible(
-    match.ratingsPublishedAt === null ? null : Date.parse(match.ratingsPublishedAt),
-  );
+  return meansAreVisible(publishedAtMsOf(match));
+}
+
+/** `matches.ratings_published_at` in epoch ms, or null — the one input of both predicates. */
+function publishedAtMsOf(match: { ratingsPublishedAt: string | null }): number | null {
+  return match.ratingsPublishedAt === null ? null : Date.parse(match.ratingsPublishedAt);
 }
 
 /** The rows one rater has already written for one match. Nobody else's scores are selected. */
@@ -419,15 +422,26 @@ type RatingResultsCommon = {
   canHide: boolean;
 };
 
+/**
+ * `readable` is the discriminant and `published` is a fact, and since decision 190 they are two
+ * different questions: the coach reads the figures of a match the team is still waiting for.
+ *
+ * So `readable: true, published: false` is the coach's own state, and it is the one the screens have
+ * to word carefully — what he is reading is not what the squad can read. `published: true` with
+ * `readable: false` cannot happen and is not expressible.
+ */
 export type RatingResultsView =
   | (RatingResultsCommon & {
-      published: true;
+      readable: true;
+      /** Whether the **team** can read these same figures. False while only the coach can. */
+      published: boolean;
       players: RatedPlayer[];
       manOfTheMatch: ManOfTheMatchView | null;
       /** Notes written for this match — **coach only**, else 0. */
       ratingCount: number;
     })
   | (RatingResultsCommon & {
+      readable: false;
       published: false;
     });
 
@@ -436,11 +450,13 @@ export type RatingResultsView =
  *
  * Two boundaries, both enforced by what is *selected*:
  *
- * - **hidden means nothing is read.** The `select` that would fetch the scores is below the early
- *   return, so a hidden match's figures never leave Postgres — for anybody, the coach included. He has
- *   a button to show them, which is a different thing from reading them early. Under decision 139 that
- *   button is the *only* thing that opens this, and it goes both ways: hiding a match again puts every
- *   figure back behind this same early return;
+ * - **hidden means nothing is read — unless the reader is the coach** (decision 190). The `select`
+ *   that would fetch the scores is below the early return, so an unpublished match's figures never
+ *   leave Postgres for the team. They do leave it for the coach, and that is the change: he was being
+ *   refused the mean of notes he is entitled to read one by one, which made his own switch something
+ *   he had to flip to see what he was deciding about. `meansAreReadable` is the predicate, and
+ *   `published` stays on the payload as a separate fact so the screen can say « pas encore sorties »
+ *   while showing them to him. Publication is untouched for everybody else and still goes both ways;
  * - **not the coach means no note and no count.** The scores are fetched (they are needed for the
  *   means) but `received` stays empty and `count` stays null for every other reader, so there is no
  *   RSC payload to inspect and no field to un-hide in DevTools.
@@ -502,9 +518,15 @@ export async function getRatingResults(input: {
     canHide: input.canPublish && published,
   };
 
-  if (!published) {
-    // Hard stop. Nothing below this line runs, so nothing below this line can leak.
-    return { ...common, published: false };
+  /*
+   * Hard stop, and it is now about one reader rather than about the match: the coach reads his own
+   * match's figures before the team does (decision 190), everybody else waits for the column. Keyed
+   * on `canSeeNotes` — `rating:readNotes`, which is already « the notes are his » — rather than on a
+   * new permission, so the two cannot drift apart.
+   */
+  if (!meansAreReadable(publishedAtMsOf(match), input.canSeeNotes)) {
+    // Nothing below this line runs, so nothing below this line can leak.
+    return { ...common, readable: false, published: false };
   }
 
   const rows = await db
@@ -551,7 +573,8 @@ export async function getRatingResults(input: {
 
   return {
     ...common,
-    published: true,
+    readable: true,
+    published,
     players,
     manOfTheMatch: toManOfTheMatchView(manOfTheMatch(aggregate), nameOf, byMembership),
     ratingCount: input.canSeeNotes ? aggregate.ratingCount : 0,

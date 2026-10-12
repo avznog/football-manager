@@ -4,13 +4,28 @@
  * A real `<table>`, because that is what this is, with four narrow numeric columns that still fit a
  * 360 px screen. The players who came on are listed first; an unused substitute shows 0’ rather than
  * disappearing, which is the honest record of a Sunday.
+ *
+ * ## The two figures decision 189 added, and why they are lines rather than columns
+ *
+ * The owner asked for « the minutes played as a goal, and the minutes of invincibility (X goal taken
+ * every X minutes, goal included) ». Both are per-player facts, and both are **sentences**: a fifth
+ * and sixth right-aligned numeric column would not fit 390 px, and « 30 » under a header reading
+ * « But » would be read as goals scored by anybody glancing. So they go under the name, where
+ * « 43’ sans encaisser » and « 1 csc » already live, and they say what they are.
+ *
+ * The rate is `concededWhileOn` over `minutes` — his whole time on the turf, goals taken while he
+ * wore the gloves included, which is the owner's « goal included » — and it is printed by
+ * `concededRateLineFr`, the same formatter `/stats` prints its « Buts encaissés » cards with. One
+ * formatter, two screens: a player must read the same sentence about himself on both.
  */
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { RETRO_MINUTES_NOTE } from "@/lib/calendar/labels";
+import { capitalizeFirst } from "@/lib/calendar/time";
 import type { EntryMode } from "@/db/schema";
 import type { RecapPlayerLine } from "@/lib/rating/recap";
+import { concededRateLineFr, formatMinutes } from "@/lib/stats/format";
 
 export function MinutesTable({
   players,
@@ -26,7 +41,9 @@ export function MinutesTable({
     <Card title="Temps de jeu" as="h2" flush>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <caption className="sr-only">Minutes jouées, buts et passes décisives par joueur</caption>
+          <caption className="sr-only">
+            Minutes jouées, temps au but, buts encaissés, buts et passes décisives par joueur
+          </caption>
           <thead>
             <tr className="border-y border-border/60 text-left text-xs text-ink-subtle">
               <th scope="col" className="py-2 pl-4 font-medium">
@@ -67,9 +84,25 @@ export function MinutesTable({
                       </Badge>
                     ) : null}
                   </span>
-                  {player.wasGoalkeeper && player.gkCleanMinutes > 0 ? (
+                  {/* « 20′ au but ». This line used to read « 13′ sans encaisser » instead, and that
+                      figure is **gone from every screen in the app** by the owner's decision: he had
+                      « minutes d'invincibilité » removed as meaningless, and a stretch of minutes
+                      with nothing conceded in it is the same quantity under another name. What
+                      replaces it on this row is the rate below — how often, not how long. */}
+                  {player.gkMinutes > 0 ? (
                     <span className="mt-0.5 block text-xs text-ink-subtle">
-                      {player.gkCleanMinutes}’ sans encaisser
+                      {formatMinutes(player.gkMinutes)} au but
+                    </span>
+                  ) : null}
+                  {/* « Aucun but encaissé en 87′ », or « 1 but toutes les 30′ sur 60′ » — the owner's
+                      « minutes of invincibility », which he defines as the rate. Only for a man who
+                      was on the pitch: a rate over no minutes is a division about nothing, and an
+                      unused substitute conceded nothing in a way that says nothing about him. */}
+                  {player.minutes > 0 ? (
+                    <span className="mt-0.5 block text-xs text-ink-subtle">
+                      {capitalizeFirst(
+                        concededRateLineFr(player.concededWhileOn, player.minutes),
+                      )}
                     </span>
                   ) : null}
                   {player.ownGoals > 0 ? (

@@ -5924,3 +5924,75 @@ Files: `app/(jeu)/match/[id]/jeu/_components/lineup-browser.tsx` (new),
 `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `lib/match/presenter.ts`,
 `lib/match/presenter.test.ts`, `lib/match/reducer.test.ts`, `e2e/happy-path.spec.ts`,
 `docs/DECISIONS.md` (192, 193), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-10-12 — the fourth backlog, track A: the match page and the recap become one
+
+Four issues that all land on one screen, done in the order the merge required: **#215** (B4.2, one
+page), **#216** (B4.3, the two figures in « Temps de jeu »), **#225** (B4.12, the coach reads every
+note), **#214** (B4.1, deleting a match). Decisions **189**, **190** and **191**. No migration. Run in
+a worktree against `football_wa`, a clone of preview — three matches rebuilt from the paper sheets,
+342 real notes, one match published and two hidden, plus a fourth played through as a test.
+
+**The merge (189).** `/match/[id]` now carries both halves and `/match/[id]/recap` is a
+`permanentRedirect`. Grepping `/recap` first was the right order: it is in the calendar's past rows,
+in four buttons on the notation screen, in two Server Action `redirect`s (`submitRetroMatch`'s carries
+`?saisie=1`, which no screen has ever read), in three `revalidatePath`s, and in `scripts/audit-screens.ts`.
+Three cards were *deleted* rather than moved, and the reason is the same each time: they existed
+because there were two pages. The order after the final whistle is the owner's list, and the e2e pins
+it as an `h2` sequence for coach and player — worth the five lines, because nothing else in the suite
+notices a reordering. The page is **fifteen screens of scroll** on Galacticos for the coach, eleven of
+which are his notes panel; that is the consequence of his « notes before temps de jeu », and it is his
+call to revisit.
+
+**The two figures (189, #216).** Sentences under the name, not columns — six numeric columns do not
+fit 390 px. The rate is `concededWhileOn / minutes` through `concededRateLineFr`, which is
+`lib/stats/format.ts`'s and was **imported rather than copied**, another track being in that file at
+the same time. It produces the owner's « Aucun but encaissé en 6′ » verbatim for a man who conceded
+nothing, which is why it was the right function to reach for. **« 13′ sans encaisser » was removed**
+from the panel on the orchestrator's word that the owner had « minutes d'invincibilité » taken off
+`/stats` and the player card: the one panel this issue exists to improve would otherwise have been the
+last screen still showing it.
+
+**The coach's notes (190).** One predicate, `meansAreReadable`, keyed on `rating:readNotes` rather
+than on a new `can()` action. The interesting half was the wording: `published` had been doing two
+jobs, « the figures exist for this reader » and « the team can read them », and splitting it into
+`readable` + `published` is what lets his card say « tu es le seul à les voir » instead of silently
+looking like everybody's. `MIN_NOTES_FOR_MEAN` was left applying to him and the justification is in the
+decision — the Atletico match, with one note per player, is the case that shows he loses nothing by it.
+
+**Deleting (191).** The orphan check inside the transaction is the part worth keeping: every child
+table carries `on delete cascade`, so the check can never fire today, and it is there because the one
+thing the owner cannot verify by looking is whether something was left behind. The confirmation is its
+own screen because what it destroys is a déroulé and a dozen people's notes; the card left `/modifier`
+rather than being duplicated. The browser test does the crafted request properly — the `$ACTION_ID_…`
+field is read off the **coach's** rendered form, then posted with the **player's** session, which is
+the only way to make a request Next will actually route to the action — and asserts that the match is
+still there afterwards rather than asserting a status code.
+
+**What was looked at.** `audit/b4a/`, 390 px, `deviceScaleFactor: 2`, both `colorScheme`s, coach
+(`potter`) and player (`raphaël`) in one pass, full-page then sliced to be read: Galacticos
+(published), Bayern (121 notes, hidden), Atletico (0–0, one note each, one keeper who conceded
+nothing), `/supprimer` as both roles, and the calendar. What the pass found and fixed: the « Tes
+notes » card told the coach « les moyennes sortiront quand le coach les sortira », about himself. What
+it confirmed: the player sees no count, no author chip and no publish switch on either match; the
+« Aucun but encaissé en 6′ » line is the owner's sentence on screen; `/supprimer` is a French 404 for
+a player, server-side.
+
+Gates: `npm run typecheck`, `npx eslint app components lib e2e db scripts proxy.ts proxy.test.ts`
+(clean), `npm test` — 70 files, **1485** tests — and `E2E_PORT=3101 npm run test:e2e`, **10 passed in
+2.9 m**, including the new deletion scenario. The dev server's cwd was checked against `/proc/<pid>/cwd`
+before any of it was believed (`COORDINATION.md`).
+
+Files — the page and its components: `app/(app)/match/[id]/page.tsx` (rewritten),
+`app/(app)/match/[id]/recap/page.tsx` (now the redirect), `app/(app)/match/[id]/supprimer/page.tsx`
+(new), seven components moved from `[id]/recap/_components/` to `[id]/_components/` of which
+`minutes-table.tsx`, `ratings-panel.tsx` and `man-of-the-match.tsx` changed,
+`app/(app)/match/[id]/modifier/page.tsx` (the delete card removed),
+`app/(app)/match/[id]/notation/page.tsx`, `app/(app)/calendrier/_components/event-row.tsx`,
+`app/(app)/joueur/[id]/page.tsx` (one comment that had gone untrue). Libraries:
+`lib/rating/published.ts`, `lib/rating/queries.ts`, `lib/rating/recap.ts`, `lib/rating/actions.ts`,
+`lib/calendar/deletion.ts`, `lib/match/actions.ts`, `lib/match/queries.ts`, `lib/match/append.ts`,
+`lib/retro/actions.ts`. Tests: `lib/calendar/deletion.test.ts`, `lib/rating/published.test.ts`,
+`lib/rating/recap.test.ts`, `lib/auth/can.test.ts`, `e2e/happy-path.spec.ts`. Docs: `CLAUDE.md`
+(invariant 1 gains a sentence), `docs/DECISIONS.md` (189–191), `docs/ROADMAP.md`, `docs/SESSIONS.md`,
+`scripts/audit-screens.ts`.

@@ -659,14 +659,21 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(page.getByText("Actions refusées")).toHaveCount(0);
 
     await page.getByRole("link", { name: "Revenir au match" }).click();
-    // Wait for the navigation before asking for the score: game mode's own scoreboard and its
-    // timeline both read « 1 – 1 » now that the two agree on the character (decision 061), so an
-    // unscoped `getByText` matches two elements on the page we are leaving. The match page states
-    // the score and the result on one line in its header — that line is the assertion.
+    /*
+     * Wait for the navigation before asking for the score: game mode's own scoreboard and its
+     * timeline both read « 1 – 1 » now that the two agree on the character (decision 061), so an
+     * unscoped `getByText` matches two elements on the page we are leaving.
+     *
+     * The scoreboard region, not the header: the match page carried its own one-line score and
+     * result until decision 189 merged the recap into it, and printing both would have been the
+     * same figure twice, 200 px apart. So the header states a score only while a match is `live`,
+     * and a finished one is described by the card the recap brought with it.
+     */
     await expect(page).toHaveURL(new RegExp(`${matchUrl}$`));
-    const headline = page.locator("header p").filter({ hasText: /^\d+ – \d+/ });
+    const headline = page.getByRole("region", { name: "Score du match" });
     await expect(headline).toContainText("1 – 1");
     await expect(headline).toContainText("Match nul");
+    await expect(page.locator("header p").filter({ hasText: /^\d+ – \d+/ })).toHaveCount(0);
   });
 
   /* ---------------------------------------------------------------------- */
@@ -713,7 +720,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
      * 139 nothing does but the coach. It is simply where a man with nothing left to send belongs, and
      * where he finds out whether the means are out (`actions.ts`).
      */
-    await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap$`));
+    await expect(page).toHaveURL(new RegExp(`${matchUrl}$`));
 
     // Scoped to the scoreboard, because the equaliser's « 1 – 1 » is *also* on the timeline three
     // cards below — since the two agree on the character, which is decision 061's point, an
@@ -748,7 +755,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
 
       await rateEveryone(page, fixture, rater, striker);
       await page.getByRole("button", { name: "Envoyer mes notes" }).click();
-      await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap$`));
+      await expect(page).toHaveURL(new RegExp(`${matchUrl}$`));
     }
 
     /*
@@ -779,7 +786,10 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await logout(page);
     await login(page, coach.username, fixture.password);
     await page.goto(matchUrl);
-    await expect(page.getByRole("link", { name: "Voir le résumé" })).toBeVisible();
+    // « Voir le résumé » is gone with the second page it led to (decision 189): the résumé is this
+    // page. What proves he is not asked to rate is the absence of the duty card's own button.
+    await expect(page.getByRole("link", { name: "Voir le résumé" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Déroulé du match" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Noter les joueurs" })).toHaveCount(0);
 
     await page.goto(`${matchUrl}/notation`);
@@ -787,27 +797,54 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(page.locator("input[type=range]")).toHaveCount(0);
   });
 
+  await test.step("the coach reads every note before he has shown anything (decision 190)", async () => {
+    /*
+     * The owner's sentence: « at any moment, the coach sees the ratings of every one — basically, as
+     * if the ratings were released. » So the state a player sees here — « les moyennes ne sont pas
+     * encore sorties », and nothing else — is not the state the coach sees. He reads the figures, the
+     * counts and the individual notes of a match he has not published, and the card says in two ways
+     * that nobody else can: a « pas encore sorties » badge, and a sentence.
+     *
+     * The three-note floor still applies to him, deliberately (decision 137's own reason survives:
+     * the floor is about the figure, not the reader, and he has the notes themselves). Four raters is
+     * exactly the floor, so every figure is there.
+     */
+    await logout(page);
+    await login(page, coach.username, fixture.password);
+    await page.goto(matchUrl);
+
+    const hidden = ratingsCard(page);
+    await expect(hidden).toContainText("pas encore sorties");
+    await expect(hidden).toContainText("Les moyennes ne sont pas encore sorties : tu es le seul à les voir.");
+    // The state of the collection, which is a sentence only he gets: 4 raters × 7 teammates, out of
+    // the eight on the sheet who could have sent a set. **Eight, not nine**, and that is decision
+    // 159's denominator: the coach never plays, is on no sheet, and so is in neither.
+    await expect(hidden).toContainText("28 notes, 4 sur 8 de la feuille de match.");
+    // The figures and the notes themselves, before publication. This is the whole of 190.
+    await expect(ratingRow(page, striker)).toContainText("9,0");
+    await expect(ratingRow(page, striker)).toContainText("3 notes");
+    for (const author of [gk, cm1, cm2]) {
+      await expect(ratingRow(page, striker)).toContainText(author.displayName);
+    }
+    // And the man of the match, with the warning that the celebration has not happened yet.
+    await expect(page.getByRole("heading", { name: "Homme du match" })).toBeVisible();
+    await expect(
+      page.getByText("Les moyennes ne sont pas encore sorties : personne d’autre ne lit ça."),
+    ).toBeVisible();
+  });
+
   await test.step("the coach shows the means without the four who never rated, and the striker is crowned", async () => {
-    await page.goto(`${matchUrl}/recap`);
+    await page.goto(matchUrl);
 
     const pending = ratingsCard(page);
-    /*
-     * The coach, and only the coach, gets the figures and the names: he is the one who can go and ask,
-     * and the alternative is a button that gives up on five people without saying who they are.
-     *
-     * **Eight, not nine**, and that is decision 159's denominator: the match sheet rates — seven
-     * starters and one substitute — and the coach, who never plays and so is on no sheet, is not in
-     * the fraction and not among the names. Under 139 it was nine, every member; under 137 « the
-     * players with minutes ».
-     */
-    await expect(pending).toContainText("4 sur 8 de la feuille de match ont noté.");
-    await expect(pending).toContainText(sub.displayName);
-    await expect(pending).not.toContainText(coach.displayName);
-    await expect(pending).toContainText("C’est toi qui décides quand les moyennes sortent.");
     /*
      * What the tap costs, before the tap — and the two things it no longer costs. It does **not** freeze
      * the figures and it does **not** close the notation: both were true under 138 and both are now
      * false, so the card promising either would be the screen out-stating the server.
+     *
+     * The four names used to be here too, in the « pas encore sorties » empty state the coach no
+     * longer lands on (decision 190). They are on his own `/notation` tally instead; what this card
+     * owes him is the count the button acts on, which the sentence below carries.
      */
     await expect(pending).toContainText(
       "Les moyennes seront calculées sans les 4 séries qui manquent, et elles bougeront encore si " +
@@ -847,7 +884,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   await test.step("a player reads the means, and never a note nor a count", async () => {
     await logout(page);
     await login(page, gk.username, fixture.password);
-    await page.goto(`${matchUrl}/recap`);
+    await page.goto(matchUrl);
 
     const ratings = ratingsCard(page);
     await expect(ratings).toContainText("La moyenne des notes des coéquipiers");
@@ -956,7 +993,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
    * below is written for the correct behaviour and left to fail until `detail` reads the note.
    */
   await test.step("a comment is still readable on the recap, three weeks later", async () => {
-    await page.goto(`${matchUrl}/recap`);
+    await page.goto(matchUrl);
     await expect(page.getByRole("heading", { name: "Déroulé du match" })).toBeVisible();
 
     await expect(timelineLine(page, NOTE_ALONE)).toContainText("28’");
@@ -974,7 +1011,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
    * anywhere in it renders as a card that is simply not there, which no unit test would notice.
    */
   await test.step("the recap shows one block per composition the match went through", async () => {
-    await page.goto(`${matchUrl}/recap`);
+    await page.goto(matchUrl);
     const strip = page.getByRole("list", {
       name: "Les compositions du match, de la première à la dernière",
     });
@@ -987,6 +1024,54 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(strip.getByText("Changement").first()).toBeVisible();
     // The trailing spacer is `aria-hidden`, so this counts blocks and nothing else.
     expect(await strip.getByRole("listitem").count()).toBeGreaterThanOrEqual(2);
+  });
+
+  /**
+   * **One page after the match, in a deliberate order** (decision 189).
+   *
+   * The merge is a reordering as much as a deletion, and the order is the part a refactor can undo
+   * without failing anything else: every assertion in this spec passes with the cards shuffled. So it
+   * is pinned as a list, for both readers, in one pass — which is also the cheapest statement of what
+   * each role gets. The player's list is the coach's minus the three cards that are the coach's job
+   * (`Composition`, `Corriger le match`, `Supprimer le match`), and in the same order.
+   *
+   * And the old URL redirects rather than 404s: it is in a WhatsApp message from last Sunday.
+   */
+  await test.step("the merged page reads in one order, and /recap redirects to it", async () => {
+    /** The result is a `region` rather than a heading, so the list starts at the notes. */
+    const AFTER_THE_MATCH = [
+      "Homme du match",
+      "Les notes",
+      "Temps de jeu",
+      "Déroulé du match",
+      "Les compositions",
+    ];
+
+    await logout(page);
+    await login(page, coach.username, fixture.password);
+    await page.goto(matchUrl);
+    await expect(page.locator("main").getByRole("heading", { level: 2 })).toHaveText([
+      // He is on no sheet, so he owes nothing and gets no card about his own notes (decision 159).
+      ...AFTER_THE_MATCH,
+      "Composition",
+      "Corriger le match",
+      "Mode match",
+      "Supprimer le match",
+    ]);
+
+    // `permanentRedirect`, so the URL the coach sent after the match still lands on the figures.
+    await page.goto(`${matchUrl}/recap`);
+    await expect(page).toHaveURL(new RegExp(`${matchUrl}$`));
+
+    await logout(page);
+    await login(page, gk.username, fixture.password);
+    await page.goto(matchUrl);
+    await expect(page.locator("main").getByRole("heading", { level: 2 })).toHaveText([
+      // He rated everybody, so he is told so — above the figures his notes are in.
+      "Tes notes",
+      ...AFTER_THE_MATCH,
+      "Mode match",
+    ]);
   });
 });
 
@@ -1100,6 +1185,10 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
     "Mode match",
     "Composition",
     "Terminer le match",
+    // Decision 191 put the deletion on the match page, for every status, and last: under everything
+    // it would destroy. On a match nobody has played it destroys nothing, and the confirmation it
+    // opens says so rather than offering the same red button on an empty match and a season.
+    "Supprimer le match",
   ]);
   await page.getByRole("link", { name: "Ouvrir le mode match" }).click();
   // The starting seven are applied by opening game mode (decision 153).
@@ -1298,6 +1387,10 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
     "Mode match",
     "Composition",
     "Terminer le match",
+    // Decision 191 put the deletion on the match page, for every status, and last: under everything
+    // it would destroy. On a match nobody has played it destroys nothing, and the confirmation it
+    // opens says so rather than offering the same red button on an empty match and a season.
+    "Supprimer le match",
   ]);
   await page.getByRole("button", { name: "Marquer comme terminé" }).click();
 
@@ -1368,7 +1461,7 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   // The action redirects here itself, so wait for *its* navigation rather than starting one: a
   // `goto` fired in the same tick cancels the POST still in flight, and the recap then truthfully
   // reports a submission that never landed.
-  await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap\\?saisie=1$`));
+  await expect(page).toHaveURL(new RegExp(`${matchUrl}\\?saisie=1$`));
   await expect(page.getByText("rien saisi")).toHaveCount(0);
   await expect(page.getByText("1 – 0").first()).toBeVisible();
   // The substitution typed in the merged list reached the log: without this, a row the new type
@@ -1425,7 +1518,7 @@ test("un changement ajouté après le match : refusé s’il est impossible, sin
   await page.getByLabel("Joueur entrant").selectOption(sub.membershipId);
   await page.getByLabel("Minute du changement").fill("30");
   await page.getByRole("button", { name: "Enregistrer le match" }).click();
-  await expect(page).toHaveURL(new RegExp(`${matchUrl}/recap\\?saisie=1$`));
+  await expect(page).toHaveURL(new RegExp(`${matchUrl}\\?saisie=1$`));
 
   await page.goto(`${matchUrl}/saisie`);
   await expect(page.getByRole("heading", { level: 1, name: "Corriger le match" })).toBeVisible();
@@ -1472,11 +1565,131 @@ test("un changement ajouté après le match : refusé s’il est impossible, sin
       .click();
     await expect(page.getByText("Correction enregistrée.")).toBeVisible();
 
-    await page.goto(`${matchUrl}/recap`);
+    await page.goto(matchUrl);
     const line = timelineLine(page, `Entre : ${cm2.displayName}`);
     await expect(line).toContainText("Changement");
     await expect(line).toContainText("40’");
     await expect(line).toContainText(`Sort : ${striker.displayName}`);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Deleting a match, and everything attached to it (decision 191)            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * **Create a match, give it a sheet and a déroulé, then delete it.**
+ *
+ * Its own test because it ends with the match gone, which no other scenario can tolerate — and worth
+ * a fixture of its own for the same reason.
+ *
+ * What it is here to catch is not the button. It is the three things that would be *wrong*:
+ *
+ * 1. **the confirmation counts what goes.** The sentence is the only safeguard there is, and under
+ *    decision 191 the two biggest things a match owns — the déroulé and the notes — are reachable for
+ *    the first time, so the number of events has to be in it;
+ * 2. **a player cannot**, by UI or by crafted request. `match:delete` is coach-only, so the page is a
+ *    404 for him and `deleteMatch` throws on `assertCan` before a row is read — the POST below is the
+ *    crafted request, made with his own session and the right ids;
+ * 3. **nothing is left behind.** The match is gone from the calendar, and its own URL is a 404 — which
+ *    is what a cascade that missed a child table could not produce, because the transaction rolls
+ *    itself back when anything still points at the match.
+ */
+test("supprimer un match : la confirmation compte ce qui part, et un joueur ne peut pas", async ({
+  page,
+}) => {
+  const fixture = provisionFixture();
+  const player = playerOf(fixture, "gk");
+  await login(page, fixture.coach.username, fixture.password);
+
+  await page.getByRole("link", { name: "Nouveau match" }).first().click();
+  await page.getByLabel("Adversaire").fill(OPPONENT);
+  await page.getByLabel("Coup d’envoi").fill(`${parisDate(threeWeeksAgo())}T15:00`);
+  await page.getByRole("button", { name: "Créer le match" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
+  const matchUrl = new URL(page.url()).pathname;
+
+  const matchId = matchUrl.split("/").pop() ?? "";
+  /** The id Next gives `deleteMatch`, read off the coach's own form. See the player's step. */
+  let actionId = "";
+
+  await test.step("a fresh match says nothing else is attached to it yet", async () => {
+    await page.getByRole("link", { name: "Supprimer ce match…" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Supprimer le match" })).toBeVisible();
+    await expect(
+      page.getByText("Le match disparaît du calendrier. Rien d’autre n’y est encore rattaché."),
+    ).toBeVisible();
+
+    /*
+     * The `$ACTION_ID_…` hidden field Next renders in the no-JavaScript fallback of a Server Action
+     * form. It is taken from the *coach's* page because it is the one thing a player genuinely cannot
+     * read — his own request for this screen is a 404 — and it is what makes his post below a real
+     * crafted request rather than a POST at a page, which Next would refuse for the wrong reason.
+     */
+    const html = await (await page.request.get(`${matchUrl}/supprimer`)).text();
+    actionId = /name="(\$ACTION_ID_[0-9a-f]+)"/.exec(html)?.[1] ?? "";
+    expect(actionId, "the Server Action form should carry a $ACTION_ID_ field").not.toBe("");
+
+    // The way out is a link, and it goes back to the match rather than to the calendar.
+    await page.getByRole("link", { name: "Annuler" }).click();
+    await expect(page).toHaveURL(new RegExp(`${matchUrl}$`));
+  });
+
+  await test.step("a player is refused the screen and the action", async () => {
+    await logout(page);
+    await login(page, player.username, fixture.password);
+
+    // The UI half: a 404 in French, inside the shell, which does not confirm the match exists.
+    await page.goto(`${matchUrl}/supprimer`);
+    await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
+    await expect(page.getByText("réservée aux coachs")).toBeVisible();
+
+    /*
+     * And the server half, which is the one that matters: his own session, the coach's action id, the
+     * right `teamId` and `matchId`. `assertCan` throws before a row is read, so what is asserted is
+     * the only thing that counts — the match is still there afterwards. The status is deliberately
+     * not asserted: how Next dresses a thrown Server Action is Next's business and has changed
+     * between majors, while « the match survived » is the claim decision 191 makes.
+     */
+    await page.request.post(`${matchUrl}/supprimer`, {
+      form: { [actionId]: "", teamId: fixture.team.id, matchId },
+      failOnStatusCode: false,
+    });
+
+    await logout(page);
+    await login(page, fixture.coach.username, fixture.password);
+    await page.goto(matchUrl);
+    await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
+  });
+
+  await test.step("the coach deletes it, and the déroulé is counted in the warning", async () => {
+    // A déroulé, so the warning has something irreplaceable to name. « Marquer comme terminé » keeps
+    // the log empty, so the events come from the retro form: one goal is enough to make it non-zero.
+    await page.getByRole("button", { name: "Marquer comme terminé" }).click();
+    await page.getByRole("link", { name: "Saisir le match" }).click();
+    const slots = page.locator('select[name^="starter:"]');
+    for (const [index, [key]] of STARTERS.entries()) {
+      await slots.nth(index).selectOption(playerOf(fixture, key).membershipId);
+    }
+    await page.getByRole("button", { name: "+ But pour nous" }).click();
+    await page.getByRole("button", { name: "Enregistrer le match" }).click();
+    await expect(page).toHaveURL(new RegExp(`${matchUrl}\\?saisie=1$`));
+
+    await page.goto(`${matchUrl}/supprimer`);
+    const card = page.getByText(/Le match disparaît du calendrier, et avec lui/);
+    await expect(card).toContainText("du déroulé");
+    await expect(card).toContainText("la feuille de match");
+    await expect(card).toContainText("C’est définitif.");
+
+    await page.getByRole("button", { name: "Supprimer définitivement" }).click();
+
+    // Back on the calendar, and the match is nowhere on it.
+    await expect(page.getByRole("heading", { level: 1, name: "Calendrier" })).toBeVisible();
+    await expect(page.getByText(OPPONENT)).toHaveCount(0);
+
+    // And its own URL is gone, which is what proves the row went rather than merely the row's link.
+    await page.goto(matchUrl);
+    await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
   });
 });
 

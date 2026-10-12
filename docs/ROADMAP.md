@@ -2223,3 +2223,52 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       checked), six presenter tests, and an e2e test that applies the 30′ plan at the 12th and asserts
       the 30th minute then proposes nothing. Looked at at 390 px in both themes, coach and player in
       one pass
+
+- [x] **B4.2 · one page after the match, not two** (issue #215, decision **189**). `/match/[id]`
+      carries everything it and `/match/[id]/recap` had, and `/recap` is a `permanentRedirect` rather
+      than a 404 — the old URL is in a WhatsApp message from last Sunday. The order after the final
+      whistle is the owner's own list: the result, the notes (the duty, the man of the match, the
+      panel), le temps de jeu, le Déroulé, les compositions, the coach's planning card, les
+      corrections, game mode as consultation, and the deletion last. Three things went with the
+      merge rather than moving: « Après le match », whose whole content was a « Voir le résumé »
+      button; the recap's two empty states, which existed because a reader could reach the reading
+      page of a match with nothing to read; and the match page's own score line, which the
+      `Scoreboard` says better 200 px lower. Every `/recap` href in `app/`, `lib/` and `e2e/`
+      rewritten, components moved to `[id]/_components/`. The browser suite pins the `h2` order for
+      both readers, because every other assertion in it passes with the cards shuffled. Looked at at
+      390 px in both themes, coach and player in one pass, on a published match, an unpublished one
+      and a 0–0 (`audit/b4a/`)
+- [x] **B4.3 · « Temps de jeu » shows the minutes in goal and the conceded rate** (issue #216,
+      decision **189**). Two sentences under the player's name rather than two more numeric columns:
+      « 20′ au but », and « 1 but toutes les 6′ sur 50′ » — `concededWhileOn` over `minutes`, goals
+      taken in goal included, which is the owner's « goal included ». A man who conceded nothing
+      reads **« Aucun but encaissé en 6′ »**, his own wording, from `concededRateLineFr` — the
+      formatter `/stats` prints its « Buts encaissés » cards with, imported rather than copied. And
+      « 13′ sans encaisser » is **gone** from the panel, because the owner had « minutes
+      d'invincibilité » removed as meaningless everywhere else; `gkCleanMinutes` is still measured for
+      the équipe type's keeper slot. `gkMinutes` and `concededWhileOn` added to the recap's player
+      line, with unit tests on the arithmetic and on the empty case
+- [x] **B4.12 · the coach reads every note at any moment** (issue #225, decision **190**).
+      `meansAreReadable(publishedAtMs, isCoach)` beside the untouched `meansAreVisible`, keyed on
+      `rating:readNotes` rather than on a new permission. Publication is exactly what it was for the
+      **team**; what changed is that the man deciding whether a match's means may go out is no longer
+      the one man refused a look at them. His screen says so twice — a « pas encore sorties » badge
+      and « tu es le seul à les voir » — and the man-of-the-match card he now reaches early says
+      « personne d'autre ne lit ça ». `MIN_NOTES_FOR_MEAN = 3` **still applies to him**, deliberately:
+      decision 137's reason survives untouched, and the Atletico match is the proof on screen (twelve
+      notes, every mean « — », every note itself under it). Unit tests on the predicate, including
+      that the player's arm of it *is* the old one. **One seam, named in the decision**: `/stats` and
+      the profiles still count published matches only, so he reads a figure on a match page that is in
+      none of his season averages
+- [x] **B4.1 · delete a game, and everything attached to it** (issue #214, decision **191**).
+      `deleteMatch` no longer refuses a match with a log: invariant 1 is about *rewriting* history, and
+      `CLAUDE.md` now says so. One transaction, `can()` as the only guard (`match:delete` is the
+      coach's and the delegated operator's clause does not reach it), and the **orphan check inside
+      the transaction** — all seven child tables counted after the delete, rolled back if anything
+      answers, so a child added later without a cascade fails loudly. A confirmation **screen**,
+      `/match/[id]/supprimer`, reached from the bottom of the match page and naming what goes with
+      quantities: « 28 événements du déroulé, 111 notes, la feuille de match et 1 composition ». The
+      card left `/modifier`: two entry points to one irreversible act is one too many. Unit tests on
+      the holds sentence and on the permission; the browser suite creates a match, gives it a déroulé,
+      deletes it, and asserts that a player is refused both the screen and a crafted post made with
+      his own session and the coach's action id

@@ -28,17 +28,33 @@ function Trophy() {
 export function ManOfTheMatchCard({
   manOfTheMatch,
   minRatings,
+  published,
 }: {
   manOfTheMatch: ManOfTheMatchView | null;
   minRatings: number;
+  /**
+   * Whether the **team** can read this. False only for the coach, who sees the title before he has
+   * shown the means (decision 190) — and is told so, because « homme du match » on a card the squad
+   * cannot see is a celebration that has not happened yet.
+   */
+  published: boolean;
 }) {
+  const hiddenNote = published ? null : (
+    <p className="text-xs text-ink-subtle">
+      Les moyennes ne sont pas encore sorties : personne d’autre ne lit ça.
+    </p>
+  );
+
   if (!manOfTheMatch) {
     return (
       <Card title="Homme du match" as="h2">
-        <p className="text-sm text-ink-muted">
-          Pas encore assez de notes : il en faut au moins {minRatings} sur un même joueur pour
-          désigner un homme du match.
-        </p>
+        <div className="space-y-2">
+          <p className="text-sm text-ink-muted">
+            Pas encore assez de notes : il en faut au moins {minRatings} sur un même joueur pour
+            désigner un homme du match.
+          </p>
+          {hiddenNote}
+        </div>
       </Card>
     );
   }
@@ -72,6 +88,7 @@ export function ManOfTheMatchCard({
             </span>{" "}
             de moyenne{manOfTheMatch.tied ? " — ex æquo" : ""}
           </p>
+          {hiddenNote}
         </div>
       </div>
     </Card>
