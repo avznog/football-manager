@@ -16,7 +16,7 @@ import {
   sortPlayers,
   variance,
 } from "./aggregate";
-import { cleanShareFr, cleanSharePercentFr, concededRateLineFr } from "./format";
+import { concededCountRowFr, concededRateLineFr, eventRateFr, GOAL_WORDS_FR } from "./format";
 
 /* -------------------------------------------------------------------------- */
 /* Fixtures — all hand-written, nothing read from a database                   */
@@ -135,7 +135,8 @@ describe("an empty season", () => {
     expect(stats.team.played).toBe(0);
     expect(stats.topScorers).toEqual([]);
     expect(stats.topRated).toEqual([]);
-    expect(stats.keepers).toEqual([]);
+    expect(stats.topConcededGk).toEqual([]);
+    expect(stats.scoringRate.entries).toEqual([]);
 
     // The active player is still listed — a squad that loses its unselected players reads as a bug —
     // but every derived number is null, not zero.
@@ -257,17 +258,25 @@ describe("goalkeepers", () => {
     expect(playerNamed(stats.players, "momo").gkCleanMinutes).toBe(10);
   });
 
-  it("ranks keepers by clean sheets, then clean minutes", () => {
-    expect(stats.keepers.map((keeper) => keeper.teamMemberId)).toEqual(["hugo", "momo"]);
+  it("ranks the keepers on what they conceded, fewest first (decision 195)", () => {
+    // Hugo conceded nothing in his half hour, so he is first — the old « most conceded » ranking put
+    // Momo there and listed Hugo nowhere at all.
+    expect(stats.topConcededGk.map((entry) => [entry.teamMemberId, entry.value, entry.count])).toEqual([
+      ["hugo", 0, 30],
+      ["momo", 1, 30],
+    ]);
   });
 
-  it("leaves outfield players out of the keepers list", () => {
+  it("leaves outfield players out of the two goalkeeping lists", () => {
     const outfield = season({
       members: [member("julien", "Julien")],
       matches: [match("m1")],
       lines: [line("m1", "julien", { minutes: 60 })],
     });
-    expect(outfield.keepers).toEqual([]);
+    expect(outfield.topConcededGk).toEqual([]);
+    expect(outfield.topGkMinutes).toEqual([]);
+    // And he is in the outfield list instead, with his whole hour (decision 196).
+    expect(outfield.topOutfieldMinutes.map((entry) => entry.value)).toEqual([60]);
   });
 });
 
@@ -544,7 +553,7 @@ describe("a competition filter that excludes somebody's only match", () => {
   it("keeps him out of every leaderboard", () => {
     expect(stats.topScorers.map((entry) => entry.teamMemberId)).toEqual(["julien"]);
     expect(stats.topRated).toEqual([]);
-    expect(stats.keepers).toEqual([]);
+    expect(stats.topConcededGk).toEqual([]);
   });
 
   it("gives him everything back when the filter is lifted", () => {
@@ -563,7 +572,7 @@ describe("a competition filter that excludes somebody's only match", () => {
     expect(yanis.goals).toBe(3);
     expect(yanis.matchesPlayed).toBe(1);
     expect(unfiltered.topScorers.map((entry) => entry.teamMemberId)).toEqual(["yanis", "julien"]);
-    expect(unfiltered.keepers.map((keeper) => keeper.teamMemberId)).toEqual(["yanis"]);
+    expect(unfiltered.topConcededGk.map((entry) => entry.teamMemberId)).toEqual(["yanis"]);
   });
 });
 
@@ -745,12 +754,14 @@ describe("the figures of decision 162", () => {
     expect(karim.positions).toEqual([{ group: "AIL", minutes: 100, goalsFor: 3, goalsAgainst: 3 }]);
   });
 
-  it("ranks who conceded most outfield, and carries the minutes beside it", () => {
+  it("ranks who conceded fewest outfield, and carries the minutes beside it", () => {
+    // Fewest first since decision 195: one goal in thirty minutes leads three in a hundred. That is
+    // the count ranking, and it is not the rate — the rate card below has these two the other way up.
     expect(
       stats.topConcededOutfield.map((entry) => [entry.teamMemberId, entry.value, entry.count]),
     ).toEqual([
-      ["karim", 3, 100],
       ["hugo", 1, 30],
+      ["karim", 3, 100],
     ]);
   });
 
@@ -779,9 +790,16 @@ describe("the figures of decision 162", () => {
     expect(wing.entries.map((entry) => entry.teamMemberId)).toEqual(["karim"]);
   });
 
-  it("ranks minutes, minutes in goal and clean minutes", () => {
+  it("ranks all the minutes, the minutes in goal and the minutes outfield (decision 196)", () => {
     expect(stats.topMinutes[0]).toMatchObject({ teamMemberId: "karim", value: 100 });
-    expect(stats.topGkMinutes.map((entry) => entry.teamMemberId)).toEqual(["hugo"]);
+    expect(stats.topGkMinutes.map((entry) => [entry.teamMemberId, entry.value])).toEqual([
+      ["hugo", 30],
+    ]);
+    // Hugo's hour is half in goal, so his outfield figure is the other half and not his total.
+    expect(stats.topOutfieldMinutes.map((entry) => [entry.teamMemberId, entry.value])).toEqual([
+      ["karim", 100],
+      ["hugo", 30],
+    ]);
   });
 });
 
@@ -814,20 +832,14 @@ describe("the denominators the rate cards are built on (decision 184)", () => {
   });
   const leo = playerNamed(stats.players, "leo");
 
-  it("gives the invincibility share the whole pitch time, and the keeper's his goal time", () => {
-    // `/stats` « Minutes d'invincibilité » and the profile card's outfield grid: all-pitch.
-    expect(cleanShareFr(leo.cleanMinutes, leo.minutes)).toBe("33 % de 60′ jouées");
-    // The Gardiens card and the profile card's keeper grid: in goal alone.
-    expect(cleanSharePercentFr(leo.gkCleanMinutes, leo.gkMinutes)).toBe("67 %");
-  });
-
-  it("never subtracts one clean clock from the other", () => {
-    // What the subtraction would claim — 0′ clean outfield — against the 30′ he actually kept clean.
+  it("keeps the two clean clocks apart, and subtracts neither from the other", () => {
+    // No screen divides these any more — decision 196 took « minutes d’invincibilité » and the
+    // Gardiens card away — but the reducer still measures both, and the trap is still here: the
+    // subtraction claims 0′ clean outfield where he actually kept thirty of them clean.
+    expect(leo.cleanMinutes).toBe(20);
+    expect(leo.gkCleanMinutes).toBe(20);
     expect(leo.cleanMinutes - leo.gkCleanMinutes).toBe(0);
-    expect(cleanSharePercentFr(leo.cleanMinutes - leo.gkCleanMinutes, leo.outfieldMinutes)).toBe(
-      "0 %",
-    );
-    // So no screen computes it: the two figures are each divided by their own stretch of minutes.
+    expect(leo.outfieldMinutes).toBe(30);
   });
 
   it("feeds each conceded total the minutes it was conceded in", () => {
@@ -839,5 +851,143 @@ describe("the denominators the rate cards are built on (decision 184)", () => {
     expect(concededRateLineFr(leo.concededOutfield, leo.outfieldMinutes)).toBe(
       "aucun but encaissé en 30′",
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Decisions 195–197: fewest first, three minute lists, personal rates         */
+/* -------------------------------------------------------------------------- */
+
+describe("the reshaped rankings of the owner's fourth backlog", () => {
+  /**
+   * Three players and two matches, built so that every empty case the screen must word is in here:
+   *
+   * - **Nina** plays two whole matches outfield, concedes nothing, scores twice and gives one pass.
+   * - **Momo** keeps goal for one match, concedes two, and never touches the ball at the other end.
+   * - **Rémi** plays twenty minutes outfield, concedes one, and has scored nothing all season.
+   */
+  const stats = season({
+    members: [member("nina", "Nina"), member("momo", "Momo"), member("remi", "Rémi")],
+    matches: [
+      match("m1", { score: { goalsFor: 2, goalsAgainst: 2 } }),
+      match("m2", { score: { goalsFor: 1, goalsAgainst: 1 } }),
+    ],
+    lines: [
+      line("m1", "nina", { minutes: 60, goals: 1, assists: 1 }),
+      line("m2", "nina", { minutes: 60, goals: 1 }),
+      line("m1", "momo", { minutes: 60, gkMinutes: 60, concededWhileOn: 2, concededWhileGk: 2 }),
+      line("m2", "remi", { minutes: 20, concededWhileOn: 1 }),
+    ],
+  });
+
+  it("puts the man who conceded nothing first, and says it as the owner says it", () => {
+    expect(
+      stats.topConcededOutfield.map((entry) => [entry.teamMemberId, entry.value, entry.count]),
+    ).toEqual([
+      ["nina", 0, 120],
+      ["remi", 1, 20],
+    ]);
+
+    // « aucun but » over « encaissé en 120′ »: one sentence read downwards, in a 110 px column.
+    const first = stats.topConcededOutfield[0];
+    expect(concededCountRowFr(first.value, first.count)).toEqual({
+      value: "aucun but",
+      detail: "encaissé en 120′",
+    });
+    // Momo's hour was spent in goal, so he is not in the outfield list at all.
+    expect(stats.topConcededOutfield.map((entry) => entry.teamMemberId)).not.toContain("momo");
+  });
+
+  it("ranks a goalkeeper who never conceded above one who did, over his own minutes", () => {
+    const withTwoKeepers = season({
+      members: [member("momo", "Momo"), member("nina", "Nina")],
+      matches: [match("m1", { score: { goalsFor: 0, goalsAgainst: 2 } })],
+      lines: [
+        line("m1", "momo", { minutes: 30, gkMinutes: 30, concededWhileOn: 2, concededWhileGk: 2 }),
+        line("m1", "nina", { minutes: 30, gkMinutes: 30 }),
+      ],
+    });
+    expect(
+      withTwoKeepers.topConcededGk.map((entry) => [entry.teamMemberId, entry.value, entry.count]),
+    ).toEqual([
+      ["nina", 0, 30],
+      ["momo", 2, 30],
+    ]);
+  });
+
+  it("prefers the longer record among two equal counts", () => {
+    // Nothing conceded in 120′ is a better record than nothing conceded in 20′, so it leads — the
+    // ascending order never lets a cameo head the card on a tie.
+    const cameo = season({
+      members: [member("nina", "Nina"), member("remi", "Rémi")],
+      matches: [match("m1")],
+      lines: [line("m1", "nina", { minutes: 120 }), line("m1", "remi", { minutes: 20 })],
+    });
+    expect(cameo.topConcededOutfield.map((entry) => entry.teamMemberId)).toEqual(["nina", "remi"]);
+  });
+
+  it("splits the minutes into three lists, each over its own population (decision 196)", () => {
+    expect(stats.topMinutes.map((entry) => [entry.teamMemberId, entry.value])).toEqual([
+      ["nina", 120],
+      ["momo", 60],
+      ["remi", 20],
+    ]);
+    // Momo kept goal for his whole hour, so he has no outfield minute and is in neither the outfield
+    // list nor, for Nina and Rémi, the goal one.
+    expect(stats.topOutfieldMinutes.map((entry) => [entry.teamMemberId, entry.value])).toEqual([
+      ["nina", 120],
+      ["remi", 20],
+    ]);
+    expect(stats.topGkMinutes.map((entry) => [entry.teamMemberId, entry.value])).toEqual([
+      ["momo", 60],
+    ]);
+  });
+
+  it("rates a player on his own goals, over his own minutes (decision 197)", () => {
+    expect(
+      stats.scoringRate.entries.map((entry) => [
+        entry.teamMemberId,
+        entry.count,
+        entry.minutes,
+        entry.minutesPerEvent,
+      ]),
+    ).toEqual([
+      // One goal every sixty minutes, then the two men who have never scored — shortest record first,
+      // so the longest goalless run is last rather than lost in the middle.
+      ["nina", 2, 120, 60],
+      ["remi", 0, 20, null],
+      ["momo", 0, 60, null],
+    ]);
+
+    expect(eventRateFr(2, 120, GOAL_WORDS_FR)).toEqual({
+      rate: "1 but toutes les 60′",
+      record: "2 buts en 120′",
+    });
+    expect(eventRateFr(0, 20, GOAL_WORDS_FR)).toEqual({
+      rate: "aucun but marqué",
+      record: "en 20′",
+    });
+  });
+
+  it("counts the passes he gave, not the goals the team scored while he was on", () => {
+    expect(
+      stats.assistRate.entries.map((entry) => [entry.teamMemberId, entry.count, entry.minutes]),
+    ).toEqual([
+      ["nina", 1, 120],
+      ["remi", 0, 20],
+      ["momo", 0, 60],
+    ]);
+    // The team's own figure is a different number and stays where it was.
+    expect(playerNamed(stats.players, "nina").goalsForWhileOn).toBe(0);
+  });
+
+  it("lists nobody without a minute on either rate board", () => {
+    const bench = season({
+      members: [member("nina", "Nina")],
+      matches: [match("m1")],
+      squad: [{ matchId: "m1", teamMemberId: "nina", role: "substitute" }],
+    });
+    expect(bench.scoringRate.entries).toEqual([]);
+    expect(bench.assistRate.entries).toEqual([]);
   });
 });

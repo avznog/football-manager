@@ -914,12 +914,16 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
   });
 
   await test.step("the season: five per list, the rest folded, and a table sorted by its headers", async () => {
-    // Decisions 176 and 178. Eight men played, so « Minutes jouées » shows five and folds three — and
-    // the fold is a native `<details>`, which is why closed rows are not in the accessibility tree.
+    // Decisions 176 and 178. Eight men played, so « Toutes les minutes jouées » shows five and folds
+    // three — and the fold is a native `<details>`, which is why closed rows are not in the
+    // accessibility tree. The card was « Minutes jouées » until decision 196 split the minutes into
+    // three lists, of which this is the one over every minute played.
     await page.goto("/stats");
     const minutes = page
       .locator("section")
-      .filter({ has: page.getByRole("heading", { name: "Minutes jouées", exact: true }) })
+      .filter({
+        has: page.getByRole("heading", { name: "Toutes les minutes jouées", exact: true }),
+      })
       .last();
     await expect(minutes.getByRole("listitem")).toHaveCount(5);
     await minutes.getByText(`Tout afficher (${PLAYED.length})`).click();

@@ -201,15 +201,19 @@ export function pendingRatingsNoteFr(pendingMatches: number, isSelf: boolean): s
 /* -------------------------------------------------------------------------- */
 
 /**
- * « toutes les 24′ », or « jamais » for a man who conceded nothing — never ∞. His **raw** rate, minutes
- * over goals, rounded to the minute and never below one.
+ * « toutes les 24′ », or « jamais » for a man the thing never happened to — never ∞. The **raw** rate,
+ * minutes over events, rounded to the minute and never below one.
  *
- * Shared by the profile card (« Un but pris : toutes les 24′ ») and `/stats`'s « Le moins de buts
- * encaissés » (decision 177), so a player reads the same figure about himself on both screens.
+ * **The one unit every rate on these screens is said in** (decision 195). The owner reads « 1 but
+ * toutes les 24 minutes » and does not read « 0,49/h », so nothing here ever prints an event per hour:
+ * goals conceded, goals scored and assists given all come out of this function, and the four rate
+ * boards of `/stats` plus the profile card therefore say the same kind of sentence.
+ *
+ * It was called `concededEveryFr` until decision 195 made it general; the arithmetic is unchanged.
  */
-export function concededEveryFr(minutes: number, conceded: number): string {
-  if (conceded === 0) return "jamais";
-  return `toutes les ${formatMinutes(Math.max(1, Math.round(minutes / conceded)))}`;
+export function everyFr(minutes: number, count: number): string {
+  if (count === 0) return "jamais";
+  return `toutes les ${formatMinutes(Math.max(1, Math.round(minutes / count)))}`;
 }
 
 /**
@@ -223,7 +227,7 @@ export function concededRateFr(
 ): { rate: string; record: string } {
   if (conceded === 0) return { rate: "aucun but encaissé", record: `en ${formatMinutes(minutes)}` };
   return {
-    rate: `1 but ${concededEveryFr(minutes, conceded)}`,
+    rate: `1 but ${everyFr(minutes, conceded)}`,
     record: concededRecordFr(conceded, minutes),
   };
 }
@@ -249,35 +253,73 @@ export function concededRecordFr(conceded: number, minutes: number): string {
  */
 export function concededRateLineFr(conceded: number, minutes: number): string {
   if (conceded === 0 || minutes <= 0) return concededRecordFr(conceded, minutes);
-  return `1 but ${concededEveryFr(minutes, conceded)} sur ${formatMinutes(minutes)}`;
+  return `1 but ${everyFr(minutes, conceded)} sur ${formatMinutes(minutes)}`;
 }
 
 /**
- * « 71 % », the share of a stretch of minutes that was played with the sheet unbroken.
+ * The two lines of a row on the two **count** boards, « Buts encaissés sur le terrain » and « Buts
+ * encaissés au goal », which rank fewest first since decision 195.
  *
- * Null when the denominator is zero (rule 1 above): nobody's invincibility is `0 %` because he has
- * never played. Only for the places where the denominator is already printed in the same `<dl>` —
- * everywhere else, `cleanShareFr` carries it.
+ * The ranked figure is the count; the line under it is the rate, so the reader can tell this card from
+ * the frequency card beside it without reading the heading twice.
+ *
+ * A man who never conceded is first, and the two lines are one sentence read downwards — « aucun but »
+ * over « encaissé en 87′ » — which is the owner's own wording for that row (2026-10-12) in the only
+ * shape a 110 px column has for it. Never « 0 but »: a count board whose first row reads zero invites
+ * the reader to look for the missing number.
  */
-export function cleanSharePercentFr(cleanMinutes: number, minutes: number): string | null {
-  if (minutes <= 0) return null;
-  return formatPercent(cleanMinutes / minutes);
+export function concededCountRowFr(
+  conceded: number,
+  minutes: number,
+): { value: string; detail: string } {
+  if (conceded === 0) {
+    return { value: "aucun but", detail: `encaissé en ${formatMinutes(minutes)}` };
+  }
+  return { value: plural(conceded, "but"), detail: concededRateLineFr(conceded, minutes) };
 }
 
 /**
- * « 71 % de 120′ jouées » — the invincibility share and the minutes it is a share of (decision 184).
+ * How a countable thing a player *did* is said as a rate: « 1 but toutes les 24′ » over « 3 buts en
+ * 72′ » (decision 197).
  *
- * **The numerator and the denominator must be the same stretch of pitch time.** `cleanMinutes` over
- * `minutes` for a player, `gkCleanMinutes` over `gkMinutes` for a keeper, and never one minus the
- * other: a man who concedes outfield and then takes the gloves restarts his keeper clean clock and
- * not his pitch one (`lib/match/reducer.ts`, and rule 10 of `aggregate.ts`), so a subtraction is not
- * the outfield figure. This function only divides what it is handed; the caller owes it a matching
- * pair.
+ * The same two lines as `concededRateFr`, in the same unit (`everyFr`), because « 1 but marqué toutes
+ * les 24′ » and « 1 but encaissé toutes les 24′ » are the same kind of statement and the screen holds
+ * four such boards. The record is never dropped (decision 184): « 1 but toutes les 7′ » over seven
+ * minutes is not the claim it looks like.
+ *
+ * Two refusals rather than a division: nothing done at all reads `words.none` over the minutes it was
+ * not done in, and a count over **no** whole minute — the cache floors minutes — reads the count alone.
  */
-export function cleanShareFr(cleanMinutes: number, minutes: number): string | null {
-  const share = cleanSharePercentFr(cleanMinutes, minutes);
-  return share === null ? null : `${share} de ${formatMinutes(minutes)} jouées`;
+export function eventRateFr(
+  count: number,
+  minutes: number,
+  words: EventWordsFr,
+): { rate: string; record: string } {
+  if (count === 0) return { rate: words.none, record: `en ${formatMinutes(minutes)}` };
+  const record = `${count} ${count > 1 ? words.many : words.one} en ${formatMinutes(minutes)}`;
+  if (minutes <= 0) return { rate: `${count} ${count > 1 ? words.many : words.one}`, record };
+  return { rate: `1 ${words.one} ${everyFr(minutes, count)}`, record };
 }
+
+/** The three words `eventRateFr` needs about one kind of event. */
+export type EventWordsFr = { one: string; many: string; none: string };
+
+/** « 1 but toutes les 24′ » · « 3 buts en 72′ » · « aucun but marqué ». */
+export const GOAL_WORDS_FR: EventWordsFr = {
+  one: "but",
+  many: "buts",
+  none: "aucun but marqué",
+};
+
+/**
+ * « passe déc. » and not « passe décisive »: the figure sits in a 110 px column at 390 px, and the
+ * profile card already abbreviates it the same way.
+ */
+export const ASSIST_WORDS_FR: EventWordsFr = {
+  one: "passe déc.",
+  many: "passes déc.",
+  none: "aucune passe déc.",
+};
 
 /** `1.24` → `+1,2`, `-0.04` → `0,0`: a goal difference per 60, signed, one decimal. */
 export function formatSignedDecimal(value: number): string {

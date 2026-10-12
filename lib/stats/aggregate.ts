@@ -70,6 +70,7 @@ import {
   type ConcededRateBoard,
   type PositionImpact,
   type PositionSeason,
+  type RankedMember,
 } from "./impact";
 import type { MatchPositionLine, MatchStatLine } from "./match-lines";
 import { positionGroupOf, positionGroupRank } from "./positions";
@@ -257,6 +258,65 @@ export type TeamSeasonStats = {
   unrecordedMatches: number;
 };
 
+/**
+ * One player on a « 1 but toutes les X′ » board: what he did, over the minutes he did it in
+ * (decision 197).
+ *
+ * `minutesPerEvent` is `minutes / count`, unrounded, and **null when he never did it** — « aucun but
+ * marqué », which is a real record and not an infinity to print. Unlike the conceded boards, where
+ * never is the best possible figure, never is the *worst* here: those rows sort last.
+ */
+export type MinutesPerEventEntry = RankedMember & {
+  /** The minutes the rate is over — his whole time on the pitch, goal included. */
+  minutes: number;
+  count: number;
+  minutesPerEvent: number | null;
+};
+
+export type MinutesPerEventBoard = {
+  /** Everybody with minutes, most frequent first. The screen shows five, then folds the rest. */
+  entries: MinutesPerEventEntry[];
+};
+
+/**
+ * Most frequent first, raw — the same rule as `concededRateBoard` read the other way round
+ * (decision 197).
+ *
+ * Nobody without a minute is listed: a rate over no time is not a figure. Among two men who did it at
+ * the same rate the longer record leads, because a goal every twenty minutes over two matches is more
+ * of a claim than one over twenty minutes. The comparison is `minutes × other's count`, integers both,
+ * so two equal rates compare equal without a division rounding them apart.
+ *
+ * The men it never happened to come last, **shortest record first**, so the man with the most minutes
+ * and nothing to show for them is bottom of the list rather than hidden in the middle of it.
+ */
+export function minutesPerEventBoard(
+  rows: readonly (RankedMember & { minutes: number; count: number })[],
+): MinutesPerEventBoard {
+  const entries = rows
+    .filter((row) => row.minutes > 0)
+    .map(
+      (row): MinutesPerEventEntry => ({
+        ...memberOf(row),
+        minutes: row.minutes,
+        count: row.count,
+        minutesPerEvent: row.count > 0 ? row.minutes / row.count : null,
+      }),
+    )
+    .sort((a, b) => {
+      if (a.count === 0 || b.count === 0) {
+        if (a.count !== b.count) return a.count === 0 ? 1 : -1;
+        return a.minutes - b.minutes || a.displayName.localeCompare(b.displayName, "fr");
+      }
+      return (
+        a.minutes * b.count - b.minutes * a.count ||
+        b.minutes - a.minutes ||
+        a.displayName.localeCompare(b.displayName, "fr")
+      );
+    });
+  return { entries };
+}
+
 export type LeaderboardEntry = {
   teamMemberId: string;
   displayName: string;
@@ -275,20 +335,31 @@ export type SeasonStats = {
   topAssists: LeaderboardEntry[];
   /** Best average received, over `MIN_RATED_MATCHES` matches at least. */
   topRated: LeaderboardEntry[];
-  /** Players who spent time in goal, best clean-sheet record first. */
-  keepers: PlayerSeasonStats[];
-  /** Most goals conceded while on the pitch outside the goal — « qui a pris combien » (rule 10). */
+  /**
+   * **Fewest** goals conceded outside the goal first, over his outfield minutes (decision 195). Every
+   * player with outfield minutes is in it, including the men who conceded nothing — they lead it, which
+   * is the whole point of the inversion, and a ranking that dropped them would have put the best record
+   * of the season nowhere.
+   */
   topConcededOutfield: LeaderboardEntry[];
-  /** Most goals conceded in goal, with the minutes in goal beside it. */
+  /** The same, in goal: fewest conceded first, over the minutes in goal (decision 195). */
   topConcededGk: LeaderboardEntry[];
   /** « 1 but encaissé toutes les X min », outfield, raw (decision 177). */
   outfieldConcededRate: ConcededRateBoard;
   /** The same for time in goal, over the minutes in goal alone. */
   keeperConcededRate: ConcededRateBoard;
-  /** Minutes on the pitch, in goal, and with the sheet unbroken. */
+  /**
+   * The three minute rankings of decision 196: every minute played, the minutes spent in goal, and the
+   * minutes spent outside it. A man with no minute in the population is not in its ranking — a « minutes
+   * au goal » list eleven rows deep, nine of them empty, says nothing about a goalkeeper.
+   */
   topMinutes: LeaderboardEntry[];
   topGkMinutes: LeaderboardEntry[];
-  topCleanMinutes: LeaderboardEntry[];
+  topOutfieldMinutes: LeaderboardEntry[];
+  /** « 1 but marqué toutes les X′ », his own goals over his own minutes (decision 197). */
+  scoringRate: MinutesPerEventBoard;
+  /** The same for the passes he gave. Never `goalsForWhileOn`, which is the team's. */
+  assistRate: MinutesPerEventBoard;
   /** The best at each position by smoothed goal difference per 60 (decision 162, Q7). */
   impact: PositionImpact[];
   /** True when not one match or rating survives the filter. */
@@ -637,26 +708,28 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     include: (player) => player.rating.count >= MIN_RATED_MATCHES,
   });
 
-  const keepers = players
-    .filter((player) => player.gkMinutes > 0)
-    .sort(
-      (a, b) =>
-        b.gkCleanSheets - a.gkCleanSheets ||
-        b.gkCleanMinutes - a.gkCleanMinutes ||
-        b.gkMinutes - a.gkMinutes ||
-        a.displayName.localeCompare(b.displayName, "fr"),
-    );
-
+  /*
+   * Fewest conceded first (decision 195), and everybody with minutes in the population is in it: a
+   * man who conceded nothing heads the list, where the old « who took the most » would not have listed
+   * him at all. The eligibility is therefore the minutes, not the count — `include` rather than the
+   * default « value > 0 », which would now keep exactly the wrong half of the squad.
+   *
+   * More minutes for the same total is the better record, so the minutes are the tie-break, highest
+   * first: nothing conceded in a whole match leads nothing conceded in six minutes.
+   */
   const topConcededOutfield = leaderboard(players, {
     valueOf: (player) => player.concededOutfield,
-    // More minutes for the same total is the better record, so it is the tie-break the other way.
-    tieBreak: (player) => -player.outfieldMinutes,
+    order: "asc",
+    tieBreak: (player) => player.outfieldMinutes,
     countOf: (player) => player.outfieldMinutes,
+    include: (player) => player.outfieldMinutes > 0,
   });
   const topConcededGk = leaderboard(players, {
     valueOf: (player) => player.concededWhileGk,
-    tieBreak: (player) => -player.gkMinutes,
+    order: "asc",
+    tieBreak: (player) => player.gkMinutes,
     countOf: (player) => player.gkMinutes,
+    include: (player) => player.gkMinutes > 0,
   });
   const outfieldConcededRate = concededRateBoard(
     players.map((player) => ({
@@ -682,11 +755,30 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     tieBreak: (player) => player.appearances.goalkeeper,
     countOf: (player) => player.appearances.goalkeeper,
   });
-  const topCleanMinutes = leaderboard(players, {
-    valueOf: (player) => player.cleanMinutes,
-    tieBreak: (player) => -player.minutes,
-    countOf: (player) => player.minutes,
+  /*
+   * `minutes − gkMinutes` (rule 10), counted in matches *played* rather than in matches with outfield
+   * minutes: a keeper's whole afternoon in goal would otherwise read « 0′ · 1 match » — he is simply
+   * not in this list, because the default eligibility is a non-zero value.
+   */
+  const topOutfieldMinutes = leaderboard(players, {
+    valueOf: (player) => player.outfieldMinutes,
+    tieBreak: (player) => player.matchesPlayed,
+    countOf: (player) => player.matchesPlayed,
   });
+  /*
+   * His own goals and his own passes, over his own minutes (decision 197) — never `goalsForWhileOn`,
+   * which counts what the team did while he was on and is the impact card's business.
+   */
+  const scoringRate = minutesPerEventBoard(
+    players.map((player) => ({ ...memberOf(player), minutes: player.minutes, count: player.goals })),
+  );
+  const assistRate = minutesPerEventBoard(
+    players.map((player) => ({
+      ...memberOf(player),
+      minutes: player.minutes,
+      count: player.assists,
+    })),
+  );
   const impact = impactByPosition(
     players.map((player) => ({ ...memberOf(player), positions: player.positions })),
   );
@@ -699,14 +791,15 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     topScorers,
     topAssists,
     topRated,
-    keepers,
     topConcededOutfield,
     topConcededGk,
     outfieldConcededRate,
     keeperConcededRate,
     topMinutes,
     topGkMinutes,
-    topCleanMinutes,
+    topOutfieldMinutes,
+    scoringRate,
+    assistRate,
     impact,
     isEmpty,
     pendingRatingMatches: input.pendingRatingMatches ?? 0,
@@ -764,7 +857,8 @@ export function sortPlayers(
   return [...players].sort(comparePlayers(key));
 }
 
-function memberOf(player: PlayerSeasonStats) {
+/** Who a ranked row is about, out of anything that carries the four fields. */
+function memberOf(player: RankedMember): RankedMember {
   return {
     teamMemberId: player.teamMemberId,
     displayName: player.displayName,
@@ -775,10 +869,21 @@ function memberOf(player: PlayerSeasonStats) {
 
 type LeaderboardSpec = {
   valueOf: (player: PlayerSeasonStats) => number;
+  /**
+   * `"asc"` for the lists where small is good — the two conceded counts, fewest first (decision 195).
+   * Defaults to `"desc"`, which is what a « meilleur buteur » means.
+   *
+   * The tie-break is **always** highest first, whichever way the value runs: it is the record the value
+   * is measured over, and more of it is more convincing in both directions.
+   */
+  order?: "asc" | "desc";
   tieBreak: (player: PlayerSeasonStats) => number;
   /** The secondary figure shown next to the value. Defaults to the value itself. */
   countOf?: (player: PlayerSeasonStats) => number;
-  /** Who is eligible at all. Defaults to "has a non-zero value". */
+  /**
+   * Who is eligible at all. Defaults to "has a non-zero value" — which an ascending list must always
+   * override, since zero is the top of it.
+   */
   include?: (player: PlayerSeasonStats) => boolean;
 };
 
@@ -789,12 +894,16 @@ function leaderboard(
   const { valueOf, tieBreak } = spec;
   const countOf = spec.countOf ?? valueOf;
   const include = spec.include ?? ((player: PlayerSeasonStats) => valueOf(player) > 0);
+  const byValue =
+    spec.order === "asc"
+      ? (a: PlayerSeasonStats, b: PlayerSeasonStats) => valueOf(a) - valueOf(b)
+      : (a: PlayerSeasonStats, b: PlayerSeasonStats) => valueOf(b) - valueOf(a);
 
   return players
     .filter(include)
     .sort(
       (a, b) =>
-        valueOf(b) - valueOf(a) ||
+        byValue(a, b) ||
         tieBreak(b) - tieBreak(a) ||
         a.displayName.localeCompare(b.displayName, "fr"),
     )

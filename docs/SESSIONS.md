@@ -5692,3 +5692,87 @@ preview database and two scripts that no page imports.
 Files: `scripts/import-ratings.mts` (new), `scripts/radarlocal-names.mts` (new),
 `scripts/import-radarlocal.mts` (the table moved out), `docs/DECISIONS.md` (188), `docs/ROADMAP.md`,
 `docs/SESSIONS.md`.
+
+## 2026-10-12 — Backlog 4, track C: `/stats` reshaped around « toutes les X minutes »
+
+Four issues that are one change of mind about the statistics screen (#219, #220, #221, #222), on the
+`football_wc` clone of preview, port 3103. Decisions **195**, **196**, **197**.
+
+**The unit is minutes, everywhere.** The owner has now said twice that he reads « 1 but toutes les X
+minutes » and does not read « 0,49/h », so `concededEveryFr` is renamed **`everyFr`** and is the one
+function that turns a count and a stretch of minutes into a sentence — for what a player took and for
+what he did. Four rate boards and the profile card go through it, and the only per-hour figure left in
+the repo is `impact.ts`'s smoothed goal difference, which is a different quantity on its own card.
+**`concededEveryFr` is therefore gone from `lib/stats/format.ts`**, and `cleanShareFr` and
+`cleanSharePercentFr` with it; nothing outside this track imported any of the three (checked by grep
+before the rename), and `concededRecordFr`, which `lib/stats/best-seven-copy.ts` *does* import, is
+untouched.
+
+**Fewest first changes who is on a list, not just the order.** Ranked from the most conceded, the
+eligibility that made sense was « conceded at least one »; read the other way that keeps exactly the
+wrong half of the squad, because the man who conceded nothing is the top of the list. So both conceded
+cards are ranked ascending over everybody with minutes in their population, and the first row reads
+« aucun but » over « encaissé en 87′ » — the owner's own wording, split across the two lines of the
+row because the value column is 110 px wide at 390 px. `leaderboard()` took an `order` and keeps its
+tie-break descending in both directions.
+
+**The two cards that both read « best first ».** A count card and a frequency card now sit next to
+each other in each defensive section, which the issue warned about. One rule for the whole page: a
+plain noun heads a count, « Qui … le plus / le moins souvent » heads a rate, and the description's
+first words say which way the list runs. On the owner's own data the two are visibly different lists —
+the count card reads Léo C, Édouard, Benoît, Maxime, Lucas and the rate card Léo C, Maxime, Lucas,
+Édouard — which also disproves decision 184's stated reason for not inverting the count card, so 195
+amends that clause and leaves the rest of 184 standing.
+
+**What disappeared with the Gardiens table, and what did not.** Minutes in goal and conceded in goal
+are both still on the screen (one is now a ranking of its own). **Clean sheets are not: `gkCleanSheets`
+is displayed nowhere any more**, on `/stats` or on a profile, and neither is `gkCleanMinutes` or its
+share. That is the real loss and it is deliberate — it is the quantity the owner has just called
+meaningless, counted per match. All three are still *measured*, because `lib/stats/best-seven.ts`
+builds two of the four sevens out of them; what was deleted is what nothing read afterwards, the
+`keepers` list and the `topCleanMinutes` ranking. `aggregate.test.ts` keeps decision 184's trap as an
+assertion about the numbers rather than about their wording: the hour half spent in goal where
+`cleanMinutes − gkCleanMinutes` claims 0′ clean outfield and the truth is 30′.
+
+**Personal, not the team's.** `scoringRate` and `assistRate` read `match_player_stats.goals` and
+`.assists` over his own minutes — never `goals_for_while_on`, which is what the team did while he was
+on and belongs to the impact card. A man it never happened to is in the list and last, « aucun but
+marqué » over « en 20′ », shortest record first among those rows so the longest barren run is the
+bottom one; nobody without a minute is listed at all, and a goal in a sub-minute cameo prints the count
+rather than « toutes les 1′ ».
+
+**Section order after the change**, 13 cards where there were 12, 8269 px tall at 390 px with every
+« Tout afficher » folded: bilan · l'équipe type · **Attaque** (buteurs · passeurs · qui marque le plus
+souvent · qui fait marquer le plus souvent) · **Défense** (buts encaissés sur le terrain · qui encaisse
+le moins souvent) · **Gardiens** (buts encaissés au goal · qui encaisse le moins souvent au goal) ·
+**Temps de jeu** (toutes les minutes · sur le terrain · au goal) · **Impact par poste** · **Notes** ·
+the squad table. Counts before frequencies inside every section; the « Gardiens » *heading* stays, it
+is the *table* under it that the owner asked to remove.
+
+**What was looked at, and what it caught.** `audit/b4c/`: `/stats` whole, and each of the four sections
+on its own, at 390 px in light and dark, as coach `potter` and as player `raphael` in one pass; plus
+Samuel's profile (109′ in goal, 46′ outfield, two goals, no assist) and Raphaël's (no minutes at all).
+The section images for the two roles are identical but for the avatar in the sticky header, which is
+what the page's own docstring promises. Two defects found by looking and fixed: the heading « Qui
+encaisse le moins souvent sur le terrain » came out **truncated** as « … sur le te… » (a `Card` title
+is one `truncate`d line), so « sur le terrain » moved into the description; and the profile card had
+**two figures labelled « Un but pris »** in two grids over two different denominators, so the keeper's
+is « Un but pris au goal ». Empty cases read true on real data: « jamais · sur 155′ » for Samuel's
+assists, no rate block at all for Raphaël's `0′`, « aucun but encaissé en 10′ » for Thomas in goal.
+
+**One consequential edit outside the track's files**: `e2e/happy-path.spec.ts` selects the minutes card
+by its heading, which is now « Toutes les minutes jouées ».
+
+Gates: `npm run typecheck`, `npx eslint app components lib e2e db scripts proxy.ts proxy.test.ts`,
+`npm test` (70 files, 1479 tests, of which `lib/stats/aggregate.test.ts` 61 and
+`lib/stats/format.test.ts` 31), `E2E_PORT=3103 npm run test:e2e` (9 passed, 3.1 min) — all green.
+
+**Open for the owner**: no card has a minimum of minutes, so a six-minute cameo heads both conceded
+cards (the roadmap has carried that question since decision 177); and `/stats/equipe-type` still ranks
+a « 7 d'invincibilité » on the clean minutes decision 196 retires everywhere else.
+
+Files: `lib/stats/aggregate.ts`, `lib/stats/format.ts`, `app/(app)/stats/page.tsx`,
+`app/(app)/stats/_components/rate-board.tsx`, `app/(app)/stats/_components/keepers.tsx` (deleted),
+`app/(app)/joueur/_components/stats-card.tsx`, `lib/stats/aggregate.test.ts`,
+`lib/stats/format.test.ts`, `e2e/happy-path.spec.ts`, `docs/DECISIONS.md` (195–197),
+`docs/ROADMAP.md`, `docs/SESSIONS.md`.
