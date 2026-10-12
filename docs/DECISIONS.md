@@ -7202,6 +7202,95 @@ names landing on one member all abort before a row is written.
 « Alexis CHARRIER » still maps to nobody, and the script asserts what the old `profiles.json` shows:
 he is in the old database, he is an admin of it, and he gives no note and receives none.
 
+## 192 — Game mode stops listing everybody who is off the pitch
+**2026-10-12** · accepted · the owner's fourth backlog (issue #217) · **supersedes decision 087** on
+the heading of that list, which no longer exists · no migration
+
+The owner: « I do not need, under the field, to have the "En dehors du terrain" section. »
+
+**Decision.** The card under the pitch is gone, for both roles. `enterableCardFr` is deleted from
+`lib/match/presenter.ts` with its four tests, and `availableOptions` — the list itself — is now read
+only by the pickers « Qui sort ? », « Qui entre ? » and TERRAIN's bench, which is where a player is
+actually brought on.
+
+**Why, and what the deletion had to preserve.** Decision 087 made that heading true (« Qui peut
+entrer » for the operator, « En dehors du terrain » for a reader) rather than making the list shorter,
+and the list stayed deliberately wide: every squad member who is not on the pitch, *plus* everybody
+else on the roster, so a coach one man short at 20′ is offered whoever turned up. On this team that is
+**eleven rows** before the kick-off — four substitutes and seven « hors feuille » — and screenshots at
+390 px say what that costs: the Déroulé starts below the fold on a pitch-sized screen, and before the
+kick-off `canAct` is false, so all eleven are *disabled*. A dead list of eleven names between the
+pitch and the log.
+
+The one job it did besides listing was a tap target: a row opened « Changement » with that player
+already ticked as coming in (decisions 147 and 152). **That route survives unchanged** one tap further
+away — ACTION → « Changement » → « Qui sort ? » (« Suivant » with nobody ticked) → « Qui entre ? », the
+same `available` list, same multi-select, same pre-arranged pitch. Nothing else in the repo read
+`enterableCardFr`, and nothing else was the only way to anything: a player's own disc is still the
+one-tap route to taking him off (decision 175), and the empty state « Tous les joueurs sont sur le
+terrain. » said nothing the pitch above it did not already show.
+
+**Consequences.** The screen under the pitch is now one button — the planned compositions (decision
+193) — and then the log. A coach who wants to know who is available reads it where he picks: in the
+question. Game mode no longer states the squad anywhere, which is `/match/[id]`'s job.
+
+---
+
+## 193 — Any planned composition, applied whenever the coach decides, stamped at the tap
+**2026-10-12** · accepted · the owner's fourth backlog (issue #218) · extends decisions **147** and
+**153**; does not touch **150** · no migration
+
+The owner: « I want the possibliity to apply any predefined composition before or later than the
+predefined time. I should get a button where I can preview the next (or previous) compos, and apply
+one at any time. »
+
+Until now a plan was offered on exactly one occasion: the minute it was drawn for, as the prompt
+`pendingLineup` raises (invariant 3) — plus the starting one, applied when game mode opens (decision
+153). A half that goes badly is precisely when the coach wants the 45′ shape at the 23rd, and that was
+reachable only by rebuilding it by hand on TERRAIN.
+
+**Decision.** One row under the pitch, « Compositions prévues (N) », opens a sheet that steps through
+**every** composition planned for the match — next and previous, in minute order — shows each one
+described against the pitch as it stands, and applies the one on screen with « Appliquer maintenant ».
+`LineupBrowser` (`app/(jeu)/match/[id]/jeu/_components/lineup-browser.tsx`) is the sheet;
+`plannedLineupViews` and `plannedLineupStatusFr` in `lib/match/presenter.ts` are what it says.
+
+Four things hold it together, and three of them are other decisions:
+
+- **It is a change at the minute of the tap** (decision 147). One `LINEUP_APPLIED` carrying the plan's
+  `lineupId`, stamped at the « Appliquer maintenant » press — not at the tap that opened the browser,
+  because the coach reads three cards before he chooses, and not at `from_minute`. The 30′ plan applied
+  at the 12th minute is **12’** in the Déroulé, and the e2e test asserts exactly that.
+- **The plan's own `from_minute` is never rewritten.** It stays « Composition prévue à la 30’ » in the
+  browser and on `/composition` afterwards: it is a plan, not a record. The record is the event.
+- **Nothing new on the server.** `appendMatchEvents` already writes `lineups.applied_event_id` for any
+  `LINEUP_APPLIED` whose payload names a plan, with `is null` in the predicate so a re-POST cannot
+  re-point a confirmed one; it has never cared what minute the event carries. Verified on a clone: the
+  25′ plan applied at 0′ has `applied_event_id` pointing at an event whose `minute` is 0 and
+  `from_minute` still 25.
+- **A plan applied out of order is applied, so it is not proposed again.** This is the question the
+  issue left open. `reduceMatch` raises `pendingLineup` only for a plan with no *standing* application
+  in the log (`appliedLineupIds`, derived from the events and not from the column — decision 150), so
+  applying the 30′ plan at the 12th means the 30th minute raises nothing, and the card says
+  « Déjà appliquée : elle ne sera plus proposée. » Annul that application and the plan comes back, at
+  its own minute, exactly as decision 150 already specifies. The alternative — proposing it a second
+  time at `from_minute` — would be a card asking the coach to confirm something he has already done.
+
+**What the sheet may not claim.** `plannedLineupStatusFr` is a pure function with a test, for the
+reason `emptyPitchFr` is: three states that are easy to print over each other. « Déjà appliquée » ·
+« Son heure est venue » · « Prévue à la 45’ », and for somebody who cannot operate the match the same
+facts with no instruction he cannot follow (decision 087's rule). « Appliquer maintenant » is
+**disabled, not hidden**, when the pitch already *is* that composition — the sentence above it says
+why — because applying it would append a change that changed nothing: a « Changement » line with no
+detail under it.
+
+**What does not change.** The prompt at the plan's own minute stays, and is still how the common case
+is answered; the starting composition is still applied by opening game mode (153) and still cannot be
+annulled (150); « Ajuster sur le terrain » is offered from the browser on the same terms as from the
+prompt, and both now go through one `adjustPlan`. The browser is offered to a viewer too — reading the
+plans from the touchline is the same legitimate thing as reading the score — with no button to apply
+them, which is the rule the prompt already followed.
+
 ## 195 — Both conceded lists rank fewest first, and every rate on `/stats` is said in minutes
 
 **2026-10-12** · accepted · the owner's fourth backlog (#219) · `lib/stats/aggregate.ts`,
@@ -7451,3 +7540,5 @@ under every disc of the légende. A unit the reader cannot name makes the whole 
   done asks for.
 - The rules under the title lost « par heure » too: « celui qui attend le moins de minutes entre deux
   buts », « celui qui encaisse le moins souvent ».
+
+---

@@ -1638,6 +1638,68 @@ describe("planned compositions", () => {
     expect(state.onPitch.map((player) => player.memberId)).toContain("leo");
   });
 
+  /*
+   * Decision 193: a plan can be applied at any minute, before or after the one it was drawn for, and
+   * the event is stamped at the tap rather than at `from_minute`. These two say what the reducer then
+   * makes of it — and the answer is the whole of the decision: an applied plan is applied, so it is
+   * never proposed a second time when its own minute comes round.
+   */
+  it("stops proposing a later plan that was applied early, and keeps its planned minute", () => {
+    const early = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN, "l-initial") },
+      // The 30’ plan, applied at 12’: one snapshot, stamped where the coach tapped.
+      {
+        type: "LINEUP_APPLIED",
+        min: 12,
+        period: 1,
+        payload: lineupPayload({ ...STARTING_ELEVEN, [SLOT.mc1]: "yanis" }, "l-second-half"),
+      },
+    ]);
+
+    // Before its minute: already applied, and nothing is proposed.
+    const atTwenty = reduceMatch(early, planned, { ...CONFIG, nowMs: T0 + 20 * MIN });
+    expect(atTwenty.plannedLineups[1]).toMatchObject({ applied: true, due: false, fromMinute: 30 });
+    expect(atTwenty.pendingLineup).toBeNull();
+    expect(atTwenty.appliedLineupIds).toContain("l-second-half");
+
+    // And when the 30th minute does come round, it is still not proposed: it happened.
+    const atThirtyTwo = reduceMatch(early, planned, { ...CONFIG, nowMs: T0 + 32 * MIN });
+    expect(atThirtyTwo.plannedLineups[1]).toMatchObject({ applied: true, due: true, fromMinute: 30 });
+    expect(atThirtyTwo.pendingLineup).toBeNull();
+
+    // The change is at 12’, which is where the man who came on starts accruing minutes.
+    expect(atThirtyTwo.timeline.find((entry) => entry.type === "LINEUP_APPLIED" && entry.minuteLabel === "12’")).toBeDefined();
+    expect(playerState(atThirtyTwo, "yanis")!.minutes).toBe(20);
+    expect(playerState(atThirtyTwo, "leo")!.minutes).toBe(12);
+  });
+
+  it("stamps a plan applied late at the minute of the tap, not at the minute it was drawn for", () => {
+    const late = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN, "l-initial") },
+      { type: "PERIOD_END", min: 30, period: 1 },
+      { type: "KICKOFF", min: 30, period: 2 },
+      // The 30’ plan, confirmed at 44’: nobody tapped « Appliquer » for fourteen minutes.
+      {
+        type: "LINEUP_APPLIED",
+        min: 44,
+        period: 2,
+        payload: lineupPayload({ ...STARTING_ELEVEN, [SLOT.mc1]: "yanis" }, "l-second-half"),
+      },
+    ]);
+
+    const state = reduceMatch(late, planned, { ...CONFIG, nowMs: T0 + 50 * MIN });
+    // The plan is still a plan for the 30th; the record says 44’.
+    expect(state.plannedLineups[1]).toMatchObject({ applied: true, fromMinute: 30 });
+    expect(state.pendingLineup).toBeNull();
+    expect(playerState(state, "yanis")!.minutes).toBe(6);
+    expect(playerState(state, "leo")!.minutes).toBe(44);
+    const applied = state.compositions.at(-1)!;
+    expect(applied.minuteLabel).toBe("44’");
+    expect(applied.startingLineup).toBe(false);
+  });
+
   it("flags a planned player who has been injured in this match", () => {
     const state = reduceMatch(events, planned, CONFIG);
     expect(state.plannedLineups[1].flags).toContainEqual({ memberId: "thomas", reason: "injured" });

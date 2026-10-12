@@ -4,7 +4,6 @@ import { MS_PER_MINUTE } from "./clock";
 import {
   availableOptions,
   clockActionFr,
-  enterableCardFr,
   eventLabel,
   mergeEvents,
   minuteLabelFr,
@@ -16,6 +15,8 @@ import {
   pendingLineupChangesFr,
   pendingLineupView,
   periodsOf,
+  plannedLineupStepFr,
+  plannedLineupViews,
   phaseLabelFr,
   pitchView,
   playerIndex,
@@ -396,55 +397,6 @@ describe("the player pickers", () => {
     expect(options[0].warn).toBe(true);
     // The sheet says nothing about Fabien, but a coach one short at 20′ still needs him.
     expect(options.at(-1)?.subtitle).toBe("hors feuille");
-  });
-
-  it("does not call the list « Remplaçants » when most of it is not", () => {
-    // Before the kick-off nobody is on the pitch, so the list is the whole squad (invariant 3).
-    const before = reduceLive(live(log([])), [], T0);
-    const all = availableOptions(before, PLAYERS);
-    const substitutes = all.filter((option) =>
-      PLAYERS.some(
-        (player) => player.memberId === option.memberId && player.squadRole === "substitute",
-      ),
-    );
-
-    expect(all.length).toBeGreaterThan(substitutes.length);
-    const card = enterableCardFr({ available: all, players: PLAYERS, canAct: true });
-    expect(card.titleFr).not.toBe("Remplaçants");
-    expect(card.titleFr).toBe("Qui peut entrer");
-    expect(card.hintFr).toContain("puis le reste du groupe");
-  });
-
-  it("says nothing about the order when the list really is the substitutes", () => {
-    const state = reduceLive(live(log(KICKED_OFF)), [], T0 + 20 * MIN);
-    const onlySubs = availableOptions(state, PLAYERS).filter((option) =>
-      PLAYERS.some(
-        (player) => player.memberId === option.memberId && player.squadRole === "substitute",
-      ),
-    );
-
-    const card = enterableCardFr({ available: onlySubs, players: PLAYERS, canAct: true });
-
-    expect(card.hintFr).toBe("Touche un joueur pour le faire entrer.");
-  });
-
-  it("tells a spectator what the list is, not what to do with it", () => {
-    const state = reduceLive(live(log(KICKED_OFF)), [], T0 + 20 * MIN);
-    const card = enterableCardFr({
-      available: availableOptions(state, PLAYERS),
-      players: PLAYERS,
-      canAct: false,
-    });
-
-    expect(card.titleFr).toBe("En dehors du terrain");
-    expect(card.hintFr).toBeNull();
-  });
-
-  it("does not call an empty list a bench nobody is sitting on", () => {
-    const card = enterableCardFr({ available: [], players: PLAYERS, canAct: true });
-
-    expect(card.emptyFr).toBe("Tous les joueurs sont sur le terrain.");
-    expect(card.emptyFr).not.toContain("banc");
   });
 
   it("says out loud that a player has already played, rather than hiding them", () => {
@@ -951,6 +903,119 @@ describe("the planned-composition prompt", () => {
         slots: [STARTING_SEVEN[0]!],
       }),
     ).toEqual({ kind: "sentence", text: "1 joueur entre en jeu." });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Stepping through the plans                                                 */
+/* -------------------------------------------------------------------------- */
+
+describe("stepping through the planned compositions", () => {
+  const lineup = (
+    id: string,
+    fromMinute: number,
+    slots: readonly { slotId: string; memberId: string }[],
+    isInitial = false,
+  ) => ({
+    id,
+    fromMinute,
+    isInitial,
+    appliedEventId: null,
+    formationId: "f1",
+    formationLabel: "1-3-2-1",
+    slots,
+  });
+
+  /** The 20’ plan brings Momo on for Karim; the 45’ plan brings Yanis on for Léo as well. */
+  const sevenWith = (pairs: Record<string, string>) =>
+    STARTING_SEVEN.map((entry) => ({ ...entry, memberId: pairs[entry.slotId] ?? entry.memberId }));
+
+  const LINEUPS = [
+    lineup("l-0", 0, STARTING_SEVEN, true),
+    lineup("l-20", 20, sevenWith({ [SLOT.mc2]: "momo" })),
+    lineup("l-45", 45, sevenWith({ [SLOT.mc2]: "momo", [SLOT.mc1]: "yanis" })),
+  ];
+
+  /**
+   * Kicked off with the starting composition applied **as that plan** — `lineupId: "l-0"` and not
+   * null, which is what `appendMatchEvents` records and therefore what makes `applied` true.
+   */
+  const STARTED: Fixture[] = [
+    { type: "KICKOFF", min: 0, period: 1 },
+    { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_SEVEN, "l-0") },
+  ];
+
+  const at = (events: LiveEvent[], nowMin: number, canApply = true) => {
+    const state = reduceLive(live(events, { lineups: LINEUPS }), [], T0 + nowMin * MIN);
+    return plannedLineupViews(state.plannedLineups, LINEUPS, index, { canApply });
+  };
+
+  it("lists every plan in minute order, whatever the match has done with it", () => {
+    const cards = at(log(STARTED), 25);
+
+    expect(cards.map((card) => card.title)).toEqual([
+      "Composition de départ",
+      "Composition prévue à la 20’",
+      "Composition prévue à la 45’",
+    ]);
+    // The starting seven are on the pitch, so the first card is the one that changes nothing.
+    expect(cards[0]).toMatchObject({ applied: true, due: true, isEmpty: true });
+    expect(cards[1]).toMatchObject({ applied: false, due: true, isEmpty: false });
+    // Described against the pitch as it stands, not against the plan before it.
+    expect(cards[2].changes).toEqual(["Léo → Yanis", "Karim → Momo"]);
+    expect(cards[2]).toMatchObject({ applied: false, due: false, fromMinute: 45 });
+  });
+
+  it("says of each plan what is true of it, and asks nothing of a viewer", () => {
+    const coach = at(log(STARTED), 25);
+    expect(coach[0].statusFr).toBe("Déjà appliquée : elle ne sera plus proposée.");
+    expect(coach[1].statusFr).toContain("Son heure est venue");
+    expect(coach[2].statusFr).toContain("Prévue à la 45’");
+    expect(coach[2].statusFr).toContain("à la minute de ta confirmation");
+
+    // Decision 087's rule: somebody who cannot operate the match is told the fact and given no
+    // instruction he cannot follow.
+    const viewer = at(log(STARTED), 25, false);
+    expect(viewer[1].statusFr).toBe("Son heure est venue, pas encore appliquée.");
+    expect(viewer[2].statusFr).toBe("Prévue à la 45’, pas encore appliquée.");
+    for (const card of viewer) expect(card.statusFr).not.toContain("Tu peux");
+  });
+
+  /*
+   * Decision 193, the half of it a screen could get wrong: a plan applied out of order keeps its
+   * planned minute in its title — the plan is not rewritten — and stops promising to come back.
+   */
+  it("keeps the planned minute of a plan applied early, and stops offering it as pending", () => {
+    const early = log([
+      ...STARTED,
+      {
+        type: "LINEUP_APPLIED",
+        min: 12,
+        period: 1,
+        payload: lineupPayload(LINEUPS[2].slots, "l-45"),
+      },
+    ]);
+    const cards = at(early, 13);
+
+    expect(cards[2].title).toBe("Composition prévue à la 45’");
+    expect(cards[2]).toMatchObject({ applied: true, due: false, fromMinute: 45, isEmpty: true });
+    expect(cards[2].statusFr).toBe("Déjà appliquée : elle ne sera plus proposée.");
+    // And the prompt agrees: the 20’ plan is the one still waiting, not this one.
+    const state = reduceLive(live(early, { lineups: LINEUPS }), [], T0 + 25 * MIN);
+    expect(state.pendingLineup?.lineupId).toBe("l-20");
+  });
+
+  it("drops a plan the lineups no longer carry rather than inventing a card for it", () => {
+    const state = reduceLive(live(log(STARTED), { lineups: LINEUPS }), [], T0 + 25 * MIN);
+    const cards = plannedLineupViews(state.plannedLineups, [LINEUPS[0]], index, { canApply: true });
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0].lineupId).toBe("l-0");
+  });
+
+  it("numbers the step for a reader, one-based", () => {
+    expect(plannedLineupStepFr(0, 3)).toBe("1 sur 3");
+    expect(plannedLineupStepFr(2, 3)).toBe("3 sur 3");
   });
 });
 

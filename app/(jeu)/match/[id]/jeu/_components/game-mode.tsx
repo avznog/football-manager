@@ -9,7 +9,6 @@ import {
   ConfirmSheet,
   LineupComposer,
   MultiPlayerPicker,
-  OptionRow,
   PlayerPicker,
   REMARK_ICONS,
   TerrainSheet,
@@ -30,7 +29,6 @@ import { createOutbox, toWireEvent, type OutboxRecord, type OutboxState } from "
 import {
   availableOptions,
   clockActionFr,
-  enterableCardFr,
   eventLabel,
   finalWhistleEvents,
   mergeEvents,
@@ -41,6 +39,7 @@ import {
   pendingLineupView,
   periodsOf,
   phaseLabelFr,
+  plannedLineupViews,
   pitchView,
   playerIndex,
   proposedPitchView,
@@ -50,6 +49,7 @@ import {
   type EventStamp,
   type LiveMatch,
   type PendingEvent,
+  type PlannedLineupCard,
   type PlayerOption,
   type TimelineLine,
 } from "@/lib/match/presenter";
@@ -61,6 +61,7 @@ import {
 } from "@/lib/match/terrain";
 import { CommentSheet } from "./comment-sheet";
 import { EventTimeline } from "./event-timeline";
+import { LineupBrowser } from "./lineup-browser";
 import { LineupPrompt } from "./lineup-prompt";
 import { MatchBar } from "./match-bar";
 import { RemarkSheet } from "./remark-sheet";
@@ -126,6 +127,12 @@ type Flow =
     }
   /** `initial` is set when TERRAIN hands its arrangement over to the list. */
   | { step: "composer"; initial?: readonly SlotAssignment[] }
+  /**
+   * The planned compositions, stepped through (decision 193). `index` is which one is on screen;
+   * applying it is a change at the **current** minute, so this step is opened with `setFlow` and
+   * never freezes the clock — see `openPlans`.
+   */
+  | { step: "plans"; index: number }
   | { step: "whistle" }
   | { step: "void"; line: TimelineLine };
 
@@ -465,9 +472,26 @@ export function GameMode({ live, canOperate }: GameModeProps) {
   const stampLabel = `${minuteLabelFr(stamp.clockMs, stamp.period, periods)} · ${phaseLabelFr(state)}`;
 
   const canAct = canOperate && state.started && !state.finished;
-  // Who the list of players off the pitch is written for: the operator taps it, everybody else reads
-  // it, and before the kick-off nobody can tap it at all (decision 087).
-  const enterable = enterableCardFr({ available, players: live.players, canAct });
+  /**
+   * Applying a composition is the one thing the operator may do before the kick-off as well as
+   * during the match, so this is not `canAct`: the starting seven have to be able to walk on, and a
+   * plan drawn for the 45th can be applied the moment the coach decides to (decision 193). It is the
+   * same condition the prompt's own « Appliquer » already carried.
+   */
+  const canApplyLineup = canOperate && !state.finished;
+
+  /**
+   * Every planned composition, in minute order, described against the pitch as it stands — what the
+   * browser steps through (decision 193). A finished match keeps the list: nothing can be applied to
+   * it, and the sheet then offers no buttons at all.
+   */
+  const plans = useMemo(
+    () =>
+      plannedLineupViews(state.plannedLineups, live.lineups, players, {
+        canApply: canApplyLineup,
+      }),
+    [state.plannedLineups, live.lineups, players, canApplyLineup],
+  );
 
   // An empty pitch is not the same fact as an empty `lineups`, and the copy used to say the second
   // on the strength of the first — under a card showing the very composition it said did not exist.
@@ -639,6 +663,43 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     });
   }
 
+  /**
+   * Open the browser on the plan the coach is most likely to be after: the first one his match has
+   * not applied yet, else the last of the list.
+   *
+   * `setFlow` and not `openFlow`, deliberately: a browser is not an action, and the coach reads three
+   * cards before he chooses. Freezing the clock at the tap that opened it would stamp the change he
+   * eventually confirms a minute early — so the sheet's minute goes on ticking and the event is
+   * stamped at « Appliquer maintenant » (decisions 031 and 147 both point the same way here: the
+   * stamp belongs to the tap that *decides* the fact).
+   */
+  function openPlans() {
+    const next = plans.findIndex((card) => !card.applied);
+    setFlow({ step: "plans", index: next === -1 ? plans.length - 1 : next });
+  }
+
+  /**
+   * Apply a planned composition at the minute of this tap (decision 147): one `LINEUP_APPLIED`
+   * carrying the plan's id, so `appendMatchEvents` records on `lineups.applied_event_id` that this is
+   * what was applied. The plan's own `from_minute` is left alone — it is a plan, not a record — and a
+   * plan applied out of order is simply applied: the reducer stops proposing it, because it only ever
+   * proposes a plan the log has no standing application for (decision 193).
+   */
+  function applyPlan(card: PlannedLineupCard) {
+    closeFlow();
+    void emit("LINEUP_APPLIED", { lineupId: card.lineupId, slots: card.slots }, { atMs: Date.now() });
+  }
+
+  /** « Ajuster » on a plan, from the prompt or from the browser: TERRAIN, pre-filled with it. */
+  function adjustPlan(card: Pick<PlannedLineupCard, "lineupId" | "title" | "slots" | "formationId">) {
+    openFlow({
+      step: "terrain",
+      origin: { kind: "plan", lineupId: card.lineupId, title: card.title },
+      initial: card.slots,
+      formationId: card.formationId ?? currentFormationId,
+    });
+  }
+
   /** « Karim · 34’ · 2e période » on every sheet of a flow opened from his disc. */
   const subjectLabel = (subject: string | undefined) =>
     subject ? `${players.nameOf(subject)} · ${stampLabel}` : stampLabel;
@@ -674,6 +735,22 @@ export function GameMode({ live, canOperate }: GameModeProps) {
     ...onPitch,
     ...available.filter((option) => onSheetMemberIds.has(option.memberId)),
   ];
+
+  /**
+   * The plan the browser has on screen, and its ghost pitch.
+   *
+   * Clamped, because `plans` is derived from the log and the log moves under the sheet: applying one
+   * of them refreshes the page, and a plan that stops being listed at all — its `lineups` row deleted
+   * from the composition screen on another phone — must not leave the sheet reading an index that no
+   * longer exists.
+   */
+  const browsedPlan = flow?.step === "plans" ? (plans[Math.min(flow.index, plans.length - 1)] ?? null) : null;
+  const browsedSlots = browsedPlan
+    ? proposedPitchView(browsedPlan.slots, live.slots, players, {
+        onPitchMemberIds: state.onPitch.map((entry) => entry.memberId),
+        flags: browsedPlan.flags,
+      })
+    : [];
 
   /**
    * The one button beside the score, and only while nobody is on the pitch: then the fastest way in
@@ -728,7 +805,7 @@ export function GameMode({ live, canOperate }: GameModeProps) {
             // composition, because the route handler answers 403 and the tap becomes a rejected
             // action.
             onApply={
-              canOperate && !state.finished
+              canApplyLineup
                 ? () =>
                     void emit(
                       "LINEUP_APPLIED",
@@ -738,15 +815,13 @@ export function GameMode({ live, canOperate }: GameModeProps) {
                 : null
             }
             onAdjust={
-              canOperate && !state.finished
+              canApplyLineup
                 ? () =>
-                    openFlow({
-                      step: "terrain",
-                      origin: { kind: "plan", lineupId: prompt.lineupId, title: prompt.title },
-                      initial: prompt.slots,
+                    adjustPlan({
+                      ...prompt,
                       formationId:
                         live.lineups.find((lineup) => lineup.id === prompt.lineupId)?.formationId ??
-                        currentFormationId,
+                        null,
                     })
                 : null
             }
@@ -803,31 +878,20 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           />
         )}
 
-        {/* Not « Remplaçants »: ten of the thirteen rows under that heading were not (decision 087). */}
-        <Card title={enterable.titleFr} description={enterable.hintFr ?? undefined} flush>
-          {available.length === 0 ? (
-            <div className="p-4">
-              <EmptyState title={enterable.emptyFr} />
-            </div>
-          ) : (
-            <ul className="space-y-2 p-3">
-              {available.map((option) => (
-                <li key={option.memberId}>
-                  <OptionRow
-                    label={option.name}
-                    subtitle={option.subtitle}
-                    warn={option.warn}
-                    leading={option.jerseyNumber ?? undefined}
-                    disabled={!canAct}
-                    onClick={() =>
-                      openFlow({ step: "change-out", outIds: [], inIds: [option.memberId] })
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+        {/* Where the list of everybody off the pitch used to be (decision 192). The bench is not a
+            listing any more: who can come on is a question « Changement » asks, and the eleven rows
+            that stood here pushed the Déroulé off the screen.
+
+            In its place, one row: the way into the planned compositions (decision 193). It is under
+            the pitch rather than in the top bar because that bar has 13 px to spare at 393 px
+            (`match-bar.tsx` has the arithmetic) and « Composition » already lives there before the
+            kick-off; and it is offered to a viewer too, who reads the plans and is given no button to
+            apply them — the same rule the prompt follows. */}
+        {plans.length > 0 ? (
+          <Button variant="secondary" fullWidth onClick={openPlans}>
+            Compositions prévues ({plans.length})
+          </Button>
+        ) : null}
 
         <EventTimeline
           lines={timeline}
@@ -1054,6 +1118,26 @@ export function GameMode({ live, canOperate }: GameModeProps) {
           onConfirm={(assignments) =>
             finish("LINEUP_APPLIED", { lineupId: null, slots: assignments })
           }
+        />
+      ) : null}
+
+      {/* The planned compositions, stepped through (decision 193). `setFlow` on every step, so the
+          minute on the sheet is the live one and « Appliquer maintenant » stamps the change at the
+          tap that confirms it. */}
+      {flow?.step === "plans" ? (
+        <LineupBrowser
+          open
+          onClose={closeFlow}
+          cards={plans}
+          index={Math.min(flow.index, plans.length - 1)}
+          onStep={(index) => setFlow({ step: "plans", index })}
+          slots={browsedSlots}
+          kit={live.kit}
+          stampLabel={stampLabel}
+          onApply={
+            canApplyLineup && browsedPlan ? () => applyPlan(browsedPlan) : null
+          }
+          onAdjust={canApplyLineup && browsedPlan ? () => adjustPlan(browsedPlan) : null}
         />
       ) : null}
 

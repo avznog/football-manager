@@ -2195,3 +2195,31 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       true of what the reader sees. Each seven's paragraph now reads its unit out loud, and the
       offensive one names both polarities — the défensive draft said « mieux c'est pour un buteur » on
       a pitch where nobody is read on a goal he scored, which the 390 px pass caught
+
+- [x] **B4.4 · game mode drops « En dehors du terrain »** (issue #217, decision **192**). The card
+      under the pitch is gone for both roles, and `enterableCardFr` with it (four tests deleted). Before
+      the deletion every job it did was checked: its one tap target — a bench row opening « Changement »
+      with that player ticked as coming in — survives one tap further away, through ACTION →
+      « Changement » → « Qui sort ? » (« Suivant » with nobody ticked) → « Qui entre ? », the same
+      `available` list; and a player's own disc is still the one-tap way to take him off (decision 175).
+      Nothing else read the helper. What it cost is what the screenshots show: **eleven rows** before
+      the kick-off on this team, all of them disabled because `canAct` is false until the kick-off, and
+      the Déroulé below the fold. Looked at at 390 px in both themes, coach and player in one pass,
+      before and after (`audit/b4b/`)
+- [x] **B4.5 · any planned composition, applied early or late** (issue #218, decision **193**).
+      « Compositions prévues (N) » under the pitch opens `LineupBrowser`: « Précédente » / « Suivante »
+      step through every plan of the match in minute order, each described against the pitch **as it
+      stands**, and « Appliquer maintenant » applies the one on screen. The event is one
+      `LINEUP_APPLIED` carrying the plan's id, **stamped at that tap** (decision 147) — the 30′ plan
+      applied at the 12th reads 12’ in the Déroulé — and the plan's own `from_minute` is untouched. No
+      server change: `appendMatchEvents` already writes `applied_event_id` for any such event whatever
+      minute it carries, verified on a clone (25′ plan, event at 0′, `from_minute` still 25). **A plan
+      applied out of order is not proposed again at its own minute**, because the reducer only ever
+      proposes a plan with no standing application in the log — annul it and the prompt comes back
+      (decision 150), and the sheet says « Déjà appliquée : elle ne sera plus proposée. »
+      `plannedLineupStatusFr` is pure and tested, three states and a viewer's version of each;
+      « Appliquer maintenant » is disabled when the pitch already is that composition. Two reducer
+      tests (a later plan applied early, an earlier one applied late, minutes and `compositions`
+      checked), six presenter tests, and an e2e test that applies the 30′ plan at the 12th and asserts
+      the 30th minute then proposes nothing. Looked at at 390 px in both themes, coach and player in
+      one pass

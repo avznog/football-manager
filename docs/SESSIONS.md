@@ -5854,3 +5854,73 @@ because `impactPer60` is now the raw figure. Decision **200** of the reserved ra
 Files: `lib/stats/impact.ts`, `lib/stats/sevens.ts`, `lib/stats/best-seven-copy.ts`,
 `app/(app)/stats/equipe-type/_components/seven-pitch.tsx`, `app/(app)/stats/_components/impact.tsx`,
 their three test files, `docs/DECISIONS.md` (198, 199), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+---
+
+## 2026-10-12, track B of the fourth backlog — game mode loses a dead list and gains the plans
+
+Two issues, both in game mode: **#217** removes the list of everybody off the pitch, **#218** makes any
+planned composition applicable at any minute. Decisions **192** and **193**. No migration, no server
+change. Worked in a worktree against a clone of preview (`football_wb`) on port 3102.
+
+**B4.4 — « En dehors du terrain » is gone (decision 192).** The owner's line was about a *listing*, so
+the first job was finding out what else the card did. One thing: a row was a tap target that opened
+« Changement » with that player ticked as coming in (147, 152). That route is untouched one tap further
+away — ACTION → « Changement » → « Qui sort ? » with nobody ticked → « Qui entre ? », the same
+`available` list — and a player's own disc is still the one-tap way to take him off (175). Nothing else
+in the repo read `enterableCardFr`; it is deleted with its four tests, and `availableOptions` now feeds
+only the pickers. **The screenshot is the argument**: on this team, before the kick-off, the card stood
+over **eleven** rows — four substitutes and seven « hors feuille » — every one of them *disabled*,
+because `canAct` is false until the kick-off (decision 087 said so and it was right). Eleven dead names
+between the pitch and the Déroulé, which started below the fold. Both roles saw the same card: the
+operator's heading « Qui peut entrer » only appears *after* the kick-off, so what the owner was looking
+at was the viewer's wording on his own screen.
+
+**B4.5 — the plans, stepped through and applied whenever (decision 193).** « Compositions prévues (N) »
+sits where that card was and opens `LineupBrowser`: « Précédente » / « Suivante » over every plan of the
+match in minute order, each with its title, what it would do **to the pitch as it stands**, its
+warnings, its ghost pitch, and « Appliquer maintenant » · « Ajuster sur le terrain ».
+
+Most of it already existed. `state.plannedLineups` carries one entry per plan with its diff, its flags,
+`due` and `applied`, so `plannedLineupViews` is a translation and `pendingLineupView` was refactored to
+share its builder (`lineupViewOf`). Three things were decided rather than wired:
+
+- **The stamp.** The sheet is opened with `setFlow`, not `openFlow`, so the clock keeps ticking and the
+  event is stamped at « Appliquer maintenant » — the tap that decides the fact. Opening a browser is
+  not an action, and the coach reads three cards before he chooses. The 30′ plan applied at the 12th is
+  **12’** in the log, and the plan still reads « prévue à la 30’ » everywhere (decision 147).
+- **Out of order.** The issue left this open. A plan applied early **is applied**, so it is never
+  proposed again: `pendingLineup` is raised only for a plan with no standing application in the log,
+  which is decision 150's rule already, and annulling the application brings the prompt back at the
+  plan's own minute. The card says « Déjà appliquée : elle ne sera plus proposée. »
+- **The no-op.** « Appliquer maintenant » is disabled — not hidden — when the pitch already is that
+  composition, with the existing sentence « Cette composition ne change rien sur le terrain. » above it
+  saying why. Applying it would append a « Changement » line with nothing under it.
+
+**Nothing on the server changed, and that was checked rather than assumed.** `appendMatchEvents` writes
+`lineups.applied_event_id` for any `LINEUP_APPLIED` whose payload names a plan, `is null` in the
+predicate, and has never read the minute. On the clone: the 25′ plan applied at 0′ left
+`applied_event_id` pointing at an event with `minute = 0` and `from_minute` still **25**.
+
+**What was looked at.** The clone's four matches are all `finished`, so a scheduled match with
+**three** planned compositions (0′, 15′, 25′) was created on it — in SQL rather than through the
+composition editor, which is a deviation worth naming — and game mode walked at 390 px in light and
+dark, as the coach (`potter`) and as a player (`raphael`), before and after each change, in one pass.
+Screenshots in `audit/b4b/`. What the pair showed: the two roles differ by the read-only banner, the
+ACTION bar and the sheet's footer, and by nothing that states a different fact — the viewer's status
+line is « Prévue à la 15’, pas encore appliquée. » where the coach's is « … Tu peux l’appliquer tout de
+suite : elle sera enregistrée à la minute de ta confirmation. », which is decision 087's rule about not
+handing somebody an instruction he cannot follow. The stepper's buttons were « Préc. » / « Suiv. »
+until the screenshot: **the visible label has to be a word of the accessible name** (WCAG 2.5.3, the
+rule `match-bar.tsx` spells out), and « Préc. » is not a word of « Composition précédente ». They read
+« Précédente » / « Suivante » now, and both fit at 390 px with room.
+
+Gates: `npm run typecheck`, `npx eslint app components lib e2e db scripts proxy.ts proxy.test.ts`,
+`npm test` (70 files, **1476** tests — four deleted with `enterableCardFr`, seven added), and
+`E2E_PORT=3102 npm run test:e2e` (**10 passed**, 2.9 min), which includes a new test applying the 30′
+plan at the 12th minute and asserting that the 30th then proposes nothing.
+
+Files: `app/(jeu)/match/[id]/jeu/_components/lineup-browser.tsx` (new),
+`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `lib/match/presenter.ts`,
+`lib/match/presenter.test.ts`, `lib/match/reducer.test.ts`, `e2e/happy-path.spec.ts`,
+`docs/DECISIONS.md` (192, 193), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
