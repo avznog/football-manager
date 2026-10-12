@@ -38,6 +38,7 @@ import { positionLabelFr } from "@/db/reference";
 import type { BestSevenCriterion, ObservedFigure, ShrinkageReport } from "./best-seven";
 import {
   NO_VALUE_FR,
+  everyFr,
   concededRecordFr,
   formatDecimal,
   formatMinutes,
@@ -46,6 +47,7 @@ import {
   formatRating,
   plural,
 } from "./format";
+import { minutesPerCount } from "./impact";
 import { SEVEN_KINDS, type SevenFigure, type SevenKind, type SevenObserved } from "./sevens";
 
 /* -------------------------------------------------------------------------- */
@@ -178,14 +180,15 @@ export const SEVEN_OPTION_FR: Readonly<Record<SevenKind, string>> = {
  */
 export const SEVEN_RULE_FR: Readonly<Record<SevenKind, string>> = {
   offensive:
-    "La meilleure attaque : à chaque poste de champ, le plus de buts par heure, puis de passes " +
-    "décisives ; au goal, celui qui y a joué et y encaisse le moins.",
+    "La meilleure attaque : à chaque poste de champ, celui qui attend le moins de minutes entre deux " +
+    "buts, puis celui qui donne le plus de passes décisives ; au goal, celui qui y a joué et y " +
+    "encaisse le moins souvent.",
   defensive:
-    "La meilleure défense : à chaque poste de champ, le moins de buts encaissés par heure sur le " +
-    "terrain ; au goal, celui qui y a joué et y encaisse le moins.",
+    "La meilleure défense : à chaque poste de champ, celui qui encaisse le moins souvent quand il est " +
+    "sur le terrain ; au goal, celui qui y a joué et y encaisse le moins souvent.",
   legende:
-    "Le meilleur à chaque poste, de l’attaque vers la défense, jugé sur la différence de buts quand " +
-    "il y joue ; au goal, jamais quelqu’un en dessous de la moyenne des gardiens.",
+    "Le meilleur à chaque poste, de l’attaque vers la défense, jugé sur la différence de buts brute " +
+    "quand il y joue ; au goal, jamais quelqu’un en dessous de la moyenne des gardiens.",
   notes: "La meilleure moyenne des notes reçues, à chaque poste.",
 };
 
@@ -471,20 +474,19 @@ export function shrinkageSentenceFr(
  *
  * Null when every pick has a figure of his own, in which case there is nothing to warn about.
  *
- * **Decision 187 narrowed what reaches this sentence, and did not retire it.** A man with no minute at
- * all is no longer a candidate, so the disc it is about is now one of two things: a player who has
- * played but never at *that* post (the légende is judged per post) or one nobody has rated yet. Hence
- * « à ce poste », and hence the reason no longer being « pour ne pas avoir joué ».
+ * **Decision 187 narrowed what reaches this sentence, and decision 198 narrowed it again.** A man with
+ * no minute at all is no longer a candidate, and the impact no longer has a mean to stand in for him —
+ * it is raw, so no figure at that post means no figure, full stop. What is left is a man nobody has
+ * rated, and a man with minutes but none outside the goal on a défensive seven. Hence « dans cette
+ * sélection » rather than the « à ce poste » the légende used to need.
  */
 export function squadMeanStandInFr(count: number): string | null {
   if (count <= 0) return null;
   const many = count > 1;
   return (
-    `${count} des sept ${many ? "n’ont" : "n’a"} aucun chiffre cette saison à ce poste : ` +
-    `${many ? "ils sont affichés" : "il est affiché"} à la moyenne de l’équipe, donc ` +
-    // « pour ne pas avoir joué » until decision 187, which is no longer what this is about: everybody
-    // on the pitch has played, and what he has not done is jouer *à ce poste* — or être noté.
-    `${many ? "ni flattés ni punis" : "ni flatté ni puni"} pour ne pas y avoir encore de chiffre.`
+    `${count} des sept ${many ? "n’ont" : "n’a"} aucun chiffre ${many ? "à eux" : "à lui"} sur ce critère dans cette ` +
+    `sélection : ${many ? "ils sont affichés" : "il est affiché"} à la moyenne de l’équipe, donc ` +
+    `${many ? "ni flattés ni punis" : "ni flatté ni puni"} pour ne pas en avoir encore.`
   );
 }
 
@@ -577,24 +579,62 @@ export function emptySlotsFr(input: {
 /* -------------------------------------------------------------------------- */
 
 /**
+ * The window every rate on this screen is « per »: sixty minutes of play.
+ *
+ * It is what makes `everyFr` usable here. That function turns a **count over a stretch of minutes**
+ * into « toutes les 24′ », and a seven's cell holds neither — it holds a shrunk rate, a float. Sixty
+ * minutes and the rate *are* such a pair (« this many per sixty »), so the same sentence comes out of
+ * the same function rather than out of a second copy of the division.
+ */
+const MINUTES_PER_HOUR = 60;
+
+/**
  * The ranked figure of one cell, in its own scale. Each slot of a seven can be scored by a different
  * figure now (decision 171), so the screen formats by the cell's `figure`, never by the seven:
  *
- * - goals: shrunk goals per hour, « 0,45/h », the scale the old `goals` criterion printed;
- * - conceded (in goal or outfield): the shrunk rate turned into « 1 but/24′ », S12's reading of it;
- * - impact: the shrunk goal difference per hour, signed, « +1,2/h »;
+ * - goals: « 1 but/133′ », the shrunk rate read as a waiting time (decision 199);
+ * - conceded (in goal or outfield): the same reading, « 1 but/24′ », as it has been since S12;
+ * - impact: the raw goal difference, signed, with the stretch it is over: « +6,0 pour 60′ »;
  * - ratings: a mark out of ten.
+ *
+ * **No bare `/h` anywhere, which is decision 199.** « 0,49/h » was on screen for the goals and the
+ * impact, and the owner wrote twice in one backlog that he could not tell what it meant. A rate of
+ * countable events is printed as the waiting time between two — his own « X but every X minutes » —
+ * and the impact, which is a *difference* and has no waiting time (it can be zero, or negative),
+ * names the stretch of play it is divided over instead.
+ *
+ * **The sentence is `format.ts`'s own `everyFr`**, handed the rate as « so many per 60 », so this
+ * screen cannot come to word a rate differently from `/stats`: one function turns a count over a
+ * stretch of minutes into « toutes les 24′ », and both screens call it. `compact` is the disc caption,
+ * 104 px wide, where « 1 but toutes les 133′ » does not fit — that one form is built here from
+ * `minutesPerCount`, which is the number `everyFr` prints the sentence of (same rounding, floor of one
+ * minute), because a caption cannot hold a sentence and the DP's key cannot be one.
  */
-export function formatSevenFigure(figure: SevenFigure, value: number | null): string {
+export function formatSevenFigure(
+  figure: SevenFigure,
+  value: number | null,
+  compact = false,
+): string {
   if (value === null) return NO_VALUE_FR;
+  // A shrunk rate of zero means the whole squad's is zero — nobody scored, or nobody conceded, in this
+  // selection — and « 1 but toutes les ∞ » is not a figure. The polarity of the noun reads off the
+  // seven's own rule sentence above the pitch, for the goals as for the conceded cells.
+  const every = (rate: number) =>
+    rate <= 0
+      ? "aucun but"
+      : compact
+        ? `1 but/${minutesPerCount(rate)}′`
+        : `1 but ${everyFr(MINUTES_PER_HOUR, rate)}`;
   switch (figure) {
     case "goals":
-      return `${formatDecimal(value, 2)}/h`;
     case "keeperConceded":
     case "outfieldConceded":
-      return value <= 0 ? "aucun but" : `1 but/${Math.max(1, Math.round(60 / value))}′`;
+      return every(value);
     case "impact":
-      return `${formatSignedDecimal(value)}/h`;
+      // Not abbreviated on the disc: « +6,0 » alone is the figure the owner could not read, and
+      // « +1,8 pour 60′ » measures 82 px on the turf at the caption's 11 px — inside the 104 px
+      // budget two neighbouring captions leave each other.
+      return `${formatSignedDecimal(value)} pour 60′`;
     case "ratings":
       return formatRating(value);
   }
@@ -665,20 +705,44 @@ export function keeperRuleFr(input: {
   );
 }
 
-/** What the smoothing does to the new sevens, and the one rule of each that a reader would not guess. */
+/**
+ * What the figure under each name **is**, and what was done to it before it was ranked.
+ *
+ * Two claims, and since decision 199 the first one comes first: the unit. « 0,49/h » was on screen and
+ * the owner wrote twice that he did not understand it, so the sentence now reads the figure out loud —
+ * « 1 but toutes les 133′ » is a goal every 133 minutes of his play — before it explains the smoothing.
+ * And the légende says the opposite of the other three, because decision 198 took the smoothing out of
+ * the impact: there the figure is the plain division, and a reader can check it against the counts
+ * printed under the name.
+ */
 export function sevenSmoothingFr(seven: SevenKind): string | null {
-  const base =
-    "Chaque chiffre est lissé vers la moyenne de l’équipe : quelques minutes ne suffisent pas pour " +
-    "passer devant une saison entière. Sous chaque joueur, ce qu’il a vraiment fait.";
+  const smoothed =
+    "Il est lissé vers la moyenne de l’équipe : quelques minutes ne suffisent pas pour passer devant " +
+    "une saison entière. Sous chaque joueur, ce qu’il a vraiment fait.";
   switch (seven) {
     case "offensive":
-      return `${base} Deux joueurs dont les buts par heure s’affichent pareil sont départagés par leurs passes décisives.`;
+      // Both polarities are on this pitch — six men are read on the goals they score, the gardien on
+      // the ones he takes — so the sentence names them separately rather than leaving the reader to
+      // work out which of the two « 1 but toutes les X′ » he is looking at.
+      return (
+        "Le gros chiffre se lit « 1 but toutes les X minutes de jeu » : pour un joueur de champ c’est " +
+        "un but qu’il marque, et plus l’attente est courte, mieux c’est ; pour le gardien c’est un " +
+        `but qu’il encaisse, et c’est l’inverse. ${smoothed} Deux joueurs dont l’attente s’affiche ` +
+        "pareil sont départagés par leurs passes décisives."
+      );
     case "defensive":
-      return `${base} Le temps passé au goal n’est pas compté pour un joueur de champ : il a son propre chiffre.`;
+      return (
+        "Le gros chiffre se lit « 1 but encaissé toutes les X minutes de jeu », pour le gardien comme " +
+        `pour les joueurs de champ : plus l’attente est longue, mieux c’est. ${smoothed} Le temps ` +
+        "passé au goal n’est pas compté pour un joueur de champ : il a son propre chiffre."
+      );
     case "legende":
       return (
-        `${base} La différence de buts est celle de l’équipe pendant qu’il occupait ce poste ; un joueur ` +
-        "qui n’y a jamais joué y est compté à la moyenne du poste."
+        "Le gros chiffre est la différence de buts de l’équipe pendant qu’il tenait ce poste, ramenée " +
+        "à 60 minutes de jeu : +1 et 0 encaissé en 10′ donne « +6,0 pour 60′ ». Rien n’est lissé, et " +
+        "le calcul se refait à la main avec les chiffres écrits dessous. Le chiffre du gardien, lui, " +
+        "est l’attente entre deux buts encaissés, lissée vers la moyenne des gardiens. Un joueur qui " +
+        "n’a jamais tenu le poste n’y a aucun chiffre, et le sept place d’abord ceux qui y ont joué."
       );
     case "notes":
       return null;
@@ -689,9 +753,14 @@ export function sevenSmoothingFr(seven: SevenKind): string | null {
 export const KEEPER_REFUSED_BADGE_FR = "écarté du goal";
 
 /**
- * Whose average a disc with no figure of its own is wearing: the team's, or — in the légende, which is
- * judged per position — the post's (`impactAt` in `impact.ts`).
+ * Whose average a disc with no figure of its own is wearing.
+ *
+ * It used to answer « moyenne du poste » for the impact, and decision 198 makes that unreachable rather
+ * than wrong: the impact is raw now, so a man with no minute at the post has **no** figure at all
+ * (`adjusted === null`) and this caption is not drawn for him. The keepers are named separately because
+ * they are their own population (rule 4 of `best-seven.ts`): « moyenne de l’équipe » under a goal disc
+ * would name the wrong twelve people.
  */
 export function squadMeanStandInShortFr(figure: SevenFigure): string {
-  return figure === "impact" ? "moyenne du poste" : "moyenne de l’équipe";
+  return figure === "keeperConceded" ? "moyenne des gardiens" : "moyenne de l’équipe";
 }

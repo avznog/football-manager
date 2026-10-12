@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { concededRateBoard, fitCountModel, impactByPosition, shrunkPer60 } from "./impact";
+import {
+  concededRateBoard,
+  fitCountModel,
+  impactByPosition,
+  minutesPerCount,
+  rawImpactPer60,
+  shrunkPer60,
+} from "./impact";
 import { positionGroupLabelFr, positionGroupOf } from "./positions";
 
 function member(id: string) {
@@ -72,24 +79,72 @@ describe("concededRateBoard (decision 177: raw)", () => {
   });
 });
 
+describe("minutesPerCount", () => {
+  it("reads a rate per 60 back as the wait between two", () => {
+    expect(minutesPerCount(0.45)).toBe(133);
+    expect(minutesPerCount(2.5)).toBe(24);
+    expect(minutesPerCount(6)).toBe(10);
+  });
+
+  it("never prints « toutes les 0′ »", () => {
+    expect(minutesPerCount(120)).toBe(1);
+  });
+});
+
+describe("rawImpactPer60 (decision 198: no smoothing at all)", () => {
+  it("is the plain division, reproducible by hand", () => {
+    // The owner's own example: +1 and nothing conceded in ten minutes at MC.
+    expect(rawImpactPer60({ group: "MC", minutes: 10, goalsFor: 1, goalsAgainst: 0 })).toBe(6);
+  });
+
+  it("is exactly zero for a man who neither scored nor conceded there", () => {
+    // His other example: Édouard, +0 / −0 in six minutes at DC, which read « −2,4 » before.
+    expect(rawImpactPer60({ group: "DC", minutes: 6, goalsFor: 0, goalsAgainst: 0 })).toBe(0);
+    // And for a post where both happened once: zero is a figure, not a missing one.
+    expect(rawImpactPer60({ group: "DC", minutes: 10, goalsFor: 1, goalsAgainst: 1 })).toBe(0);
+  });
+
+  it("goes negative when the team conceded more while he held the post", () => {
+    expect(rawImpactPer60({ group: "DC", minutes: 30, goalsFor: 1, goalsAgainst: 7 })).toBe(-12);
+    expect(rawImpactPer60({ group: "AIL", minutes: 34, goalsFor: 2, goalsAgainst: 5 })).toBeCloseTo(
+      -5.294,
+      3,
+    );
+  });
+
+  it("has no figure at all for a post he never held, rather than a mean standing in", () => {
+    expect(rawImpactPer60(undefined)).toBeNull();
+    expect(rawImpactPer60({ group: "AT", minutes: 0, goalsFor: 0, goalsAgainst: 0 })).toBeNull();
+  });
+});
+
 describe("impactByPosition", () => {
   const players = [
-    // Forty hours of DC at +1 per 60 between them…
+    // Ten hours of DC at +1 per 60 between them…
     {
       ...member("long"),
       positions: [{ group: "DC" as const, minutes: 600, goalsFor: 20, goalsAgainst: 10 }],
     },
     {
       ...member("solid"),
-      positions: [{ group: "DC" as const, minutes: 600, goalsFor: 15, goalsAgainst: 12 }],
+      positions: [{ group: "DC" as const, minutes: 600, goalsFor: 15, goalsAgainst: 18 }],
     },
-    // …and ten minutes with one goal for: +6 per 60 raw, which must not top the list.
+    // …and ten minutes with one goal for: +6 per 60, which now *does* top the list (decision 198).
     {
       ...member("cameo"),
       positions: [
         { group: "DC" as const, minutes: 10, goalsFor: 1, goalsAgainst: 0 },
         { group: "GB" as const, minutes: 60, goalsFor: 2, goalsAgainst: 1 },
       ],
+    },
+    // Nothing either way, in two different lengths of spell: both are exactly 0,0.
+    {
+      ...member("quiet"),
+      positions: [{ group: "DC" as const, minutes: 20, goalsFor: 0, goalsAgainst: 0 }],
+    },
+    {
+      ...member("quieter"),
+      positions: [{ group: "DC" as const, minutes: 6, goalsFor: 0, goalsAgainst: 0 }],
     },
   ];
   const impact = impactByPosition(players);
@@ -100,21 +155,34 @@ describe("impactByPosition", () => {
     expect(impact.find((position) => position.group === "AT")!.entries).toEqual([]);
   });
 
-  it("smooths ten minutes so they cannot win", () => {
-    expect(dc.entries[0].teamMemberId).toBe("long");
-    const cameo = dc.entries.find((entry) => entry.teamMemberId === "cameo")!;
-    expect(cameo.rawPer60).toBeCloseTo(6);
-    expect(cameo.impactPer60).toBeLessThan(dc.entries[0].impactPer60);
+  it("ranks on the raw figure, so a short spell can lead — with its minutes beside it", () => {
+    expect(dc.entries.map((entry) => entry.teamMemberId)).toEqual([
+      "cameo",
+      "long",
+      "quiet",
+      "quieter",
+      "solid",
+    ]);
+    expect(dc.entries[0]).toMatchObject({ minutes: 10, goalsFor: 1, goalsAgainst: 0 });
+    expect(dc.entries[0].impactPer60).toBeCloseTo(6);
   });
 
-  it("keeps the raw difference and the minutes beside the ranked figure", () => {
-    expect(dc.entries[0]).toMatchObject({ minutes: 600, goalsFor: 20, goalsAgainst: 10, rawPer60: 1 });
-    expect(dc.entries).toHaveLength(3);
+  it("prints 0,0 for a man nothing happened to, and the longer spell first", () => {
+    const quiet = dc.entries.find((entry) => entry.teamMemberId === "quiet")!;
+    const quieter = dc.entries.find((entry) => entry.teamMemberId === "quieter")!;
+    expect(quiet.impactPer60).toBe(0);
+    expect(quieter.impactPer60).toBe(0);
+    expect(dc.entries.indexOf(quiet)).toBeLessThan(dc.entries.indexOf(quieter));
   });
 
-  it("puts a man alone at a position on the position's own figures", () => {
+  it("goes below zero only for a man the team actually conceded under", () => {
+    const solid = dc.entries.find((entry) => entry.teamMemberId === "solid")!;
+    expect(solid.impactPer60).toBeCloseTo(-0.3);
+    expect(dc.entries.filter((entry) => entry.impactPer60 < 0)).toHaveLength(1);
+  });
+
+  it("gives a man alone at a position his own figure, untouched", () => {
     const gb = impact.find((position) => position.group === "GB")!;
-    // One keeper: the squad mean is his own, so shrinking changes nothing.
     expect(gb.entries[0].impactPer60).toBeCloseTo(1);
   });
 });

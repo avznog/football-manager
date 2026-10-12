@@ -447,7 +447,10 @@ function DiscFigures({ cell }: { cell: SevenCell }) {
   return (
     <span className="flex max-w-26 flex-col items-center leading-tight">
       <span className="rounded-full bg-surface/90 px-1.5 text-[0.6875rem] font-bold text-ink tabular-nums">
-        {formatSevenFigure(cell.figure, cell.adjusted)}
+        {/* The caption's own form: « 1 but/133′ » rather than « 1 but toutes les 133′ », which needs
+            more than the 104 px two neighbouring captions leave each other. The list under the pitch
+            prints the unabbreviated sentence, so nothing here is the only statement of anything. */}
+        {formatSevenFigure(cell.figure, cell.adjusted, true)}
       </span>
       {raw !== null ? (
         <span className="max-w-full truncate rounded-full bg-surface/80 px-1 text-[0.5625rem] font-medium text-ink-muted tabular-nums">

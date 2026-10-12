@@ -5776,3 +5776,81 @@ Files: `lib/stats/aggregate.ts`, `lib/stats/format.ts`, `app/(app)/stats/page.ts
 `app/(app)/joueur/_components/stats-card.tsx`, `lib/stats/aggregate.test.ts`,
 `lib/stats/format.test.ts`, `e2e/happy-path.spec.ts`, `docs/DECISIONS.md` (195–197),
 `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-10-12, track D of the fourth backlog — the impact table says what happened, and nothing reads « /h »
+
+**B4.10 (#223) and B4.11 (#224), decisions 198 and 199.** Two complaints with one cause between them:
+the figures on `/stats`'s « Impact par poste » and on the équipe type were not figures the owner could
+either check or name.
+
+**The impact is raw now.** It was two shrunk Poisson rates and their difference, and over three matches
+the mean they were pulled towards is negative, so the table had no positive number anywhere: « +1 / −0 »
+printed −1,8 and « +0 / −0 » printed −2,4. `rawImpactPer60` is the plain division — `(gf − ga) ÷ minutes
+× 60` — and the two counts and the minutes stay printed beside it, which is what makes « a ten-minute
+spell can lead a post » honest rather than hidden. Reproduced on the clone of preview, before and after:
+
+| | before | after | by hand |
+|---|---|---|---|
+| Benjamin, `MC`, `+1 / −0 en 10′` | −1,75 (« −1,8 ») | **+6,00** | 1 ÷ 10 × 60 = 6 |
+| Édouard, `DC`, `+0 / −0 en 6′` | −2,35 (« −2,4 ») | **0,00** | 0 ÷ 6 × 60 = 0 |
+| Lucas, `DC`, `+5 / −3 en 66′` | −1,35 | **+1,82** | 2 ÷ 66 × 60 = 1,8181… |
+| Léo M, `DC`, `+1 / −7 en 30′` | −4,55 | **−12,00** | −6 ÷ 30 × 60 = −12 |
+
+Decision 198 is written so that it and 162 cannot be used to undo each other: **a figure the reader can
+check by hand is never smoothed; a figure that exists only to order a list may be.** Every other use of
+shrinkage stands, the équipe type's conceded keys included.
+
+**The 7 de légende reads the same raw figure**, so the two screens cannot disagree about one man at one
+post. That needed one decision of its own: with no model there is no post mean, so a man who has never
+held the post has **no** figure there (`null`, a « — » on the disc) rather than a number that is not his
+— and because a bare `0` would then promote him over every real record below zero, each position group
+now has two lexicographic keys, « has he played this post » and then the figure.
+
+**Nothing says « /h ».** A rate of countable events is the wait between two, « 1 but toutes les 133′ »,
+and « 1 but/133′ » in the 104 px disc caption — the owner's own « X but every X minutes », and the form
+`/stats` has used since decision 177. The impact, which can be zero or negative, names the stretch it is
+divided over: « +6,0 pour 60′ », 82 px measured on the turf. The offensive seven's tie-break moved onto
+the printed figure (`scoringKey`) so that « equal on screen » and « equal to the DP » are the same thing.
+
+**The sentence is `format.ts`'s, not a second copy of it.** `formatSevenFigure` calls `everyFr`
+(`concededEveryFr` until track C's rename lands) with the pair « this many per sixty minutes », which is
+what lets one function word every rate in the app. Two cases it cannot serve, and both are reported
+rather than worked around: the 104 px disc caption, where « 1 but toutes les 133′ » does not fit, and the
+DP's key, which cannot be a sentence. Both come from `minutesPerCount` — the number `everyFr` prints the
+sentence of, same rounding, same floor of one minute — and `best-seven-copy.test.ts` pins the identity
+`formatSevenFigure("goals", r) === \`1 but ${everyFr(60, r)}\`` for four rates, so a change to the shared
+function fails here too instead of silently splitting the two screens.
+
+**Flagged, not acted on: no seven is ranked on clean minutes.** Track C asked. The four sevens are
+`goals`+`assists`, `outfieldConceded`, the raw `impact`, and `ratings`, each with a **`keeperConceded`**
+goal slot — grep for `cleanSheet` finds it in `best-seven.ts`'s `BEST_SEVEN_CRITERIA` and its four
+`switch` arms, reachable only through `bestSeven()` and `evaluateSquad(…, "cleanSheet")`, and
+**`bestSeven()` has no caller left** (one mention, in a comment in `seven-pitch.tsx`). `?critere=cleanSheet`
+degrades to the offensive seven, as `parseSeven` is tested to. So there is no seven to remove, and the
+corollary is the other half of track C's note: `gkCleanMinutes` / `gkCleanSheets` are no longer read by
+anything on screen — `best-seven-input.ts` still copies them into every candidate, and only the dead
+criterion looks at them. Retiring the `cleanSheet` criterion is a clean deletion in a file I own and was
+left undone: it is not what either issue asked for, and whether the measurement keeps being written is
+the owner's call.
+
+**What was looked at**, at 390 px, light and dark, coach (`potter`) and player (`pierre`) in one pass,
+screenshots in `audit/b4d/` and read: the impact card with every list unfolded — positives present,
+`+0 / −0` reading exactly `0,0`, the « Milieu central » block with Benjamin second at +6,0 — and all four
+sevens, pitch, full-width list and caveat card. **The 390 px pass caught a sentence no test would have**:
+the first draft of the reading sentence said « plus l'attente est courte, mieux c'est pour un buteur » on
+the *défensive* seven, where every outfield figure is a goal conceded and nobody is read on a goal he
+scored. Each seven now has its own, and the offensive one names both polarities. The screens have no
+role-dependent branch, and the two columns confirmed it rather than assuming it.
+
+Gates: `npm run typecheck`, `npx eslint app components lib e2e db scripts proxy.ts proxy.test.ts`,
+`npm test` (70 files, **1483 tests**), and `E2E_PORT=3104 npm run test:e2e` (**9 passed**, 2.8 min) since
+`/stats` is on the happy path. Database `football_wd`, port 3104, no git write.
+
+**Shared file touched, deliberately**: `app/(app)/stats/_components/impact.tsx` belongs to track C's area
+and holds the impact card's own description and note, which decision 198 makes untrue. The edit is
+confined to those two strings and the header comment; the value and detail lines needed no change,
+because `impactPer60` is now the raw figure. Decision **200** of the reserved range is unused.
+
+Files: `lib/stats/impact.ts`, `lib/stats/sevens.ts`, `lib/stats/best-seven-copy.ts`,
+`app/(app)/stats/equipe-type/_components/seven-pitch.tsx`, `app/(app)/stats/_components/impact.tsx`,
+their three test files, `docs/DECISIONS.md` (198, 199), `docs/ROADMAP.md`, `docs/SESSIONS.md`.

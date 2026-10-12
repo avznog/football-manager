@@ -156,6 +156,51 @@ describe("the defensive seven", () => {
 });
 
 describe("the 7 de légende", () => {
+  /**
+   * Decision 198: the impact is the raw division, here as on `/stats`. Over a short season the squad's
+   * own difference is negative, and the shrinkage this replaces dragged a `+1 / −0` spell below a long
+   * record that conceded twice as much as it scored. The owner read the result and rejected it.
+   */
+  it("ranks a post on the raw goal difference, short spells included", () => {
+    const result = solveSeven("legende", {
+      slots: [slot("mc", "MC")],
+      candidates: [
+        player({
+          displayName: "Dix minutes",
+          minutes: 600,
+          declarations: { MC: "primary" },
+          positions: [at("MC", 10, 1, 0)],
+        }),
+        player({
+          displayName: "Toute la saison",
+          minutes: 600,
+          declarations: { MC: "primary" },
+          positions: [at("MC", 600, 10, 20)],
+        }),
+      ],
+    });
+    const cellOf = (name: string) => result.cells[result.candidates.findIndex((c) => c.id === name)][0];
+    // +1 in ten minutes is +6,0 for 60′ — reproducible by hand, and it leads.
+    expect(cellOf("Dix minutes").adjusted).toBeCloseTo(6);
+    expect(cellOf("Toute la saison").adjusted).toBeCloseTo(-1);
+    expect(pickedName(result, "mc")).toBe("Dix minutes");
+  });
+
+  it("is exactly zero at a post where nothing happened either way", () => {
+    const result = solveSeven("legende", {
+      slots: [slot("dc", "DC")],
+      candidates: [
+        player({
+          displayName: "Six minutes",
+          minutes: 600,
+          declarations: { DC: "primary" },
+          positions: [at("DC", 6, 0, 0)],
+        }),
+      ],
+    });
+    expect(result.cells[0][0].adjusted).toBe(0);
+  });
+
   it("fills the attack first, even when the total would rather have him at the back", () => {
     const result = solveSeven("legende", {
       slots: [slot("dc", "DC"), slot("at", "AT")],
@@ -202,18 +247,28 @@ describe("the 7 de légende", () => {
     expect(result.keepersRefused).toBe(1);
   });
 
-  it("gives a man with no minutes at a post that post's average, not a zero", () => {
+  /**
+   * Decision 198 took the shrinkage out of the impact, which also took away the post's mean: the man
+   * who has never held the post has no figure there at all now, where he used to be credited the
+   * post's own average. So the seven says so — a `null` under his name rather than a number that is
+   * not his — and it places the man who *has* played the post first even when that man's record is
+   * negative. A bare `0` for « never played » would have promoted him above every real record below
+   * zero, which is how a seven claiming « le meilleur à ce poste » ends up showing a « — ».
+   */
+  it("gives a man with no minutes at a post no figure at all, and prefers the man who played it", () => {
     const result = solveSeven("legende", {
       slots: [slot("at", "AT")],
       candidates: [
         player({ displayName: "Habitué", minutes: 600, declarations: { AT: "primary" }, positions: [at("AT", 600, 2, 10)] }),
-        player({ displayName: "Nouveau", minutes: 0, declarations: { AT: "primary" } }),
+        player({ displayName: "Nouveau", minutes: 600, declarations: { AT: "primary" } }),
       ],
     });
     const cellOf = (name: string) => result.cells[result.candidates.findIndex((c) => c.id === name)][0];
     expect(cellOf("Nouveau").observed.denominator).toBe(0);
-    // One man at AT: the position's mean is his own figure, so the newcomer is credited exactly that.
-    expect(cellOf("Nouveau").adjusted).toBeCloseTo(cellOf("Habitué").adjusted as number);
+    expect(cellOf("Nouveau").adjusted).toBeNull();
+    // Habitué is at −0,8 per 60 and still goes in: measured beats unmeasured.
+    expect(cellOf("Habitué").adjusted).toBeCloseTo(-0.8);
+    expect(pickedName(result, "at")).toBe("Habitué");
   });
 });
 
