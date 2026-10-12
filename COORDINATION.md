@@ -34,12 +34,29 @@ where they disagree.**
   `db/snapshots/preview-20261012.sql`, **redacted**: no password hashes, no `sessions` rows, because
   this repository is public. `db/snapshots/README.md` has the rule. So **preview now shows « Les 7
   orteils de la main », and the old preview logins are gone**; its users are production's.
-- **Run migrations against Neon's direct endpoint, not `-pooler`.** `pg_restore` sets `search_path` to
-  `''` for its session (line 16 of any `pg_dump`), the pooler handed that connection to the next
-  client, and `0011`'s unqualified `DROP TABLE "training_attendance"` then failed on a table that was
-  plainly there. Drop `-pooler` from the host and it works; the app is unaffected because Drizzle
-  qualifies every table with its schema. Preview is at **15 migration rows** (through `0014`) with
-  `db:refreeze` run; production is still at **11** (through `0010`).
+- **Never dump, restore or migrate through Neon's `-pooler` host. Use the direct endpoint.** Line 16
+  of every `pg_dump` is `SELECT pg_catalog.set_config('search_path', '', false)`. It is session-scoped,
+  the pooler lends that server connection to the next client, and **the whole app then 500s**: Drizzle
+  does **not** qualify a table in the default schema, so `select … from "users"` resolves against an
+  empty `search_path` and Postgres answers `relation "users" does not exist`. That is not a theory —
+  it is what the preview did on 2026-10-12 until it was fixed, and the Vercel runtime log named it.
+  An earlier version of this line claimed the app was unaffected « because Drizzle qualifies every
+  table with its schema ». **That is wrong**, and it was wrong in the direction that matters.
+- **If it happens anyway, the recovery** is to connect on the **direct** endpoint and
+  `select pg_terminate_backend(pid) from pg_stat_activity where usename = 'neondb_owner' and pid <>
+  pg_backend_pid();`. The pooler then opens fresh server connections with the normal
+  `"$user", public`. Confirm with `show search_path` **on the pooled host** a few times before
+  believing it; one poisoned connection can survive a first check and fail a page minutes later.
+- Preview is at **15 migration rows** (through `0014`) with `db:refreeze` run; production is still at
+  **11** (through `0010`).
+- **The preview was walked end to end on 2026-10-12 after the swap** — both roles, every main screen,
+  no 5xx — so the swap is verified, not assumed. `/saisie` and `/composition` are a 404 for a player,
+  as decision 026 intends.
+- **The super admin's production password is trivially weak and must be rotated** (the owner said what
+  it is; it is deliberately not written here, because this repository is public). That account is a
+  coach of the team and can read and rewrite every team in the instance, and the app is on a public
+  URL. `docs/SESSIONS.md` has also been naming a candidate super-admin password in plain text for
+  weeks, which is its own problem.
 - **The cahier des charges rework has landed in full.** All thirteen slices, S1–S13 (#174–#186), are
   merged on `main` and deployed to the **preview**. Every issue #160–#172 is closed, and the Project
   « Football-manager » (`gh project view 5 --owner avznog`) holds every merged pull request and every

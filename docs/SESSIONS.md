@@ -5200,9 +5200,20 @@ right there, and `select count(*) from positions` failed too — while `show sea
 `SELECT pg_catalog.set_config('search_path', '', false)`, session-scoped, and Neon's pooler handed that
 server connection to the next client. Production, unpolluted, showed the normal `"$user", public`. The
 only persistent override on either database belongs to the `neon_auth` role, identically. Dropping
-`-pooler` from the host fixed it; `0011`–`0014` and `db:refreeze` then ran clean. **The app never
-noticed, because Drizzle qualifies every table with its schema** — it is unqualified DDL in a migration
-that breaks. Verified after: 15 migration rows, trainings and availability gone, `AIL` present,
+`-pooler` from the host fixed it; `0011`–`0014` and `db:refreeze` then ran clean.
+
+**I then wrote that the app was unaffected « because Drizzle qualifies every table with its schema »,
+and that was wrong.** It does not qualify a table in the default schema. The deployed preview was in
+fact completely broken — every login returned a 500 — and the Vercel runtime log named it exactly:
+`select "id", "username", … from "users" "users" where …` with `[cause] relation "users" does not
+exist`. An unqualified identifier against an empty `search_path` resolves to nothing, so it is not
+only migrations that break; it is the app, on its first query. The recovery was to terminate the
+poisoned backends from the **direct** endpoint
+(`pg_terminate_backend` over `pg_stat_activity where usename = 'neondb_owner'`), after which the
+pooled host reported `"$user", public` again and the login worked. One poisoned connection outlived
+the first check and still failed a page afterwards, so the pooled host is worth checking several
+times rather than once. The rule is therefore wider than it first looked: **dump, restore and migrate
+on the direct endpoint, never the pooler.** Verified after: 15 migration rows, trainings and availability gone, `AIL` present,
 `match_player_positions` filled (24 player rows, 36 position rows), per-position minutes summing to
 each player's minutes, `GB` minutes equal to `gk_minutes`, and the deployed preview answering a login
 attempt from the new data with no 5xx.
@@ -5228,3 +5239,32 @@ as a post-match change with nobody in and nobody out (S10, decision 169) — a f
 no test pins that case, so it should be verified before an import leans on it.
 
 Files: `COORDINATION.md`, `docs/SESSIONS.md`, `backlogs/matches-1-3.md`.
+
+## 2026-10-12, later — the preview was broken, and the Vercel log said why
+
+The owner asked for the preview to be checked rather than assumed, and it was right to ask: after the
+swap **every page on `dev.7orteils.bgonzva.fr` was the login screen, and the login itself returned
+500**. The walk that « passed » earlier in the day had read `200` and an `<h1>` for eighteen URLs
+without noticing that the `<h1>` was « Football Manager » on all of them — the login page's. A smoke
+test that cannot tell a logged-in page from a login page is not a smoke test; the fix was to assert
+the real heading (« Calendrier », « Statistiques », « Mode match · … ») and to wait for the URL to
+leave `/connexion` instead of for `networkidle`, which resolves before the redirect.
+
+The cause and the correction are written up above, under the swap: `pg_restore` empties `search_path`
+for its session, Neon's pooler reuses that connection, and Drizzle's unqualified `"users"` then does
+not resolve. The claim that the app was immune was mine and it was wrong.
+
+**After the fix, walked in full, both roles, no 5xx and no page error:** `/calendrier`, `/equipe`,
+`/stats`, all four `équipe type` sevens, `/moi`, a player's page, a finished match and its recap and
+notation, the corrections screen, a scheduled match and its compositions, and game mode on the live
+match. A player gets a 404 on `/saisie` and `/composition`, which is decision 026. Game mode on the
+live match correctly shows the starting composition as **proposed and not applied** — decision 153
+applies it on open only *before* the kick-off, and that match has one.
+
+Two leftovers seen and not touched, both already named elsewhere: game mode still says « hors
+feuille » where S6 renamed it « non sélectionné », and the équipe type reads « pas son poste » on six
+of seven discs because production has coach-set positions for one player only.
+
+Two preview accounts were given a known password so the deployed app could be walked at all —
+production's hashes came with the restore. That is a write to preview and nowhere else; the scratch
+script that did it refused any host but the preview endpoint and was deleted.
