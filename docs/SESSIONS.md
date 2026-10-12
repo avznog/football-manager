@@ -5415,3 +5415,40 @@ Gardien de but, Défenseur central, Ailier », above the minutes those came from
 
 Files: `scripts/assign-positions-from-play.mts`, `docs/DECISIONS.md` (180), `docs/ROADMAP.md`,
 `docs/SESSIONS.md`.
+
+## 2026-10-12, last — the rebuilt data is kept, and the apply was rehearsed on a copy of production
+
+The owner asked that the work not have to be done twice: « when we will be deploying on prod, we will
+want all these data to be integrated in the production ». So the result is committed as
+`db/snapshots/matches-1-3-rebuilt.sql` — the three rebuilt event logs, their two derived caches, the
+match sheets and the 29 preferred positions. It carries **no users, no hashes, no sessions and no
+ratings**, so unlike `preview-20261012.sql` nothing needed redacting for a public repository.
+
+**It can be applied to production at all only because the identifiers are production's.** Preview was
+restored from production the same morning, and that was verified rather than assumed: the md5 of every
+`matches.id`, `team_members.id` and `users.id` is identical on both. `positions` is the one table whose
+md5 differs, and for the expected reason — production is at `0010` and has no `AIL`. That is the file's
+precondition, written at its top: **apply it after the next tag has run `0011`–`0014` and
+`db:refreeze`**, never before.
+
+**The apply was rehearsed end to end on a local restore of the production dump taken the same day**,
+which is the part worth copying next time. Restore production's `public` and `drizzle` (creating the
+`drizzle` schema by hand first, because `pg_restore --schema=X` filters out its own `CREATE SCHEMA`),
+run `db:migrate` — 11 → 15 migration rows, `AIL` appears — run `db:refreeze` as `release.yml` does,
+then apply the file. The result is **byte-identical to preview across seven fingerprints**:
+`match_events`, `match_player_stats`, `match_player_positions`, `player_positions`, `match_squad`, the
+match statuses and `lineups.applied_event_id`. The four checks the file's own header tells a reader to
+run afterwards were then run on that rehearsal: Bayern `finished`, scores 3–9 / 3–2 / 2–5, Galacticos'
+four keepers with Nicolas absent, and 29 wishes over 15 members with one primary each.
+
+**Two things the file has to do in the right order**, both of which would otherwise fail: it releases
+`lineups.applied_event_id` before deleting `match_events` (that column has a foreign key to it) and
+restores it afterwards; and it finishes Bayern, which production still carries as `live`.
+
+There are now two routes to the same state and the README says which to use when: **this file** for
+exactly what was reviewed on preview, and **the two scripts** — `rebuild-matches.mts` and
+`assign-positions-from-play.mts`, driven by `backlogs/matches-1-3-blocks.json` — when the paper has
+changed. Both scripts refuse production by name, deliberately.
+
+Files: `db/snapshots/matches-1-3-rebuilt.sql`, `db/snapshots/README.md`, `COORDINATION.md`,
+`docs/SESSIONS.md`.
