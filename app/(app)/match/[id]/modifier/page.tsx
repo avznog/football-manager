@@ -4,24 +4,23 @@
  * `params` is a Promise in Next 16 and `PageProps<"/match/[id]/modifier">` comes from
  * `next typegen` (`docs/NEXTJS16.md`).
  *
- * The « supprimer » button only appears while the event log is empty. A match that has been played
- * is never deleted: `match_events` is append-only and holds the only record of what happened
- * (decision 003). `deleteMatch` refuses regardless — this just avoids offering a dead button.
+ * **Deleting is no longer here** (decision 191). It used to be a « Supprimer » card at the bottom of
+ * this form, offered only while the event log was empty — because a played match could not be deleted
+ * at all. Now one can, and what that destroys is big enough to deserve a screen of its own:
+ * `/match/[id]/supprimer`, reached from the match page. Two entry points to one irreversible act is
+ * one too many, and the one that survives is the one on the page that shows what would be lost.
  */
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
-import { matchDeletionWarningFr } from "@/lib/calendar/deletion";
 import { toLocalInput } from "@/lib/calendar/time";
 import { competitionOptions } from "@/lib/competition/options";
 import { getTeamCompetitions } from "@/lib/competition/queries";
-import { deleteMatch } from "@/lib/match/actions";
-import { getMatch, getMatchDeletionHolds, hasMatchEvents } from "@/lib/match/queries";
+import { getMatch } from "@/lib/match/queries";
 import { MatchForm } from "../../_components/match-form";
 
 export const metadata = { title: "Modifier le match" };
@@ -33,11 +32,7 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
   const match = await getMatch(team.id, id);
   if (!match) notFound();
 
-  const [logged, holds, allCompetitions] = await Promise.all([
-    hasMatchEvents(match.id),
-    getMatchDeletionHolds(match.id),
-    getTeamCompetitions(team.id),
-  ]);
+  const allCompetitions = await getTeamCompetitions(team.id);
 
   // The competition this match is already filed under stays offered even once archived: saving the
   // form would otherwise silently re-file last autumn's cup match under the championship.
@@ -71,21 +66,6 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
           }}
         />
       </Card>
-
-      {!logged && can(actor, "match:delete", { teamId: team.id }) ? (
-        <Card title="Supprimer" description={matchDeletionWarningFr(holds)}>
-          {/* A plain form: no confirmation dialog to get wrong, and it works without JavaScript.
-              Which is exactly why the description above counts the sheet and the compositions the
-              cascade takes too (decision 098). */}
-          <form action={deleteMatch}>
-            <input type="hidden" name="teamId" value={team.id} />
-            <input type="hidden" name="matchId" value={match.id} />
-            <Button type="submit" variant="danger" fullWidth>
-              Supprimer ce match
-            </Button>
-          </form>
-        </Card>
-      ) : null}
     </div>
   );
 }

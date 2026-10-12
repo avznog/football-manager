@@ -54,6 +54,9 @@ travaillez ».
 
 1. **`match_events` is append-only.** Never `UPDATE`, never `DELETE`. A mistake is corrected by
    appending a `VOID` event that points at it. The reducer skips voided events.
+   This is about **rewriting history**, so deleting the match itself is not an exception to it
+   (decision 191): nothing is left behind to be read as a half-truth, it is behind `can()` and a
+   confirmation that counts what goes, and no screen in the app deletes an individual event.
 2. **All live match state is derived**, never stored: score, who is on the pitch, minutes played,
    clean-sheet minutes. `lib/match/reducer.ts` is the only place that computes it, and it is a
    **pure function** — no database access, no `Date.now()`, no randomness. This is what makes it

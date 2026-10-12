@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { meanOfNotes, meansAreVisible } from "./published";
+import { meanOfNotes, meansAreReadable, meansAreVisible } from "./published";
 
 describe("meansAreVisible", () => {
   it("hides a match nobody has released", () => {
@@ -19,6 +19,33 @@ describe("meansAreVisible", () => {
     // « not yet » would hide a match the coach had just shown.
     expect(meansAreVisible(Date.parse("2099-01-01T00:00:00Z"))).toBe(true);
     expect(meansAreVisible(0)).toBe(true);
+  });
+});
+
+describe("meansAreReadable", () => {
+  const PUBLISHED = Date.parse("2026-10-02T18:00:00Z");
+
+  it("shows an unpublished match to the coach", () => {
+    // Decision 190, the whole of it: he no longer waits for his own switch.
+    expect(meansAreReadable(null, true)).toBe(true);
+  });
+
+  it("still hides an unpublished match from everybody else", () => {
+    // The half that must not move: publication is what the *team* waits for.
+    expect(meansAreReadable(null, false)).toBe(false);
+  });
+
+  it("shows a published match to everybody", () => {
+    expect(meansAreReadable(PUBLISHED, false)).toBe(true);
+    expect(meansAreReadable(PUBLISHED, true)).toBe(true);
+  });
+
+  it("never contradicts meansAreVisible for a reader who is not the coach", () => {
+    // Two spellings of one rule is how a season table comes to disagree with a match page, so the
+    // player's arm of this predicate is asserted to *be* the old one rather than to resemble it.
+    for (const publishedAt of [null, 0, PUBLISHED]) {
+      expect(meansAreReadable(publishedAt, false)).toBe(meansAreVisible(publishedAt));
+    }
   });
 });
 

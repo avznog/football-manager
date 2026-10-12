@@ -241,7 +241,7 @@ export async function amendMatchEvents(actor: Actor, raw: unknown): Promise<Appe
 
   revalidatePath(`/match/${matchId}`);
   revalidatePath(`/match/${matchId}/jeu`);
-  revalidatePath(`/match/${matchId}/recap`);
+  revalidatePath(`/match/${matchId}`);
   revalidatePath(`/match/${matchId}/saisie`);
   revalidatePath("/stats");
   revalidatePath("/calendrier");

@@ -166,8 +166,10 @@ async function discover(): Promise<{ coach: string; player: string; targets: Tar
       // is the point. What a non-operator does not get is the buttons.
       { name: "jeu", path: `/match/${scheduled.id}/jeu`, audience: "everyone" },
       { name: "notation", path: `/match/${played.id}/notation`, audience: "everyone" },
-      { name: "recap", path: `/match/${played.id}/recap`, audience: "everyone" },
+      // No « recap » entry: decision 189 merged it into « match-joue » above, which now carries the
+      // result, the notes, the temps de jeu, the Déroulé and the blocks. `/recap` only redirects.
       { name: "saisie", path: `/match/${retro.id}/saisie`, audience: "coach" },
+      { name: "match-supprimer", path: `/match/${played.id}/supprimer`, audience: "coach" },
     ],
   };
 }

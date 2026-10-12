@@ -7202,6 +7202,211 @@ names landing on one member all abort before a row is written.
 « Alexis CHARRIER » still maps to nobody, and the script asserts what the old `profiles.json` shows:
 he is in the old database, he is an admin of it, and he gives no note and receives none.
 
+## 189 — A finished match is one page, in the order a reader wants it
+
+**2026-10-12** · accepted · **supersedes the « this lives at its own route » paragraph of the recap
+(screen 6 of `docs/PLAN.md`)** and extends decision 174's ordering to the half of the page that comes
+after the final whistle · issues #215 and #216 · no migration
+
+The owner's fourth backlog: « Once a game is over, there are two different pages. There should not :
+there is the page where we see "composition", "après le match", "corriger le match" and there is the
+page where we see "Les notes", "temps de jeu", "déroulé du match". Merge those into one. »
+
+He is right, and the split had stopped meaning anything rather than having been wrong to begin with.
+The reasoning behind `/match/[id]/recap` was written down and was about *mood*: the match page is
+where a match is organised, the recap is where it is read, « a different shape, a different mood, and
+a different set of people coming to it ». After a season, nobody opens a match played three weeks ago
+to organise it, and the page he landed on offered him a button to the page he wanted.
+
+### The merge, and what disappears with it
+
+`/match/[id]` carries everything both pages had. `/match/[id]/recap` is a **`permanentRedirect`**, not
+a 404: the old URL is in a WhatsApp message from last Sunday and in a dozen browser histories, and
+nothing in this repository can reach those. Every `href` to it in `app/`, `lib/` and `e2e/` is
+rewritten — the calendar's past rows, the notation screen's four ways out, two Server Action redirects
+and three `revalidatePath` calls.
+
+Three things are **deleted** rather than moved, and each existed only because there were two pages:
+
+- **« Après le match », the card whose whole content was a « Voir le résumé » button.** Its other job
+  — the rating duty — is the « À toi de noter » card the recap already had, so the two became one;
+- **the recap's two empty states**, « Ce match n'a pas encore été joué » and « Le match n'est pas
+  terminé ». They existed because a reader could reach the reading page of a match with nothing to
+  read. On the merged page a scheduled match simply shows the organising half, which is the honest
+  answer and not a refusal;
+- **the match page's own one-line score and result.** The `Scoreboard` says the same figures plus the
+  scorers, the assists and « 11 joueurs utilisés », so printing both was the same number twice, 200 px
+  apart. The header keeps a scoreline **only while a match is `live`**, where a result would be a
+  claim nobody can make yet.
+
+### The order, which is the design
+
+The page is long — fifteen screens of scroll on the owner's Galacticos match, most of it the coach's
+notes panel — so the order is not a detail. Two sequences:
+
+- **before and during**, unchanged from decision 174: « Mode match », the composition, « Terminer le
+  match ». That is the order of the afternoon;
+- **after**, which is the owner's own list: the **result**, the **notes** (the duty first for whoever
+  still owes some, then the man of the match, then the panel), the **temps de jeu**, the **Déroulé**,
+  the **compositions** the match went through, then the coach's planning card, the **corrections**,
+  game mode as consultation, and the deletion last of all (decision 191).
+
+Two judgements inside that list. The coach's « Composition » card goes **below** the blocks: after the
+match the blocks are what happened and the card is what he planned, including the plans the afternoon
+never used, so the record comes before the intention. And « Saisir le match » / « Corriger le match »
+stays one card in the corrections slot even though an unrecorded match makes it the page's only real
+action — because on such a match there are no notes, no minutes, no Déroulé and no blocks, so that
+slot *is* the top of the page. The alternative was a second copy of the card higher up, which is the
+duplication the owner asked to be rid of.
+
+The browser suite pins the order as a list of `h2`s, for both readers in one pass, because every other
+assertion in it passes with the cards shuffled.
+
+### « Temps de jeu » gains the two figures of issue #216, and loses one
+
+« On the "Temps de jeu" pannel, I want you to add the minutes played as a goal, and the minutes of
+invincibility (X goal taken every X minutes, goal included). » Both are per-player **sentences** under
+the name, where « 1 csc » already lives, rather than two more right-aligned columns: six numeric
+columns do not fit 390 px, and a column headed « But » holding 20 would be read as goals scored.
+
+- **« 20′ au but »**, from `gkMinutes`. In a team where the gloves go round — four keepers in one of
+  the three rebuilt matches (decision 179) — « il a joué 50′ » and « il en a passé 20 au but » are two
+  facts, and the panel stated only the first;
+- **« 1 but toutes les 6′ sur 50′ »**, `concededWhileOn` over `minutes`. He calls it « minutes of
+  invincibility » and defines it as the rate, which is what is built: his whole time on the pitch,
+  **goals taken while he wore the gloves included**, which is his « goal included ». A man who
+  conceded nothing reads **« Aucun but encaissé en 6′ »** — his own words, chosen on 2026-10-12 —
+  never ∞ and never a division. The formatter is `concededRateLineFr` in `lib/stats/format.ts`, the
+  one `/stats` prints its « Buts encaissés » cards with, so a player reads the same sentence about
+  himself on both screens;
+- **and « 13′ sans encaisser » is gone.** The owner had « minutes d'invincibilité » removed from the
+  statistics as meaningless, and a stretch of minutes with nothing conceded in it is that quantity
+  under another name. Leaving it on the one panel this entry exists to improve would have made the app
+  contradict itself between `/stats` and the match page. `gkCleanMinutes` is still **measured** —
+  `lib/stats/best-seven.ts` fits the équipe type's keeper slot on it — and is still carried on the
+  recap's player line; what changed is that nothing shows it.
+
+The components move from `app/(app)/match/[id]/recap/_components/` to
+`app/(app)/match/[id]/_components/`, next to the page that renders them.
+
+### The cost, stated
+
+Two full replays of the log per render of a finished match: `getMatchRecap` and `getRatingResults`
+each call `loadMatchState`. That is what the two pages did between them before the merge, so nothing
+got slower, and threading one `MatchState` through `getRatingResults` would make its three other
+callers carry a value none of them wants. It is written down in the page rather than fixed, so that
+the next session knows the duplication is seen rather than missed.
+
+## 190 — The coach reads every note at any moment; publication is what the team waits for
+
+**2026-10-12** · accepted · **supersedes decision 139's « nothing else ever opens this » as it
+applies to the coach**, and nothing else of 137, 139 or 159 · keeps `MIN_NOTES_FOR_MEAN` applied to
+the coach, deliberately · issue #225 · no migration
+
+The owner: « At any moment, the coach sees the ratings of every one. Basically, as if the ratings were
+released. »
+
+What he was looking at was a screen that gave him **every individual note** of a match — that is
+decision 137, and the notes are his alone — and refused him **the mean of those same notes** until he
+had pressed his own button. `getRatingResults` returned `published: false` above the select, for
+everybody, the coach included; the stated reason was that having a button to show the figures is a
+different thing from reading them early. It is, and it was the wrong line to draw: the man deciding
+whether a match's means are fit to go out was the one man not allowed to look at them first.
+
+**`meansAreReadable(publishedAtMs, isCoach)`** is the new predicate, beside the untouched
+`meansAreVisible`. `isCoach` is `can(actor, "rating:readNotes", …)` passed in — the permission that
+already means « the notes and the counts are his » — rather than a new action, because a second way of
+asking one question is how two answers drift apart.
+
+- **Publication is unchanged for the team.** `matches.ratings_published_at` is still the one column
+  the coach writes, still reversible, and still the whole of « are the means out » for every other
+  reader. `published` stays on the payload beside the new `readable` discriminant, because the screen
+  has to say *which* of the two it is showing him;
+- **and it says so twice**: a « pas encore sorties » badge on « Les notes », and a sentence — « Les
+  moyennes ne sont pas encore sorties : tu es le seul à les voir. » The man-of-the-match card he now
+  also reaches early carries « personne d'autre ne lit ça », because « Homme du match » on a card the
+  squad cannot see is a celebration that has not happened yet;
+- **the switch moved** with him. « Sortir les moyennes » used to live only in the empty state he no
+  longer lands on; it is now under the figures, in the full panel and in the « pas encore assez de
+  notes » one.
+
+### `MIN_NOTES_FOR_MEAN = 3` still applies to him, and that was asked
+
+Decision 137's note says the floor is about the **figure**, not about the reader, and that the coach
+« is not deprived, because he has the notes themselves ». That reasoning survives this entry intact,
+and the Atletico test match is the proof on screen: twelve notes, one per player, every mean « — », and
+under each one the note itself — « 5,0 Léo C ». He loses nothing a mean of one note would have told
+him. If the floor were lifted for him alone, his screen and the squad's would disagree about what
+counts as a mean, for one reader, with nothing on either to say which number he was quoting.
+
+### What does not change, and the seam it leaves
+
+The « notes seven », `/stats` and a player's profile still count **published** matches only. That is
+deliberate and it is a seam worth naming: the coach now reads a figure on a match page that is in none
+of his own season averages. Season statistics are a different claim — what the team's record *is* —
+and making them depend on who is looking is precisely the tree decision 137 tore out. If the owner
+wants his statistics to include matches he has not published, that is a separate decision, and it is
+his.
+
+## 191 — A match can be deleted, with everything attached to it, behind a confirmation that counts
+
+**2026-10-12** · accepted · **supersedes `deleteMatch`'s refusal of a match with a log**, which was
+decision 003 read as « a log is never deleted » · amends non-negotiable invariant 1 of `CLAUDE.md`
+with one sentence · issue #214 · no migration
+
+« Possiblity to delete a game. This would delete every data linked to it. »
+
+Until now `deleteMatch` counted `match_events` and returned silently if there were any, and the only
+button leading to it was at the bottom of `/match/[id]/modifier`, offered only while that count was
+zero. So a match recorded by mistake — the wrong opponent, a friendly that turned out to be somebody
+else's, an afternoon typed up twice — became undeletable the moment anything was logged against it.
+
+### Invariant 1 is not weakened, and the distinction is the whole entry
+
+« `match_events` is append-only. Never `UPDATE`, never `DELETE`. » is about **rewriting history**: a
+goal given to the wrong man is corrected by appending a `VOID`, so that the log a figure was derived
+from is still there to be read. Deleting a match does not rewrite a match. It removes the subject the
+log is about, and leaves nothing behind to be read as a half-truth — which is the failure mode
+append-only exists to prevent. `CLAUDE.md`'s invariant now says that in a sentence, so the next session
+does not have to re-derive it. The *other* exception, decision 179's rebuild, remains a scripted,
+preview-only one: no screen in the app deletes an individual event, and none is being added.
+
+### How it is carried
+
+- **`can()` and nothing else decides.** `match:delete` is in `COACH_ACTIONS` and nowhere else, so the
+  delegated match operator's clause does not reach it: running game mode for one afternoon is lent out
+  (decision 004), erasing the afternoon is not. A player's crafted post lands on `assertCan`'s throw
+  before a row is read, which the browser suite asserts with his own session and the action id read
+  off the coach's form — the page being a 404 for him is a courtesy, not the guard;
+- **one transaction, with the orphan check inside it.** The children all carry `on delete cascade`, so
+  the single `delete` is meant to be enough — and « meant to be » is what a schema change quietly
+  breaks. So the transaction counts what is left in all seven tables (`match_events`,
+  `match_player_stats`, `match_player_positions`, `match_squad`, `ratings`, `lineups`, `lineup_slots`)
+  and **rolls itself back** if anything answers. A child table added later without a cascade fails
+  loudly here instead of leaving rows nothing can reach;
+- **`ratings_published_at` goes with the row**, being a column of it, and `injuries` does **not**: it
+  is keyed on the member and the dates, never on the match, and a torn hamstring is not undone by a
+  calendar row disappearing.
+
+### The confirmation is a screen, and it counts
+
+`/match/[id]/supprimer`, reached from a card at the bottom of the match page — under everything it
+would destroy. A plain form and a plain « Annuler » link, so it works with no JavaScript and has no
+dialog to mis-tap, and `matchDeletionWarningFr` names what goes **with quantities**: « Le match
+disparaît du calendrier, et avec lui 28 événements du déroulé, 111 notes, la feuille de match et 1
+composition. C'est définitif. » A category makes nobody stop; a number does. The log is named first
+because it is the only one of the four that cannot be entered again — a sheet can be re-ticked and a
+composition re-drawn, while « qui a marqué à la 54ᵉ » is gone. `match_player_stats` and
+`match_player_positions` are deliberately **not** counted: they are a cache of what the log already
+says, and asking a coach to weigh a number that is not a fact of his afternoon is noise.
+
+There is deliberately **no second gesture** — no « type the opponent's name » box. The screen is two
+taps and a page of consequences away from anything mis-tappable, and a confirmation nobody reads
+because it is a chore is worse than one sentence he does read.
+
+**The card left `/match/[id]/modifier`.** Two entry points to one irreversible act is one too many, and
+the one that survives is on the page that shows what would be lost.
+
 ## 192 — Game mode stops listing everybody who is off the pitch
 **2026-10-12** · accepted · the owner's fourth backlog (issue #217) · **supersedes decision 087** on
 the heading of that list, which no longer exists · no migration

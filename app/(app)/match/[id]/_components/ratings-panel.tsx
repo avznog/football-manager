@@ -4,17 +4,22 @@
  * ## Two readers, one component, and the difference is in the data
  *
  * Decision 137 splits this screen in two, and the split is **not** done here. `getRatingResults`
- * decides both halves before it issues a select: an unpublished match's scores are never read at all,
- * and a reader who is not the coach receives `received: []` and `count: null` for every player. So the
- * `canSeeNotes` branches below are about *layout*, not about secrecy — there is nothing in the RSC
- * payload for a crafted request or a DevTools inspection to find. See `lib/rating/queries.ts`.
+ * decides both halves before it issues a select: an unpublished match's scores are never read for the
+ * team at all, and a reader who is not the coach receives `received: []` and `count: null` for every
+ * player. So the `canSeeNotes` branches below are about *layout*, not about secrecy — there is
+ * nothing in the RSC payload for a crafted request or a DevTools inspection to find. See
+ * `lib/rating/queries.ts`.
  *
  * What each reader gets:
  *
- * - **a player** reads « Karim · 7,5 ». No count, which is the question the owner was asked and
- *   answered: on his own row the count is an invitation to work out who did not rate him, and in a
- *   squad of a dozen that arithmetic is easy and poisonous;
- * - **the coach** reads « Karim · 7,5 (5 notes) » and under it every note with its author.
+ * - **a player** reads « Karim · 7,5 », once the coach has shown the means. No count, which is the
+ *   question the owner was asked and answered: on his own row the count is an invitation to work out
+ *   who did not rate him, and in a squad of a dozen that arithmetic is easy and poisonous;
+ * - **the coach** reads « Karim · 7,5 (5 notes) » and under it every note with its author —
+ *   **whether or not he has shown them** (decision 190). When he has not, the card says so above the
+ *   figures and his « Sortir les moyennes » button sits under them: what he is looking at is not what
+ *   the squad can look at, and a screen that did not say which of the two it was showing him would be
+ *   worse than one that made him publish to find out.
  *
  * ## Why « en attente » is not a locked door any more
  *
@@ -53,7 +58,7 @@ export function RatingsPanel({
    */
   mayRate: boolean;
 }) {
-  if (!results.published) {
+  if (!results.readable) {
     return (
       <Card title="Les notes" as="h2">
         <div className="space-y-3">
@@ -71,8 +76,11 @@ export function RatingsPanel({
             }
           />
 
-          {/* Coach only, and the only thing that ever opens this (decision 139) — nothing publishes a
-              match by itself any more, so this is not an escape hatch but the door. */}
+          {/* Unreachable as the permissions stand, and kept rather than deleted: `rating:readNotes`
+              and `rating:publish` are both the coach's (`lib/auth/can.ts`), so a reader who lands in
+              this branch — he cannot read the notes, hence decision 190 does not open the figures for
+              him — never has the switch either. If the two are ever separated, the man who may
+              publish must not lose the button. */}
           {results.canPublish ? (
             <RatingsVisibilityForm
               teamId={teamId}
@@ -97,9 +105,33 @@ export function RatingsPanel({
    */
   const hasRows = rated.length > 0 || (results.canSeeNotes && results.ratingCount > 0);
 
+  /**
+   * The switch, whichever way it points, and null for a reader who does not hold it.
+   *
+   * One expression rather than two call sites, because under decision 190 the coach reaches the
+   * *published* layout of this card while the means are still in — so « Sortir les moyennes » now has
+   * to be reachable from the full panel and from the « pas encore assez de notes » state, and not
+   * only from the empty one it used to live in.
+   */
+  const visibilitySwitch = results.canHide ? (
+    <RatingsVisibilityForm teamId={teamId} matchId={matchId} mode="hide" silent={0} />
+  ) : results.canPublish ? (
+    <RatingsVisibilityForm
+      teamId={teamId}
+      matchId={matchId}
+      mode="show"
+      silent={results.tally?.silent.length ?? 0}
+    />
+  ) : null;
+
+  /** « pas encore sorties » — the coach is reading figures the squad cannot (decision 190). */
+  const hiddenBadge = results.published ? null : (
+    <Badge variant="warning">pas encore sorties</Badge>
+  );
+
   if (!hasRows) {
     return (
-      <Card title="Les notes" as="h2">
+      <Card title="Les notes" as="h2" action={hiddenBadge ?? undefined}>
         <div className="space-y-3">
           <EmptyState
             title="Pas encore assez de notes"
@@ -111,12 +143,10 @@ export function RatingsPanel({
             }
           />
 
-          {/* The coach has shown a match that has nothing to show, which is exactly the state he will
-              want to undo. Offering the way back here rather than only on the full panel is the whole
-              point of a switch that goes both ways. */}
-          {results.canHide ? (
-            <RatingsVisibilityForm teamId={teamId} matchId={matchId} mode="hide" silent={0} />
-          ) : null}
+          {/* Either half of the switch. Published and empty is the state the coach will want to undo;
+              unpublished and empty is the state he reads before deciding — and he gets here now
+              rather than to the « pas encore sorties » card above (decision 190). */}
+          {visibilitySwitch}
         </div>
       </Card>
     );
@@ -125,19 +155,9 @@ export function RatingsPanel({
   return (
     <Card
       title="Les notes"
-      /* The coach alone gets a denominator, and it is **the match sheet** rather than the players with
-         minutes or the whole team: its starters, substitutes and supporters are who may rate (decision
-         159), so « 23 notes, 5 sur 12 de la feuille de match » is the state of the collection. `tally`
-         is null for every other reader. */
-      description={
-        results.tally
-          ? `${pluralize(results.ratingCount, "note")}, ${tallyFractionFr(results.tally)}.` +
-            (rated.length === 0
-              ? ` Aucune moyenne n’est sortie : il en faut ${MIN_NOTES_FOR_MEAN} sur un même joueur.`
-              : "")
-          : "La moyenne des notes des coéquipiers, pour chaque joueur qui était sur le terrain."
-      }
+      description={panelDescriptionFr(results, rated.length)}
       as="h2"
+      action={hiddenBadge ?? undefined}
       flush
     >
       <ul className="divide-y divide-border/60 border-t border-border/60">
@@ -148,15 +168,48 @@ export function RatingsPanel({
         ))}
       </ul>
 
-      {/* The other half of the switch. Below the figures rather than above them, because the card is
-          here to be read and this is an action on it — and `flush` means the padding is ours. */}
-      {results.canHide ? (
-        <div className="border-t border-border/60 px-4 py-3">
-          <RatingsVisibilityForm teamId={teamId} matchId={matchId} mode="hide" silent={0} />
-        </div>
+      {/* The switch. Below the figures rather than above them, because the card is here to be read and
+          this is an action on it — and `flush` means the padding is ours. */}
+      {visibilitySwitch ? (
+        <div className="border-t border-border/60 px-4 py-3">{visibilitySwitch}</div>
       ) : null}
     </Card>
   );
+}
+
+/**
+ * What the card says about itself, to the two people who can be reading it.
+ *
+ * The coach alone gets a denominator, and it is **the match sheet** rather than the players with
+ * minutes or the whole team: its starters, substitutes and supporters are who may rate (decision
+ * 159), so « 23 notes, 5 sur 12 de la feuille de match » is the state of the collection. `tally` is
+ * null for every other reader.
+ *
+ * And since decision 190 it also has to say **which of the two screens he is on**: a coach reading
+ * figures nobody else can read is told so in words, not only by the badge. « tu es le seul à les
+ * voir » rather than « elles sont masquées » — the second describes the team's screen, and the
+ * sentence is about his.
+ */
+function panelDescriptionFr(
+  results: Extract<RatingResultsView, { readable: true }>,
+  ratedCount: number,
+): string {
+  if (!results.tally) {
+    return "La moyenne des notes des coéquipiers, pour chaque joueur qui était sur le terrain.";
+  }
+
+  const parts = [`${pluralize(results.ratingCount, "note")}, ${tallyFractionFr(results.tally)}.`];
+  if (!results.published) {
+    parts.push("Les moyennes ne sont pas encore sorties : tu es le seul à les voir.");
+  }
+  if (ratedCount === 0) {
+    // « ne se calcule » rather than « n'est sortie », which decision 190 made ambiguous: on his
+    // screen « sortie » is now about publication and this sentence is about the floor.
+    parts.push(
+      `Aucune moyenne ne se calcule : il en faut ${MIN_NOTES_FOR_MEAN} sur un même joueur.`,
+    );
+  }
+  return parts.join(" ");
 }
 
 /**
@@ -174,7 +227,7 @@ export function RatingsPanel({
  * list of people to blame, when the only person who can end it is the coach.
  */
 function pendingDescriptionFr(
-  results: Extract<RatingResultsView, { published: false }>,
+  results: Extract<RatingResultsView, { readable: false }>,
   mayRate: boolean,
 ): string {
   const mine =

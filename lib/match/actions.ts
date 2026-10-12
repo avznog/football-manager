@@ -15,7 +15,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
-import { competitions, matchEvents, matches } from "@/db/schema";
+import { competitions, matches } from "@/db/schema";
 import { assertCan } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
@@ -44,6 +44,9 @@ async function competitionBelongsToTeam(teamId: string, competitionId: string): 
 
 const UNKNOWN_COMPETITION_FR =
   "Cette compétition n’existe plus. Choisis-en une autre, ou recrée-la sur la page Équipe.";
+
+/** The handle Drizzle hands to a `db.transaction` callback. */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** Everything a calendar change can be seen from. */
 function revalidateCalendar(matchId?: string): void {
@@ -135,11 +138,30 @@ export async function updateMatch(_prev: FormState, formData: FormData): Promise
 }
 
 /**
- * Deletes a match that was never played.
+ * Deletes a match, and everything that hangs off it, in one transaction.
  *
- * A match with events in its log is **never** deleted: `match_events` is append-only and holds
- * the only record of what happened (decision 003), and a cascade would erase it. A mistake on a
- * played match is corrected by amending it (M7), not by dropping the row.
+ * **It used to refuse a played match**, and that refusal was decision 003 read as « a log is never
+ * deleted ». The owner asked for the opposite (decision 191): a match recorded by mistake, or a
+ * friendly that turned out to be somebody else's, takes its déroulé, its notes, its sheet and its
+ * compositions with it. Invariant 1 is not weakened by this and is not an exception to it either:
+ * append-only is about **rewriting history** — a goal given to the wrong man is corrected by
+ * appending a `VOID`, never by an `UPDATE` — and this does not rewrite a match, it removes the
+ * subject the log is about. Nothing survives to be read as a half-truth, which is the failure mode
+ * append-only exists to prevent.
+ *
+ * Three things carry it:
+ *
+ * - **`can()` and nothing else decides** (invariant 4). `match:delete` is in `COACH_ACTIONS` and
+ *   nowhere else, so a player's crafted post lands on `assertCan`'s throw before a row is read. The
+ *   UI not offering the card is a courtesy, not the guard;
+ * - **one transaction**, because a half-deleted match is worse than either outcome: a `matches` row
+ *   gone with notes still pointing at it is unreachable data, and a log gone with the match left is a
+ *   match that silently claims nothing happened;
+ * - **the orphan check is inside it.** The children all carry `on delete cascade`, so the single
+ *   `delete` is already meant to be enough — but « meant to be » is what a schema change quietly
+ *   breaks, and the one thing the owner cannot check by looking is whether something was left
+ *   behind. So the transaction counts what is left in all seven tables and **rolls itself back** if
+ *   anything answers. A table added later without a cascade fails loudly here rather than leaking.
  */
 export async function deleteMatch(formData: FormData): Promise<void> {
   const actor = await requireActor();
@@ -152,22 +174,56 @@ export async function deleteMatch(formData: FormData): Promise<void> {
 
   assertCan(actor, "match:delete", { teamId: parsed.data.teamId });
 
-  const [{ count } = { count: "0" }] = await db
-    .select({ count: sql<string>`count(*)` })
-    .from(matchEvents)
-    .where(eq(matchEvents.matchId, parsed.data.matchId));
+  const { matchId, teamId } = parsed.data;
 
-  if (Number(count) > 0) {
-    // Nothing to report through: the UI only offers the button on a match with an empty log.
-    return;
-  }
+  await db.transaction(async (tx) => {
+    const deleted = await tx
+      .delete(matches)
+      .where(and(eq(matches.id, matchId), eq(matches.teamId, teamId)))
+      .returning({ id: matches.id });
 
-  await db
-    .delete(matches)
-    .where(and(eq(matches.id, parsed.data.matchId), eq(matches.teamId, parsed.data.teamId)));
+    // Another team's match, or one already gone: nothing was deleted, so there is nothing to check
+    // and nothing to report — the screen that offered this only exists for a match of this team.
+    if (deleted.length === 0) return;
+
+    const left = await countMatchOrphans(tx, matchId);
+    if (left > 0) {
+      // Rolls the delete back. The message is for the log and for whoever reads it next; a coach
+      // sees the error boundary and the match still in his calendar, which is the safe half.
+      throw new Error(
+        `deleteMatch: ${left} row(s) still reference match ${matchId} after the delete — ` +
+          "a child table is missing its `on delete cascade`. Rolled back.",
+      );
+    }
+  });
 
   revalidateCalendar();
   redirect("/calendrier");
+}
+
+/**
+ * How many rows still point at a match. Zero is what makes « rien ne reste » a fact rather than a
+ * claim about the schema.
+ *
+ * Every table that holds a `match_id`, plus `lineup_slots`, which holds a `lineup_id` and so would
+ * survive a `lineups` row deleted without its own cascade. Read inside the deleting transaction, so
+ * what it sees is what the delete left.
+ */
+async function countMatchOrphans(tx: Tx, matchId: string): Promise<number> {
+  const [row] = await tx.execute<{ left: string }>(sql`
+    select
+      (select count(*) from match_events where match_id = ${matchId})
+      + (select count(*) from match_player_stats where match_id = ${matchId})
+      + (select count(*) from match_player_positions where match_id = ${matchId})
+      + (select count(*) from match_squad where match_id = ${matchId})
+      + (select count(*) from ratings where match_id = ${matchId})
+      + (select count(*) from lineups where match_id = ${matchId})
+      + (select count(*) from lineup_slots
+           where lineup_id in (select id from lineups where match_id = ${matchId}))
+      as left
+  `);
+
+  return Number(row?.left ?? 0);
 }
 
 /* -------------------------------------------------------------------------- */

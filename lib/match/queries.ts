@@ -186,15 +186,23 @@ export async function hasMatchEvents(matchId: string): Promise<boolean> {
 }
 
 /**
- * What would go with this match, for the sentence on the « supprimer » card.
+ * What would go with this match, for the sentence on the confirmation screen.
  *
- * Two counts in one round trip, from a match row that is not joined to anything: scalar
+ * Four counts in one round trip, from a match row that is not joined to anything: scalar
  * subqueries, so a match with no sheet and no composition still comes back with zeros rather than
  * no row at all.
+ *
+ * The log and the notes joined the sheet and the compositions with decision 191, which made a
+ * played match deletable: before it the button existed only on a match with an empty log, so
+ * counting `match_events` would have described something nobody could reach. `match_events` is
+ * counted **raw** — voided rows included — because the warning is about what disappears from the
+ * database, not about what the Déroulé draws.
  */
 export async function getMatchDeletionHolds(matchId: string): Promise<MatchDeletionHolds> {
   const [row] = await db
     .select({
+      events: sql<string>`(select count(*) from match_events where match_id = ${matchId})`,
+      ratings: sql<string>`(select count(*) from ratings where match_id = ${matchId})`,
       squad: sql<string>`(select count(*) from match_squad where match_id = ${matchId})`,
       lineups: sql<string>`(select count(*) from lineups where match_id = ${matchId})`,
     })
@@ -203,6 +211,8 @@ export async function getMatchDeletionHolds(matchId: string): Promise<MatchDelet
 
   // `count(*)` is a bigint, which postgres.js hands over as a string.
   return {
+    events: Number(row?.events ?? 0),
+    ratings: Number(row?.ratings ?? 0),
     squad: Number(row?.squad ?? 0),
     lineups: Number(row?.lineups ?? 0),
   };

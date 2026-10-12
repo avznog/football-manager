@@ -20,10 +20,13 @@ export type EventRowProps = {
 
 export function EventRow({ event, variant }: EventRowProps) {
   const startsAt = new Date(event.startsAt);
-  // A match already played is opened to be *read*, not organised: the score is right there on the
-  // row, so the thing the tap is asking for is the recap — who scored, who played, the notes. The
-  // recap links back to the match page for anyone who came for the sheet or the compositions.
-  const href = variant === "past" ? `/match/${event.id}/recap` : `/match/${event.id}`;
+  /*
+   * One destination for both variants, since decision 189 merged the match page and the recap: a
+   * played match is opened to be *read* — who scored, who played, the notes — and that is now the
+   * bottom of the same page a match still to be played opens on. This used to be `/recap` for a past
+   * row and the `variant` is kept because the row's own contents still depend on it.
+   */
+  const href = `/match/${event.id}`;
   const title = matchTitle(event);
   const subtitle = matchSubtitle(event);
 

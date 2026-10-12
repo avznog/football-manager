@@ -153,8 +153,8 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
         <EmptyState
           {...notSelectedFr(sheetEmpty)}
           action={
-            <ButtonLink href={`/match/${match.id}/recap`} variant="secondary">
-              Voir le résumé du match
+            <ButtonLink href={`/match/${match.id}`} variant="secondary">
+              Retour au match
             </ButtonLink>
           }
         />
@@ -166,8 +166,8 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
           title="Personne à noter sur ce match"
           description="Le déroulé de ce match ne retient aucun joueur sur le terrain."
           action={
-            <ButtonLink href={`/match/${match.id}/recap`} variant="secondary">
-              Voir le résumé du match
+            <ButtonLink href={`/match/${match.id}`} variant="secondary">
+              Retour au match
             </ButtonLink>
           }
         />
@@ -180,7 +180,7 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
                 ? "Les moyennes de ce match sont sorties, elles sont dans le résumé."
                 : "C’est le coach qui décide quand les moyennes sortent."}
             </p>
-            <ButtonLink href={`/match/${match.id}/recap`}>Voir le résumé du match</ButtonLink>
+            <ButtonLink href={`/match/${match.id}`}>Voir le résumé du match</ButtonLink>
           </div>
         </Card>
       ) : !mayRate ? (
@@ -195,8 +195,8 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
           title="Tu ne peux pas noter ce match"
           description="Ton compte n’a pas le droit de donner des notes dans cette équipe."
           action={
-            <ButtonLink href={`/match/${match.id}/recap`} variant="secondary">
-              Voir le résumé du match
+            <ButtonLink href={`/match/${match.id}`} variant="secondary">
+              Retour au match
             </ButtonLink>
           }
         />

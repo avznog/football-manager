@@ -163,6 +163,31 @@ describe("can — coaches", () => {
   });
 });
 
+describe("can — deleting a match (decision 191)", () => {
+  /*
+   * Since decision 191 this destroys a déroulé, a dozen people's notes, the sheet and the
+   * compositions, in one transaction and with no way back — so « who may » stopped being a detail of
+   * a button on a form nobody had played yet. It is the coach's, and the delegated match operator's
+   * clause must not reach it: running game mode for one afternoon is lent out (decision 004), and
+   * erasing the afternoon is not.
+   */
+  const match = { status: "finished" as const, operatorUserId: "player-user" };
+
+  it("is the coach's, playing himself or not", () => {
+    expect(can(coach, "match:delete", { teamId: TEAM })).toBe(true);
+    expect(can(playerCoach, "match:delete", { teamId: TEAM })).toBe(true);
+  });
+
+  it("is refused to a player, including the one who operated the match", () => {
+    expect(can(player, "match:delete", { teamId: TEAM })).toBe(false);
+    expect(can(player, "match:delete", { teamId: TEAM, match })).toBe(false);
+  });
+
+  it("stops at his own team", () => {
+    expect(can(coach, "match:delete", { teamId: OTHER_TEAM })).toBe(false);
+  });
+});
+
 describe("can — preferred positions are the coach's (decision 163)", () => {
   it("lets a coach set any player's, playing himself or not", () => {
     for (const who of [coach, playerCoach]) {
