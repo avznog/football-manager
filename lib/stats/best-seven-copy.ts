@@ -323,13 +323,22 @@ export function declaredPostsFr(): string {
 /** The badge under a disc whose man never declared that post (`fit === "none"`). */
 export const OUT_OF_POSITION_BADGE_FR = "pas son poste";
 
-/** Why a « pas son poste » badge exists at all: a seven has to be complete. */
+/**
+ * Why a « pas son poste » badge exists at all: the post goes to somebody who has played rather than
+ * staying empty.
+ *
+ * It used to end « un sept doit être complet, donc le poste est rempli plutôt que laissé vide », and
+ * decision 187 makes the first half untrue: a post *is* left vide when nobody in the squad has played
+ * enough to be a candidate at all (`emptySlotsFr`). What survives is the comparison the reader is owed
+ * — among the men who have played, one at the wrong post beats an empty one.
+ */
 export function outOfPositionNoteFr(count: number): string | null {
   if (count <= 0) return null;
   return (
     `${plural(count, "poste")} ${count > 1 ? "sont tenus" : "est tenu"} par quelqu’un qui ne l’a ` +
-    `pas déclaré, et ${count > 1 ? "leurs disques le disent" : "son disque le dit"} : un sept doit ` +
-    "être complet, donc le poste est rempli plutôt que laissé vide."
+    `pas déclaré, et ${count > 1 ? "leurs disques le disent" : "son disque le dit"} : parmi les ` +
+    "joueurs qui ont du temps de jeu, mieux vaut en placer un hors de ses postes que laisser le " +
+    "poste vide."
   );
 }
 
@@ -461,6 +470,11 @@ export function shrinkageSentenceFr(
  * the screen counts with.
  *
  * Null when every pick has a figure of his own, in which case there is nothing to warn about.
+ *
+ * **Decision 187 narrowed what reaches this sentence, and did not retire it.** A man with no minute at
+ * all is no longer a candidate, so the disc it is about is now one of two things: a player who has
+ * played but never at *that* post (the légende is judged per post) or one nobody has rated yet. Hence
+ * « à ce poste », and hence the reason no longer being « pour ne pas avoir joué ».
  */
 export function squadMeanStandInFr(count: number): string | null {
   if (count <= 0) return null;
@@ -468,7 +482,9 @@ export function squadMeanStandInFr(count: number): string | null {
   return (
     `${count} des sept ${many ? "n’ont" : "n’a"} aucun chiffre cette saison à ce poste : ` +
     `${many ? "ils sont affichés" : "il est affiché"} à la moyenne de l’équipe, donc ` +
-    `${many ? "ni flattés ni punis" : "ni flatté ni puni"} pour ne pas avoir joué.`
+    // « pour ne pas avoir joué » until decision 187, which is no longer what this is about: everybody
+    // on the pitch has played, and what he has not done is jouer *à ce poste* — or être noté.
+    `${many ? "ni flattés ni punis" : "ni flatté ni puni"} pour ne pas y avoir encore de chiffre.`
   );
 }
 
@@ -483,8 +499,22 @@ export function squadMeanStandInFr(count: number): string | null {
 export function excludedFromSquadFr(input: {
   departedWithData: number;
   nonPlayers: number;
+  /** Decision 187: squad players with no minute in this selection. */
+  withoutMinutes: number;
 }): string | null {
   const parts: string[] = [];
+  if (input.withoutMinutes > 0) {
+    // First, because it is the only one of the three about men the reader *expected* to see: a name in
+    // the squad list, absent from both the pitch and the picker. The rule is stated with the count, so
+    // the sentence is an answer and not a tally — and it says « temps de jeu … dans cette sélection »,
+    // because the filter is per competition and a man left out here may be in the seven for « toutes ».
+    const many = input.withoutMinutes > 1;
+    parts.push(
+      `${plural(input.withoutMinutes, "joueur")} de l’effectif ${many ? "n’ont" : "n’a"} aucune ` +
+        `minute de jeu dans cette sélection : le sept ne prend que ceux qui ont joué, donc ` +
+        `${many ? "ils en restent" : "il en reste"} dehors`,
+    );
+  }
   if (input.departedWithData > 0) {
     const many = input.departedWithData > 1;
     parts.push(
@@ -502,12 +532,42 @@ export function excludedFromSquadFr(input: {
   return `${parts.join(" · ")}.`;
 }
 
-/** Fewer men in the squad than posts on the pitch: some slots are honestly empty. */
-export function emptySlotsFr(count: number): string | null {
-  if (count <= 0) return null;
+/**
+ * Posts nobody could be found for, and **why** — which since decision 187 is two different facts.
+ *
+ * It used to be one sentence: « l'effectif ne compte pas encore assez de joueurs pour remplir la
+ * forme », true of a squad of five. Excluding the men with no game time makes a second cause reachable,
+ * and the old sentence false under it: a squad of twelve of whom four have played leaves three posts
+ * empty with a perfectly large effectif. So the sentence names the cause the reader can act on, and
+ * quotes the count it rests on — `eligible` is how many men the seven could choose from at all.
+ *
+ * The posts stay **empty**, drawn as « Poste vide » rather than filled: this screen may not put a man
+ * on a pitch to make a shape look complete, which is the same rule `outOfPositionNoteFr` obeys from the
+ * other side (it fills an undeclared post, with somebody who has played, and badges the disc).
+ */
+export function emptySlotsFr(input: {
+  count: number;
+  /** Candidates the seven had to choose from: squad players with a minute in this selection. */
+  eligible: number;
+  /** Squad players left out for having none (decision 187). */
+  withoutMinutes: number;
+}): string | null {
+  if (input.count <= 0) return null;
+  const posts =
+    `${plural(input.count, "poste")} ${input.count > 1 ? "restent vides" : "reste vide"}`;
+  if (input.withoutMinutes <= 0) {
+    return `${posts} : l’effectif ne compte pas encore assez de joueurs pour remplir la forme.`;
+  }
+  if (input.eligible === 0) {
+    return (
+      `${posts} : personne n’a encore de temps de jeu dans cette sélection, et le sept ne prend que ` +
+      "les joueurs qui ont joué."
+    );
+  }
+  const many = input.eligible > 1;
   return (
-    `${plural(count, "poste")} ${count > 1 ? "restent vides" : "reste vide"} : l’effectif ne compte ` +
-    "pas encore assez de joueurs pour remplir la forme."
+    `${posts} : ${plural(input.eligible, "joueur")} seulement ${many ? "ont" : "a"} du temps de jeu ` +
+    "dans cette sélection, et le sept ne prend que ceux-là."
   );
 }
 

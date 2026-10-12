@@ -23,10 +23,25 @@
  * every new team (decision 094's row two), whom `can()` has never let be convoqué and who must not
  * be put on a pitch by a statistic either.
  *
- * A candidate with **no data at all is kept**. That is not an oversight: rule 2 of `best-seven.ts`
- * lands a zero-exposure player exactly on the squad mean, so he heads neither the best nor the worst
- * seven, and dropping him here would instead make a seven of five men on a squad that has only just
- * started its season.
+ * **A member with no game time is excluded too** (decision 187, and the owner's third backlog: « si un
+ * joueur n'a pas de temps de jeu, ne pas le mettre dans l'équipe type »). It used to be kept, for a
+ * reason that was true when it was written: rule 2 of `best-seven.ts` lands a zero-exposure player
+ * exactly on the squad mean, so he heads no seven — but he is routinely *in* one, because the mean beats
+ * a real figure at any slot with two candidates, and a post nobody declared is filled rather than left
+ * empty (rule 5). Somebody who has never played could therefore be drawn into the best attack of a
+ * season he did not play, badged « pas son poste », on a figure that is not his.
+ *
+ * **This is not the minimum-exposure threshold the owner refused** (rule 2 of `best-seven.ts`, and
+ * decision 115 before it). That refusal is about *how much* a man has played: a threshold makes a
+ * player appear and vanish as a Sunday passes, and the shrinkage answers it continuously instead. The
+ * question here is the prior one — *has he played at all* — and it has no continuum to be discontinuous
+ * on: zero minutes is not a thin figure, it is no figure. Fifteen minutes still ranks, shrunk hard
+ * towards the squad, exactly as he asked.
+ *
+ * The exclusion is **per selection**, because `minutes` is: a competition filter where a man has not
+ * played leaves him out of *that* seven and in the one for « toutes ». And like the other two it is
+ * **counted** (`withoutMinutes`) so the screen states it rather than letting the reader infer an
+ * absence.
  */
 
 import type { PlayerSeasonStats } from "./aggregate";
@@ -53,7 +68,10 @@ export type DeclaredPositions = {
 };
 
 export type BestSevenSquad = {
-  /** In `getSquad`'s order; `bestSeven` re-sorts by its own tie-breaks anyway. */
+  /**
+   * The players a seven may be built from: in `getSquad`'s order (`bestSeven` re-sorts by its own
+   * tie-breaks anyway), and **only those with a minute in this selection** (decision 187).
+   */
   candidates: SevenCandidate[];
   /**
    * Members who have a season in this selection but are no longer in the squad. Their goals stay in
@@ -63,6 +81,14 @@ export type BestSevenSquad = {
   departedWithData: number;
   /** Squad members with `is_player = false`: encadrement, never a candidate for a pitch. */
   nonPlayers: number;
+  /**
+   * Players of the current squad with **no minute** in this selection (decision 187). Counted, not
+   * hidden: « 2 joueurs n'ont pas de temps de jeu » is the only way the reader finds out why a name he
+   * expected is neither on the pitch nor in the picker.
+   */
+  withoutMinutes: number;
+  /** How many of them did make it in — the number the empty-post sentence has to quote. */
+  eligible: number;
 };
 
 /**
@@ -113,7 +139,7 @@ export function toBestSevenSquad(
 ): BestSevenSquad {
   const seasonById = new Map(players.map((player) => [player.teamMemberId, player]));
 
-  const candidates = squad
+  const squadPlayers = squad
     .filter((member) => member.isPlayer)
     .map((member): SevenCandidate => {
       const season = seasonById.get(member.membershipId);
@@ -153,10 +179,20 @@ export function toBestSevenSquad(
       };
     });
 
+  /**
+   * Decision 187. `minutes` and nothing else: it is the one figure « temps de jeu » means, and the one
+   * the reducer writes for anybody who was on the pitch for a second. Not `hasData` — a man can carry
+   * a rating or a conceded count without a minute of his own, and the sentence under the pitch promises
+   * game time.
+   */
+  const candidates = squadPlayers.filter((candidate) => candidate.minutes > 0);
+
   return {
     candidates,
     departedWithData: players.filter((player) => player.hasLeft && player.hasData).length,
     nonPlayers: squad.filter((member) => !member.isPlayer).length,
+    withoutMinutes: squadPlayers.length - candidates.length,
+    eligible: candidates.length,
   };
 }
 
