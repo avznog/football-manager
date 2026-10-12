@@ -52,6 +52,18 @@ home/away, the competition and — for the first two — the scores. They came f
 **Match 3 is the other case:** Bayern Barbecue Club is still `live` in production with 9 events and no
 final whistle, so the sheet is the only record of what happened — including its goals.
 
+## The owner's rule for a line without a block
+
+**« Every sub that is only noted with a minute (not yet a block) is position per position »**
+(2026-10-12). So wherever the paper records a change as a line rather than redrawing the seven, **the
+player coming on takes the exact post of the player coming off**, and nobody else moves. That is what
+turns every one of those lines into a block, and it is why the derived blocks below reconcile with the
+next block the owner actually drew — which is the check that the rule is being applied correctly rather
+than merely assumed.
+
+It settles, with no further questions, the positions of every substitution line on all three sheets:
+three on sheet 1, seven on sheet 2, four on sheet 3. The owner has confirmed all fourteen.
+
 ## How to read the sheets, and why that reading is the one used below
 
 Each sheet is a sequence of **blocks**. A block is the seven players on the pitch, drawn as four lines,
@@ -137,9 +149,9 @@ which is production's eleven exactly. **Fully verified by the owner on 2026-10-1
 | position | player | place in the drawing |
 | --- | --- | --- |
 | `AT` | Samuel | top |
-| `AIL` | Benjamin | second line, left |
+| `AIL` (left) | Benjamin | second line, left |
 | `MC` | Thomas | second line, centre |
-| `AIL` | Pierre | second line, right |
+| `AIL` (right) | Pierre | second line, right |
 | `DC` | Lucas | third line, left |
 | `DC` | Nicolas | third line, right |
 | `GB` | Léo M | bottom |
@@ -348,8 +360,10 @@ every one of the 11 named players appears on the pitch in at least one block.
 ## Match 2 — sheet `game2.jpeg`, untitled
 
 **This is FC Hexagone, 29/09/2026, at home, Coupe Automne, won 3–2** — identified by its squad, which
-is production's ten exactly. Its blocks and lines have **not** been through the pass the owner gave
-match 1, and two of them disagree (the 48′ line against the 54′ block).
+is production's ten exactly. **Fully verified by the owner on 2026-10-12**, lines and blocks: the seven
+substitution lines at 18′, 26′, 37′, 48′ (three) and 52′ are each drawn out as a block below, and the
+apparent contradiction between the 48′ line and the 54′ block turned out to be an unrecorded change
+rather than a conflict.
 
 - **Date, opponent, home/away, competition, score:** none on the sheet; all in production, from the
   RadarLocal import.
@@ -364,9 +378,9 @@ match 1, and two of them disagree (the 48′ line against the 54′ block).
 | position | player | place in the drawing |
 | --- | --- | --- |
 | `AT` | Samuel | top |
-| `AIL` | Clément | second line, left |
+| `AIL` (left) | Clément | second line, left |
 | `MC` | Maxime | second line, centre |
-| `AIL` | Pierre | second line, right |
+| `AIL` (right) | Pierre | second line, right |
 | `DC` | Nicolas | third line, left |
 | `DC` | Lucien | third line, right |
 | `GB` | Lucas | bottom |
@@ -399,6 +413,22 @@ Nicodème (`DC`). **Three one-for-one swaps, each into the exact slot of the pla
 nobody else moves. The cleanest block transition on any of the three sheets. No substitution line
 records them.
 
+**Block 18′ — derived, not drawn on the sheet.** The owner confirmed the 18′ line (2026-10-12), and his rule for every line without a block: the
+arrival takes the exact post of the man who comes off. Pierre held `AIL` (right).
+
+| position | player |
+| --- | --- |
+| `AT` | Charles |
+| `AIL` (left) | Édouard |
+| `MC` | Maxime |
+| `AIL` (right) | **Clément** |
+| `DC` | Nicodème |
+| `DC` | Lucien |
+| `GB` | Lucas |
+
+Off the pitch: Samuel, Pierre, Nicolas.
+Changes from 11′: **off** Pierre — **on** Clément, at `AIL` (right). One for one, nobody moves.
+
 **Block 22′**
 
 | position | player |
@@ -418,9 +448,24 @@ underneath — and « Édouard » also appears, not struck, in the `MC` slot of 
 the owner wrote Édouard in the wrong slot, struck it, and the midfield line is Charles / Édouard /
 Clément. The struck name is clearly legible as Édouard; what is uncertain is only the intent.
 
-Changes from 11′, after the 18′ line below is applied: **off** Maxime, Lucien — **on** Samuel (`AT`),
-Nicolas (`DC`); Charles moves `AT` → `AIL` (left) and Édouard moves `AIL` (left) → `MC`. No
-substitution line records these two.
+Changes from the 18′ block: **off** Maxime, Lucien — **on** Samuel (`AT`), Nicolas (`DC`); Charles
+moves `AT` → `AIL` (left) and Édouard moves `AIL` (left) → `MC`. No substitution line records these
+two.
+
+**Block 26′ — derived, not drawn on the sheet.** Confirmed line, same rule. Clément held `AIL` (right) in the 22′ block.
+
+| position | player |
+| --- | --- |
+| `AT` | Samuel |
+| `AIL` (left) | Charles |
+| `MC` | Édouard |
+| `AIL` (right) | **Pierre** |
+| `DC` | Nicolas |
+| `DC` | Nicodème |
+| `GB` | Lucas |
+
+Off the pitch: Lucien, Clément, Maxime.
+Changes from 22′: **off** Clément — **on** Pierre, at `AIL` (right). One for one, nobody moves.
 
 **Block 30′**
 
@@ -435,10 +480,25 @@ substitution line records these two.
 | `GB` | Samuel |
 
 Off the pitch: Édouard, Nicodème, Clément.
-Changes from 22′, after the 26′ line below is applied: **off** Édouard, Nicodème — **on** Maxime (`AIL`
-right), Lucien (`DC`); Charles moves `AIL` (left) → `AT`, Pierre moves `AIL` (right) → `AIL` (left),
-Lucas moves `GB` → `MC`, Samuel moves `AT` → `GB`. **Goalkeeper change: Lucas → Samuel**, and Samuel stays in goal
-for the rest of the sheet. No substitution line records any of this.
+Changes from the 26′ block: **off** Édouard, Nicodème — **on** Maxime (`AIL` right), Lucien (`DC`);
+Charles moves `AIL` (left) → `AT`, Pierre moves `AIL` (right) → `AIL` (left), Lucas moves `GB` → `MC`,
+Samuel moves `AT` → `GB`. **Goalkeeper change: Lucas → Samuel**, and Samuel stays in goal for the rest
+of the sheet. No substitution line records any of this.
+
+**Block 37′ — derived, not drawn on the sheet.** Confirmed line, same rule. Pierre held `AIL` (left) in the 30′ block.
+
+| position | player |
+| --- | --- |
+| `AT` | Charles |
+| `AIL` (left) | **Clément** |
+| `MC` | Lucas |
+| `AIL` (right) | Maxime |
+| `DC` | Nicolas |
+| `DC` | Lucien |
+| `GB` | Samuel |
+
+Off the pitch: Édouard, Nicodème, Pierre.
+Changes from 30′: **off** Pierre — **on** Clément, at `AIL` (left). One for one, nobody moves.
 
 **Block 40′**
 
@@ -453,9 +513,41 @@ for the rest of the sheet. No substitution line records any of this.
 | `GB` | Samuel |
 
 Off the pitch: Lucas, Maxime, Pierre.
-Changes from 30′, after the 37′ line below is applied: **off** Lucas, Maxime — **on** Édouard (`AIL`
-left), Nicodème (`DC`); Nicolas moves `DC` → `MC`, Clément moves `AIL` (left) → `AIL` (right). No
-substitution line records these two.
+Changes from the 37′ block: **off** Lucas, Maxime — **on** Édouard (`AIL` left), Nicodème (`DC`);
+Nicolas moves `DC` → `MC`, Clément moves `AIL` (left) → `AIL` (right). No substitution line records
+these two.
+
+**Block 48′ — derived, not drawn on the sheet.** The owner confirmed all three 48′ lines (2026-10-12): Lucas for Nicodème, Pierre for Charles,
+Maxime for Nicolas — each into the post of the man who came off, from the 40′ block.
+
+| position | player |
+| --- | --- |
+| `AT` | **Pierre** |
+| `AIL` (left) | Édouard |
+| `MC` | **Maxime** |
+| `AIL` (right) | Clément |
+| `DC` | **Lucas** |
+| `DC` | Lucien |
+| `GB` | Samuel |
+
+Off the pitch: Charles, Nicodème, Nicolas.
+Changes from 40′: **off** Nicodème, Charles, Nicolas — **on** Lucas (`DC`), Pierre (`AT`), Maxime
+(`MC`). Three one-for-one swaps, nobody moves.
+
+**Block 52′ — derived, not drawn on the sheet.** Confirmed line, same rule. Lucien held `DC`.
+
+| position | player |
+| --- | --- |
+| `AT` | Pierre |
+| `AIL` (left) | Édouard |
+| `MC` | Maxime |
+| `AIL` (right) | Clément |
+| `DC` | Lucas |
+| `DC` | **Nicodème** |
+| `GB` | Samuel |
+
+Off the pitch: Charles, Lucien, Nicolas.
+Changes from 48′: **off** Lucien — **on** Nicodème, at `DC`. One for one, nobody moves.
 
 **Block 54′**
 
@@ -471,29 +563,32 @@ substitution line records these two.
 
 Off the pitch: Clément, Nicolas, Lucien.
 
-**UNCERTAIN, and it is a contradiction rather than a reading problem.** Applying the four
-substitution lines at 48′ and 52′ to the 40′ block gives, at 52′: Pierre, Édouard, Maxime, Clément,
-Lucas, Nicodème, Samuel on the pitch and Charles, Nicolas, Lucien off it. The 54′ block differs from
-that by exactly one pair: **Charles is on the pitch (at `AT`) and Clément is off it**, the reverse of
-the derived state. So either Charles came back on for Clément between 52′ and 54′ with no line
-recording it, or the 48′ line « Pierre ↗ Charles ↘ » does not mean what every other line means. The
-sheet does not say which, and this file does not choose.
+**The contradiction here is resolved.** It used to read as a conflict: the 48′ line takes Charles off,
+yet this block has him back at `AT` with Clément off instead. The owner confirmed the 48′ and 52′ lines
+and said the rest of the sheet is right (2026-10-12), so both are true and the answer is the ordinary
+one on these sheets — **Charles came back on for Clément between 52′ and 54′, and no line records it**,
+exactly like the dozen other unrecorded block-to-block changes. The 48′ line means what every other
+line means.
 
-Changes from 40′, after the 48′ and 52′ lines: **off** Nicolas, Lucien, Clément — **on** Pierre (`AIL`
-left), Maxime (`MC`), Lucas (`DC`), Charles (`AT`, see above); Édouard moves `AIL` (left) → `AIL`
-(right), Nicodème stays `DC`.
+Changes from the 52′ block: **off** Clément (`AIL` right) — **on** Charles (`AT`); Pierre moves `AT` →
+`AIL` (left) and Édouard moves `AIL` (left) → `AIL` (right). Maxime, Nicodème, Lucas and Samuel hold
+their posts.
 
 ### Substitution lines written on the sheet
 
-| minute | on | off | position taken |
+All seven are **confirmed by the owner** (2026-10-12), and each is drawn out as a block above. The
+position is not on any line; it comes from his rule — **the arrival takes the exact post of the man who
+comes off** — and every one of them then reconciles with the next block already on the paper.
+
+| minute | on | off | post taken, from the previous block |
 | --- | --- | --- | --- |
-| 18′ | Clément | Pierre | **UNCERTAIN:** no position on the line. Pierre was `AIL` (right) in the 11′ block, and Clément is at `AIL` (right) in the 22′ block, so `AIL` (right). |
-| 26′ | Pierre | Clément | **UNCERTAIN:** Clément was `AIL` (right) at 22′; Pierre is `AIL` (left) in the 30′ block. |
-| 37′ | Clément | Pierre | **UNCERTAIN:** Pierre was `AIL` (left) at 30′; Clément is `AIL` (right) in the 40′ block. |
-| 48′ | Lucas | Nicodème | **UNCERTAIN:** Nicodème was `DC` at 40′, and Lucas is `DC` in the 54′ block. But see 52′ below — Nicodème is recorded as coming back on four minutes later. |
-| 48′ | Pierre | Charles | **UNCERTAIN:** Charles was `AT` at 40′ and is `AT` again in the 54′ block; Pierre is `AIL` (left) there. See the contradiction noted under the 54′ block. |
-| 48′ | Maxime | Nicolas | **UNCERTAIN:** Nicolas was `MC` at 40′, and Maxime is `MC` in the 54′ block. |
-| 52′ | Nicodème | Lucien | **UNCERTAIN:** Lucien was `DC` at 40′, and Nicodème is `DC` in the 54′ block. |
+| 18′ | Clément | Pierre | `AIL` (right) |
+| 26′ | Pierre | Clément | `AIL` (right) |
+| 37′ | Clément | Pierre | `AIL` (left) |
+| 48′ | Lucas | Nicodème | `DC` |
+| 48′ | Pierre | Charles | `AT` |
+| 48′ | Maxime | Nicolas | `MC` |
+| 52′ | Nicodème | Lucien | `DC` |
 
 The three lines at 48′ are written one under another in that order; the sheet gives no finer ordering
 than « all three at 48′ ». (`import-radarlocal.mts` had the same problem and settled it by taking the
@@ -528,6 +623,11 @@ sheets 1 and 2 are identified by their squads. **It is still `live` in productio
 final whistle and no frozen statistics, so this sheet is the only record of what happened in it, goals
 included.
 
+**Its positions and substitutions are verified by the owner** (2026-10-12): the four lines at 37′, 39′
+(two) and 45′, drawn as blocks below, and every block. What remains open is only in the goals — two
+ambiguous minutes and the 32′ assist — and the final score, which neither the sheet nor production
+holds.
+
 - **Date, opponent, home/away, competition:** not on the sheet; in production.
 - **Final score:** **not written anywhere, and not in production either** — the match was never
   finished there. The goal lists imply 2–5 (see the sanity check).
@@ -543,9 +643,9 @@ included.
 | position | player | place in the drawing |
 | --- | --- | --- |
 | `AT` | Charles | top |
-| `AIL` | Benjamin | second line, left |
+| `AIL` (left) | Benjamin | second line, left |
 | `MC` | Maxime | second line, centre |
-| `AIL` | Pierre | second line, right |
+| `AIL` (right) | Pierre | second line, right |
 | `DC` | Lucien | third line, left |
 | `DC` | Nicodème | third line, right |
 | `GB` | Samuel | bottom |
@@ -606,6 +706,54 @@ Changes from 19′: **off** Benjamin, Clément, Thomas, Lucien — **on** Charle
 Pierre (`AIL` right), Lucas (`DC`). No substitution line records them. If the match is 2×30 this is the
 second-half restart.
 
+**Block 37′ — derived, not drawn on the sheet.** The owner confirmed the 37′ line (2026-10-12) and the position-per-position rule. Rémi held
+`AIL` (left).
+
+| position | player |
+| --- | --- |
+| `AT` | Charles |
+| `AIL` (left) | **Clément** |
+| `MC` | Maxime |
+| `AIL` (right) | Pierre |
+| `DC` | Nicodème |
+| `DC` | Lucas |
+| `GB` | Samuel |
+
+Off the pitch: Benjamin, Rémi, Lucien, Thomas.
+Changes from 30′: **off** Rémi — **on** Clément, at `AIL` (left). One for one, nobody moves.
+
+**Block 39′ — derived, not drawn on the sheet.** Both 39′ lines, confirmed: Thomas for Maxime and Benjamin for Charles, each into the post of
+the man who came off — Maxime held `MC`, Charles held `AT`.
+
+| position | player |
+| --- | --- |
+| `AT` | **Benjamin** |
+| `AIL` (left) | Clément |
+| `MC` | **Thomas** |
+| `AIL` (right) | Pierre |
+| `DC` | Nicodème |
+| `DC` | Lucas |
+| `GB` | Samuel |
+
+Off the pitch: Charles, Rémi, Lucien, Maxime.
+Changes from 37′: **off** Maxime, Charles — **on** Thomas (`MC`), Benjamin (`AT`). Two one-for-one
+swaps, nobody moves.
+
+**Block 45′ — derived, not drawn on the sheet.** The 45′ line, confirmed, and the reverse of one of the 39′ pair: Benjamin held `AT`.
+
+| position | player |
+| --- | --- |
+| `AT` | **Charles** |
+| `AIL` (left) | Clément |
+| `MC` | Thomas |
+| `AIL` (right) | Pierre |
+| `DC` | Nicodème |
+| `DC` | Lucas |
+| `GB` | Samuel |
+
+Off the pitch: Benjamin, Rémi, Lucien, Maxime.
+Changes from 39′: **off** Benjamin — **on** Charles, at `AT`. One for one, nobody moves.
+
 **Block 47′** — **UNCERTAIN:** another number is scribbled over before « 47 »; the surviving figure
 reads `47`.
 
@@ -620,12 +768,13 @@ reads `47`.
 | `GB` | Samuel |
 
 Off the pitch: Lucas, Benjamin, Rémi, Lucien.
-Changes from 30′, after the 37′, 39′, 39′ and 45′ lines below are applied: those four lines give, at
-45′, Charles, Clément, Thomas, Pierre, Nicodème, Lucas and Samuel on the pitch with Benjamin, Rémi,
-Lucien and Maxime off it. **The 47′ block differs from that by exactly one pair: Maxime is on the pitch
-(at `MC`) and Lucas off it, the reverse of the derived state** — so Maxime is back without a line
-bringing him on, and Lucas is off without a line taking him off. In the block Thomas has also moved
-`MC` → `DC`. See the open questions.
+Changes from the 45′ block: **off** Lucas — **on** Maxime, at `MC`; Thomas moves `MC` → `DC`. No line
+records this one, like most of the changes on these sheets.
+
+**This is what the 39′ line « Thomas ↗ Maxime ↘ » looked like a contradiction against, and it is not
+one.** Thomas came on at `MC` at 39′ because that was Maxime's post; when Maxime came back on here,
+Thomas moved to `DC` and Lucas came off. Both facts stand, and the owner's « rest is verified » covers
+the block.
 
 **Block 50′**
 
@@ -701,12 +850,16 @@ records them. This is the last block on the sheet.
 
 ### Substitution lines written on the sheet
 
-| minute | on | off | position taken |
+All four are **confirmed by the owner** (2026-10-12) and drawn out as blocks above. The post comes from
+his position-per-position rule, and each derived block reconciles with the 47′ block already on the
+paper.
+
+| minute | on | off | post taken, from the previous block |
 | --- | --- | --- | --- |
-| 37′ | Clément | Rémi | **UNCERTAIN:** no position on the line. Rémi was `AIL` (left) at 30′ and Clément is `AIL` (left) in the 47′ block, so `AIL` (left). There is also a short scribble struck out between « 37′ » and the arrow. |
-| 39′ | Benjamin | Charles | **UNCERTAIN:** Charles was `AT`; Benjamin presumably takes `AT`. Reversed six minutes later by the 45′ line. |
-| 39′ | Thomas | Maxime | **UNCERTAIN:** Maxime was `MC`. But the 47′ block has Maxime at `MC` and Thomas at `DC`, which this line does not explain. |
-| 45′ | Charles | Benjamin | **UNCERTAIN:** the reverse of the 39′ line; Charles back at `AT`. |
+| 37′ | Clément | Rémi | `AIL` (left) — a short scribble is struck out between « 37′ » and the arrow |
+| 39′ | Benjamin | Charles | `AT` — reversed six minutes later by the 45′ line |
+| 39′ | Thomas | Maxime | `MC` |
+| 45′ | Charles | Benjamin | `AT` |
 
 The two lines at 39′ are written in different columns of the sheet (Benjamin/Charles on the left,
 Thomas/Maxime on the right) and the sheet gives no ordering between them.
@@ -785,9 +938,22 @@ Everything else in this quotation is legible.
 - **Matches 1 and 2 need no goals from the paper.** Production already holds 3–9 and 3–2 with full
   event logs. The earlier worry that they would import as 0–0 does not apply: nothing new is being
   created.
-- **Match 1 is fully verified by the owner** (2026-10-12): the three substitution lines at 47′, 48′ and
-  56′, their positions, and every block. Blocks for 47′, 48′ and 56′ are derived above and reconcile
-  with the 51′ block already on the paper — which also explains that block's overwrites.
+- **All three sheets are verified by the owner** (2026-10-12) for what they are for — the positions
+  and the substitutions. Every one of the fourteen substitution lines is now a block, and every block
+  was checked against the next block he actually drew: each holds seven distinct players and differs
+  from its neighbour by exactly the players the confirmed lines name.
+  - Match 3: the 37′, 39′ (two) and 45′ lines. Its 39′/47′ puzzle is not a contradiction either —
+    Thomas came on at `MC` because that was Maxime's post, and moved to `DC` at 47′ when Maxime
+    returned and Lucas came off.
+  - Match 1: the 47′, 48′ and 56′ lines, now blocks, reconciling with the 51′ block and explaining its
+    overwrites.
+  - Match 2: the seven lines at 18′, 26′, 37′, 48′ (three) and 52′, now blocks. Its one apparent
+    contradiction — the 48′ line taking Charles off against the 54′ block having him back — is **not** a
+    contradiction: Charles came back on for Clément between 52′ and 54′ with no line recording it, like
+    the sheet's other unrecorded changes.
+- **The rule for a line without a block**: the arrival takes the post of the man who comes off, nobody
+  else moves. It has its own section near the top, and it is what lets every line become a block. Each
+  derived block was checked against the next block the owner drew.
 - **The purpose**: a record of everyone's position at all times, written back onto the matches that
   already exist.
 
@@ -816,30 +982,18 @@ Everything else in this quotation is legible.
 4. **`58'` or `53'`** for Pierre's second goal, and **`46'` or `56'`** for the fourth goal conceded
    (which would put two at 56′).
 5. **The assist on the 32′ goal** — one, or genuinely none?
-6. **Match 3, 39′ → 47′:** the 39′ line takes Maxime off for Thomas, yet the 47′ block has Maxime at
-   `MC`, Thomas at `DC`, and Lucas off with no line taking him off.
-
-**Match 2, not yet verified the way match 1 now is:**
-
-7. **Match 2, 48′ → 54′:** the 48′ line takes Charles off, and the 54′ block has him back at `AT` with
-   Clément off instead. Did Charles come back on, or is the line wrong?
-8. **Its blocks and lines generally** — match 1 took one message to settle; the same pass over sheet 2
-   would settle it.
-9. **Match 2's squad of 10**, with no Benjamin, Thomas, Rémi, Benoît or Léo M. Production agrees
-   exactly, so this is likely just true — worth one word of confirmation.
-
 **Smaller, and mostly harmless:**
 
-10. **Is a block the pitch as it was, or a plan?** Match 1's answer is « as it was », since the owner
-    verified blocks and lines together and they reconcile. Assumed to hold for sheets 2 and 3.
-11. **The illegible corrections** that may hide a name: match 2's 0′ block (a struck name under
-    Clément, and a struck bench line) and match 3's 50′ `AIL` (right) (« Thomas » over something).
-    Match 1's are now explained.
-12. **The scribbled-over minutes**: `11'` on sheet 2, `10'` and `47'` on sheet 3. Match 1's `11'` is
-    confirmed.
-13. **Supporters.** Every named player appears on the pitch in at least one block on all three sheets,
+6. **Is a block the pitch as it was, or a plan?** Answered for all three — « as it was ». The owner
+   verified blocks and lines together and they reconcile at every step on every sheet.
+7. **The illegible corrections** that may hide a name: match 2's 0′ block (a struck name under Clément,
+   and a struck bench line) and match 3's 50′ `AIL` (right) (« Thomas » over something). Match 1's are
+   explained, and match 2's do not change any seven — the surviving names are consistent with its
+   verified blocks either side.
+8. **The scribbled-over minutes**: `10'` and `47'` on sheet 3. Sheets 1 and 2 are confirmed.
+9. **Supporters.** Every named player appears on the pitch in at least one block on all three sheets,
     so as read there are no unused substitutes. Production records Léo C as a supporter for match 1,
     which the sheet does not mention — the sheets list only who was off the pitch, so that is
     consistent, not contradictory.
-14. **Ratings, injuries, cards, man of the match**: none on any sheet. Production already carries the
+10. **Ratings, injuries, cards, man of the match**: none on any sheet. Production already carries the
     ratings the owner supplied by hand and one declared injury for match 1.
