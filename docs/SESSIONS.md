@@ -5470,3 +5470,45 @@ printed in plain text for weeks. Neither is the thing he declined, so if either 
 its own issue rather than a reopening of this one — but neither is being raised again unprompted.
 
 Files: `COORDINATION.md`, `docs/SESSIONS.md`.
+
+## 2026-10-12, B3.3 — a man with no game time is not a candidate for an équipe type
+
+Issue #203, from the owner's third backlog: « If a player has no game time, do not put it in the
+"equipe type". » Decision **187**. Worked in parallel with two other sessions, in a worktree, on a
+clone of preview (`football_wc`, port 3103).
+
+The exclusion itself is three lines in `lib/stats/best-seven-input.ts`, which already owned the
+judgement: it dropped the departed and the encadrement and **counted** them for the screen to say so,
+so a third count (`withoutMinutes`, plus `eligible`) joins them. Nothing in `lib/stats/best-seven.ts`
+or `sevens.ts` changed — the arithmetic is innocent, the candidate list was the bug.
+
+**The copy was the work.** Three sentences became untrue the moment a post could be empty for a new
+reason, and none of them would have failed a test:
+
+- « l'effectif ne compte pas encore assez de joueurs pour remplir la forme » is false of a squad of
+  twelve of whom four have played. `emptySlotsFr` takes the eligible count now and names the cause;
+- « un sept doit être complet, donc le poste est rempli plutôt que laissé vide » stops being the reason
+  for a « pas son poste » badge once a post *can* be left vide;
+- « ni flattés ni punis pour ne pas avoir joué » describes nobody who can still be on the pitch: a
+  stand-in disc is now a man who played but not at *that* post, or one nobody has rated.
+
+**Verified on the clone rather than trusted.** 15 members have minutes and all 15 have declared posts
+(decision 180 holds), three have neither: Raphaël, Léo C and the super admin — who was already out as a
+non-player. The four sevens are **identical** before and after; what changed on screen is the swap
+picker, which no longer offers two men at « 0′ », and one new sentence under the pitch. Both read at
+390 px, light and dark, as the coach `potter` and as the player `raphael` in one pass — the same pixels
+in both roles, this screen has no role branch — screenshots under `audit/b3c/`.
+
+**What is not on a screenshot:** the thin-squad case. Every finished match on this data has 10 or 11
+players, so no competition filter empties a post, and I did not fake stats on a clone of production
+identifiers to see it. It is covered by unit tests instead: `best-seven-input.test.ts` runs
+`toBestSevenSquad` + `solveSeven` over all four sevens with eight idle men who declare every post and
+four who played and declare none, and asserts four discs, three empty picks, and no ghost on the pitch.
+
+Gates: `npm run typecheck`, `eslint`, `npm test` (1456 tests, 70 files). No e2e — no Server Action, no
+match flow, and the happy path does not walk `/stats/equipe-type`.
+
+Files: `lib/stats/best-seven-input.ts`, `lib/stats/best-seven-input.test.ts`,
+`lib/stats/best-seven-copy.ts`, `lib/stats/best-seven-copy.test.ts`, `lib/stats/best-seven.ts` (rule 2's
+comment only), `app/(app)/stats/equipe-type/page.tsx`, `docs/DECISIONS.md` (187), `docs/ROADMAP.md`,
+`docs/SESSIONS.md`.

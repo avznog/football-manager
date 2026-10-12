@@ -11,6 +11,9 @@
  * 3. **Who may keep goal**: somebody who has played there, and in the légende never somebody below the
  *    keepers' average (Q8) — `keeperRuleFr` says how many were considered and refused.
  * 4. **Every figure was smoothed**, and each disc prints the raw record beside the ranked figure.
+ * 5. **Who was not in the running**: whoever has left, the encadrement, and — decision 187 — anybody
+ *    with no minute of game time in this selection (`excludedFromSquadFr`). A post nobody is left for
+ *    stays « Poste vide » and says why (`emptySlotsFr`), rather than being filled to look complete.
  *
  * Read-only, so no new permission: `team:read` (decision 002), and the layout guard has already
  * refused anybody with no team.
@@ -244,7 +247,13 @@ function Body({
   }
 
   const slots = toBestSevenSlots(formation.slots);
-  const { candidates, departedWithData, nonPlayers } = toBestSevenSquad(stats.players, squad);
+  // `candidates` is the squad minus three exclusions the screen states rather than performs in
+  // silence: whoever has left, the encadrement, and — since decision 187 — anybody with no minute in
+  // this selection. The last one is why a post can now be empty on a squad of twelve.
+  const { candidates, departedWithData, nonPlayers, withoutMinutes, eligible } = toBestSevenSquad(
+    stats.players,
+    squad,
+  );
 
   const result = solveSeven(query.seven, { candidates, slots });
 
@@ -297,8 +306,8 @@ function Body({
       ? shrinkageSentenceFr("ratings", result.ratingsModel)
       : null,
     squadMeanStandInFr(squadMeanStandIns),
-    excludedFromSquadFr({ departedWithData, nonPlayers }),
-    emptySlotsFr(emptySlots),
+    excludedFromSquadFr({ departedWithData, nonPlayers, withoutMinutes }),
+    emptySlotsFr({ count: emptySlots, eligible, withoutMinutes }),
   ].filter((note): note is string => note !== null);
 
   return (

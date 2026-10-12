@@ -522,13 +522,13 @@ describe("honesty 3 — a disc showing the squad's figure, not the man's", () =>
     const one = squadMeanStandInFr(1) as string;
     expect(one).toBe(
       "1 des sept n’a aucun chiffre cette saison à ce poste : il est affiché à la moyenne de " +
-        "l’équipe, donc ni flatté ni puni pour ne pas avoir joué.",
+        "l’équipe, donc ni flatté ni puni pour ne pas y avoir encore de chiffre.",
     );
 
     const three = squadMeanStandInFr(3) as string;
     expect(three).toBe(
       "3 des sept n’ont aucun chiffre cette saison à ce poste : ils sont affichés à la moyenne de " +
-        "l’équipe, donc ni flattés ni punis pour ne pas avoir joué.",
+        "l’équipe, donc ni flattés ni punis pour ne pas y avoir encore de chiffre.",
     );
 
     // The count is the denominator of the claim, and rule 2 of `aggregate.ts` forbids one without it.
@@ -542,21 +542,61 @@ describe("honesty 3 — a disc showing the squad's figure, not the man's", () =>
 /* -------------------------------------------------------------------------- */
 
 describe("the squad", () => {
+  /** The three exclusions, each defaulting to « nobody », so a test names only the one it is about. */
+  const excluded = (input: Partial<Parameters<typeof excludedFromSquadFr>[0]>) =>
+    excludedFromSquadFr({ departedWithData: 0, nonPlayers: 0, withoutMinutes: 0, ...input });
+
   it("names who could not be chosen from, in singular and plural", () => {
-    expect(excludedFromSquadFr({ departedWithData: 0, nonPlayers: 0 })).toBeNull();
-    expect(excludedFromSquadFr({ departedWithData: 1, nonPlayers: 0 })).toContain("1 joueur parti a");
-    expect(excludedFromSquadFr({ departedWithData: 2, nonPlayers: 0 })).toContain(
-      "2 joueurs partis ont",
-    );
-    expect(excludedFromSquadFr({ departedWithData: 0, nonPlayers: 1 })).toContain(
-      "1 membre de l’encadrement n’est pas joueur",
-    );
+    expect(excluded({})).toBeNull();
+    expect(excluded({ departedWithData: 1 })).toContain("1 joueur parti a");
+    expect(excluded({ departedWithData: 2 })).toContain("2 joueurs partis ont");
+    expect(excluded({ nonPlayers: 1 })).toContain("1 membre de l’encadrement n’est pas joueur");
+  });
+
+  it("says who was left out for having no game time, and that it is the rule (decision 187)", () => {
+    const one = excluded({ withoutMinutes: 1 }) as string;
+    expect(one).toContain("1 joueur de l’effectif n’a aucune minute de jeu dans cette sélection");
+    expect(one).toContain("le sept ne prend que ceux qui ont joué");
+    expect(one).toContain("il en reste dehors");
+
+    const two = excluded({ withoutMinutes: 2 }) as string;
+    expect(two).toContain("2 joueurs de l’effectif n’ont aucune minute de jeu");
+    expect(two).toContain("ils en restent dehors");
+
+    // « dans cette sélection » is load-bearing: the exclusion is per competition, and the same man is
+    // a candidate again under « Toutes ».
+    expect(one).toContain("dans cette sélection");
+
+    // The three exclusions are one sentence, separated by the screen's own « · ».
+    const all = excluded({ departedWithData: 1, nonPlayers: 1, withoutMinutes: 1 }) as string;
+    expect(all.split(" · ")).toHaveLength(3);
   });
 
   it("admits an empty post rather than drawing six men as a seven", () => {
-    expect(emptySlotsFr(0)).toBeNull();
-    expect(emptySlotsFr(1)).toContain("1 poste reste vide");
-    expect(emptySlotsFr(2)).toContain("2 postes restent vides");
+    expect(emptySlotsFr({ count: 0, eligible: 7, withoutMinutes: 0 })).toBeNull();
+    expect(emptySlotsFr({ count: 1, eligible: 6, withoutMinutes: 0 })).toBe(
+      "1 poste reste vide : l’effectif ne compte pas encore assez de joueurs pour remplir la forme.",
+    );
+    expect(emptySlotsFr({ count: 2, eligible: 5, withoutMinutes: 0 })).toContain(
+      "2 postes restent vides",
+    );
+  });
+
+  it("blames the right cause when it is the game-time rule that emptied the post", () => {
+    // A squad of twelve of whom four have played: « l’effectif ne compte pas assez de joueurs » would
+    // be false, and would send the reader looking for eight men he already has.
+    const thin = emptySlotsFr({ count: 3, eligible: 4, withoutMinutes: 8 }) as string;
+    expect(thin).toContain("3 postes restent vides");
+    expect(thin).toContain("4 joueurs seulement ont du temps de jeu dans cette sélection");
+    expect(thin).not.toContain("l’effectif ne compte pas");
+
+    expect(emptySlotsFr({ count: 7, eligible: 1, withoutMinutes: 9 })).toContain(
+      "1 joueur seulement a du temps de jeu",
+    );
+    // Nobody at all: its own sentence, because « 0 joueur seulement a » is not French.
+    expect(emptySlotsFr({ count: 7, eligible: 0, withoutMinutes: 9 })).toContain(
+      "personne n’a encore de temps de jeu dans cette sélection",
+    );
   });
 
 });
@@ -583,8 +623,10 @@ describe("the tutoiement (decision 074)", () => {
       squadMeanStandInFr(1),
       squadMeanStandInFr(3),
       outOfPositionNoteFr(2),
-      excludedFromSquadFr({ departedWithData: 2, nonPlayers: 1 }),
-      emptySlotsFr(2),
+      excludedFromSquadFr({ departedWithData: 2, nonPlayers: 1, withoutMinutes: 2 }),
+      emptySlotsFr({ count: 2, eligible: 5, withoutMinutes: 0 }),
+      emptySlotsFr({ count: 3, eligible: 4, withoutMinutes: 8 }),
+      emptySlotsFr({ count: 7, eligible: 0, withoutMinutes: 9 }),
     ].join(" ");
 
     expect(everything).not.toMatch(/\bvous\b|\bvotre\b|\bvos\b/i);

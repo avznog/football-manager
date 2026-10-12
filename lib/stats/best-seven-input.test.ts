@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PlayerSeasonStats } from "./aggregate";
 import { toBestSevenSlots, toBestSevenSquad, type DeclaredPositions } from "./best-seven-input";
+import { SEVEN_KINDS, solveSeven } from "./sevens";
 
 /** A season row with every figure distinct, so a swapped field cannot pass by coincidence. */
 function seasonRow(overrides: Partial<PlayerSeasonStats> = {}): PlayerSeasonStats {
@@ -130,29 +131,64 @@ describe("toBestSevenSquad", () => {
     expect(candidates[0]?.ratingCount).toBe(0);
   });
 
-  it("keeps a squad member with no season row, as a zero-exposure candidate", () => {
-    // Rule 2 of `best-seven.ts` lands him exactly on the squad mean, so he heads neither seven.
-    // Dropping him here would instead make a seven of five men on a squad that has just started.
-    const { candidates } = toBestSevenSquad([], [member({ membershipId: "m9" })]);
+  it("excludes a squad member with no season row at all, and counts him (decision 187)", () => {
+    // He used to be kept, on the grounds that rule 2 of `best-seven.ts` lands him on the squad mean
+    // and so he heads no seven — but he is routinely *in* one, on a figure that is not his. « A-t-il
+    // joué » is not the minimum-exposure threshold the owner refused, which is « a-t-il assez joué ».
+    const { candidates, withoutMinutes, eligible } = toBestSevenSquad(
+      [],
+      [member({ membershipId: "m9" })],
+    );
 
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({
-      id: "m9",
-      minutes: 0,
-      goals: 0,
-      assists: 0,
-      cleanMinutes: 0,
-      gkMinutes: 0,
-      gkCleanMinutes: 0,
-      ratingAverage: null,
-      ratingCount: 0,
-      ratingVariance: null,
-    });
+    expect(candidates).toEqual([]);
+    expect(withoutMinutes).toBe(1);
+    expect(eligible).toBe(0);
+  });
+
+  it("excludes a member who has a season row but not one minute of it", () => {
+    // The realistic shape of it: convoqué, on the sheet, never on the pitch. A rating or a conceded
+    // count can exist without a minute, and `minutes` is what « temps de jeu » means.
+    const { candidates, withoutMinutes } = toBestSevenSquad(
+      [
+        seasonRow({ teamMemberId: "bench", minutes: 0, outfieldMinutes: 0, gkMinutes: 0 }),
+        seasonRow(),
+      ],
+      [member({ membershipId: "bench", displayName: "Raphaël" }), member()],
+    );
+
+    expect(candidates.map((candidate) => candidate.id)).toEqual(["m1"]);
+    expect(withoutMinutes).toBe(1);
+  });
+
+  it("keeps a man with a single minute, shrunk rather than gated", () => {
+    // The line between this change and the threshold the owner refused, pinned: one minute ranks.
+    const { candidates, withoutMinutes, eligible } = toBestSevenSquad(
+      [seasonRow({ minutes: 1 })],
+      [member()],
+    );
+
+    expect(candidates.map((candidate) => candidate.minutes)).toEqual([1]);
+    expect(withoutMinutes).toBe(0);
+    expect(eligible).toBe(1);
+  });
+
+  it("does not count the encadrement as men without game time", () => {
+    // He is already out for not being a player, and counting him twice would print two sentences
+    // about one absent name.
+    const { withoutMinutes, nonPlayers } = toBestSevenSquad(
+      [],
+      [member({ membershipId: "coach", isPlayer: false }), member({ membershipId: "m1" })],
+    );
+
+    expect(nonPlayers).toBe(1);
+    expect(withoutMinutes).toBe(1);
   });
 
   it("excludes a member who is not a player, and counts him", () => {
     const { candidates, nonPlayers } = toBestSevenSquad(
-      [seasonRow({ teamMemberId: "coach", isPlayer: false })],
+      // Both have minutes, so the only thing that can keep him out is `is_player` (decision 187 would
+      // otherwise do it for him, and the test would pass without testing anything).
+      [seasonRow({ teamMemberId: "coach", isPlayer: false }), seasonRow()],
       [member({ membershipId: "coach", isPlayer: false }), member()],
     );
 
@@ -233,7 +269,13 @@ describe("toBestSevenSquad", () => {
 
   it("keeps the squad's order, and takes identity from the squad rather than the season", () => {
     const { candidates } = toBestSevenSquad(
-      [seasonRow({ teamMemberId: "b", displayName: "Momo", jerseyNumber: 4 })],
+      [
+        // « a »'s row says nothing about who he is — both names used to come from this side, and an
+        // absent one produced `displayName: ""`, a nameless disc on the pitch and a nameless picker
+        // row. The join is what may be thin; who he is never is.
+        seasonRow({ teamMemberId: "a", displayName: "", jerseyNumber: null }),
+        seasonRow({ teamMemberId: "b", displayName: "Momo", jerseyNumber: 4 }),
+      ],
       [
         member({ membershipId: "a", displayName: "Alex", jerseyNumber: 7 }),
         member({ membershipId: "b", displayName: "Momo", jerseyNumber: 4 }),
@@ -241,8 +283,6 @@ describe("toBestSevenSquad", () => {
     );
 
     expect(candidates.map((candidate) => candidate.id)).toEqual(["a", "b"]);
-    // No season row for « a », and that must not cost him his name: the join is what is missing, not
-    // his identity. `displayName: ""` drew a nameless disc on the pitch and a nameless picker row.
     expect(candidates[0]).toMatchObject({ displayName: "Alex", jerseyNumber: 7 });
     expect(candidates[1]).toMatchObject({ displayName: "Momo", jerseyNumber: 4 });
   });
@@ -257,6 +297,91 @@ describe("toBestSevenSquad", () => {
     );
 
     expect(candidates[0]).toMatchObject({ displayName: "Karim", jerseyNumber: 8 });
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Decision 187, end to end: the adapter feeding the four sevens              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The exclusion matters where the two files meet, so these go through `solveSeven` rather than stop at
+ * the candidate list: a filter that let one zero-minute man through would still produce a plausible
+ * seven, which is the defect class decision 097 is about.
+ */
+describe("a man with no game time, through the four sevens", () => {
+  const SLOT_CODES = ["GB", "DC", "DC", "MC", "AIL", "AIL", "AT"] as const;
+  const slots = toBestSevenSlots(
+    SLOT_CODES.map((code, index) => ({ id: `s${index}`, positionCode: code })),
+  );
+
+  /** Everything a post can be declared as, so the positional objective *wants* this man. */
+  const everyPost: DeclaredPositions["positions"] = [
+    { code: "GB", preference: "primary" },
+    { code: "DC", preference: "primary" },
+    { code: "MC", preference: "primary" },
+    { code: "AIL", preference: "primary" },
+    { code: "AT", preference: "primary" },
+  ];
+
+  /**
+   * Eight men who have never played, each declaring every post — and the figures that used to put them
+   * on the pitch: no exposure lands them exactly on the squad mean (rule 2), which beats a real figure
+   * at any slot with a second candidate, and their declarations beat a played man's « pas son poste ».
+   */
+  const idle = Array.from({ length: 8 }, (_, index) =>
+    member({
+      membershipId: `idle${index}`,
+      displayName: `Fantôme ${index}`,
+      jerseyNumber: null,
+      positions: everyPost,
+    }),
+  );
+
+  /** Four who have played, declaring nothing: every slot is « pas son poste » for them. */
+  const played = Array.from({ length: 4 }, (_, index) =>
+    member({ membershipId: `played${index}`, displayName: `Joueur ${index}`, positions: [] }),
+  );
+  const playedSeasons = played.map((man, index) =>
+    seasonRow({
+      teamMemberId: man.membershipId,
+      minutes: 60 + index,
+      // One of them has kept goal, so the GB slot has somebody the keeper rule allows.
+      gkMinutes: index === 0 ? 30 : 0,
+      gkCleanMinutes: index === 0 ? 10 : 0,
+      concededWhileGk: index === 0 ? 2 : 0,
+      outfieldMinutes: index === 0 ? 30 : 60 + index,
+      positions: [{ group: "DC", minutes: 60, goalsFor: 2, goalsAgainst: 1 }],
+    }),
+  );
+
+  const squad = toBestSevenSquad(playedSeasons, [...idle, ...played]);
+
+  it("leaves them out of the candidate list, however many posts they declared", () => {
+    expect(squad.candidates.map((candidate) => candidate.id)).toEqual(
+      played.map((man) => man.membershipId),
+    );
+    expect(squad.withoutMinutes).toBe(8);
+    expect(squad.eligible).toBe(4);
+  });
+
+  it("empties the posts it cannot fill rather than drawing a ghost in them", () => {
+    for (const kind of SEVEN_KINDS) {
+      const result = solveSeven(kind, { candidates: squad.candidates, slots });
+
+      const filled = result.picks.filter((pick) => pick.player !== null);
+      // Four men, seven posts: four discs and three « Poste vide » — never a seventh name, and never a
+      // man in two slots.
+      expect(filled, kind).toHaveLength(4);
+      expect(new Set(filled.map((pick) => pick.player?.id)).size, kind).toBe(4);
+      expect(result.picks.filter((pick) => pick.player === null), kind).toHaveLength(3);
+
+      // And the men on it are the ones who played, not the ones who declared the posts.
+      for (const pick of filled) {
+        expect(pick.player?.id, kind).toMatch(/^played/);
+        expect(pick.cell, kind).not.toBeNull();
+      }
+    }
   });
 });
 

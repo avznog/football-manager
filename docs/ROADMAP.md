@@ -2067,3 +2067,18 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       the call is his
 - [ ] **Open for the owner · production.** Decision 179 is preview-only by its own guard. The
       rehearsal is now done and reversible; running it on production is his word plus a code change
+
+## From the owner's third backlog — 2026-10-12
+
+- [x] **A member with no game time is left out of the équipe type** (issue #203, decision **187**).
+      `toBestSevenSquad` drops a squad player with 0 minutes **in the selection being read** — a third
+      exclusion beside the departed and the encadrement, counted and stated rather than silent. Two
+      rules used to put him on the pitch together: an undeclared post is filled and badged « pas son
+      poste », and no exposure lands him exactly on the squad mean. **Not** the minimum-minutes
+      threshold the owner refused — « a-t-il joué » rather than « a-t-il assez joué », and one minute
+      still ranks (tested). Three sentences that became untrue were rewritten: `emptySlotsFr` now
+      names which of the two causes emptied a post (« 4 joueurs seulement ont du temps de jeu dans
+      cette sélection »), `outOfPositionNoteFr` no longer claims a seven must be complete, and
+      `squadMeanStandInFr` no longer says « pour ne pas avoir joué ». On a clone of preview it changed
+      **none of the four sevens** and removed Raphaël and Léo C from the swap picker. Looked at at
+      390 px in both themes, coach and player in one pass, on all four sevens

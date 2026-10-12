@@ -51,6 +51,14 @@
  *        pulled most of the way back to the mean, so it does not crown a worst defender;
  *      - it is **continuous**: nothing appears or disappears as an exposure crosses a value.
  *
+ *    **Decision 187 did not put a threshold back.** The caller (`best-seven-input.ts`) no longer offers
+ *    a man with *zero* minutes as a candidate at all, which is a different question from the one the
+ *    owner answered here: « a-t-il joué » rather than « a-t-il assez joué ». Nothing in this file
+ *    changed, and nothing may — fifteen minutes still ranks, shrunk hard towards the squad, and no
+ *    figure appears or vanishes as a Sunday passes. The zero-exposure branches below stay, because
+ *    they are still reached: by a man who has played but never at the post the légende is judging, and
+ *    by one nobody has rated.
+ *
  * 3. **`m` is measured, not chosen.** A hardcoded prior strength would be this file inventing how
  *    sceptical to be. Instead it is the method-of-moments ratio of the noise *within* one player's
  *    figures to the real spread *between* players: a uniform squad measures a large `m` and a

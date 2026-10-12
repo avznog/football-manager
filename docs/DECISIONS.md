@@ -6867,3 +6867,69 @@ instance the team reads is the owner's call to make deliberately, not a side eff
 The result: 29 rows over 15 members, every post of the 1-2-3-1 with several declared candidates
 (`GB` 4, `DC` 6, `MC` 6, `AIL` 9, `AT` 4), and **« pas son poste » gone from all three sevens** —
 0 badges where there were 6 of 7.
+
+## 187 — A member with no game time is not a candidate for any équipe type
+
+**2026-10-12** · accepted · the owner's third backlog, issue #203: « If a player has no game time, do
+not put it in the "equipe type". » · `lib/stats/best-seven-input.ts`, `lib/stats/best-seven-copy.ts` ·
+no migration
+
+`toBestSevenSquad` already left two kinds of member out of the four sevens and **counted them for the
+screen to say so**: whoever has left the squad, and the encadrement. A third joins them — a player with
+**no minute in the selection being read**.
+
+He could be drawn onto the pitch by two of this screen's own rules working together, neither of which
+is wrong on its own:
+
+- a post nobody declared is **filled** rather than left empty, and the disc is badged « pas son poste »
+  (decision 171, rule 5);
+- a man with no exposure lands **exactly on the squad mean** (`best-seven.ts`, rule 2), which beats a
+  real figure at any slot with a second candidate — and in the légende, which is judged per post, the
+  post's own mean beats a real negative impact.
+
+So « la meilleure attaque » could include somebody who has never attacked anything, on a figure that is
+the squad's, in a shirt nobody gave him. Decision 180 removes the last reason to keep him: every player
+with a minute now has declared posts, so excluding the others costs the sevens nothing — verified on a
+clone of preview, where it changed **none of the four sevens**, and only removed Raphaël and Léo C from
+the swap picker (the super admin was already out as a non-player).
+
+### This is not the minimum-exposure threshold the owner refused
+
+He refused one twice, and `best-seven.ts` rule 2 is the argument: a threshold makes a player appear and
+vanish as a Sunday passes, so a thin figure is **shrunk towards the squad, never gated**. That answers
+« a-t-il *assez* joué ». This decision answers the prior question, « a-t-il joué », which has no
+continuum to be discontinuous on: zero minutes is not a thin figure, it is no figure, and there is no
+Sunday on which a man crosses this line without having played football. **Fifteen minutes still ranks**,
+shrunk hard, exactly as he asked — pinned by a test on one minute. Nothing in `best-seven.ts` changed,
+and its rule 2 now carries this paragraph so the next session cannot read the exclusion as a reversal.
+
+It is also **per selection**, because `minutes` is: a man with no minute in the championnat is out of
+*that* seven and back in the one for « toutes ». The sentence under the pitch therefore says « dans
+cette sélection » rather than « cette saison ».
+
+### What the screen says when the exclusion empties a post
+
+With fifteen eligible players it cannot happen — every post of the 1-2-3-1 has declared candidates —
+but it must not produce a six-man seven drawn as a seven. It does not, and it is **not** given a new
+behaviour: the post stays **empty**, « Poste vide » in the list under the pitch, the team figure labelled
+« Moyenne sur 4 postes » rather than « des sept » (that is decision 171's own `aggregationLabelFr`), and
+the DP leaves the slot at `-1` because there is nobody left to put in it. What changed is that the
+screen now names the **right cause**:
+
+- `emptySlotsFr` used to say « l'effectif ne compte pas encore assez de joueurs pour remplir la forme »,
+  which is true of a squad of five and **false** of a squad of twelve of whom four have played. It now
+  quotes the number of men the seven could choose from — « 3 postes restent vides : 4 joueurs seulement
+  ont du temps de jeu dans cette sélection » — with its own sentence for nobody at all, and keeps the
+  old wording for the case the old wording was about;
+- `outOfPositionNoteFr` used to end « un sept doit être complet, donc le poste est rempli plutôt que
+  laissé vide ». The first half is no longer true, so the sentence now says what survives: among the men
+  who have played, one at the wrong post beats an empty one;
+- `squadMeanStandInFr` used to explain a stand-in disc with « ni flattés ni punis pour ne pas avoir
+  joué ». Everybody on the pitch has now played; what such a man has not done is play *at that post*, or
+  be rated. The reason becomes « pour ne pas y avoir encore de chiffre », and the sentence stays, because
+  the légende and the notes seven still reach it.
+
+The exclusion is stated with its count in `excludedFromSquadFr`, first of the three, because it is the
+only one about a man the reader **expected** to see: a name in his squad list, absent from both the pitch
+and the picker. He is absent from the picker too, deliberately — a seven the reader hand-edits is still
+this screen's claim about a season, and « Ton équipe » sits under the same paragraph.
