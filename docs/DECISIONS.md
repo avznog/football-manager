@@ -7747,3 +7747,51 @@ under every disc of the légende. A unit the reader cannot name makes the whole 
   buts », « celui qui encaisse le moins souvent ».
 
 ---
+
+## 200 — A password from the old app still works, and becomes argon2 the first time it is used
+
+**2026-10-12** · accepted · the owner's decision, on the eve of `v1.0.0` · amends decision 008's
+« argon2id » on verification only, not on hashing · affects `lib/auth/password.ts` and the login path
+
+The team's previous app, `info-radarlocal` on Supabase, holds the passwords the owner's teammates
+actually know. Those are **bcrypt** hashes — `$2a$06$…` and `$2a$10$…`, sixty characters, read from the
+real table rather than assumed. This app hashes with argon2id (decision 008), and `verifyPassword`
+returned `false` for a *correct* password against one of them: that was proved, not inferred. bcrypt is
+one-way, so the hashes cannot be converted, and the three ways out were to reset a dozen passwords by
+hand, to make everybody use the « mot de passe oublié » path this app deliberately does not have, or to
+read both algorithms. The owner chose the third.
+
+- **Verification reads the algorithm off the prefix.** `$2a$`, `$2b$` and `$2y$` go to
+  `@node-rs/bcrypt` — the same family as the existing `@node-rs/argon2`, so no second native
+  toolchain; anything else goes to argon2id, which is what the function has always done. **Not** « try
+  argon2, fall back on the exception »: a fallback keyed on a throw cannot tell a bcrypt hash from a
+  corrupt one, and a corrupt one must stay a wrong password. `$2x$` is deliberately not in the list —
+  it exists only to reproduce a 2011 PHP bug, no imported hash carries it, and a prefix we cannot name
+  reads as a refusal rather than as a guess.
+- **`hashPassword` is argon2id and nothing else.** Nowhere in this application writes a bcrypt hash:
+  not the join form, not `resetMemberPassword`, not `db:seed`, not `db:bootstrap`. bcrypt is a format
+  we *read*, never one we produce, and `OPTIONS` is untouched.
+- **`verifyPassword` now answers `{ ok, needsUpgrade }`** instead of a bare boolean, so the caller can
+  rewrite what it has just proved. `needsUpgrade` is true only when `ok` is: a failed attempt rewrites
+  nothing, which is what stops a wrong guess from touching a row. The signature change is deliberate
+  rather than additive — a second function would have let the login path keep calling the old one and
+  never upgrade anybody — and the login action is the **only** caller in the repository.
+- **The upgrade happens in the login request**, because that is the one moment the plaintext exists.
+  It is also the one moment it is allowed to fail silently: the password has already been proved, so a
+  write that throws costs a log line and not a login. The log line carries the user's id and the
+  error's class only — never the password, never a hash, and deliberately not the error itself, whose
+  `DrizzleQueryError` message would print the bound parameters, which *are* the new hash.
+- **The timing decoy still works.** An unknown username is still verified against a real argon2id hash
+  of a random value, computed once per process, so « no such user » costs what a wrong password costs.
+  A bcrypt verification at cost 6 is *faster* than that argon2 call, which means the login of a
+  teammate who has not yet been upgraded is slightly quicker than one who has — it is a one-off per
+  account, it reveals nothing about a username that does not exist, and it disappears as the upgrades
+  happen.
+- **This is a migration path with an end, and that end is the point.** Once no `$2a$` — or `$2b$`, or
+  `$2y$` — hash remains in `users.password_hash`, the bcrypt branch, the dependency and the
+  `needsUpgrade` field can all go, and `verifyPassword` becomes a boolean again. The query that says
+  when is `select count(*) from users where password_hash like '$2%'`; when it answers zero, this
+  decision has been spent. Nothing automates that: it is a deletion to make deliberately, after the
+  owner's teammates have all signed in at least once.
+
+---

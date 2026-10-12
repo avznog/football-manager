@@ -2272,3 +2272,19 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       the holds sentence and on the permission; the browser suite creates a match, gives it a déroulé,
       deletes it, and asserts that a player is refused both the screen and a crafted post made with
       his own session and the coach's action id
+
+## The passwords the teammates already know — 2026-10-12
+
+- [x] **bcrypt is verified as well as argon2, and upgraded on the way through** (decision **200**).
+      The hashes imported from `info-radarlocal` are `$2a$06$` and `$2a$10$`, and `verifyPassword`
+      was refusing correct passwords against them. Verification now reads the algorithm off the
+      prefix — `$2a$`/`$2b$`/`$2y$` to `@node-rs/bcrypt`, everything else to argon2id — and answers
+      `{ ok, needsUpgrade }`, so `login` can rewrite the row with an argon2id hash in the same
+      request, once, the first time its owner signs in. `hashPassword` stays argon2id only: bcrypt
+      is read here and never written. A failed upgrade is swallowed and logged without the password,
+      the hash or the Drizzle error, because the user has already proved the password
+- [ ] **Delete the bcrypt branch when nothing needs it.** `select count(*) from users where
+      password_hash like '$2%'` on production is the whole test; when it answers zero, the branch,
+      `@node-rs/bcrypt` and the `needsUpgrade` field all go and `verifyPassword` is a boolean again.
+      Deliberately not automated — it is a deletion to make once the owner's teammates have each
+      signed in at least once
