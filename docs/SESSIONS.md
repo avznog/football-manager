@@ -5511,4 +5511,55 @@ match flow, and the happy path does not walk `/stats/equipe-type`.
 Files: `lib/stats/best-seven-input.ts`, `lib/stats/best-seven-input.test.ts`,
 `lib/stats/best-seven-copy.ts`, `lib/stats/best-seven-copy.test.ts`, `lib/stats/best-seven.ts` (rule 2's
 comment only), `app/(app)/stats/equipe-type/page.tsx`, `docs/DECISIONS.md` (187), `docs/ROADMAP.md`,
+
+## 2026-10-12 — Backlog 3, track B: the three figures on `/stats` that hid their rate
+
+Issues **#204**, **#205** and **#206**, one coherent change to three cards, in a worktree against a
+local clone of the preview database — so the keeper and per-position figures are the three matches
+decision 179 rebuilt, with four keepers and real outfield splits, rather than the demo season.
+
+**Decision 184** is the whole of it, and it is presentation only: no aggregate, no ranking and no
+model changed. Each of the three cards is ranked on a count and keeps that count as its bold figure;
+what moved is the small line under it, which used to be only the denominator and is now the rate *with*
+its denominator. « 12 buts » over « 1 but toutes les 7′ sur 79′ »; « 86′ » over « 67 % de 128′ jouées ».
+
+**The ranking was deliberately left where it was**, and that is the one judgement in here worth
+arguing with. Ranking the total cards on their rate would turn each of them into « Le moins de buts
+encaissés », the card one above it, printed backwards (decision 177); and ranking invincibility on the
+percentage would crown six clean minutes at 100 %, which is what decision 162 refused and 177 kept
+refusing. So the bold column stays monotone in the number the order comes from.
+
+Three formatters, all pure and all tested: `concededRateLineFr`, `cleanShareFr` and
+`cleanSharePercentFr`. The last exists only for the two places where the denominator is already a
+`Figure` in the same `<dl>` — the Gardiens card and the profile card's keeper block, both of which
+print « Minutes » beside the share. Everywhere else the denominator travels with the number, because
+« 1 but toutes les 8′ » over eight minutes and over four matches are not the same claim (decision 020).
+
+**What was checked rather than assumed.** The two invincibility figures are not interchangeable:
+`aggregate.test.ts` now pins an hour where a man plays half of it in goal and the only goal is
+conceded at 40′ while he wears the gloves. `cleanMinutes − gkCleanMinutes` is then 0, and the
+half-hour he spent outfield was entirely clean — so the subtraction is not an outfield figure and no
+screen computes it. Samuel on the clone is the live version of the same shape: 52′ clean of 155′
+played, 29′ clean of 109′ in goal, and 23 is a number that means nothing.
+
+Three empty cases, each with a test: nobody conceded → « aucun but encaissé en 35′ »; a conceding
+spell the cache floored to `0′` → the record, never « toutes les 0′ »; no minutes at all → `null`, a
+dash, never `0 %`.
+
+**Looked at** at 390 px, light and dark, as the coach `potter` and as the player `samuel`, card by
+card: the two « Buts encaissés » cards, « Le moins de buts encaissés » beside them, Gardiens, « Minutes
+d'invincibilité », and Samuel's and Nicolas's profile cards — a keeper with both records and an
+outfielder with no keeper block at all. The arithmetic cross-checks on screen: Pierre reads « 1 but
+toutes les 16′ sur 128′ » on one card and « 8 buts encaissés en 128′ » on the next. No console error,
+no sideways scroll at 390 px. The new description of « Minutes d'invincibilité » was shortened after
+reading the first capture, where it ran to three lines above five rows. Screenshots in `audit/b3b/`,
+which `.gitignore` excludes, so the readings above are the record.
+
+`npm run typecheck`, `eslint` and `npm test` (70 files, 1457 tests) pass. No end-to-end run: no Server
+Action, no match flow and no screen on the happy path's walk changed — `happy-path.spec.ts` asserts
+`/stats` by heading and fold, not by these two lines.
+
+Files: `lib/stats/format.ts`, `lib/stats/format.test.ts`, `lib/stats/aggregate.test.ts`,
+`app/(app)/stats/page.tsx`, `app/(app)/stats/_components/keepers.tsx`,
+`app/(app)/joueur/_components/stats-card.tsx`, `docs/DECISIONS.md`, `docs/ROADMAP.md`,
 `docs/SESSIONS.md`.

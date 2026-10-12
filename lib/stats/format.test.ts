@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   NO_VALUE_FR,
   appearancesLineFr,
+  cleanShareFr,
+  cleanSharePercentFr,
   concededEveryFr,
   concededRateFr,
+  concededRateLineFr,
   concededRecordFr,
   formatDecimal,
   formatSignedDecimal,
@@ -203,6 +206,42 @@ describe("the rate and impact copy (decisions 162 and 177)", () => {
       record: "1 but encaissé en 20′",
     });
     expect(concededRateFr(0, 35)).toEqual({ rate: "aucun but encaissé", record: "en 35′" });
+  });
+
+  it("prints a conceded rate with the minutes it is a rate over (decision 184)", () => {
+    expect(concededRateLineFr(4, 120)).toBe("1 but toutes les 30′ sur 120′");
+    expect(concededRateLineFr(1, 8)).toBe("1 but toutes les 8′ sur 8′");
+    // Rounding never pushes the rate below a minute, and the denominator says it is eight minutes.
+    expect(concededRateLineFr(8, 8)).toBe("1 but toutes les 1′ sur 8′");
+  });
+
+  it("refuses a conceded rate it cannot compute, and prints the record instead", () => {
+    // Nobody conceded: no division, and the sentence the cahier asks for in place of ∞.
+    expect(concededRateLineFr(0, 35)).toBe("aucun but encaissé en 35′");
+    expect(concededRateLineFr(0, 0)).toBe("aucun but encaissé en 0′");
+    // Minutes are floored, so a forty-second stint that conceded is `0′`: no « toutes les 0′ », and
+    // no rate invented out of a rounding either.
+    expect(concededRateLineFr(1, 0)).toBe("1 but encaissé en 0′");
+  });
+
+  it("turns clean minutes into a share of the minutes they are a share of (decision 184)", () => {
+    expect(cleanShareFr(85, 120)).toBe("71 % de 120′ jouées");
+    expect(cleanShareFr(120, 120)).toBe("100 % de 120′ jouées");
+    expect(cleanShareFr(0, 60)).toBe("0 % de 60′ jouées");
+    // Six clean minutes are 100 %, and the denominator beside it is the whole point.
+    expect(cleanShareFr(6, 6)).toBe("100 % de 6′ jouées");
+  });
+
+  it("has no invincibility share for a man who has not played", () => {
+    expect(cleanShareFr(0, 0)).toBeNull();
+    expect(cleanSharePercentFr(0, 0)).toBeNull();
+  });
+
+  it("prints the share alone where the denominator is already beside it", () => {
+    expect(cleanSharePercentFr(20, 30)).toBe("67 %");
+    // A keeper's share is `gkCleanMinutes / gkMinutes`, and an outfielder's `cleanMinutes / minutes`:
+    // the same function, never the difference of the two (rule 10 of `aggregate.ts`).
+    expect(cleanSharePercentFr(30, 30)).toBe("100 %");
   });
 
   it("says « aucun but encaissé » in the record rather than infinity", () => {

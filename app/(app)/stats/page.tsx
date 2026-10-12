@@ -26,6 +26,8 @@ import {
   equipeTypeHref,
 } from "@/lib/stats/best-seven-copy";
 import {
+  cleanShareFr,
+  concededRateLineFr,
   formatMinutes,
   formatRating,
   matchCount,
@@ -200,7 +202,9 @@ function SeasonCards({
           description="Joueur de champ : les buts pris pendant qu’il jouait, hors temps au goal"
           entries={stats.topConcededOutfield}
           valueLabel={(entry) => plural(entry.value, "but")}
-          countLabel={(entry) => `en ${formatMinutes(entry.count)}`}
+          /* The rate under the total, with the minutes it is a rate over (decision 184). The card is
+             ranked on the count above — « le moins de buts encaissés » below ranks on the rate. */
+          countLabel={(entry) => concededRateLineFr(entry.value, entry.count)}
           emptyMessage="Aucun but encaissé sur cette sélection pendant qu’un joueur de champ était sur le terrain."
         />
         <RateBoard
@@ -220,9 +224,12 @@ function SeasonCards({
         />
         <Leaderboard
           title="Buts encaissés au goal"
+          /* The description carries « dans les buts », so the rate line under each total does not
+             have to repeat it in a column 110 px wide. */
+          description="Gardien : les buts pris pendant qu’il était dans les buts, et à quelle fréquence"
           entries={stats.topConcededGk}
           valueLabel={(entry) => plural(entry.value, "but")}
-          countLabel={(entry) => `en ${formatMinutes(entry.count)} au goal`}
+          countLabel={(entry) => concededRateLineFr(entry.value, entry.count)}
           emptyMessage="Aucun but encaissé dans les buts sur cette sélection."
         />
         <Keepers keepers={stats.keepers} />
@@ -245,10 +252,15 @@ function SeasonCards({
         />
         <Leaderboard
           title="Minutes d’invincibilité"
-          description="Minutes sur le terrain sans que l’équipe encaisse, gardien compris"
+          description="Minutes sans que l’équipe encaisse, gardien compris, et leur part du temps de jeu"
           entries={stats.topCleanMinutes}
           valueLabel={(entry) => formatMinutes(entry.value)}
-          countLabel={(entry) => `sur ${formatMinutes(entry.count)} jouées`}
+          /* The percentage under the minutes, with the minutes played it is a part of (decision 184).
+             The ranking stays on the minutes themselves: a man who played six clean minutes is at
+             100 % and would otherwise head the card, which is the whole point of decision 162. */
+          countLabel={(entry) =>
+            cleanShareFr(entry.value, entry.count) ?? `sur ${formatMinutes(entry.count)} jouées`
+          }
           emptyMessage="Personne n’a encore de minutes sans encaisser sur cette sélection."
         />
       </Section>
