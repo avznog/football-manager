@@ -33,6 +33,7 @@ import type { MatchRow } from "@/lib/match/queries";
 import { MIN_NOTES_FOR_MEAN } from "@/lib/rating/aggregate";
 import { ratingInvitationFr } from "@/lib/rating/labels";
 import { getMatchRecap, getRatingResults } from "@/lib/rating/queries";
+import { CompositionsStrip } from "./_components/compositions-strip";
 import { ManOfTheMatchCard } from "./_components/man-of-the-match";
 import { MinutesTable } from "./_components/minutes-table";
 import { RatingsPanel } from "./_components/ratings-panel";
@@ -201,6 +202,14 @@ export default async function RecapPage({ params }: PageProps<"/match/[id]/recap
       ) : null}
 
       <TimelineList entries={recap.timeline} />
+
+      {/* « On the bottom », where the owner asked for it: the Déroulé above says what changed, and
+          this says what the pitch looked like after each change (decision 182). Both roles read it —
+          there is no branch here, and that is deliberate: a composition is not privileged. */}
+      <CompositionsStrip
+        compositions={recap.compositions}
+        kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
+      />
     </div>
   );
 }

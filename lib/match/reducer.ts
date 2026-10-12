@@ -289,6 +289,14 @@ export type TimelineActor = {
    * timeline can say « Karim → AT » without re-reading the payload. Absent everywhere else.
    */
   positionCode?: string | null;
+  /**
+   * Where he stood *before* it, on the `moved` actors of a `LINEUP_APPLIED`. Only the presenter
+   * needs it, and only to keep quiet: the two `AIL` slots are one position (decision 157), so a
+   * player crossing between them has changed slot and not post, and « Pierre → AIL » about a man
+   * who was already an ailier is a change the Déroulé invented (decision 181). Comparing the two
+   * codes is the test, which is why both travel. Absent everywhere else.
+   */
+  fromPositionCode?: string | null;
 };
 
 export type TimelineEntry = {
@@ -392,6 +400,30 @@ export type PlannedLineupState = {
   flags: readonly PlannedLineupFlag[];
 };
 
+/**
+ * The pitch as one `LINEUP_APPLIED` left it — one of the owner's « blocks » (decision 182).
+ *
+ * The rebuilt matches hold no paired substitution any more: every change is a snapshot of the whole
+ * seven (decision 147), so the ordered list of these is the composition history of the match, and it
+ * is the reducer that holds it because the reducer is the only thing that knows where anybody stood
+ * (invariant 2). No names, no coordinates: those are the presenter's.
+ */
+export type CompositionSnapshot = {
+  /** `match_events.id` of the `LINEUP_APPLIED` — a stable React key, and the block's identity. */
+  eventId: string;
+  clockMs: number;
+  /** Continuous minute (decision 009). */
+  minute: number;
+  /** `34’`, `30’+2` — the same label the timeline stamps on the event. */
+  minuteLabel: string;
+  /** This one filled an empty pitch: the composition rather than a change. */
+  startingLineup: boolean;
+  /** Slot → member, ordered like a team sheet. `slotId` is null for a slot nobody can place. */
+  assignments: readonly { memberId: string; slotId: string | null }[];
+  /** Squad members with a playing role who were not on the pitch then. Empty without `config.squad`. */
+  offPitch: readonly string[];
+};
+
 export type MatchState = {
   periods: PeriodsConfig;
   /** What the clock says, and whether it is ticking. */
@@ -427,6 +459,8 @@ export type MatchState = {
   pendingLineup: PlannedLineupState | null;
   /** `lineups.id` of every composition actually applied, in order. */
   appliedLineupIds: readonly string[];
+  /** Every composition the match went through, in order — one per applied `LINEUP_APPLIED`. */
+  compositions: readonly CompositionSnapshot[];
   voidedEventIds: readonly string[];
   anomalies: readonly MatchAnomaly[];
 };
@@ -696,6 +730,7 @@ export function reduceMatch(
   const concededAt: number[] = [];
   const scoredAt: number[] = [];
   const appliedLineupIds: string[] = [];
+  const compositions: CompositionSnapshot[] = [];
   const injuredInMatch = new Set<string>();
   const everLeftPitch = new Set<string>();
   let goalsFor = 0;
@@ -1081,8 +1116,33 @@ export function reduceMatch(
                 memberId: change.memberId,
                 role: "moved",
                 positionCode: slots.positionOf(change.toSlotId),
+                fromPositionCode: slots.positionOf(change.fromSlotId),
               });
             }
+            /*
+             * The pitch as this event left it. Every change is one `LINEUP_APPLIED` snapshot of the
+             * whole seven (decision 147), so the sequence of these *is* the match's composition
+             * history — and the recap draws one block per entry (decision 182). Recorded here and
+             * not re-derived by a reader, because invariant 2 puts the pitch in one place; a voided
+             * event never reaches this branch, so it contributes no block either.
+             */
+            compositions.push({
+              eventId: event.id,
+              clockMs,
+              minute: clockMsToMinute(clockMs),
+              minuteLabel: formatMinuteLabelFr(clockMs, event.period, periods),
+              startingLineup,
+              assignments: [...pitch]
+                .map(([memberId, entry]) => ({ memberId, slotId: entry.slotId }))
+                .sort(
+                  (a, b) =>
+                    slots.sortOf(a.slotId) - slots.sortOf(b.slotId) ||
+                    (a.memberId < b.memberId ? -1 : a.memberId > b.memberId ? 1 : 0),
+                ),
+              offPitch: (config.squad ?? [])
+                .filter((entry) => entry.role !== "supporter" && !pitch.has(entry.teamMemberId))
+                .map((entry) => entry.teamMemberId),
+            });
             if (applied.lineupId) appliedLineupIds.push(applied.lineupId);
             checkPitch(event, clockMs);
           }
@@ -1284,6 +1344,7 @@ export function reduceMatch(
     plannedLineups,
     pendingLineup,
     appliedLineupIds,
+    compositions,
     voidedEventIds: [...voidedBy.keys()],
     anomalies,
   };

@@ -1331,8 +1331,10 @@ describe("a group change is one snapshot of the pitch", () => {
         { memberId: "julien", role: "out" },
         { memberId: "momo", role: "in", positionCode: "MC" },
         { memberId: "yanis", role: "in", positionCode: "AT" },
-        { memberId: "samir", role: "moved", positionCode: "GB" },
-        { memberId: "hugo", role: "moved", positionCode: "DG" },
+        // A `moved` actor carries both codes, so the presenter can tell a real change of post from
+        // a swap of sides between two slots that share one (decision 181).
+        { memberId: "samir", role: "moved", positionCode: "GB", fromPositionCode: "DG" },
+        { memberId: "hugo", role: "moved", positionCode: "DG", fromPositionCode: "GB" },
       ]),
     );
     expect(change?.actors).toHaveLength(6);

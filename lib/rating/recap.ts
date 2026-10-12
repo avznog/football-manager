@@ -38,7 +38,12 @@ import type { SquadRole } from "@/db/schema";
 import { pluralize, resultLabel, scoreLineFr } from "@/lib/calendar/labels";
 import { VOIDED_SUFFIX_FR } from "@/lib/match/events";
 import { noteDetailFr, pitchEventFr, remarkDetailFr } from "@/lib/match/presenter";
-import type { MatchState, PlayerMatchState, TimelineEntry } from "@/lib/match/reducer";
+import type {
+  CompositionSnapshot,
+  MatchState,
+  PlayerMatchState,
+  TimelineEntry,
+} from "@/lib/match/reducer";
 
 /** What this module needs to know about a person: how to write their name. */
 export type RecapMember = {
@@ -116,6 +121,69 @@ export type RecapPlayerLine = {
   minutesLabel: string;
 };
 
+/* -------------------------------------------------------------------------- */
+/* The blocks: every composition the match went through                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A `formation_slots` row, with the coordinates the reducer has no use for.
+ *
+ * `reduceMatch` takes the same rows as `SlotInfo` and reads only `id`, `positionCode` and `sort`:
+ * where a slot *is* on the turf is a presentation fact, and this is the presentation half.
+ */
+export type RecapSlot = {
+  id: string;
+  formationId: string;
+  positionCode: string;
+  /** 0..1000, left to right — `components/pitch/README.md` owns the space. */
+  x: number;
+  /** 0..1000, our goal line to the opponent's. */
+  y: number;
+  sort: number;
+};
+
+/** One disc, or one empty slot, of a block. Structurally the `PitchSlot` of `components/pitch`. */
+export type RecapCompositionSlot = {
+  id: string;
+  x: number;
+  y: number;
+  positionCode: string;
+  player: { id: string; name: string; jerseyNumber: number | null } | null;
+};
+
+/**
+ * One of the owner's « blocks »: the pitch as one change left it (decision 182).
+ *
+ * The paper sheets he rebuilt the season from are drawn as a column of blocks, one per change, and
+ * that is what the recap now shows at the bottom: the minute, the seven in the 1-2-3-1, and who was
+ * off the pitch while they played.
+ */
+export type RecapComposition = {
+  eventId: string;
+  minute: number;
+  /** `34’` — the same label the Déroulé stamps on the change that produced this block. */
+  minuteLabel: string;
+  /**
+   * « Composition de départ » or « Changement ».
+   *
+   * Said *under* the minute rather than instead of it: twelve blocks are told apart by when they
+   * happened, so the minute is the big type on every one of them and the kind is the caption.
+   */
+  kindLabel: string;
+  startingLineup: boolean;
+  slots: readonly RecapCompositionSlot[];
+  /** Squad members with a playing role who were not on the pitch, by name. Supporters excluded. */
+  offPitch: readonly { memberId: string; name: string; jerseyNumber: number | null }[];
+  /**
+   * « Hors du terrain : Hugo, Momo », or null when everybody selected was on it.
+   *
+   * Not « Sur le banc »: decision 087 struck that heading off a list of thirteen where ten were not
+   * on any bench, and a man who has just gone off injured is not on one either. « Hors du terrain »
+   * is exactly what the snapshot knows — he was not among the seven — and nothing more.
+   */
+  offPitchLabel: string | null;
+};
+
 export type MatchRecap = {
   goalsFor: number;
   goalsAgainst: number;
@@ -136,6 +204,12 @@ export type MatchRecap = {
   /** Anybody credited with an assist. */
   assisters: readonly RecapAssister[];
   timeline: readonly RecapTimelineEntry[];
+  /**
+   * Every composition the match went through, in order (decision 182). Empty when the caller passes
+   * no slot catalogue: a block cannot be drawn without coordinates, and an empty strip says less
+   * wrongly than seven discs piled in the centre circle.
+   */
+  compositions: readonly RecapComposition[];
   /** Everybody who played, most minutes first, then the unused substitutes. */
   players: readonly RecapPlayerLine[];
   /** « 9 joueurs utilisés » and friends, for the sober line under the celebration. */
@@ -153,7 +227,7 @@ const CLOCK_TONE_TYPES = new Set(["KICKOFF", "PERIOD_END", "FINAL_WHISTLE"]);
 export function buildRecap(
   state: MatchState,
   members: readonly RecapMember[],
-  options: { unknownName?: string } = {},
+  options: { unknownName?: string; slots?: readonly RecapSlot[] } = {},
 ): MatchRecap {
   const directory = new Map(members.map((member) => [member.memberId, member]));
   const unknownName = options.unknownName ?? UNKNOWN_MEMBER_NAME;
@@ -172,6 +246,7 @@ export function buildRecap(
     scorers: buildScorers(state.players, nameOf),
     assisters: buildAssisters(state.players, nameOf),
     timeline: buildTimeline(state.timeline, nameOf),
+    compositions: buildCompositions(state.compositions, options.slots ?? [], directory, unknownName),
     players: buildPlayerLines(state.players, directory, unknownName),
     playersUsed: state.players.filter((player) => player.playedMatch).length,
     playersUsedLabel: pluralize(
@@ -347,6 +422,94 @@ export function describeActors(
   if (injured.length > 0) parts.push(injured.join(", "));
 
   return parts.length > 0 ? parts.join(", ") : null;
+}
+
+/**
+ * The blocks: one pitch per composition the match went through, in order.
+ *
+ * The sequence is `state.compositions`, which the reducer records as it replays the log — this adds
+ * names and coordinates and decides nothing about *what* the pitch held. It only exists because the
+ * rebuild (decision 179) made every change a snapshot of the whole seven (decision 147): before it,
+ * a paired substitution told you two names and never the other five.
+ *
+ * Every slot of the formation is drawn, occupied or not, so a block that fields six shows the hole
+ * rather than a pitch that silently lost a line. The formation is the one the occupied slots belong
+ * to, exactly as `pitchView` picks it in game mode, and a player in a slot the catalogue does not
+ * know still gets a disc in the middle: a missing player would be the worse of the two lies.
+ */
+export function buildCompositions(
+  compositions: readonly CompositionSnapshot[],
+  slots: readonly RecapSlot[],
+  directory: ReadonlyMap<string, RecapMember>,
+  unknownName: string,
+): RecapComposition[] {
+  if (slots.length === 0) return [];
+  const byId = new Map(slots.map((slot) => [slot.id, slot]));
+  const discOf = (memberId: string): { id: string; name: string; jerseyNumber: number | null } => {
+    const member = directory.get(memberId);
+    return {
+      id: memberId,
+      name: member?.displayName ?? unknownName,
+      jerseyNumber: member?.jerseyNumber ?? null,
+    };
+  };
+
+  return compositions.map((snapshot) => {
+    const occupantOf = new Map(
+      snapshot.assignments
+        .filter((assignment) => assignment.slotId !== null)
+        .map((assignment) => [assignment.slotId as string, assignment.memberId]),
+    );
+    const formationId = snapshot.assignments
+      .map((assignment) => (assignment.slotId === null ? null : byId.get(assignment.slotId)))
+      .find((slot) => slot !== undefined && slot !== null)?.formationId;
+
+    const drawn: RecapCompositionSlot[] = slots
+      .filter((slot) => slot.formationId === formationId || occupantOf.has(slot.id))
+      .slice()
+      .sort((a, b) => a.sort - b.sort)
+      .map((slot) => {
+        const occupant = occupantOf.get(slot.id);
+        return {
+          id: slot.id,
+          x: slot.x,
+          y: slot.y,
+          positionCode: slot.positionCode,
+          player: occupant ? discOf(occupant) : null,
+        };
+      });
+
+    for (const assignment of snapshot.assignments) {
+      if (assignment.slotId !== null && byId.has(assignment.slotId)) continue;
+      drawn.push({
+        id: assignment.slotId ?? `orphan-${assignment.memberId}`,
+        x: 500,
+        y: 500,
+        positionCode: "?",
+        player: discOf(assignment.memberId),
+      });
+    }
+
+    const offPitch = snapshot.offPitch.map(discOf).map((disc) => ({
+      memberId: disc.id,
+      name: disc.name,
+      jerseyNumber: disc.jerseyNumber,
+    }));
+
+    return {
+      eventId: snapshot.eventId,
+      minute: snapshot.minute,
+      minuteLabel: snapshot.minuteLabel,
+      kindLabel: snapshot.startingLineup ? "Composition de départ" : "Changement",
+      startingLineup: snapshot.startingLineup,
+      slots: drawn,
+      offPitch,
+      offPitchLabel:
+        offPitch.length > 0
+          ? `Hors du terrain : ${offPitch.map((player) => player.name).join(", ")}`
+          : null,
+    };
+  });
 }
 
 /**

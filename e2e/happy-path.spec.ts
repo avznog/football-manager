@@ -960,6 +960,30 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await expect(about).toContainText("50’");
     await expect(about).toContainText(striker.displayName);
   });
+
+  /**
+   * **The compositions at the bottom of the recap** (decision 182): the owner's « blocks ».
+   *
+   * Asserted on the real screen rather than only in `recap.test.ts` because the chain it depends on
+   * is long — the reducer records a snapshot per applied `LINEUP_APPLIED`, the query fetches slot
+   * coordinates the reducer itself throws away, and the strip draws them — and a missing link
+   * anywhere in it renders as a card that is simply not there, which no unit test would notice.
+   */
+  await test.step("the recap shows one block per composition the match went through", async () => {
+    await page.goto(`${matchUrl}/recap`);
+    const strip = page.getByRole("list", {
+      name: "Les compositions du match, de la première à la dernière",
+    });
+    await expect(strip).toBeVisible();
+
+    // The starting seven and the group change this scenario applied, in that order. « 0’ » is the
+    // kick-off block: in the Déroulé it is hidden (seven arrivals are not seven changes) and here it
+    // is the first thing a reader wants.
+    await expect(strip.getByText("Composition de départ")).toBeVisible();
+    await expect(strip.getByText("Changement").first()).toBeVisible();
+    // The trailing spacer is `aria-hidden`, so this counts blocks and nothing else.
+    expect(await strip.getByRole("listitem").count()).toBeGreaterThanOrEqual(2);
+  });
 });
 
 /* -------------------------------------------------------------------------- */
