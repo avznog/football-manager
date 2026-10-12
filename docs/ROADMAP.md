@@ -2010,3 +2010,44 @@ browser could not be told to drop it. Decision **143** has the full account.
       left to the profile. `happy-path.spec.ts` walks the fold and a header sort
 - [ ] **Open for the owner**: whether « Le moins de buts encaissés » should require a minimum of minutes
       — today a man with 1 goal in 60′ heads the card over 8 in 324′, which is the real figure
+
+## The three paper sheets become the event logs — 2026-10-12
+
+Rebuilt on the **preview** database only, from `backlogs/matches-1-3.md` (the owner's verified
+transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-readable), by
+`scripts/rebuild-matches.mts`. Decision **179** is why it deletes events at all.
+
+- [x] **`scripts/rebuild-matches.mts`.** Dry run by default; `--commit` writes. Refuses any
+      `DATABASE_URL` that is not the Neon preview endpoint or a localhost one, refuses the production
+      endpoint **by name**, and refuses a `-pooler` host. Per match, in one transaction: delete
+      `match_events`, `match_player_stats` and `match_player_positions`, null
+      `lineups.applied_event_id`, insert the log, then `finalizeMatchById`
+- [x] **All 33 blocks are reproduced**, asserted by replaying the log through `reduceMatch` up to each
+      block's own event and comparing `onPitch` — the seven players **and** their slots — with the
+      paper. 10 · 11 · 12. Not one needed the assertion loosened
+- [x] **The three scores come out of the log**: 3–9, 3–2 and 2–5. Matches 1 and 2 keep every fact they
+      had (three goals each, nine and two conceded, Benoît's 36′ injury); Bayern's 2–5 comes from the
+      sheet because its log had no goal at all, and its real `REMARK` 1′, `COMMENT` 3′ and `REMARK` 21′
+      are kept. Bayern now ends `finished`
+- [x] **Match 1 has four goalkeepers again** — Léo M 0′→11′, Samuel 11′→30′, Thomas 30′→40′, Lucas
+      40′→51′, Léo M 51′→end — and **Nicolas has 0 goalkeeper minutes**, where the stored log had him
+      at 30′. Match 2 is Lucas 0′→30′ then Samuel 30′→end, against a stored Lucas 52′ / Nicodème 8′.
+      Season totals: Samuel 109′, Lucas 41′, Léo M 20′, Thomas 10′ — 180′ for three 60′ matches
+- [x] **`Σ match_player_positions.minutes = match_player_stats.minutes` and the `GB` row `=
+      gk_minutes`**, per player, checked on the frozen tables and not only on the reduction
+- [x] **Idempotent**: a second `--commit` leaves the three digests byte-identical, `recorded_at`
+      included
+- [x] **`ratings` untouched** — 200 rows across matches 1 and 2, `ratings_published_at` unchanged —
+      and every `match_squad` row the paper does not name left alone, so the supporters survive
+- [x] **Looked at at 390 px, both themes**: each recap's Déroulé now carries « Changement » lines with
+      « Postes : … », the 60′ goal conceded lands before the 60′ `PERIOD_END`, the 36′ injury before the
+      change that takes Benoît off, and `/stats` → Gardiens lists the four keepers. Read on
+      **`dev.7orteils.bgonzva.fr`**, the deployed preview, as the coach `leo`. Screenshots in
+      `audit/rebuild/` — which `.gitignore` excludes, like every other `audit/` capture, so they are
+      local and the readings above are the record
+- [ ] **Open for the owner · the eleven side-swap lines.** Keeping the paper's wings means a man who
+      changes side produces a slot change the Déroulé prints as « X → AIL » or « X → DC » for a man who
+      already held that position (11 lines: 1 · 6 · 4). Decision 179 names the one-rule alternative;
+      the call is his
+- [ ] **Open for the owner · production.** Decision 179 is preview-only by its own guard. The
+      rehearsal is now done and reversible; running it on production is his word plus a code change
