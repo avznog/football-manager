@@ -28,3 +28,24 @@ in.
 | File | What it is |
 |---|---|
 | `preview-20261012.sql` | The preview database on 2026-10-12, taken immediately before production's data was restored over it. The demo season « AS Dimanche », at migration `0014`. |
+| `matches-1-3-rebuilt.sql` | The first three matches rebuilt from the owner's paper sheets, plus the preferred positions derived from them (decisions 179 and 180). **Meant to be applied to production**, after the next tag has run migrations `0011`–`0014`. Carries no credentials, so nothing needed redacting. |
+
+## `matches-1-3-rebuilt.sql`, and why it is here rather than only in a script
+
+The rebuild is reproducible — `scripts/rebuild-matches.mts` and
+`scripts/assign-positions-from-play.mts`, driven by `backlogs/matches-1-3-blocks.json` — and either
+route reaches the same state. The file exists because the owner asked that the work not be done twice,
+and because the two things are not quite the same: **the file is what was reviewed on preview**, and
+the scripts are what would be computed again.
+
+Both were checked to agree, on a local restore of the production dump taken the same day: apply
+migrations `0011`–`0014`, run `db:refreeze`, then apply the file, and the result is **byte-identical**
+to preview across seven fingerprints — `match_events`, `match_player_stats`,
+`match_player_positions`, `player_positions`, `match_squad`, the match statuses and
+`lineups.applied_event_id`. That rehearsal is the reason the file can be trusted against production
+without having been run there.
+
+**It can be applied at all** only because preview was restored from production on the same day, so the
+identifiers are production's: the md5 of every `matches.id`, `team_members.id` and `users.id` is
+identical on both, verified rather than assumed. If production's rows are ever recreated, this file
+stops being applicable and the scripts become the only route.

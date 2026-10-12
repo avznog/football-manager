@@ -52,6 +52,13 @@ where they disagree.**
 - **The preview was walked end to end on 2026-10-12 after the swap** — both roles, every main screen,
   no 5xx — so the swap is verified, not assumed. `/saisie` and `/composition` are a 404 for a player,
   as decision 026 intends.
+- **The three matches are rebuilt on preview, and production can have it without redoing the work.**
+  `db/snapshots/matches-1-3-rebuilt.sql` is the reviewed result — the three event logs, their caches,
+  the sheets and the 29 derived preferred positions — ready to apply. **Its precondition is migration
+  `0014`**, so it goes *after* the next tag has run `0011`–`0014` and `db:refreeze`. Rehearsed on a
+  local restore of production: the result is byte-identical to preview across seven fingerprints.
+  `scripts/rebuild-matches.mts` and `scripts/assign-positions-from-play.mts` are the other route, and
+  both refuse production by name on purpose — running either there is the owner's deliberate act.
 - **The super admin's production password is trivially weak and must be rotated** (the owner said what
   it is; it is deliberately not written here, because this repository is public). That account is a
   coach of the team and can read and rewrite every team in the instance, and the app is on a public
@@ -1061,6 +1068,12 @@ VALUE`, for a new `COMMENT` event; `ActionChoice` in `components/action-sheet/ac
   preview and applied `0011`–`0014` + `db:refreeze`. Transcribed the owner's three paper match sheets
   into `backlogs/matches-1-3.md`; they carry positions and minutes but **no date, opponent or score**,
   and matches 1 and 2 record no goals at all, so nothing can be imported until the owner fills those in.
+
+- **2026-10-12 · owner's machine · `docs/keep-rebuilt-data`** — Rebuilt the first three matches on
+  preview from the owner's verified sheets (#198, decision 179), derived every player's preferred
+  positions from the result (#199, decision 180; « pas son poste » 6/7 → 0), and kept the whole thing
+  as `db/snapshots/matches-1-3-rebuilt.sql` for production. Preview's test logins are `leo` and
+  `raphael`; production's hashes came with the restore, so those two were given a known password.
 
 ### From the other machine
 
