@@ -2082,3 +2082,19 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       `squadMeanStandInFr` no longer says « pour ne pas avoir joué ». On a clone of preview it changed
       **none of the four sevens** and removed Raphaël and Léo C from the swap picker. Looked at at
       390 px in both themes, coach and player in one pass, on all four sevens
+
+- [x] **B3.4 · « Buts encaissés au goal » reads as a rate** (#204, decision **184**). The line under
+      each total is no longer only the time in goal: « 8 buts » over « 1 but toutes les 14′ sur 109′ »,
+      from `concededRateLineFr` in `lib/stats/format.ts`. The card keeps its ranking on the count — the
+      card ranked on the rate is « Le moins de buts encaissés au goal » above it (decision 177) — and
+      gains a description, so the rate line does not have to repeat « au goal » in a 110 px column
+- [x] **B3.5 · the same for « Buts encaissés sur le terrain »** (#205, decision **184**). « 12 buts »
+      over « 1 but toutes les 7′ sur 79′ », the same formatter, on the outfield pair `concededOutfield /
+      outfieldMinutes` that `aggregate.ts` already computes. The profile card's « Un but pris » now
+      prints « sur 46′ » under the rate, because his outfield minutes appear nowhere else on it
+- [x] **B3.6 · « Minutes d’invincibilité » carries its percentage** (#206, decision **184**).
+      « 86′ » over « 67 % de 128′ jouées » (`cleanShareFr`), and « 29′ · 27 % » on the Gardiens card and
+      the profile card's keeper block, where the denominator is the `Minutes` figure beside it
+      (`cleanSharePercentFr`). `cleanMinutes / minutes` and `gkCleanMinutes / gkMinutes`, never the
+      difference of the two: `aggregate.test.ts` pins the hour that proves the subtraction wrong.
+      The ranking stays on the minutes, so six clean minutes at 100 % cannot head the card

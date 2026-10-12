@@ -16,6 +16,7 @@ import {
   sortPlayers,
   variance,
 } from "./aggregate";
+import { cleanShareFr, cleanSharePercentFr, concededRateLineFr } from "./format";
 
 /* -------------------------------------------------------------------------- */
 /* Fixtures — all hand-written, nothing read from a database                   */
@@ -781,5 +782,62 @@ describe("the figures of decision 162", () => {
   it("ranks minutes, minutes in goal and clean minutes", () => {
     expect(stats.topMinutes[0]).toMatchObject({ teamMemberId: "karim", value: 100 });
     expect(stats.topGkMinutes.map((entry) => entry.teamMemberId)).toEqual(["hugo"]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Decision 184: the pairs the rate cards divide                               */
+/* -------------------------------------------------------------------------- */
+
+describe("the denominators the rate cards are built on (decision 184)", () => {
+  /**
+   * Léo plays a whole hour: half of it outfield, then half of it in goal, and the one goal is
+   * conceded at the 40th minute, while he is wearing the gloves.
+   *
+   * So his pitch clean clock and his keeper clean clock both restart at 40′ and both read 20′ — while
+   * the half-hour he spent outfield was entirely clean. That is why `cleanMinutes − gkCleanMinutes`
+   * is **not** his outfield figure (rule 10): it is `0` here, and the truth is 30′.
+   */
+  const stats = season({
+    members: [member("leo", "Léo")],
+    matches: [match("m1", { score: { goalsFor: 0, goalsAgainst: 1 } })],
+    lines: [
+      line("m1", "leo", {
+        minutes: 60,
+        gkMinutes: 30,
+        concededWhileOn: 1,
+        concededWhileGk: 1,
+        cleanMinutes: 20,
+        gkCleanMinutes: 20,
+      }),
+    ],
+  });
+  const leo = playerNamed(stats.players, "leo");
+
+  it("gives the invincibility share the whole pitch time, and the keeper's his goal time", () => {
+    // `/stats` « Minutes d'invincibilité » and the profile card's outfield grid: all-pitch.
+    expect(cleanShareFr(leo.cleanMinutes, leo.minutes)).toBe("33 % de 60′ jouées");
+    // The Gardiens card and the profile card's keeper grid: in goal alone.
+    expect(cleanSharePercentFr(leo.gkCleanMinutes, leo.gkMinutes)).toBe("67 %");
+  });
+
+  it("never subtracts one clean clock from the other", () => {
+    // What the subtraction would claim — 0′ clean outfield — against the 30′ he actually kept clean.
+    expect(leo.cleanMinutes - leo.gkCleanMinutes).toBe(0);
+    expect(cleanSharePercentFr(leo.cleanMinutes - leo.gkCleanMinutes, leo.outfieldMinutes)).toBe(
+      "0 %",
+    );
+    // So no screen computes it: the two figures are each divided by their own stretch of minutes.
+  });
+
+  it("feeds each conceded total the minutes it was conceded in", () => {
+    expect(concededRateLineFr(leo.concededWhileGk, leo.gkMinutes)).toBe(
+      "1 but toutes les 30′ sur 30′",
+    );
+    // Nothing conceded outfield: the record, never a division by his thirty outfield minutes.
+    expect(leo.concededOutfield).toBe(0);
+    expect(concededRateLineFr(leo.concededOutfield, leo.outfieldMinutes)).toBe(
+      "aucun but encaissé en 30′",
+    );
   });
 });

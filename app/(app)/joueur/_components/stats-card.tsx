@@ -16,6 +16,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   appearancesLineFr,
+  cleanShareFr,
+  cleanSharePercentFr,
   concededEveryFr,
   formatMinutes,
   formatRating,
@@ -87,7 +89,13 @@ export async function PlayerStatsCard({
       </FigureGrid>
 
       {/* His own record outfield and in goal (decision 162), raw — the same figure `/stats` ranks him
-          on since decision 177, worded by the same `concededEveryFr`. */}
+          on since decision 177, worded by the same `concededEveryFr`.
+
+          Each rate carries its own denominator (decision 184): his outfield minutes appear nowhere
+          else on this card, so « toutes les 24′ » would be a rate over an unstated stretch of time.
+          `cleanMinutes` is the all-pitch figure, so its share is over his **total** minutes — not
+          over `outfieldMinutes`, and never `cleanMinutes − gkCleanMinutes` (rule 10 of
+          `aggregate.ts`). */}
       {player.outfieldMinutes > 0 ? (
         <FigureGrid className="mt-3">
           <Figure
@@ -99,9 +107,15 @@ export async function PlayerStatsCard({
           <Figure
             label="Un but pris"
             value={concededEveryFr(player.outfieldMinutes, player.concededOutfield)}
+            hint={`sur ${formatMinutes(player.outfieldMinutes)}`}
             tone="muted"
           />
-          <Figure label="Sans encaisser" value={formatMinutes(player.cleanMinutes)} tone="muted" />
+          <Figure
+            label="Sans encaisser"
+            value={formatMinutes(player.cleanMinutes)}
+            hint={cleanShareFr(player.cleanMinutes, player.minutes) ?? undefined}
+            tone="muted"
+          />
         </FigureGrid>
       ) : null}
 
@@ -119,10 +133,12 @@ export async function PlayerStatsCard({
             tone="muted"
           />
           <Figure label="Clean sheets" value={player.gkCleanSheets} tone="muted" />
+          {/* The keeper's own share, over his minutes in goal — the figure beside it in this grid.
+              Two figures that look like one and are not: his pitch clean minutes are above. */}
           <Figure
             label="Sans encaisser"
             value={formatMinutes(player.gkCleanMinutes)}
-            hint="dans les buts"
+            hint={`${cleanSharePercentFr(player.gkCleanMinutes, player.gkMinutes) ?? ""} dans les buts`.trim()}
             tone="muted"
           />
         </FigureGrid>

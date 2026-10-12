@@ -6868,6 +6868,64 @@ The result: 29 rows over 15 members, every post of the 1-2-3-1 with several decl
 (`GB` 4, `DC` 6, `MC` 6, `AIL` 9, `AT` 4), and **« pas son poste » gone from all three sevens** —
 0 badges where there were 6 of 7.
 
+## 184 — A rate is printed under the figure it is ranked on, and never without its denominator
+
+**2026-10-12** · accepted · the owner's third backlog (#204, #205, #206) · presentation only: no
+model, no ranking and no aggregate changes · keeps decisions 162 and 177 intact
+
+The owner, about three cards on `/stats`: « "Buts encaissés au goal", instead of just the time in the
+goal, put 1 goal every X minute », « same for the "buts encaissés sur le terrain" », and
+« "minutes d'invincibilité" -> put a percentage of invincibility ».
+
+**What changed is the second line of a row, not the first.** Each of the three cards is ranked on a
+count — most conceded outfield, most conceded in goal, most clean minutes — and that count stays the
+bold figure on the right. What used to sit under it was only the denominator (« en 120′ au goal »,
+« sur 128′ jouées »); it is now the rate the owner asked for, *with* that denominator:
+
+- « 12 buts » over « 1 but toutes les 7′ sur 79′ » (`concededRateLineFr`);
+- « 86′ » over « 67 % de 128′ jouées » (`cleanShareFr`).
+
+**The ranking is deliberately not moved onto the rate**, and this is the whole of the decision. The
+rate card that *is* ranked on the rate already exists one card above, « Le moins de buts encaissés »
+(decision 177); ranking the total card the same way would make it that card printed backwards. And
+for invincibility a ranking by percentage would put a man who played six clean minutes at the top on
+100 %, which is exactly what decision 162 refused and what decision 177 kept refusing by ranking the
+longer record first. So the bold column stays monotone in the number the order comes from, and the
+derived figure reads under it on every row.
+
+**A rate without its denominator is the omission decision 020 is about.** « 1 but toutes les 8′ » is
+not the same claim over eight minutes as over four matches, and « 100 % d'invincibilité » over six
+minutes is a lie by omission. So no screen prints one of these figures alone:
+
+- in a ranked row, the denominator is in the same line as the rate (« sur 79′ », « de 128′ jouées »);
+- inside a `<dl>`, it may be the `Figure` beside it instead — the Gardiens card prints « 29′ · 27 % »
+  under « Sans encaisser » with « Minutes 109′ » in the same grid, and the profile card's keeper block
+  does the same. The profile card's **outfield** rate gets « sur 46′ » printed, because his outfield
+  minutes appear nowhere else on that card;
+- `cleanSharePercentFr` is the share alone and exists only for those two places; `cleanShareFr`
+  carries the denominator and is what everything else uses.
+
+**Nothing is divided by zero, and nothing reads ∞.** Three refusals, each with a test:
+- nobody conceded → the record, « aucun but encaissé en 35′ », the sentence decision 177 already
+  chose;
+- minutes are floored by the cache, so a forty-second spell that conceded is `0′` → the record again,
+  « 1 but encaissé en 0′ », never « toutes les 0′ » and never a rate invented out of a rounding;
+- no minutes at all → the share is `null`, which is a dash and « pas encore de données » (rule 1 of
+  `aggregate.ts`), never `0 %`.
+
+**The two invincibility figures are two different measurements, and neither is derived from the
+other.** `cleanMinutes / minutes` for a player, `gkCleanMinutes / gkMinutes` for his time in goal.
+The reducer restarts a keeper's clean clock when he takes the gloves and does not restart his pitch
+one, so `cleanMinutes − gkCleanMinutes` is **not** an outfield figure (rule 10 of `aggregate.ts`).
+`aggregate.test.ts` pins the case that proves it: an hour, half of it in goal, the only goal conceded
+at 40′ while he wears the gloves — the subtraction says 0′ clean outfield, and he kept a clean
+half-hour there. One formatter is handed the matching pair by each caller, and the caller owes it
+that; the function only divides what it is given.
+
+**One wording that is not an accident**: the rate says « sur 79′ » and the record of decision 177 says
+« en 79′ ». A rate is *out of* its exposure and a record happened *in* a stretch of time, and the two
+lines appear one card apart in the same section, so they are worded apart on purpose.
+
 ## 187 — A member with no game time is not a candidate for any équipe type
 
 **2026-10-12** · accepted · the owner's third backlog, issue #203: « If a player has no game time, do

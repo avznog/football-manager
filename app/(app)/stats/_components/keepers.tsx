@@ -8,7 +8,13 @@
 
 import { Card } from "@/components/ui/card";
 import type { PlayerSeasonStats } from "@/lib/stats/aggregate";
-import { formatMinutes, matchCount, plural } from "@/lib/stats/format";
+import {
+  cleanSharePercentFr,
+  concededEveryFr,
+  formatMinutes,
+  matchCount,
+  plural,
+} from "@/lib/stats/format";
 
 import { CardEmpty, Figure, FigureGrid, Note, PlayerIdentity } from "./parts";
 
@@ -42,10 +48,25 @@ export function Keepers({ keepers }: { keepers: readonly PlayerSeasonStats[] }) 
                 tone="strong"
               />
               <Figure label="Minutes" value={formatMinutes(keeper.gkMinutes)} />
-              {/* No hint: « minutes dans les buts avec la cage inviolée » is the Note under the
-                  card, in the width a sentence needs (decision 072). */}
-              <Figure label="Sans encaisser" value={formatMinutes(keeper.gkCleanMinutes)} />
-              <Figure label="Encaissés" value={keeper.concededWhileGk} />
+              {/* The hint is the share of those minutes, not a sentence: « minutes dans les buts avec
+                  la cage inviolée » is the Note under the card, in the width a sentence needs
+                  (decision 072). The percentage's denominator is the `Minutes` figure beside it in
+                  this same `<dl>`, and it is `gkMinutes` — never the pitch clean minutes minus these
+                  (decision 184). */}
+              <Figure
+                label="Sans encaisser"
+                value={formatMinutes(keeper.gkCleanMinutes)}
+                hint={cleanSharePercentFr(keeper.gkCleanMinutes, keeper.gkMinutes) ?? undefined}
+              />
+              <Figure
+                label="Encaissés"
+                value={keeper.concededWhileGk}
+                hint={
+                  keeper.concededWhileGk > 0
+                    ? concededEveryFr(keeper.gkMinutes, keeper.concededWhileGk)
+                    : undefined
+                }
+              />
             </FigureGrid>
           </li>
         ))}

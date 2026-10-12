@@ -234,6 +234,51 @@ export function concededRecordFr(conceded: number, minutes: number): string {
   return `${plural(conceded, "but encaissé", "buts encaissés")} en ${formatMinutes(minutes)}`;
 }
 
+/**
+ * « 1 but toutes les 30′ sur 120′ » — the rate, **with the minutes it is a rate over** (decision 184).
+ *
+ * The line under the total on the two « Buts encaissés » cards, where the ranked figure above is the
+ * count: the owner asked those cards to say how often rather than merely how long, and a rate that
+ * drops its denominator is the omission decision 020 is about — « 1 but toutes les 8′ » over eight
+ * minutes and over four matches are not the same statement.
+ *
+ * Two honest refusals rather than a division by zero: a man who conceded nothing reads « aucun but
+ * encaissé en 35′ », and a man credited with a goal over **no** whole minute — the cache floors
+ * minutes, so a forty-second stint is `0` — reads his record alone, because « toutes les 1′ » would
+ * be a rate invented out of a rounding.
+ */
+export function concededRateLineFr(conceded: number, minutes: number): string {
+  if (conceded === 0 || minutes <= 0) return concededRecordFr(conceded, minutes);
+  return `1 but ${concededEveryFr(minutes, conceded)} sur ${formatMinutes(minutes)}`;
+}
+
+/**
+ * « 71 % », the share of a stretch of minutes that was played with the sheet unbroken.
+ *
+ * Null when the denominator is zero (rule 1 above): nobody's invincibility is `0 %` because he has
+ * never played. Only for the places where the denominator is already printed in the same `<dl>` —
+ * everywhere else, `cleanShareFr` carries it.
+ */
+export function cleanSharePercentFr(cleanMinutes: number, minutes: number): string | null {
+  if (minutes <= 0) return null;
+  return formatPercent(cleanMinutes / minutes);
+}
+
+/**
+ * « 71 % de 120′ jouées » — the invincibility share and the minutes it is a share of (decision 184).
+ *
+ * **The numerator and the denominator must be the same stretch of pitch time.** `cleanMinutes` over
+ * `minutes` for a player, `gkCleanMinutes` over `gkMinutes` for a keeper, and never one minus the
+ * other: a man who concedes outfield and then takes the gloves restarts his keeper clean clock and
+ * not his pitch one (`lib/match/reducer.ts`, and rule 10 of `aggregate.ts`), so a subtraction is not
+ * the outfield figure. This function only divides what it is handed; the caller owes it a matching
+ * pair.
+ */
+export function cleanShareFr(cleanMinutes: number, minutes: number): string | null {
+  const share = cleanSharePercentFr(cleanMinutes, minutes);
+  return share === null ? null : `${share} de ${formatMinutes(minutes)} jouées`;
+}
+
 /** `1.24` → `+1,2`, `-0.04` → `0,0`: a goal difference per 60, signed, one decimal. */
 export function formatSignedDecimal(value: number): string {
   const rounded = Math.round(value * 10) / 10;
