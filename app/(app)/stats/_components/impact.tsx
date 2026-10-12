@@ -1,13 +1,20 @@
 /**
  * Impact par poste — the owner's Q7: « pour chaque poste, qui est le meilleur en terme d'impact pour
- * l'équipe ». The goal difference while he held that position, per 60 minutes, smoothed towards the
- * position's own figure so ten minutes cannot top the table (`lib/stats/impact.ts`, decision 162).
+ * l'équipe ». The goal difference while he held that position, divided by his minutes there and
+ * brought back to 60 minutes of play — **raw, with no smoothing at all** (decision 198).
+ *
+ * It was smoothed towards the position's own figure until 2026-10-12, so that ten minutes could not top
+ * a post. What that produced on a three-match season was a table with no positive figure anywhere: the
+ * team's own difference is negative, so every man was dragged below zero, `+1 / −0` printed « −1,8 » and
+ * `+0 / −0` printed « −2,4 ». The owner read it and said so. The figure is now the plain division, every
+ * row can be checked by hand against the two counts beside it, and a short spell *can* lead a post —
+ * which is why the minutes are never printed away from the figure.
  *
  * One card, five short lists, because five cards of a handful of rows each would be the longest stretch
  * of the page for the least information on it. Each list shows five and folds the rest under « Tout
- * afficher » like every other ranking on the page (decision 176). Every row prints the ranked figure and the record it rests on,
- * « +5 / −2 en 120′ », since the smoothed figure is not the one a player would work out himself and
- * nothing is explained on hover (decision 072).
+ * afficher » like every other ranking on the page (decision 176). Every row prints the figure and the
+ * record it is computed from, « +5 / −2 en 120′ » — printed, because nothing is explained on hover
+ * (decision 072).
  */
 
 import { Card } from "@/components/ui/card";
@@ -21,7 +28,7 @@ export function ImpactByPosition({ impact }: { impact: readonly PositionImpact[]
   return (
     <Card
       title="Impact par poste"
-      description="Différence de buts quand il joue à ce poste, pour 60 minutes"
+      description="Différence de buts quand il tient ce poste, ramenée à 60 minutes de jeu"
       as="h3"
       flush
     >
@@ -46,10 +53,11 @@ export function ImpactByPosition({ impact }: { impact: readonly PositionImpact[]
       </div>
       <div className="px-4 pb-3">
         <Note>
-          Le chiffre classé est lissé vers la moyenne du poste : dix minutes et un but ne suffisent pas
-          pour passer devant une saison entière. Sous lui, les buts marqués et encaissés pendant qu’il
-          occupait ce poste, et ses minutes. Ailier regroupe les ailiers et les milieux de côté,
-          défenseur central tous les défenseurs.
+          Le chiffre est brut : buts marqués moins buts encaissés pendant qu’il tenait ce poste, divisé
+          par ses minutes, ramené à 60 minutes de jeu. +1 et 0 encaissé en 10′ donne +6,0 ; 0 et 0 donne
+          0,0. Rien n’est lissé, donc une entrée de dix minutes peut mener un poste : les minutes sont
+          écrites à côté pour que tu voies sur quoi le chiffre repose. Ailier regroupe les ailiers et les
+          milieux de côté, défenseur central tous les défenseurs.
         </Note>
       </div>
     </Card>

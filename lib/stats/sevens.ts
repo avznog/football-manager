@@ -13,12 +13,15 @@
  * |------------|--------------------------------------------------------|---------------------------------|
  * | offensive  | goals per 60, then assists per 60                      | fewest conceded per 60 in goal  |
  * | défensive  | fewest conceded per 60 as an outfielder                | fewest conceded per 60 in goal  |
- * | légende    | impact at that post, AT → AIL → MC → DC                | in goal, never below average    |
+ * | légende    | raw impact at that post, AT → AIL → MC → DC            | in goal, never below average    |
  * | notes      | average rating received (the old `ratings` criterion)  | the same                        |
  *
  * **No new model.** Goals and assists are `best-seven.ts`'s own Gamma–Poisson cells (`evaluateSquad`
- * on `goals` and `assists`); conceded rates and impact are S12's (`lib/stats/impact.ts`): the same
- * `fitShrinkage` on the `goals` criterion, fed a different count.
+ * on `goals` and `assists`); the conceded rates are S12's (`lib/stats/impact.ts`): the same
+ * `fitShrinkage` on the `goals` criterion, fed a different count. **The impact is not a model at all
+ * since decision 198** — it is the raw goal difference per 60 at the post, which is what the owner
+ * reads in the table on `/stats`, and the two screens may not print different numbers for the same
+ * man at the same post.
  *
  * ## The order of the keys, which is the order of the cahier's sentences
  *
@@ -29,13 +32,16 @@
  * the men left. A man who is both the best scorer and the best keeper plays outfield, as the cahier
  * says.
  *
- * - **Offensive, goals then assists.** The goals key is the shrunk rate **rounded to the tenth the
- *   screen prints** (`GOALS_KEY_RESOLUTION`), and assists break ties at that resolution. Unrounded,
- *   two shrunk rates are never equal, so « puis de passes D » would never decide anything; rounded to
- *   what the reader sees, two men the screen shows as « 0,4/h » are equal scorers for him, and the one
- *   with more assists goes first. A combined figure (goals + k × assists) was the alternative and was
- *   refused: any k lets enough assists outweigh a goal, which is not « buts, puis passes ».
- * - **Légende, attack first.** One key per position group, in the order AT, AIL, MC, DC, GB: the DP
+ * - **Offensive, goals then assists.** The goals key is the shrunk rate **as the screen prints it**:
+ *   the whole minutes between two goals (`scoringKey`, and `minutesPerCount` is the one conversion).
+ *   Unrounded, two shrunk rates are never equal, so « puis de passes D » would never decide anything;
+ *   at the resolution the reader sees, two men both shown « 1 but toutes les 133′ » are equal scorers
+ *   for him, and the one with more assists goes first. A combined figure (goals + k × assists) was the
+ *   alternative and was refused: any k lets enough assists outweigh a goal, which is not « buts, puis
+ *   passes ». The key used to be the rate rounded to the tenth of a goal per hour, which was the
+ *   resolution of a figure the screen stopped printing with decision 199 — a tie-break has to be in
+ *   the unit the reader is looking at, or it breaks ties he cannot see and keeps ties he can.
+ * - **Légende, attack first.** Two keys per position group, in the order AT, AIL, MC, DC, GB: the DP
  *   maximises the striker's impact first, then the wingers', and so on down to the goal. This is the
  *   cahier's fill order **without** greedy's failure: the positional objective still comes first, so
  *   the attack can never take a man the defence needed to have its posts declared, and within a group
@@ -68,8 +74,8 @@ import {
 } from "./best-seven";
 import {
   fitCountModel,
-  fitPositionModels,
-  impactAt,
+  minutesPerCount,
+  rawImpactPer60,
   shrunkPer60,
   type PositionSeason,
 } from "./impact";
@@ -132,8 +138,20 @@ export type SevenResult = {
   ratingsModel: ShrinkageReport | null;
 };
 
-/** Two goal rates the screen prints alike are equal for the reader: it prints them to the tenth. */
-export const GOALS_KEY_RESOLUTION = 0.1;
+/**
+ * Worse than any waiting time the screen can print, for a man with no goal rate at all.
+ *
+ * The key is `−minutes between two goals`, so « never » has to be a very large wait rather than a
+ * missing one — and it has to be finite: seven of them are summed. A shrunk rate is zero only when the
+ * whole squad's is, so this is reached on a selection where nobody has scored.
+ */
+const NEVER_SCORES_KEY = -1e9;
+
+/** The goals key: the waiting time the screen prints, negated so that the shortest wait wins. */
+export function scoringKey(ratePer60: number | null): number {
+  if (ratePer60 === null || ratePer60 <= 0) return NEVER_SCORES_KEY;
+  return -minutesPerCount(ratePer60);
+}
 
 /** Légende: the order the cahier fills the posts in. */
 const LEGEND_ORDER: readonly PositionGroup[] = ["AT", "AIL", "MC", "DC", "GB"];
@@ -264,12 +282,11 @@ function buildCells(
         }
         const goalCell = goals.cells[c][s];
         const assistCell = assists.cells[c][s];
-        const goalRate = goalCell.adjusted ?? 0;
         return {
           ...goalCell,
           figure: "goals",
           observed: { ...goalCell.observed, secondary: candidate.assists },
-          keys: [Math.round(goalRate / GOALS_KEY_RESOLUTION), assistCell.adjusted ?? 0, 0],
+          keys: [scoringKey(goalCell.adjusted), assistCell.adjusted ?? 0, 0],
           allowed: true,
         };
       }),
@@ -310,21 +327,34 @@ function buildCells(
 
   /* ---- légende ------------------------------------------------------------ */
 
-  const models = fitPositionModels(
-    candidates.map((candidate) => ({ ...identityOf(candidate), positions: candidate.positions })),
-  );
-  const keyIndex = (group: PositionGroup) => LEGEND_ORDER.indexOf(group);
+  /**
+   * Two keys per position group since decision 198, and the pair is what replaces the shrinkage.
+   *
+   * The impact is raw now, so a man with no minute at the post has **no figure at all** rather than the
+   * post's mean difference. The mean used to order him among the men who had played there — below them,
+   * as it happens, since it was negative — and with it gone a bare `0` would promote him above every
+   * real record that is negative, putting a disc reading « — » in a seven whose whole claim is « le
+   * meilleur à ce poste ». So the first key of each group is **whether he has played the post at all**
+   * and the second is his figure: measured men first, then the best of them. That is the same house rule
+   * as before (unknown is neither best nor worst) stated in the one way left that does not invent a
+   * number.
+   */
+  const keyIndex = (group: PositionGroup) => LEGEND_ORDER.indexOf(group) * 2;
   const cells = candidates.map((candidate) =>
     slots.map((slot): SevenCell => {
-      const keys = LEGEND_ORDER.map(() => 0);
+      const keys = LEGEND_ORDER.flatMap(() => [0, 0]);
       if (slot.isGoalkeeper) {
-        keys[keyIndex("GB")] = -(keeperRate(candidate) ?? 0);
+        keys[keyIndex("GB")] = candidate.gkMinutes > 0 ? 1 : 0;
+        keys[keyIndex("GB") + 1] = -(keeperRate(candidate) ?? 0);
         return keeperCell(candidate, slot, keys);
       }
       const group = positionGroupOf(slot.positionCode);
       const season = group ? candidate.positions.find((position) => position.group === group) : undefined;
-      const impact = group ? impactAt(season, models[group]) : null;
-      if (group !== null && impact !== null) keys[keyIndex(group)] = impact;
+      const impact = group ? rawImpactPer60(season) : null;
+      if (group !== null && impact !== null) {
+        keys[keyIndex(group)] = 1;
+        keys[keyIndex(group) + 1] = impact;
+      }
       return {
         fit: fitOf(candidate, slot),
         figure: "impact",

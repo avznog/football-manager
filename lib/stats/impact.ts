@@ -1,14 +1,14 @@
 /**
  * The two season figures that divide by minutes: « 1 but encaissé toutes les X min », and the impact per
- * position. Only the second is shrunk before it is ranked (decision 162); the first is ranked on its raw
- * value since decision 177.
+ * position. **Neither is smoothed any more** — the first since decision 177, the second since decision
+ * 198.
  *
- * Pure. **No new model**: the impact — and the équipe type's conceded rates, in `sevens.ts` — reuse the
- * Gamma–Poisson fit of `best-seven.ts`: `fitShrinkage` on the `goals` criterion, whose exposure is
- * 60-minute blocks and whose prior strength is measured from the squad and clamped to `[1, 6]` blocks,
- * and its `shrink`. A goal conceded while a man is on the pitch
- * is a Poisson count over his minutes exactly as a goal scored is, so the model fits as it stands; the
- * adapter below only feeds it a different count.
+ * Pure. The Gamma–Poisson fit of `best-seven.ts` is still reached from here (`fitCountModel`,
+ * `shrunkPer60`), because the équipe type's conceded rates in `sevens.ts` are shrunk: `fitShrinkage` on
+ * the `goals` criterion, whose exposure is 60-minute blocks and whose prior strength is measured from
+ * the squad and clamped to `[1, 6]` blocks, and its `shrink`. A goal conceded while a man is on the
+ * pitch is a Poisson count over his minutes exactly as a goal scored is, so the model fits as it
+ * stands; the adapter below only feeds it a different count.
  *
  * ## « 1 but encaissé toutes les X min »
  *
@@ -22,14 +22,34 @@
  * `minutes − gkMinutes`, which is exact because the reducer increments both counters in the same
  * `concede()`.
  *
- * ## Impact per position (the owner's Q7)
+ * ## Impact per position (the owner's Q7, as decision 198 rewrites it)
  *
- * « Goal difference while he played that position, per 60′, smoothed. » It is computed as **two**
- * shrunk Poisson rates — goals for per 60 and goals against per 60, each fitted over the players who
- * held that position — and their difference. Shrinking the two counts separately is what lets the
- * existing model be reused (a difference of counts is not Poisson and can be negative), and it is the
- * better estimate anyway: a man's ten minutes at a position pull both of his rates towards the
- * position's own, so his difference lands near the position's mean difference rather than on « +6 ».
+ * « Goal difference while he held that post, per 60 minutes of his own play, **raw**. »
+ *
+ *     (goalsFor − goalsAgainst) ÷ minutes × 60
+ *
+ * and nothing else: `+0 / −0` is exactly `0,0`, and `+1 / −0` in 10′ is `+6,0`. Every figure the screen
+ * prints is reproducible by hand from the two counts and the minutes printed beside it.
+ *
+ * It used to be two shrunk Poisson rates — goals for and goals against, each fitted over the players
+ * who held the post — and their difference. The arithmetic was defensible and the screen was not: over
+ * three matches the team's own difference is negative, so the shrinkage dragged **every** figure below
+ * zero. A man with `+1 / −0` read `−1,8` and a man with `+0 / −0` read `−2,4`, which is not a cautious
+ * estimate of his impact, it is a statement about the team printed under his name. The owner read both
+ * and rejected the whole construction (2026-10-12).
+ *
+ * **Where smoothing still applies, and why that is not a contradiction.** Decision 162's reasoning
+ * stands everywhere it was aimed: a figure used to *rank* men against each other needs a thin
+ * denominator held back, which is why the équipe type's conceded rates (`sevens.ts`) are still shrunk
+ * and why the rating leaderboard still has its threshold. This table is not that: it is a per-post
+ * record, printed beside its own numerator, denominator and minutes, and a reader who can redo the
+ * division is not being asked to trust an estimate. So the rule is about the *print*, not about the
+ * statistics — **a figure the reader can check by hand is never smoothed; a figure that only exists to
+ * order a list may be.** Decision 198 says it in those terms, so neither entry can be undone by citing
+ * the other.
+ *
+ * A short spell can therefore top a post: Benjamin's ten minutes at `MC` lead it at `+6,0`. The minutes
+ * are printed next to the figure, always, and that is what makes it honest rather than hidden.
  */
 
 import {
@@ -84,6 +104,23 @@ export function shrunkPer60(
 ): number | null {
   const exposure = minutes / MINUTES_PER_BLOCK;
   return shrink(exposure > 0 ? count / exposure : null, exposure, model);
+}
+
+/**
+ * A rate per 60 read back as a waiting time: « 1 but toutes les X′ » (decision 199).
+ *
+ * The one unit the owner reads — « X but every X minutes » are his own words — and the only place the
+ * conversion is written, so the figure the équipe type prints and the key it ranks on cannot drift
+ * apart: two men the screen shows the same waiting time for are equal for the reader, and the key is
+ * this number.
+ *
+ * Rounded to the whole minute, and never below one: the screen has no use for « toutes les 0′ », and a
+ * rate high enough to produce it (more than a goal a minute) is not a thing this app will ever print.
+ * The caller owes a rate above zero — « jamais » is not a number of minutes, and the two callers say so
+ * in words instead.
+ */
+export function minutesPerCount(ratePer60: number): number {
+  return Math.max(1, Math.round(MINUTES_PER_BLOCK / ratePer60));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -153,57 +190,28 @@ export type ImpactEntry = RankedMember & {
   minutes: number;
   goalsFor: number;
   goalsAgainst: number;
-  /** The ranked figure: shrunk goals for per 60 minus shrunk goals against per 60. */
+  /** The ranked figure, raw (decision 198): `(goalsFor − goalsAgainst) ÷ minutes × 60`. */
   impactPer60: number;
-  /** `(goalsFor − goalsAgainst)` per 60 of his own minutes there, unshrunk. */
-  rawPer60: number;
 };
 
 export type PositionImpact = {
   group: PositionGroup;
   /** Everybody with minutes at this position, best first. The screen shows five, then the rest. */
   entries: ImpactEntry[];
-  goalsForModel: ShrinkageReport;
-  goalsAgainstModel: ShrinkageReport;
 };
 
-/** The two Poisson models of one position: goals for and goals against while a man held it. */
-export type PositionModels = { goalsForModel: ShrinkageReport; goalsAgainstModel: ShrinkageReport };
-
-/** Every position's pair of models, fitted over the players who held it — what the impact is shrunk with. */
-export function fitPositionModels(
-  players: readonly (RankedMember & { positions: readonly PositionSeason[] })[],
-): Record<PositionGroup, PositionModels> {
-  const models = {} as Record<PositionGroup, PositionModels>;
-  for (const group of POSITION_GROUPS) {
-    const samples = (count: (season: PositionSeason) => number): CountSample[] =>
-      players.flatMap((player) => {
-        const season = player.positions.find((position) => position.group === group);
-        return season && season.minutes > 0
-          ? [{ ...memberOf(player), minutes: season.minutes, count: count(season) }]
-          : [];
-      });
-    models[group] = {
-      goalsForModel: fitCountModel(samples((season) => season.goalsFor)),
-      goalsAgainstModel: fitCountModel(samples((season) => season.goalsAgainst)),
-    };
-  }
-  return models;
-}
-
 /**
- * One man's smoothed impact at one position: shrunk goals for per 60 minus shrunk goals against per 60.
+ * One man's impact at one position, raw: his goal difference there per 60 minutes of his own play
+ * (decision 198).
  *
- * **A man with no minutes there gets the position's own mean difference** — `shrink` lands exactly on
- * the squad mean at zero exposure, on both sides — which is the house rule (rule 2 of `best-seven.ts`)
- * rather than a new one: unknown is neither best nor worst. A side whose model has no mean at all (no
- * goal ever, either way, at that position) counts as a zero rate: nothing happened, and that was seen.
+ * **Null when he has no minute at that post**, and that is the honest answer rather than a cautious one:
+ * there is no longer a position mean to stand in for him, and a `0` would be a figure — « l'équipe est à
+ * l'équilibre quand il y joue » — about minutes that do not exist. Callers that have to order such a man
+ * against men who *have* played there say so themselves (`sevens.ts`, the légende's keys).
  */
-export function impactAt(season: PositionSeason | undefined, models: PositionModels): number {
-  const minutes = season?.minutes ?? 0;
-  const forRate = shrunkPer60(season?.goalsFor ?? 0, minutes, models.goalsForModel);
-  const againstRate = shrunkPer60(season?.goalsAgainst ?? 0, minutes, models.goalsAgainstModel);
-  return (forRate ?? 0) - (againstRate ?? 0);
+export function rawImpactPer60(season: PositionSeason | undefined): number | null {
+  if (season === undefined || season.minutes <= 0) return null;
+  return ((season.goalsFor - season.goalsAgainst) * MINUTES_PER_BLOCK) / season.minutes;
 }
 
 function memberOf(member: RankedMember): RankedMember {
@@ -219,17 +227,18 @@ function memberOf(member: RankedMember): RankedMember {
 export function impactByPosition(
   players: readonly (RankedMember & { positions: readonly PositionSeason[] })[],
 ): PositionImpact[] {
-  const models = fitPositionModels(players);
   return POSITION_GROUPS.map((group) => {
     const atGroup = players.flatMap((player) => {
       const season = player.positions.find((position) => position.group === group);
       return season && season.minutes > 0 ? [{ player, season }] : [];
     });
-    const { goalsForModel, goalsAgainstModel } = models[group];
 
     const entries = atGroup
       .flatMap(({ player, season }): ImpactEntry[] => {
-        const impact = impactAt(season, models[group]);
+        const impact = rawImpactPer60(season);
+        // Unreachable: `atGroup` already kept only the men with minutes there, which is exactly when
+        // `rawImpactPer60` has an answer. Narrowed rather than asserted.
+        if (impact === null) return [];
         return [
           {
             teamMemberId: player.teamMemberId,
@@ -240,22 +249,18 @@ export function impactByPosition(
             goalsFor: season.goalsFor,
             goalsAgainst: season.goalsAgainst,
             impactPer60: impact,
-            rawPer60: ((season.goalsFor - season.goalsAgainst) * MINUTES_PER_BLOCK) / season.minutes,
           },
         ];
       })
       .sort(
         (a, b) =>
           b.impactPer60 - a.impactPer60 ||
+          // Equal figures: the longer record first, so « 0,0 en 10′ » sits above « 0,0 en 6′ » rather
+          // than being ordered by a name. The same tie-break the conceded board uses.
           b.minutes - a.minutes ||
           a.displayName.localeCompare(b.displayName, "fr"),
       );
 
-    return {
-      group,
-      entries,
-      goalsForModel,
-      goalsAgainstModel,
-    };
+    return { group, entries };
   });
 }

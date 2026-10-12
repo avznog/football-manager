@@ -46,6 +46,8 @@ import {
   swapAnnouncementFr,
   type BestSevenQuery,
 } from "./best-seven-copy";
+import { everyFr } from "./format";
+import { minutesPerCount } from "./impact";
 
 const report = (overrides: Partial<ShrinkageReport> = {}): ShrinkageReport => ({
   squadMean: 0.5,
@@ -208,8 +210,10 @@ describe("naming the controls", () => {
   it("names the four sevens of the cahier, each with its rule", () => {
     expect(Object.keys(SEVEN_OPTION_FR)).toEqual(["offensive", "defensive", "legende", "notes"]);
     expect(SEVEN_OPTION_FR.legende).toBe("7 de légende");
-    expect(SEVEN_RULE_FR.offensive).toContain("buts par heure, puis de passes décisives");
-    expect(SEVEN_RULE_FR.defensive).toContain("le moins de buts encaissés");
+    // Decision 199: no rule names a « /h » any more — the attack's is a waiting time in minutes.
+    expect(SEVEN_RULE_FR.offensive).toContain("attend le moins de minutes entre deux buts");
+    expect(SEVEN_RULE_FR.offensive).not.toContain("par heure");
+    expect(SEVEN_RULE_FR.defensive).toContain("encaisse le moins souvent");
     expect(SEVEN_RULE_FR.legende).toContain("de l’attaque vers la défense");
     expect(SEVEN_RULE_FR.legende).toContain("moyenne des gardiens");
   });
@@ -253,13 +257,33 @@ describe("naming the controls", () => {
 
 describe("printing a figure", () => {
   it("writes each cell's figure in its own scale", () => {
-    expect(formatSevenFigure("goals", 0.75)).toBe("0,75/h");
+    // Decision 199: a rate of countable events is the wait between two, « X but every X minutes ».
+    expect(formatSevenFigure("goals", 0.45)).toBe("1 but toutes les 133′");
+    expect(formatSevenFigure("goals", 0.45, true)).toBe("1 but/133′");
     expect(formatSevenFigure("ratings", 7.04)).toBe("7,0");
     // A conceded rate per 60 is read as minutes per goal, as on `/stats` (decision 162).
-    expect(formatSevenFigure("keeperConceded", 2.5)).toBe("1 but/24′");
+    expect(formatSevenFigure("keeperConceded", 2.5)).toBe("1 but toutes les 24′");
+    expect(formatSevenFigure("keeperConceded", 2.5, true)).toBe("1 but/24′");
     expect(formatSevenFigure("outfieldConceded", 0)).toBe("aucun but");
-    expect(formatSevenFigure("impact", 1.24)).toBe("+1,2/h");
-    expect(formatSevenFigure("impact", -0.76)).toBe("−0,8/h");
+    // The impact is a difference: no waiting time, so it names the stretch it is divided over. Raw
+    // since decision 198, so the two counts and the minutes under the name reproduce it.
+    expect(formatSevenFigure("impact", 6)).toBe("+6,0 pour 60′");
+    expect(formatSevenFigure("impact", 0)).toBe("0,0 pour 60′");
+  });
+
+  /**
+   * The whole point of decision 199 is that the app has **one** wording for a rate, so the équipe type
+   * and `/stats` cannot drift apart. This asserts the seam rather than the string: the sentence is
+   * `format.ts`'s own, handed « so many per sixty minutes », and the disc's abbreviation carries the
+   * same number. Change the shared function and this fails here too, which is the point.
+   */
+  it("words a rate with format.ts's one sentence, and abbreviates the same number", () => {
+    for (const rate of [0.45, 2.5, 6, 0.07]) {
+      expect(formatSevenFigure("goals", rate)).toBe(`1 but ${everyFr(60, rate)}`);
+      expect(formatSevenFigure("goals", rate, true)).toBe(`1 but/${minutesPerCount(rate)}′`);
+      expect(everyFr(60, rate)).toContain(`${minutesPerCount(rate)}′`);
+    }
+    expect(formatSevenFigure("impact", -0.76)).toBe("−0,8 pour 60′");
   });
 
   it("prints a dash, never a zero, for a figure nobody has", () => {
@@ -288,8 +312,10 @@ describe("printing a figure", () => {
   });
 
   it("says whose average a man with no figure is wearing", () => {
-    expect(squadMeanStandInShortFr("impact")).toBe("moyenne du poste");
     expect(squadMeanStandInShortFr("goals")).toBe("moyenne de l’équipe");
+    // The keepers are their own population; the impact never reaches this caption at all since
+    // decision 198 — a man with no minute at the post has no figure, not the post's mean.
+    expect(squadMeanStandInShortFr("keeperConceded")).toBe("moyenne des gardiens");
   });
 
   it("labels the team figure with the number of discs it actually used", () => {
@@ -392,13 +418,19 @@ describe("who may keep goal (decision 172)", () => {
     expect(offensive).not.toContain("écarté");
     const legend = keeperRuleFr({ seven: "legende", considered: 3, refused: 1, average: 2.5 })!;
     expect(legend).toContain("1 est écarté du 7 de légende");
-    expect(legend).toContain("plus que la moyenne des gardiens, 1 but/24′");
+    expect(legend).toContain("plus que la moyenne des gardiens, 1 but toutes les 24′");
     expect(KEEPER_REFUSED_BADGE_FR).toBe("écarté du goal");
   });
 
   it("states each new seven's smoothing and its one surprising rule", () => {
     expect(sevenSmoothingFr("offensive")).toContain("départagés par leurs passes décisives");
-    expect(sevenSmoothingFr("legende")).toContain("compté à la moyenne du poste");
+    // Decision 199: the sentence reads the unit out loud before it explains the smoothing.
+    expect(sevenSmoothingFr("offensive")).toContain("1 but toutes les X minutes de jeu");
+    expect(sevenSmoothingFr("offensive")).toContain("lissé vers la moyenne de l’équipe");
+    // Decision 198: the légende says the opposite, because nothing is smoothed there.
+    expect(sevenSmoothingFr("legende")).toContain("Rien n’est lissé");
+    expect(sevenSmoothingFr("legende")).toContain("ramenée à 60 minutes de jeu");
+    expect(sevenSmoothingFr("legende")).not.toContain("moyenne du poste");
     expect(sevenSmoothingFr("notes")).toBeNull();
   });
 });
@@ -521,14 +553,14 @@ describe("honesty 3 — a disc showing the squad's figure, not the man's", () =>
     // and not the whole truth: he is regularly *in* one of them, at the squad's own average.
     const one = squadMeanStandInFr(1) as string;
     expect(one).toBe(
-      "1 des sept n’a aucun chiffre cette saison à ce poste : il est affiché à la moyenne de " +
-        "l’équipe, donc ni flatté ni puni pour ne pas y avoir encore de chiffre.",
+      "1 des sept n’a aucun chiffre à lui sur ce critère dans cette sélection : il est affiché à la " +
+        "moyenne de l’équipe, donc ni flatté ni puni pour ne pas en avoir encore.",
     );
 
     const three = squadMeanStandInFr(3) as string;
     expect(three).toBe(
-      "3 des sept n’ont aucun chiffre cette saison à ce poste : ils sont affichés à la moyenne de " +
-        "l’équipe, donc ni flattés ni punis pour ne pas y avoir encore de chiffre.",
+      "3 des sept n’ont aucun chiffre à eux sur ce critère dans cette sélection : ils sont affichés " +
+        "à la moyenne de l’équipe, donc ni flattés ni punis pour ne pas en avoir encore.",
     );
 
     // The count is the denominator of the claim, and rule 2 of `aggregate.ts` forbids one without it.

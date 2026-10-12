@@ -7351,3 +7351,103 @@ and « Une passe déc. · jamais · sur 155′ ». Both carry their denominator,
 once at the top of the card and a rate two grids below it would otherwise be a rate over an unstated
 stretch of time. The whole block is omitted for a man with no minutes, which is what Raphaël's profile
 shows: « Minutes 0′ » and no rate at all, rather than « jamais sur 0′ ».
+
+## 198 — « Impact par poste » is the raw goal difference, and nothing is smoothed there
+
+**2026-10-12** · accepted · the owner's fourth backlog (issue #223) · **supersedes the « impact per
+position » half of decision 162** · **leaves every other use of shrinkage standing** — 162's rate
+boards, the équipe type's conceded keys (`sevens.ts`), the ratings seven and `/stats`'s rating
+threshold are untouched
+
+The owner, reading the table: « The "impact par poste" table is interesting, but it is wrong on every
+level. First, there is no positive data : Benjamin in milieu central has +1 -0, and he is in -1.8 ??? …
+How can Edouard in DC have + 0 - 0 and be at -2.4 ? He should be at 0. »
+
+He is right, and the cause was not a bug. The impact was two shrunk Poisson rates — goals for and goals
+against, each fitted over the men who had held the post — and their difference. Over three matches the
+team's own difference is negative, so the mean every figure was pulled towards was negative, and the
+whole table came out below zero whatever the player had done. The figure under a man's name was a
+statement about the team.
+
+- **The headline is the raw figure**: `(goalsFor − goalsAgainst) ÷ minutes × 60`, in
+  `rawImpactPer60` (`lib/stats/impact.ts`), with the minutes and the two counts printed under it.
+  `+0 / −0` is exactly `0,0`; Benjamin's `+1 / −0` in 10′ is `+6,0`; Édouard's `+0 / −0` in 6′ is `0,0`.
+  Every figure on the card is reproducible by hand from what is printed beside it.
+- **A short spell can therefore lead a post, and the owner accepted that**: « He has accepted that a
+  twelve-minute spell can then top a position — the minutes printed beside it are what makes that
+  honest, so they must always be there. » So the minutes are never printed away from the figure, on the
+  card or on the pitch, and equal figures are ordered by the longer record (`0,0 en 20′` above
+  `0,0 en 6′`).
+- **Where smoothing still applies, and why this does not contradict decision 162.** The rule is about
+  what the figure is *for*. A figure whose only job is to **order** men — a rate card, a seven's
+  conceded key, a rating average — carries a thin denominator that will mislead, and 162's empirical
+  Bayes is still the right answer there. A figure printed **beside its own numerator, denominator and
+  minutes** is one the reader can redo himself; smoothing it replaces a fact he can check with an
+  estimate he must trust, and the estimate was not even neutral. So: **a figure the reader can check by
+  hand is never smoothed; a figure that exists only to order a list may be.** A later session must not
+  undo 162 by citing this entry, nor restore the shrinkage here by citing 162.
+- **The models are gone, not disabled**: `fitPositionModels`, `PositionModels`, `impactAt` and
+  `PositionImpact`'s two `ShrinkageReport` fields are removed, and `ImpactEntry.rawPer60` is removed as
+  well — `impactPer60` *is* the raw figure now, so a second field for it would be the drift that makes
+  a screen and a test disagree. `fitCountModel` and `shrunkPer60` stay: the conceded rates of the
+  équipe type still use them.
+- **The 7 de légende is judged on the same figure**, so the two screens cannot print different numbers
+  for the same man at the same post. One consequence had to be decided: a man who has **never held the
+  post** no longer gets the post's mean, because there is none — his cell is `null`, the honest answer,
+  and the disc would read « — ». Ranking him at a bare `0` would promote him above every real record
+  below zero, so each position group now has **two** lexicographic keys in `sevens.ts`: first whether he
+  has played the post at all, then his figure. Measured men first, then the best of them — the same house
+  rule as before (« unknown is neither best nor worst »), stated in the one way left that invents no
+  number.
+- **What the screens say now.** The card's note is « Le chiffre est brut : buts marqués moins buts
+  encaissés pendant qu'il tenait ce poste, divisé par ses minutes, ramené à 60 minutes de jeu … Rien
+  n'est lissé, donc une entrée de dix minutes peut mener un poste », and the légende's paragraph says
+  the same and adds that the keeper's own figure *is* still smoothed, towards the keepers' mean. The old
+  « lissé vers la moyenne du poste » sentences are gone from both; `squadMeanStandInShortFr` no longer
+  answers « moyenne du poste » for the impact, because that caption is now unreachable for it.
+
+## 199 — No bare « /h »: a rate of events is a waiting time, a difference names its 60 minutes
+
+**2026-10-12** · accepted · the owner's fourth backlog (issue #224) · the unit the owner asked for in
+the same backlog (« X but every X minutes ») · affects the équipe type's four sevens; the conceded cards
+of `/stats` have read this way since decision 177
+
+The owner, twice in one backlog: « What is the 0.49/h or X/h rating ? I do not understand at all. »
+
+It was goals per hour of play, printed under every disc of the offensive seven and, as a signed figure,
+under every disc of the légende. A unit the reader cannot name makes the whole seven unreadable, and
+« said twice » is the owner telling us it is not a passing remark.
+
+- **A rate of countable events is printed as the wait between two**: « 1 but toutes les 133′ » in prose
+  and in the full-width list, « 1 but/133′ » in the 104 px disc caption (`formatSevenFigure`, with a
+  `compact` flag like `sevenObservedFr`'s). That is the form `/stats` already used for « 1 but encaissé
+  toutes les X′ » (decision 177), so the two screens now read alike, and it is the form the owner wrote
+  himself.
+- **One wording, in one place**: the sentence is `format.ts`'s own `everyFr` (`concededEveryFr` until
+  track C's rename), handed the pair « this many per sixty minutes », so the équipe type cannot come to
+  word a rate differently from `/stats`. The disc caption is the one case the shared function cannot
+  serve — « 1 but toutes les 133′ » does not fit 104 px — and the DP's key is the other, because a key
+  cannot be a sentence; both are built from `minutesPerCount` in `lib/stats/impact.ts`, which is the
+  number `everyFr` prints the sentence of, with the same rounding and the same floor of one minute.
+  `best-seven-copy.test.ts` asserts the identity rather than the string, so a change to the shared
+  function fails here too.
+- **The tie-break moved with the print.** The offensive seven's goals key was the shrunk rate rounded to
+  the tenth of a goal per hour — the resolution of a figure the screen no longer prints. It is now the
+  printed waiting time itself (`scoringKey`), so « two men the screen shows alike are equal scorers and
+  assists decide between them » is true of what the reader is actually looking at. A man with no rate at
+  all sorts last, as he did before.
+- **A difference has no waiting time** — it can be zero, and it can be negative — so the impact names
+  the stretch it is divided over instead: « +6,0 pour 60′ ». Measured at 82 px on the turf at the
+  caption's 11 px, inside the 104 px two neighbouring captions leave each other; at the two widest-placed
+  discs it wraps to two lines rather than being clipped, which is the right failure on an
+  `overflow-hidden` pitch. The `/stats` card keeps the bare « +6,0 » in its narrow value column, where
+  the card's own description and note say what it is twice.
+- **Each seven now reads its own unit out loud** before it explains anything else (`sevenSmoothingFr`),
+  and the offensive one names **both polarities**, because six of its discs are goals scored and the
+  seventh is goals conceded: « pour un joueur de champ c'est un but qu'il marque, et plus l'attente est
+  courte, mieux c'est ; pour le gardien c'est un but qu'il encaisse, et c'est l'inverse. » The first
+  draft of that sentence was one line for all three sevens and was wrong on the défensive one, where
+  nobody is read on a goal he scored — caught by looking at the screen, which is what the definition of
+  done asks for.
+- The rules under the title lost « par heure » too: « celui qui attend le moins de minutes entre deux
+  buts », « celui qui encaisse le moins souvent ».

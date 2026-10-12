@@ -2172,3 +2172,26 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       preview with its four real goalkeepers (`audit/b4c/`). Still open and still the owner's: there is
       no **minimum of minutes** on any of these cards, so « aucun but encaissé en 6′ » is now the first
       row of a card rather than an unlisted one
+
+- [x] **B4.10 · « Impact par poste » shows the real goal difference, unsmoothed** (issue #223, decision
+      **198**). The headline is `(buts pour − buts contre) ÷ minutes × 60` and nothing else
+      (`rawImpactPer60`), with the minutes and the two counts under it: Benjamin at `MC` goes from
+      « −1,8 » to **« +6,0 »** on `+1 / −0 en 10′`, Édouard at `DC` from « −2,4 » to **« 0,0 »** on
+      `+0 / −0 en 6′`, and every figure on the card can be redone by hand. The two Poisson models the
+      post was shrunk towards are removed, not disabled; `fitCountModel` stays for the équipe type's
+      conceded rates, which decision 162 still governs — 198 says in which cases smoothing applies so
+      neither entry can be undone by citing the other. The 7 de légende reads the same raw figure, and
+      a man who never held a post has **no** figure there rather than the post's mean, so each position
+      group has two keys (played it at all, then the figure). Unit tests on the arithmetic including the
+      zero case and two negative ones; the card and the four sevens looked at at 390 px in both themes,
+      coach and player in one pass (`audit/b4d/`)
+- [x] **B4.11 · the équipe type's « /h » figure is legible** (issue #224, decision **199**). « 0,49/h »
+      is gone: a rate of countable events is the wait between two — « 1 but toutes les 133′ », and
+      « 1 but/133′ » in the 104 px disc caption — which is both the owner's own « X but every X
+      minutes » and the form `/stats` has used since decision 177; the impact, a difference with no
+      waiting time, names the stretch it is divided over, « +6,0 pour 60′ ». One conversion
+      (`minutesPerCount`), and the offensive seven's tie-break moved onto the printed figure
+      (`scoringKey`), so « two men the screen shows alike are departed by their passes décisives » is
+      true of what the reader sees. Each seven's paragraph now reads its unit out loud, and the
+      offensive one names both polarities — the défensive draft said « mieux c'est pour un buteur » on
+      a pitch where nobody is read on a goal he scored, which the 390 px pass caught
