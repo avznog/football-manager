@@ -181,6 +181,7 @@ import {
   retroLogIssuesFr,
   retroSubmitSchema,
 } from "../lib/retro/validation";
+import { OLD_TO_TARGET_DISPLAY_NAME } from "./radarlocal-names.mjs";
 
 /* -------------------------------------------------------------------------- */
 /* The export, as the old app shaped it                                       */
@@ -248,33 +249,10 @@ function readExport<T>(file: string): T {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Old `profiles.full_name`, **verbatim including its trailing spaces**, to this app's
- * `users.display_name`.
- *
- * Declared rather than computed, because it is a judgement: « Leo COACH » is Léo C and « Léo
- * Montpre » is Léo M, and nothing in the two strings says which of the two « Léo »s each one is.
- * `null` means « this person has no counterpart in this team », which the verification then holds to
- * its word by asserting he is referenced nowhere in the match data.
+ * The old-name-to-`users.display_name` table lives in `scripts/radarlocal-names.mts`, because
+ * `scripts/import-ratings.mts` reads the same one and the two must not drift (decision 188). It was
+ * declared here until then, and the reasoning that goes with it has moved with it.
  */
-const OLD_TO_TARGET_DISPLAY_NAME: Readonly<Record<string, string | null>> = {
-  Samuel: "Samuel",
-  Lucas: "Lucas",
-  Nicolas: "Nicolas",
-  "Lucien ": "Lucien",
-  Edouard: "Édouard",
-  Charles: "Charles",
-  Clément: "Clément",
-  Benoît: "Benoît",
-  "Maxime Goulard ": "Maxime",
-  "Leo COACH": "Léo C",
-  Pierre: "Pierre",
-  Rémi: "Rémi",
-  "Léo Montpre": "Léo M",
-  "Nicodème (gronaldo)": "Nicodème",
-  "Thomas Brunet": "Thomas",
-  "Benjamin Gonzva": "Benjamin",
-  "Alexis CHARRIER": null,
-};
 
 /**
  * Old slot code to the `position_code` + `x` of the 1-2-3-1 slot it means. `x` wherever the code is
