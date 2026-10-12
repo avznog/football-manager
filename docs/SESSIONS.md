@@ -5370,3 +5370,48 @@ temps de jeu sont approximatifs », and after the rebuild every minute is the pa
 `npm run typecheck`, `npx eslint scripts` and `npm test` (1449 tests, 70 files) all pass. No
 migration. Files: `scripts/rebuild-matches.mts`, `docs/DECISIONS.md` (179), `docs/ROADMAP.md`,
 `docs/SESSIONS.md`, `audit/rebuild/*.png`.
+
+## 2026-10-12, later still — the paper record reaches the app, on preview
+
+The owner chose **rebuild** over append for the first three matches, on the preview database, and then
+asked for every player's preferred positions to be filled in from where he actually played.
+
+**The rebuild** (decision 179, `scripts/rebuild-matches.mts`) is written up in its own pull request.
+What matters for the next session: each block became one `LINEUP_APPLIED` snapshot of the whole pitch,
+so the reducer derives everything and a goalkeeper change needs no special case; all 33 blocks were
+reproduced slot for slot by replaying the log to each block's own event; and **Nicolas lost the 30′ in
+goal that the old paired-substitution import had invented for him**. The scripts refuse production by
+name.
+
+**Then the positions** (decision 180, `scripts/assign-positions-from-play.mts`). This was only possible
+*because* of the rebuild: `match_player_positions` is the record, and before the rebuild it did not
+exist for these matches. Primary is the most-played post, secondary is any post worth a tenth of that
+player's own minutes, and a member with no minutes gets no row. The owner chose that rule over « every
+post he ever touched » and over « primary only », and chose to let the rule settle Thomas's near-tie
+(`MC` 32′ against `DC` 30′) rather than overriding it.
+
+**The check that made it believable:** Lucas was the one member whose wishes a human had set — `DC`
+primary, `GB` and `MC` secondary — and the rule derives exactly that from his minutes. The script
+prints the agreement rather than leaving a reader to notice. One case is not a proof, but it was the
+only one available and a disagreement would have been a warning.
+
+**The payoff, measured rather than asserted:** « pas son poste » went from **6 of 7 discs** to **0** in
+all three sevens, and every post of the 1-2-3-1 now has several declared candidates (`GB` 4, `DC` 6,
+`MC` 6, `AIL` 9, `AT` 4). Thomas's card reads « Poste principal : Milieu central · postes secondaires :
+Gardien de but, Défenseur central, Ailier », above the minutes those came from.
+
+**Two things worth knowing that cost time here:**
+
+- **The preview test passwords were reset under me.** I had set `leo` and `raphael` to a known password
+  so the deployed app could be walked at all — production's hashes came with the restore — and after the
+  rebuild the login failed with « Nom d'utilisateur ou mot de passe incorrect ». `search_path` was clean
+  and the site was up, so it was not the pooler trap again. Re-setting them fixed it. If a walk of
+  preview suddenly cannot log in, check that before anything else.
+- **A Playwright click on a player's name in `/equipe` did not navigate**, and the screenshot quietly
+  captured `/equipe` instead — the `<h1>` gave it away (« Les 7 orteils de la main » rather than the
+  player's name). Going to `/joueur/<id>` directly is the reliable route, and reading the `<h1>` is what
+  catches this class of silent miss. It is the same lesson as the earlier walk that « passed » while
+  the whole site was a login page.
+
+Files: `scripts/assign-positions-from-play.mts`, `docs/DECISIONS.md` (180), `docs/ROADMAP.md`,
+`docs/SESSIONS.md`.

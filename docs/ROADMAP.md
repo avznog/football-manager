@@ -903,6 +903,22 @@ tag during this rework** (decision 146): every item below reaches the preview on
             played in goal, refused below the keepers' average (Q8, decision **172**)
       - [x] Each disc prints the ranked figure and its raw record; the seven's rule under the title
 
+## The paper record reaches the app — 2026-10-12
+
+- [x] **The first three matches rebuilt from the owner's sheets** on the **preview** database
+      (decision **179**, `scripts/rebuild-matches.mts`). Each block is one `LINEUP_APPLIED` snapshot of
+      the whole pitch, so the reducer derives the leaves, moves and arrivals and a goalkeeper change
+      needs no special case. All 33 blocks reproduced slot for slot; scores derive 3–9, 3–2 and — for
+      Bayern, which was still `live` and had no goals — 2–5. The keeper spells are the paper's, and
+      **Nicolas lost the 30′ in goal the old import had invented for him**
+- [x] **Preferred positions filled in from the record** (decision **180**,
+      `scripts/assign-positions-from-play.mts`): primary is the most-played post, secondary is any post
+      worth a tenth of that player's minutes, a member with no minutes gets nothing. 29 rows over 15
+      members, and **« pas son poste » is gone from all three sevens** — it was 6 of 7 discs
+- [ ] **Production still holds the old version** of all of it: two goalkeepers for match 1, Bayern
+      unfinished, one member with wishes. Both scripts refuse production by name, deliberately; running
+      them there is the owner's decision, not a follow-up
+
 ## Deployment
 - [x] First-run bootstrap — `npm run db:bootstrap` writes the reference data and the one
       super-admin account an invite-only app cannot otherwise have (decision 052). Verified
