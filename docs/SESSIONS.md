@@ -5452,3 +5452,21 @@ changed. Both scripts refuse production by name, deliberately.
 
 Files: `db/snapshots/matches-1-3-rebuilt.sql`, `db/snapshots/README.md`, `COORDINATION.md`,
 `docs/SESSIONS.md`.
+
+## 2026-10-12, closing note — the super admin's password stays as it is
+
+The owner decided not to rotate it: « You can remove the issue to rotate the super admin's password, I
+will not do it. » Issue #208 is closed « not planned » and its card is off the board.
+
+It had been raised twice with the full cost stated — the account is a coach of « Les 7 orteils de la
+main », it can read and rewrite every team in the instance, and the app is on a public URL. He has the
+information and has decided. **`COORDINATION.md` now records it as closed**, in the same form as
+decision 132's three closed proposals, so a later session reads it as settled rather than as an
+oversight to helpfully rediscover.
+
+Two smaller things were bundled into that issue and went with it: the account being a member of the
+team's squad, and a candidate super-admin password (`choisis-en-un-vrai`) that `docs/SESSIONS.md` has
+printed in plain text for weeks. Neither is the thing he declined, so if either matters later it wants
+its own issue rather than a reopening of this one — but neither is being raised again unprompted.
+
+Files: `COORDINATION.md`, `docs/SESSIONS.md`.
