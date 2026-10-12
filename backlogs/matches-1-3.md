@@ -6,13 +6,51 @@ matches 1, 2 and 3 in that order — only the first sheet carries a title, « 1e
 are untitled and their ordering rests on the filenames). **None of this has been imported yet.** It is
 written down here so that a later script can be written directly from it, the way
 `scripts/import-radarlocal.mts` was written from `audit/radarlocal/`. Everything below is what the
-paper says; everything the paper does not say is either marked `**UNCERTAIN:**` in place or listed in
-« Open questions for the owner » at the end. Nothing has been inferred into a fact, and nothing has
-been reconciled.
+paper says; everything the paper does not say is either marked `**UNCERTAIN:**` in place or listed
+under « Open questions for the owner » at the end. Nothing has been inferred into a fact.
 
 **The one thing to know before reading on: these sheets record positions and minutes, and almost
-nothing else.** There is no date, no opponent, no home/away, no competition and no final score on any
-of the three. Only the third sheet records goals at all.
+nothing else.** No sheet carries a date, an opponent, a home/away, a competition or a final score, and
+only the third records a goal. That matters much less than it first appeared, because **each sheet is a
+match production already has** — see the next section, where the squads identify all three — so the
+missing facts are already in the database. What the sheets carry that the database does not is
+**where every player stood, minute by minute**, which is the whole point of them.
+
+## What these sheets are for, and which match each one is
+
+**The owner's purpose, in his words (2026-10-12):** « All of these information are only for the
+positions and substitutions on the field. The goal will later be to put them in the past matches, so we
+have a record of everyone's position at all time. » So the sheets are not a match report to import as a
+new match. They are the **position record for matches that already exist in production**, and the goals
+and scores on them matter only where production has none.
+
+**Each sheet is identified by its squad, and the match it names is not a guess.** Comparing the players
+each sheet puts on the pitch against the players production records as having played:
+
+| sheet | production match | squad |
+| --- | --- | --- |
+| `game1.jpeg` (« 1er Match ») | **Galacticos de Balard**, 22/09, `finished`, 3–9 | **identical**, 11 for 11 |
+| `game2.jpeg` | **FC Hexagone**, 29/09, `finished`, 3–2 | **identical**, 10 for 10 |
+| `game3.jpeg` | **Bayern Barbecue Club**, 06/10, `live`, 9 events, no stats | matches neither of the other two, and this is the only other played match |
+
+That answers, from data rather than from the owner, what no sheet says: the dates, the opponents, the
+home/away, the competition and — for the first two — the scores. They came from the RadarLocal import
+(decision 147 and the import script).
+
+**The two things the sheets add that production does not have, and one of them is a contradiction:**
+
+1. **Positions over time.** Production has **zero `POSITION_CHANGE` events, in any match.** The
+   RadarLocal export recorded substitutions as pairs with no position, so the import gave each
+   incoming player the slot of the player he replaced. Every move the paper records — and match 1 alone
+   has a dozen, including four different goalkeepers — is simply absent.
+2. **Therefore production's goalkeeper minutes for match 1 are wrong.** It says two keepers, Nicolas
+   30′ and Léo M 30′. The paper says **Léo M 0′–11′, Samuel 11′–30′, Thomas 30′–40′, Lucas 40′–51′,
+   Léo M 51′–end**. Nicolas never keeps goal on the paper at all. `gk_minutes`, `gk_clean_minutes` and
+   `conceded_while_gk` all rest on that, and so does the « Gardiens » section of `/stats` and the
+   goalkeeper slot of every équipe type.
+
+**Match 3 is the other case:** Bayern Barbecue Club is still `live` in production with 9 events and no
+final whistle, so the sheet is the only record of what happened — including its goals.
 
 ## How to read the sheets, and why that reading is the one used below
 
@@ -83,11 +121,11 @@ Clément, Édouard, Lucas, Lucien, Maxime, Nicodème, Nicolas, Pierre, Rémi, Th
 
 ## Match 1 — sheet `game1.jpeg`, titled « 1er Match »
 
-- **Date:** not on the sheet.
-- **Opponent:** not on the sheet.
-- **Home / away:** not on the sheet.
-- **Competition:** not on the sheet.
-- **Final score:** not on the sheet.
+**This is Galacticos de Balard, 22/09/2026, away, Coupe Automne, lost 3–9** — identified by its squad,
+which is production's eleven exactly. **Fully verified by the owner on 2026-10-12.**
+
+- **Date, opponent, home/away, competition, score:** none on the sheet; all in production, from the
+  RadarLocal import.
 - **Periods / duration:** not stated. The minutes run 0′ → 56′ continuously and the sheet's two columns
   split at 30′ (left column 0′/11′/20′, right column 30′/36′/40′), which is consistent with 2×30 and
   continuous minutes, but the sheet never says so.
@@ -198,6 +236,39 @@ Changes from 36′: **off** Charles, Pierre, Clément — **on** Samuel (`AT`), 
 (`DC`); Thomas moves `GB` → `MC` and Lucas moves `DC` → `GB`. **Goalkeeper change: Thomas → Lucas.**
 No substitution line records them.
 
+**Block 47′ — derived, not drawn on the sheet.** The owner confirmed the 47′ line and the position it
+took (2026-10-12): Charles on for Benjamin, at `AIL`. Benjamin held `AIL` (left) in the 40′ block, so
+that is the slot.
+
+| position | player |
+| --- | --- |
+| `AT` | Samuel |
+| `AIL` (left) | **Charles** |
+| `MC` | Thomas |
+| `AIL` (right) | Rémi |
+| `DC` | Nicolas |
+| `DC` | Léo M |
+| `GB` | Lucas |
+
+Off the pitch: Benjamin, Pierre, Clément, Benoît.
+Changes from 40′: **off** Benjamin — **on** Charles, at `AIL` (left). A one-for-one swap, nobody moves.
+
+**Block 48′ — derived, not drawn on the sheet.** The owner confirmed the 48′ line and its position:
+Pierre on for Rémi, at `AIL`. Rémi held `AIL` (right), so that is the slot.
+
+| position | player |
+| --- | --- |
+| `AT` | Samuel |
+| `AIL` (left) | Charles |
+| `MC` | Thomas |
+| `AIL` (right) | **Pierre** |
+| `DC` | Nicolas |
+| `DC` | Léo M |
+| `GB` | Lucas |
+
+Off the pitch: Benjamin, Rémi, Clément, Benoît.
+Changes from 47′: **off** Rémi — **on** Pierre, at `AIL` (right). A one-for-one swap, nobody moves.
+
 **Block 51′**
 
 | position | player |
@@ -212,30 +283,50 @@ No substitution line records them.
 
 Off the pitch: Lucas, Benjamin, Benoît, Rémi — plus one further bench line scribbled out illegibly.
 
-**UNCERTAIN:** this block is the messiest thing on the three sheets. The `MC` slot has a name struck
-through with « Charles » written underneath it; **the struck name is illegible** (roughly six letters).
-The `AIL` (right) slot has « Clément » written on top of another name, and the two are superimposed;
-the overwritten name looks like « Rémi », which is consistent with the 48′ line taking Rémi off, but
-the letters cannot be separated with confidence. « Clément » is the name that survives, and the bench
-column lists Rémi, so Clément is read as the player on the pitch.
+**This block was the messiest thing on the three sheets, and the 47′ and 48′ blocks above now explain
+it.** The owner confirmed the reading (2026-10-12). What the paper shows is a name struck through at
+`MC` with « Charles » written underneath, and « Clément » written on top of another name at `AIL`
+(right) — and the derivation accounts for both: Charles arrived at `AIL` (left) at 47′ and moves to
+`MC` here, and Rémi, whom the struck name under « Clément » resembled, had gone off at 48′. The
+overwrites are the owner correcting the drawing as the changes happened, not two players at one post.
 
-Changes from 40′, after the 47′ and 48′ lines below are applied: **off** Lucas — **on** Clément (`AIL`
-right); Pierre `AIL` (right) → `AIL` (left), Charles `AIL` (left) → `MC`, Thomas `MC` → `DC`, Léo M
-`DC` → `GB`. **Goalkeeper change: Lucas → Léo M.** No substitution line records the Clément-for-Lucas
-change.
+Changes from 48′: **off** Lucas — **on** Clément (`AIL` right); Pierre `AIL` (right) → `AIL` (left),
+Charles `AIL` (left) → `MC`, Thomas `MC` → `DC`, Léo M `DC` → `GB`. **Goalkeeper change: Lucas → Léo
+M.** No substitution line records the Clément-for-Lucas change.
+
+**Block 56′ — derived, not drawn on the sheet.** The owner confirmed the 56′ line (2026-10-12): Rémi on,
+Samuel off. He gave no position, and Samuel held `AT`, so a one-for-one swap puts Rémi there — the same
+reading the line already implied.
+
+| position | player |
+| --- | --- |
+| `AT` | **Rémi** |
+| `AIL` (left) | Pierre |
+| `MC` | Charles |
+| `AIL` (right) | Clément |
+| `DC` | Nicolas |
+| `DC` | Thomas |
+| `GB` | Léo M |
+
+Off the pitch: Lucas, Benjamin, Benoît, Samuel.
+Changes from 51′: **off** Samuel — **on** Rémi, at `AT`. A one-for-one swap, nobody moves.
 
 ### Substitution lines written on the sheet
 
+All three are **confirmed by the owner** (2026-10-12), positions included, and each is drawn out as a
+block above.
+
 | minute | on | off | position taken |
 | --- | --- | --- | --- |
-| 47′ | Charles | Benjamin | **UNCERTAIN:** the line itself names no position. Benjamin was `AIL` (left) in the 40′ block, so a straight swap puts Charles at `AIL` (left) — and the 51′ block four minutes later has Charles at `MC`. |
-| 48′ | Pierre | Rémi | **UNCERTAIN:** likewise. Rémi was `AIL` (right); the 51′ block has Pierre at `AIL` (left). |
-| 56′ | Rémi | Samuel | **UNCERTAIN:** likewise. Samuel was `AT` in the 51′ block, so Rémi at `AT`. |
+| 47′ | Charles | Benjamin | `AIL` — the owner said so; Benjamin held `AIL` (left), so that is the slot |
+| 48′ | Pierre | Rémi | `AIL` — the owner said so; Rémi held `AIL` (right), so that is the slot |
+| 56′ | Rémi | Samuel | `AT` — no position given, and Samuel held `AT`, so a one-for-one swap |
 
-**UNCERTAIN:** two further substitution lines are struck out completely and cannot be read — one
-immediately below the 47′ line (the whole line, including its minute), and one before the 48′ line
-whose minute may read `48'` (fully scribbled over). A third struck line sits above the 56′ line, also
-unreadable. None of them is transcribable.
+**The three struck-out lines are corrections, not missing changes.** Two sit around the 47′/48′ lines
+and one above the 56′ line, and none can be read. The owner's « rest is all verified for this match »
+covers the blocks and the three lines above, which together account for every player on and off the
+pitch from 0′ to 56′ with nobody unaccounted for — so the struck lines are earlier attempts at the
+same changes. That is an inference from completeness, not something he said in those words.
 
 ### Goals
 
@@ -256,11 +347,12 @@ every one of the 11 named players appears on the pitch in at least one block.
 
 ## Match 2 — sheet `game2.jpeg`, untitled
 
-- **Date:** not on the sheet.
-- **Opponent:** not on the sheet.
-- **Home / away:** not on the sheet.
-- **Competition:** not on the sheet.
-- **Final score:** not on the sheet.
+**This is FC Hexagone, 29/09/2026, at home, Coupe Automne, won 3–2** — identified by its squad, which
+is production's ten exactly. Its blocks and lines have **not** been through the pass the owner gave
+match 1, and two of them disagree (the 48′ line against the 54′ block).
+
+- **Date, opponent, home/away, competition, score:** none on the sheet; all in production, from the
+  RadarLocal import.
 - **Periods / duration:** not stated. Minutes run 0′ → 54′ continuously; the 30′ block looks like the
   second-half restart, consistent with 2×30.
 - **Squad: 10 players.** Samuel, Clément, Maxime, Pierre, Nicolas, Lucien, Lucas, Charles, Nicodème,
@@ -431,11 +523,14 @@ This is the only sheet with goals on it, and it is also the only one whose top t
 at all but a page of the owner's notes about **features for the app**, transcribed in its own section
 below.
 
-- **Date:** not on the sheet.
-- **Opponent:** not on the sheet.
-- **Home / away:** not on the sheet.
-- **Competition:** not on the sheet.
-- **Final score:** **not written anywhere.** The goal lists imply 2–5 (see the sanity check).
+**This is Bayern Barbecue Club, 06/10/2026, away, Coupe Automne** — the only played match left once
+sheets 1 and 2 are identified by their squads. **It is still `live` in production**, with 9 events, no
+final whistle and no frozen statistics, so this sheet is the only record of what happened in it, goals
+included.
+
+- **Date, opponent, home/away, competition:** not on the sheet; in production.
+- **Final score:** **not written anywhere, and not in production either** — the match was never
+  finished there. The goal lists imply 2–5 (see the sanity check).
 - **Periods / duration:** not stated. Minutes run 0′ → 59′ continuously, and the 30′ block looks like
   the second-half restart. Consistent with 2×30, never stated.
 - **Squad: 11 players.** Charles, Benjamin, Maxime, Pierre, Lucien, Nicodème, Samuel, Rémi, Lucas,
@@ -678,74 +773,73 @@ Everything else in this quotation is legible.
 
 ---
 
+## What is settled, and what is still open
+
+**Settled since the first transcription.**
+
+- **Which match each sheet is**, and with it every match-level fact no sheet carries — date, opponent,
+  home/away, competition, the **2×30** format, and the scores of matches 1 and 2. All read from
+  production: Galacticos away, Hexagone at home, Bayern away, all three Coupe Automne, all three 2×30.
+  See « What these sheets are for » at the top; the squads decide the identification, 11 for 11 and 10
+  for 10.
+- **Matches 1 and 2 need no goals from the paper.** Production already holds 3–9 and 3–2 with full
+  event logs. The earlier worry that they would import as 0–0 does not apply: nothing new is being
+  created.
+- **Match 1 is fully verified by the owner** (2026-10-12): the three substitution lines at 47′, 48′ and
+  56′, their positions, and every block. Blocks for 47′, 48′ and 56′ are derived above and reconcile
+  with the 51′ block already on the paper — which also explains that block's overwrites.
+- **The purpose**: a record of everyone's position at all times, written back onto the matches that
+  already exist.
+
 ## Open questions for the owner
 
-A scripted import needs these, and no sheet supplies them.
+**The one that decides the whole shape of the work:**
 
-**Per match, the match itself:**
+1. **How should positions reach matches that already have a frozen event log?** `match_events` is
+   append-only (invariant 1) and the starting composition cannot be voided (decision 150), so the
+   log of matches 1 and 2 cannot simply be rewritten. Three ways, and this is the owner's call:
+   - **append** a change at each minute the paper shows one, through the post-match « Ajouter un
+     changement » path (decision 169) — which does accept nobody-in-nobody-out, so a pure position
+     move is expressible. Honest and additive, but the log then contains the old inherited-slot
+     substitutions *and* the corrections;
+   - **rebuild** those two matches' logs from the paper — truer, but it means deleting events, which
+     the invariant forbids, so it would need its own decision superseding it;
+   - **leave matches 1 and 2 alone** and apply the paper only to match 3, accepting that the first two
+     keep goalkeeper minutes that are wrong.
+2. **Production's goalkeeper minutes for match 1 are wrong** (two keepers recorded, four on the paper).
+   Confirm that the paper is right and production is the artefact, before anything is written.
 
-1. **The exact dates** (and kick-off times) of matches 1, 2 and 3. No sheet carries one.
-2. **The opponents**, and **home or away** for each.
-3. **The competition**, if any, for each.
-4. **Confirmation that all three were 2×30**, i.e. `periods_count = 2`, `period_minutes = 30`. Every
-   sheet is consistent with it and none states it. Match 1's last recorded event is at 56′, match 2's
-   last block is at 54′ and match 3's at 59′, so none of them reaches 60′ on paper.
-5. **Whether `game2.jpeg` and `game3.jpeg` really are matches 2 and 3, in that order.** Only
-   `game1.jpeg` is titled (« 1er Match »).
-6. **Whether these three matches already exist as rows in the production calendar**, as the two
-   RadarLocal ones did — the earlier import matched on `kickoff_at` + opponent and refused to create
-   anything.
+**Match 3, which is the one still live in production:**
 
-**Matches 1 and 2 — the whole result:**
+3. **Its result.** The sheet lists 2 goals for and 5 against, implying 2–5, and production has the
+   match `live` with 9 events and no final whistle. Is 2–5 the final score?
+4. **`58'` or `53'`** for Pierre's second goal, and **`46'` or `56'`** for the fourth goal conceded
+   (which would put two at 56′).
+5. **The assist on the 32′ goal** — one, or genuinely none?
+6. **Match 3, 39′ → 47′:** the 39′ line takes Maxime off for Thomas, yet the 47′ block has Maxime at
+   `MC`, Thomas at `DC`, and Lucas off with no line taking him off.
 
-7. **The final score of match 1 and of match 2**, and **every goal**: minute, scorer, assist for each
-   goal scored, and minute for each goal conceded. Neither sheet records a single goal, so as things
-   stand both would import as 0–0, which invariant 2 would then derive and display as a real score —
-   exactly the kind of screen stating something untrue that the definition of done warns about.
+**Match 2, not yet verified the way match 1 now is:**
 
-**Match 3:**
+7. **Match 2, 48′ → 54′:** the 48′ line takes Charles off, and the 54′ block has him back at `AT` with
+   Clément off instead. Did Charles come back on, or is the line wrong?
+8. **Its blocks and lines generally** — match 1 took one message to settle; the same pass over sheet 2
+   would settle it.
+9. **Match 2's squad of 10**, with no Benjamin, Thomas, Rémi, Benoît or Léo M. Production agrees
+   exactly, so this is likely just true — worth one word of confirmation.
 
-8. **The final score**, to check against the 2–5 the goal lists imply.
-9. **`58'` or `53'`** for the second goal by Pierre.
-10. **`46'` or `56'`** for the fourth conceded goal (which would make two at 56′).
-11. **The assist on the 32′ goal** — was there one, or genuinely none?
+**Smaller, and mostly harmless:**
 
-**The model of the sheets — this is the big one:**
-
-12. **Is a block the actual lineup at that minute, or a plan written before the match?** The whole
-    value of these sheets is per-position minutes, and that answer decides whether the blocks or the
-    substitution lines are the source of truth. The evidence is mixed: the blocks are internally
-    consistent (7 + bench = squad, every time) and mostly agree with the lines, but match 2's 54′ block
-    and match 3's 47′ block each contradict a line (see below).
-13. **The many block-to-block changes that no substitution line records.** Almost every block differs
-    from the previous one by two to four players. Should the import synthesise a substitution at the
-    block's minute for each of them? Match 2's 0′ → 11′ and match 3's 0′ → 10′ transitions are three
-    clean one-for-one swaps each, so « yes » looks right — but then the sheets' own substitution lines
-    become a redundant subset, and some of them disagree.
-14. **Match 2, 48′ → 54′:** the 48′ line takes Charles off, and the 54′ block has him back at `AT`
-    with Clément off instead. Did Charles come back on at some minute, or is the 48′ line wrong?
-15. **Match 3, 39′ → 47′:** the 39′ line takes Maxime off for Thomas, yet the 47′ block has Maxime at
-    `MC` and Thomas at `DC`, and Lucas off the pitch with no line taking him off. What actually
-    happened?
-16. **Positions moving without a substitution.** The blocks record a lot of it, including seven
-    goalkeeper changes across the three matches (match 1: Léo M → Samuel at 11′, → Thomas at 30′, →
-    Lucas at 40′, → Léo M at 51′; match 2: Lucas → Samuel at 30′). Does the app's retro-entry path
-    (`buildRetroLog` / `retroPitch`) express a pure position move, or does every one of these have to
-    become a lineup change at a minute?
-17. **The illegible corrections**, each of which may hide a real name: match 1's 51′ `MC` slot (a
-    struck name replaced by Charles) and its `AIL` (right) slot (Clément written over what may be
-    Rémi); match 2's 0′ block (a struck name under Clément, and a struck bench line); match 3's 50′
-    `AIL` (right) slot (« Thomas » written over something). And **five substitution lines struck out
-    beyond reading** — three on sheet 1, one on sheet 2, one on sheet 3.
-18. **The scribbled-over minute numbers**: `11'` on sheet 1, `11'` on sheet 2, `10'` and `47'` on
-    sheet 3. Each has an earlier figure underneath. Are the surviving numbers the right ones?
-19. **Who, if anyone, was a supporter rather than a substitute** in each match. The sheets only ever
-    list who was off the pitch at a given moment, and in all three matches every named player appears
-    on the pitch in at least one block — so as read here there are no supporters and no unused
-    substitutes at all. Was anybody else at the match?
-20. **Ratings, injuries, cards, man of the match** for the three matches, if they exist anywhere. The
-    earlier import took ratings from means the owner supplied by hand and declared one injury that the
-    old app had no concept of; these sheets record none of the four.
-21. **Match 2's squad of 10** (against 11 for matches 1 and 3), with a completely different cast — no
-    Benjamin, Thomas, Rémi, Benoît or Léo M, who all play in match 1. Is that right, and does a squad
-    of 10 mean three substitutes and no more?
+10. **Is a block the pitch as it was, or a plan?** Match 1's answer is « as it was », since the owner
+    verified blocks and lines together and they reconcile. Assumed to hold for sheets 2 and 3.
+11. **The illegible corrections** that may hide a name: match 2's 0′ block (a struck name under
+    Clément, and a struck bench line) and match 3's 50′ `AIL` (right) (« Thomas » over something).
+    Match 1's are now explained.
+12. **The scribbled-over minutes**: `11'` on sheet 2, `10'` and `47'` on sheet 3. Match 1's `11'` is
+    confirmed.
+13. **Supporters.** Every named player appears on the pitch in at least one block on all three sheets,
+    so as read there are no unused substitutes. Production records Léo C as a supporter for match 1,
+    which the sheet does not mention — the sheets list only who was off the pitch, so that is
+    consistent, not contradictory.
+14. **Ratings, injuries, cards, man of the match**: none on any sheet. Production already carries the
+    ratings the owner supplied by hand and one declared injury for match 1.
