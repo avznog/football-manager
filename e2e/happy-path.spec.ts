@@ -1185,6 +1185,93 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
 });
 
 /**
+ * Decision 193: any planned composition, applied whenever the coach decides to.
+ *
+ * The 30′ plan is applied at the 12th minute, from the browser under the pitch, and the two halves
+ * of the decision are what is asserted — the log says **12’**, because a composition applied at the
+ * 12th is a change at the 12th (decision 147), while the plan still says « prévue à la 30’ », because
+ * a plan is not a record. And when the 30th minute does come round the prompt does **not** reappear:
+ * the plan happened, and a card asking the coach to confirm it again would be the screen stating
+ * something untrue.
+ */
+test("une compo prévue appliquée en avance : enregistrée à la minute du tap, et plus proposée", async ({
+  page,
+}) => {
+  const fixture = provisionFixture();
+  const cm2 = playerOf(fixture, "cm2");
+  const sub = playerOf(fixture, "sub");
+
+  await login(page, fixture.coach.username, fixture.password);
+  await page.getByRole("link", { name: "Nouveau match" }).first().click();
+  await page.getByLabel("Adversaire").fill(OPPONENT);
+  await page.getByLabel("Coup d’envoi").fill(`${parisDate(tomorrow())}T15:00`);
+  await page.getByRole("button", { name: "Créer le match" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
+
+  await page.getByRole("link", { name: "Composition de départ" }).click();
+  for (const [key, slot] of STARTERS) await place(page, playerOf(fixture, key), slot);
+  await segment(page, `role:${sub.membershipId}-substitute`).click();
+  await page.getByRole("button", { name: "Créer la composition" }).click();
+  await expect(compositionCard(page, "Composition de départ")).toBeVisible();
+
+  await page.getByRole("link", { name: "Nouvelle composition" }).click();
+  await expect(page.getByLabel("Minute", { exact: true })).toHaveValue("30");
+  await swap(page, sub, cm2, "milieu central");
+  await page.getByRole("button", { name: "Créer la composition" }).click();
+  await expect(compositionCard(page, "À partir de la 30ᵉ minute")).toBeVisible();
+
+  const t0 = Date.now();
+  const at = (minutes: number) => t0 + minutes * MS_PER_MINUTE;
+  await page.clock.setFixedTime(t0);
+  await page.getByRole("link", { name: `← ${OPPONENT}` }).click();
+  await page.getByRole("link", { name: "Ouvrir le mode match" }).click();
+  await expect(pitch(page, "Joueurs sur le terrain")).toBeVisible();
+  await page.getByRole("button", { name: KICKOFF_NAME, exact: true }).click();
+
+  const browser = page.getByRole("dialog", { name: "Compositions prévues" });
+
+  await test.step("the 30’ plan is applied at the 12th minute", async () => {
+    await page.clock.setFixedTime(at(12));
+
+    // Two plans, so two cards; the browser opens on the first one nothing has applied yet, which is
+    // the 30’ one — the starting seven walked on when game mode opened (decision 153).
+    await page.getByRole("button", { name: "Compositions prévues (2)" }).click();
+    await expect(browser).toContainText("Composition prévue à la 30’");
+    await expect(browser).toContainText("2 sur 2");
+    await expect(browser).toContainText(`${cm2.displayName} → ${sub.displayName}`);
+    // Its own minute is still half the match away, and the sheet says what applying it now means.
+    await expect(browser).toContainText("à la minute de ta confirmation");
+    // Nothing has changed on the pitch yet (invariant 3).
+    await expect(pitch(page, "Joueurs sur le terrain").getByRole("img", { name: sub.displayName })).toHaveCount(0);
+
+    await browser.getByRole("button", { name: "Appliquer maintenant" }).click();
+
+    // 12’, not 30’: the plan's own minute is not what stamps the change (decisions 147 and 193).
+    const line = timelineLine(page, `Entre : ${sub.displayName}`);
+    await expect(line).toContainText("12’");
+    await expect(line).toContainText(`Sort : ${cm2.displayName}`);
+    await expect(
+      pitch(page, "Joueurs sur le terrain").getByRole("img", { name: sub.displayName }),
+    ).toBeVisible();
+    await expect(page.getByText("Actions refusées")).toHaveCount(0);
+  });
+
+  await test.step("and the 30th minute proposes nothing, because it already happened", async () => {
+    await page.clock.setFixedTime(at(31));
+    await expect(page.locator('span[aria-label^="Chrono"]')).toHaveText("31:00");
+
+    // The prompt the happy path answers at the 30th is not raised at all here.
+    await expect(promptCard(page, "Composition prévue à la 30’")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Compositions prévues (2)" }).click();
+    await expect(browser).toContainText("Composition prévue à la 30’");
+    await expect(browser).toContainText("Déjà appliquée");
+    // Nothing left to apply: the pitch already is that composition.
+    await expect(browser.getByRole("button", { name: "Appliquer maintenant" })).toBeDisabled();
+  });
+});
+
+/**
  * The door decision 121 opened: a match played without the phone, closed and typed up without game
  * mode ever running.
  *

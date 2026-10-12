@@ -532,47 +532,12 @@ export function availableOptions(
     });
 }
 
-/**
- * The heading of that list, and the hint under it.
- *
- * It said « Remplaçants ». On the demo season's Étoile du Parc, before kick-off, that heading stood
- * over thirteen rows: three actual substitutes, the seven titulaires — nobody is on the pitch until
- * the coach confirms the composition (invariant 3) — two players the sheet does not mention, and a
- * supporter who is injured. Ten of the thirteen were not substitutes, and each one said so, in grey,
- * two millimetres under its own name.
- *
- * The list is right and deliberately wide: `availableOptions` explains why a coach one man short at
- * 20′ is offered whoever turned up. So the heading is what has to change, to the question the list
- * actually answers. For somebody who is only watching it answers a different question — they cannot
- * bring anyone on — so they are told what the list is instead of what to do with it.
+/*
+ * `enterableCardFr` used to live here: the heading and hint of the list of everybody off the pitch,
+ * « Qui peut entrer » for the operator and « En dehors du terrain » for a reader (decision 087).
+ * Game mode no longer draws that list at all (decision 192), and `availableOptions` is now read only
+ * by the pickers « Qui entre ? » asks with — which is where bringing a player on always happened.
  */
-export function enterableCardFr(input: {
-  available: readonly PlayerOption[];
-  players: readonly LivePlayer[];
-  canAct: boolean;
-}): { titleFr: string; hintFr: string | null; emptyFr: string } {
-  const roleOf = new Map(input.players.map((player) => [player.memberId, player.squadRole]));
-  const notSubstitutes = input.available.filter(
-    (option) => roleOf.get(option.memberId) !== "substitute",
-  ).length;
-
-  if (!input.canAct) {
-    return {
-      titleFr: "En dehors du terrain",
-      hintFr: null,
-      emptyFr: "Tous les joueurs sont sur le terrain.",
-    };
-  }
-
-  return {
-    titleFr: "Qui peut entrer",
-    hintFr:
-      notSubstitutes === 0
-        ? "Touche un joueur pour le faire entrer."
-        : "Touche un joueur pour le faire entrer. Les remplaçants d’abord, puis le reste du groupe.",
-    emptyFr: "Tous les joueurs sont sur le terrain.",
-  };
-}
 
 /** Named substitutes first, then the rest of the squad, then supporters and non-selected players. */
 function optionRank(player: LivePlayer): number {
@@ -860,30 +825,134 @@ export function pendingLineupView(
   players: PlayerIndex,
 ): PendingLineupView | null {
   if (!pending) return null;
-  const lineup = lineups.find((row) => row.id === pending.lineupId);
+  return lineupViewOf(pending, lineups, players);
+}
+
+/** One plan described against the pitch as it stands. Null when `lineups` does not carry it. */
+function lineupViewOf(
+  plan: PlannedLineupState,
+  lineups: readonly LiveLineup[],
+  players: PlayerIndex,
+): PendingLineupView | null {
+  const lineup = lineups.find((row) => row.id === plan.lineupId);
   if (!lineup) return null;
 
-  const flags = mergeLineupFlags(pending.flags, lineup.slots, players);
+  const flags = mergeLineupFlags(plan.flags, lineup.slots, players);
 
   return {
-    lineupId: pending.lineupId,
-    title: pending.isInitial
-      ? "Composition de départ"
-      : `Composition prévue à la ${pending.fromMinute}’`,
+    lineupId: plan.lineupId,
+    title: plan.isInitial ? "Composition de départ" : `Composition prévue à la ${plan.fromMinute}’`,
     /*
      * The starting composition is not a set of changes — it is the team sheet, and the ghost pitch
      * beside this list already shows it. Listing seven arrivals under « Composition de départ »
      * would be the « 7 changements » lie again. For every later plan the list is complete, unpaired
      * arrivals included: this diff is against the *pitch*, which may be down to six.
      */
-    changes: pending.isInitial ? [] : describeLineupDiffFr(pending.diff, players.nameOf),
+    changes: plan.isInitial ? [] : describeLineupDiffFr(plan.diff, players.nameOf),
     warnings: flags.map(
       (flag) => `${players.nameOf(flag.memberId)} est ${flagLabelFr(flag.reason)}`,
     ),
     flags,
     slots: lineup.slots,
-    isEmpty: pending.diff.isEmpty,
+    isEmpty: plan.diff.isEmpty,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Stepping through the plans                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One planned composition as the browser shows it: the same description the prompt gives, plus what
+ * the match has done with the plan so far.
+ */
+export type PlannedLineupCard = PendingLineupView & {
+  /** The minute it was drawn *for*. Never rewritten: it is a plan, not a record (decision 193). */
+  fromMinute: number;
+  isInitial: boolean;
+  /** The log has a standing `LINEUP_APPLIED` naming it, so it will not be proposed again. */
+  applied: boolean;
+  /** Its minute has come. */
+  due: boolean;
+  /** What the sheet says under the title — read `plannedLineupStatusFr`. */
+  statusFr: string;
+  /** The shape to draw, for an « Ajuster » that starts from this plan. */
+  formationId: string | null;
+};
+
+/**
+ * Every composition planned for this match, in minute order, each described against the pitch as it
+ * stands right now (decision 193).
+ *
+ * The reducer has already done the work: `state.plannedLineups` carries one entry per plan with its
+ * diff against the current pitch, its flags, whether its minute has come and whether the log has
+ * applied it. This turns that list into French, and it is deliberately the **whole** list — a plan
+ * already applied, and a plan whose minute is still half an hour away, are both things the coach
+ * asked to be able to look at and apply.
+ */
+export function plannedLineupViews(
+  plans: readonly PlannedLineupState[],
+  lineups: readonly LiveLineup[],
+  players: PlayerIndex,
+  options: { canApply: boolean },
+): PlannedLineupCard[] {
+  const cards: PlannedLineupCard[] = [];
+  for (const plan of plans) {
+    const view = lineupViewOf(plan, lineups, players);
+    if (!view) continue;
+    cards.push({
+      ...view,
+      fromMinute: plan.fromMinute,
+      isInitial: plan.isInitial,
+      applied: plan.applied,
+      due: plan.due,
+      statusFr: plannedLineupStatusFr({
+        applied: plan.applied,
+        due: plan.due,
+        fromMinute: plan.fromMinute,
+        canApply: options.canApply,
+      }),
+      formationId: lineups.find((row) => row.id === plan.lineupId)?.formationId ?? null,
+    });
+  }
+  return cards;
+}
+
+/**
+ * What the browser says about one plan — the one sentence that has to stay true however the coach
+ * uses it (decision 193).
+ *
+ * Three facts, and they are not the same fact: a plan the log has already applied will **not** be
+ * proposed again when its minute comes round, because the reducer raises `pendingLineup` only for a
+ * plan it has no standing application for; a plan whose minute has come and which nothing applied is
+ * the prompt's own case; and a plan drawn for later can be applied now, in which case the event is
+ * stamped at the confirmation and the plan's own `from_minute` is left alone.
+ *
+ * Here rather than in the component for the reason `emptyPitchFr` gives: Vitest runs in `node` and
+ * cannot render a client component, so a sentence this easy to get backwards lives where a test can
+ * read it.
+ */
+export function plannedLineupStatusFr(input: {
+  applied: boolean;
+  due: boolean;
+  fromMinute: number;
+  /** The viewer may operate the match, so applying is theirs to do. */
+  canApply: boolean;
+}): string {
+  if (input.applied) return "Déjà appliquée : elle ne sera plus proposée.";
+  if (input.due) {
+    return input.canApply
+      ? "Son heure est venue et rien n’a changé sur le terrain : rien ne bouge avant ta confirmation."
+      : "Son heure est venue, pas encore appliquée.";
+  }
+  return input.canApply
+    ? `Prévue à la ${input.fromMinute}’. Tu peux l’appliquer tout de suite : elle sera enregistrée à la minute de ta confirmation.`
+    : `Prévue à la ${input.fromMinute}’, pas encore appliquée.`;
+}
+
+/** « 2 sur 5 » — where the browser is in the list. */
+export function plannedLineupStepFr(index: number, total: number): string {
+  return `${index + 1} sur ${total}`;
 }
 
 /** Either the ordered list of changes, or the one sentence that stands in for it. */
