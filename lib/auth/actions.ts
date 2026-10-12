@@ -44,12 +44,37 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
   // Always run a real verification, even when the username does not exist, so the response
   // time cannot be used to discover which accounts are real.
   const storedHash = user?.passwordHash ?? (await getDecoyHash());
-  const ok = await verifyPassword(storedHash, parsed.data.password);
+  const { ok, needsUpgrade } = await verifyPassword(storedHash, parsed.data.password);
 
   if (!user || !ok) return { error: BAD_CREDENTIALS };
 
+  if (needsUpgrade) await upgradePasswordHash(user.id, parsed.data.password);
+
   await createSession(user.id);
   redirect(safeNext(formData.get("next")));
+}
+
+/**
+ * Rewrites a password inherited from the team's previous app as argon2id, the first time its
+ * owner logs in here (decision 200). It runs in the login request on purpose: that is the only
+ * moment the plaintext exists, so it is the only moment the upgrade is possible.
+ *
+ * A failure here must cost nothing — the password has just been proved right, and an account
+ * that cannot be rewritten is still an account that can log in. So it is swallowed, and the log
+ * line carries the user's id and the error's class only: never the password, never a hash.
+ * `DrizzleQueryError`'s own message would print the bound parameters, which is exactly the new
+ * hash, so the error is not logged whole.
+ */
+async function upgradePasswordHash(userId: string, plain: string): Promise<void> {
+  try {
+    const passwordHash = await hashPassword(plain);
+    await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  } catch (error) {
+    console.error(
+      `[auth] could not upgrade the password hash of user ${userId}`,
+      error instanceof Error ? error.name : typeof error,
+    );
+  }
 }
 
 /**
