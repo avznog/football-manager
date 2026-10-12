@@ -2134,3 +2134,41 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       themes on the deployed preview, Galacticos published and Bayern hidden
       (`audit/ratings-import/`). **Production still holds the fabrication**; applying this there is
       the owner's deliberate act
+
+## From the owner's fourth backlog — 2026-10-12
+
+- [x] **B4.6 · the two conceded lists rank fewest first, and say which way they read** (issue #219,
+      decision **195**). « Buts encaissés sur le terrain » and « Buts encaissés au goal » run from the
+      smallest total up, over everybody with minutes in the population rather than over whoever
+      conceded at least one — so a man who conceded nothing is first, where he used to be missing, and
+      reads « aucun but » over « encaissé en 87′ », the owner's own wording split across the row's two
+      lines. The tie-break is the record, so nothing conceded in a whole match leads nothing conceded
+      in six minutes. The count card and the frequency card beside it are told apart by the heading, on
+      one rule for the whole page: a plain noun heads a count, « Qui … le plus / le moins souvent »
+      heads a rate, and the description's first words say which way the list runs. **Amends decision
+      184** on its reason for not inverting, which the owner's own data disproves: the two lists agree
+      only about the man who conceded nothing
+- [x] **B4.7 · « minutes jouées » becomes three rankings** (issue #220, decision **196**). « Toutes
+      les minutes jouées », « Minutes jouées sur le terrain » (`minutes − gk_minutes`) and « Minutes
+      jouées au goal ». A man with no minute in a population is not in its list at all, rather than a
+      row of `0′`, and the figure under each total stays the matches he played
+- [x] **B4.8 · the « Gardiens » table and « minutes d'invincibilité » are gone** (issue #221, decision
+      **196**). Both blocks deleted, with the `keepers` list and the `topCleanMinutes` ranking that
+      fed them and `cleanShareFr` / `cleanSharePercentFr` that worded them. **Clean sheets are no
+      longer displayed anywhere** — that is the one figure lost for good, deliberately: it is the same
+      quantity the owner has just called meaningless, counted per match. `gkCleanSheets`,
+      `cleanMinutes` and `gkCleanMinutes` are still measured, because `/stats/equipe-type` builds two
+      of its sevens out of them — **which is an open question for the owner**: that screen still ranks
+      a « 7 d'invincibilité » on the figure this decision retires
+- [x] **B4.9 · personal scoring and assisting rates** (issue #222, decision **197**). « Qui marque le
+      plus souvent » and « Qui fait marquer le plus souvent »: his own `goals` and `assists` over his
+      own minutes, in the same unit as everything else on the screen (« 1 but toutes les 43′ » over
+      « 3 buts en 128′ »), and never `goals_for_while_on`, which is the team's. A man it never happened
+      to is last with « aucun but marqué » over the minutes it did not happen in — shortest record
+      first among them, so the longest barren run is the bottom row — and nobody without a minute is
+      listed. The profile card carries the same pair as two `Figure`s
+
+      All four looked at at 390 px in both themes, coach and player in one pass, on the clone of
+      preview with its four real goalkeepers (`audit/b4c/`). Still open and still the owner's: there is
+      no **minimum of minutes** on any of these cards, so « aucun but encaissé en 6′ » is now the first
+      row of a card rather than an unlisted one

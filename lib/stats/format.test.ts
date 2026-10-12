@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ASSIST_WORDS_FR,
+  GOAL_WORDS_FR,
   NO_VALUE_FR,
   appearancesLineFr,
-  cleanShareFr,
-  cleanSharePercentFr,
-  concededEveryFr,
+  concededCountRowFr,
   concededRateFr,
   concededRateLineFr,
   concededRecordFr,
+  eventRateFr,
+  everyFr,
   formatDecimal,
   formatSignedDecimal,
   impactRecordFr,
@@ -190,10 +192,10 @@ describe("pendingRatingsNoteFr", () => {
 
 describe("the rate and impact copy (decisions 162 and 177)", () => {
   it("states the raw rate as a whole number of minutes, never below one", () => {
-    expect(concededEveryFr(72, 3)).toBe("toutes les 24′");
-    expect(concededEveryFr(71, 3)).toBe("toutes les 24′");
-    expect(concededEveryFr(1, 5)).toBe("toutes les 1′");
-    expect(concededEveryFr(35, 0)).toBe("jamais");
+    expect(everyFr(72, 3)).toBe("toutes les 24′");
+    expect(everyFr(71, 3)).toBe("toutes les 24′");
+    expect(everyFr(1, 5)).toBe("toutes les 1′");
+    expect(everyFr(35, 0)).toBe("jamais");
   });
 
   it("prints the ranked rate over the record it is, never infinity", () => {
@@ -224,24 +226,57 @@ describe("the rate and impact copy (decisions 162 and 177)", () => {
     expect(concededRateLineFr(1, 0)).toBe("1 but encaissé en 0′");
   });
 
-  it("turns clean minutes into a share of the minutes they are a share of (decision 184)", () => {
-    expect(cleanShareFr(85, 120)).toBe("71 % de 120′ jouées");
-    expect(cleanShareFr(120, 120)).toBe("100 % de 120′ jouées");
-    expect(cleanShareFr(0, 60)).toBe("0 % de 60′ jouées");
-    // Six clean minutes are 100 %, and the denominator beside it is the whole point.
-    expect(cleanShareFr(6, 6)).toBe("100 % de 6′ jouées");
+  it("says the count board's two lines as one sentence read downwards (decision 195)", () => {
+    expect(concededCountRowFr(0, 87)).toEqual({
+      value: "aucun but",
+      detail: "encaissé en 87′",
+    });
+    expect(concededCountRowFr(3, 120)).toEqual({
+      value: "3 buts",
+      detail: "1 but toutes les 40′ sur 120′",
+    });
+    expect(concededCountRowFr(1, 20)).toEqual({
+      value: "1 but",
+      detail: "1 but toutes les 20′ sur 20′",
+    });
+    // A goal conceded in no whole minute keeps its record and invents no rate.
+    expect(concededCountRowFr(1, 0)).toEqual({ value: "1 but", detail: "1 but encaissé en 0′" });
   });
 
-  it("has no invincibility share for a man who has not played", () => {
-    expect(cleanShareFr(0, 0)).toBeNull();
-    expect(cleanSharePercentFr(0, 0)).toBeNull();
+  it("says what a player did in the very same unit as what he took (decision 197)", () => {
+    expect(eventRateFr(3, 120, GOAL_WORDS_FR)).toEqual({
+      rate: "1 but toutes les 40′",
+      record: "3 buts en 120′",
+    });
+    expect(eventRateFr(1, 46, GOAL_WORDS_FR)).toEqual({
+      rate: "1 but toutes les 46′",
+      record: "1 but en 46′",
+    });
+    expect(eventRateFr(2, 80, ASSIST_WORDS_FR)).toEqual({
+      rate: "1 passe déc. toutes les 40′",
+      record: "2 passes déc. en 80′",
+    });
+    // The same shape as the conceded boards: « 1 X toutes les N′ », never « 0,49/h ».
+    expect(eventRateFr(3, 120, GOAL_WORDS_FR).rate).toBe(concededRateFr(3, 120).rate);
   });
 
-  it("prints the share alone where the denominator is already beside it", () => {
-    expect(cleanSharePercentFr(20, 30)).toBe("67 %");
-    // A keeper's share is `gkCleanMinutes / gkMinutes`, and an outfielder's `cleanMinutes / minutes`:
-    // the same function, never the difference of the two (rule 10 of `aggregate.ts`).
-    expect(cleanSharePercentFr(30, 30)).toBe("100 %");
+  it("refuses to divide for a man it never happened to, and names the thing he did not do", () => {
+    expect(eventRateFr(0, 87, GOAL_WORDS_FR)).toEqual({
+      rate: "aucun but marqué",
+      record: "en 87′",
+    });
+    expect(eventRateFr(0, 87, ASSIST_WORDS_FR)).toEqual({
+      rate: "aucune passe déc.",
+      record: "en 87′",
+    });
+    // Nothing at all: a rate over no minute is not a figure, and the board does not list him — but
+    // the words are still true if it ever did.
+    expect(eventRateFr(0, 0, GOAL_WORDS_FR)).toEqual({
+      rate: "aucun but marqué",
+      record: "en 0′",
+    });
+    // A goal in a sub-minute cameo: the count stands alone rather than « toutes les 1′ ».
+    expect(eventRateFr(1, 0, GOAL_WORDS_FR)).toEqual({ rate: "1 but", record: "1 but en 0′" });
   });
 
   it("says « aucun but encaissé » in the record rather than infinity", () => {

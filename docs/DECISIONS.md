@@ -7201,3 +7201,153 @@ names landing on one member all abort before a row is written.
 
 « Alexis CHARRIER » still maps to nobody, and the script asserts what the old `profiles.json` shows:
 he is in the old database, he is an admin of it, and he gives no note and receives none.
+
+## 195 — Both conceded lists rank fewest first, and every rate on `/stats` is said in minutes
+
+**2026-10-12** · accepted · the owner's fourth backlog (#219) · `lib/stats/aggregate.ts`,
+`lib/stats/format.ts`, `app/(app)/stats/page.tsx` · presentation and ranking only: no model and no
+migration · **amends decision 184** on one point, named below
+
+The owner, about the two « Buts encaissés » cards: « For the stat "Buts encaissés sur le terrain" :
+invert the list, the first must be the one with the least goals » · « For the stat "But encaissés au
+goal" : same. »
+
+**Both count cards now run from the smallest total up**, and that changes who is *in* them. Ranked
+from the most conceded, the only eligibility that made sense was « conceded at least one » — the
+default `value > 0` of `leaderboard()`. Read the other way, that predicate keeps exactly the wrong
+half of the squad: the man who conceded nothing is the top of the list and was not on it at all. So
+eligibility is the **minutes of the population** — outfield minutes for one card, minutes in goal for
+the other — and the count may now honestly be zero.
+
+**« Aucun but encaissé en 87′ » is the owner's own wording for that first row** (asked for on
+2026-10-12), and it is printed as the two lines of the row read downwards: « aucun but » as the ranked
+figure, « encaissé en 87′ » under it. Never « 0 but » — a count board whose first row reads zero sends
+the reader looking for the number that is missing — and never the whole sentence in the value column,
+which is 110 px wide at 390 px. `concededCountRowFr` is the only place either half is worded.
+
+**The tie-break is the record, highest first, in both directions.** Nothing conceded in a whole match
+leads nothing conceded in six minutes, which is the same refusal decision 177 made when it ranked the
+longer record first among equal rates. `leaderboard()` therefore takes an `order` and keeps its
+tie-break descending whichever way the value runs.
+
+**Two cards per section, and the heading is what tells them apart.** A count card and a frequency card
+now both read « best first », and the issue was right that they must not be mistaken for each other. So
+the whole page follows one rule: **a plain noun heads a count, « Qui … le plus / le moins souvent »
+heads a rate**, and the description's first words say which way the list runs (« Du total le plus
+faible au plus élevé », « Du plus rare au plus fréquent »). Inside a section the count comes first and
+the frequency under it. Neither card is dropped: the owner asked for the inversion of the counts in
+this backlog and praised the rate in the same breath (decision 196), so both are things he reads.
+
+**One unit for every rate on the screen, and it is minutes** — « 1 but toutes les 24′ », never
+« 0,49/h ». The owner has said so twice, in this backlog and the last. `concededEveryFr` is renamed
+`everyFr` to say that it is not about conceding: the same function now words what a player took and
+what he did (decision 197), and the four rate boards plus the profile card all go through it. A figure
+per hour or per 60 minutes exists in exactly one place, `lib/stats/impact.ts`'s smoothed goal
+difference, which is a different quantity with its own card.
+
+**What this amends in decision 184.** That decision kept the two count cards ranked on the count « so
+the bold column stays monotone in the number the order comes from », and it still is — the column is
+monotone, ascending now. The clause it retires is the *reason* given for not inverting: that the
+inverted card « would make the rate card printed backwards ». It would not, and the data says so. On
+the owner's own season the count card reads Léo C, Édouard, Benoît, Maxime, Lucas and the rate card
+reads Léo C, Maxime, Lucas, Édouard: the two lists agree about the man who conceded nothing and
+disagree about everybody else, because one is a total and the other a frequency. Decision 184's other
+clauses — a rate under the count, never without its denominator, and no division by zero — are
+untouched and are what the row above rests on.
+
+**Still open, and the owner's to answer**: there is no minimum of minutes on either kind of card, so a
+six-minute cameo can head both. `docs/ROADMAP.md` has carried that question since decision 177 and this
+decision does not settle it; it only makes it more visible, because « aucun but encaissé en 6′ » is now
+the first row rather than an unlisted one.
+
+## 196 — The « Gardiens » table and « minutes d'invincibilité » go, and minutes jouées becomes three lists
+
+**2026-10-12** · accepted · the owner's fourth backlog (#220, #221) · `app/(app)/stats/page.tsx`,
+`app/(app)/stats/_components/keepers.tsx` *(deleted)*, `app/(app)/joueur/_components/stats-card.tsx`,
+`lib/stats/aggregate.ts`, `lib/stats/format.ts` · no migration · **supersedes the invincibility
+clauses of decisions 162 and 184; retires the display of decision 018's clean sheet**
+
+The owner: « Remove the table about the stats of goalkeepers, the one called "Gardiens" » · « Remove
+the stat "minutes d'invincibilité", it does not mean anything. The real stat of invincibility is the
+"X goal taken every X minutes" » · « For the stat "minutes jouées" : do one stat "toutes les minutes
+jouées", one stat "minutes jouées en goal", and one "minutes jouées sur le terrain". »
+
+**What is gone, and what is gone *for good*.** The `Gardiens` card carried four figures per keeper and
+only two of them survive elsewhere:
+
+- **minutes in goal** — survives, and is promoted to a ranking of its own (« Minutes jouées au goal »);
+- **conceded in goal** — survives, as the card decision 195 just inverted, and as a rate beside it;
+- **clean sheets** (`gkCleanSheets`, decision 018) — **no longer displayed anywhere**, on `/stats` or
+  on a profile. This is the real loss of this decision, and it is deliberate rather than overlooked: a
+  7-a-side clean sheet credited to whoever happened not to concede during his own stint is the same
+  quantity the owner has just called meaningless, counted per match instead of per minute;
+- **`gkCleanMinutes` and its share** — likewise gone from every screen, with « minutes d'invincibilité »
+  itself.
+
+**The two clean-minute figures are still measured, and nothing is deleted from the model.** The
+reducer still computes `cleanMinutes` and `gkCleanMinutes`, `aggregate.ts` still sums them and still
+counts `gkCleanSheets`, because `lib/stats/best-seven.ts` builds the défensive and légende sevens out
+of them and `/stats/equipe-type` is not in scope here. What was removed is the two things nothing read
+after the cards went: the `keepers` list and the `topCleanMinutes` ranking, dead code the moment the
+screen stopped asking for them. `cleanShareFr` and `cleanSharePercentFr` go with them, and
+`aggregate.test.ts` keeps decision 184's trap as an assertion about the numbers instead of about their
+wording: an hour, half in goal, the only goal conceded at 40′, where `cleanMinutes − gkCleanMinutes`
+claims 0′ clean outfield and the truth is 30′.
+
+**A question the owner may want to answer**: `/stats/equipe-type` still ranks a « 7 d'invincibilité »
+on exactly the figure this decision calls meaningless. Nobody asked for that seven to change and it was
+not touched.
+
+**Three minute lists, three populations.** « Toutes les minutes jouées » (`minutes`), « Minutes jouées
+sur le terrain » (`minutes − gkMinutes`, rule 10 of `aggregate.ts`) and « Minutes jouées au goal »
+(`gkMinutes`). **A man with no minute in a population is not in its list**, which is the default
+eligibility of `leaderboard()` and the only readable answer: a « minutes au goal » card sixteen rows
+deep with fourteen of them at `0′` says nothing about a goalkeeper. The secondary figure under each
+total is the matches he **played**, not the matches he played in that population — a keeper's whole
+afternoon in goal would otherwise read « 0′ · 1 match » in the outfield card he is not in.
+
+**The profile card follows the screen.** « Sans encaisser » and « Clean sheets » left it for the same
+reason they left `/stats`, and the keeper's rate took their place — « Un but pris au goal · toutes les
+14′ · sur 109′ ». « au goal » is in that label because the outfield grid above has a « Un but pris » of
+its own over a different stretch of minutes, and two identical labels on one card are read as one
+number measured twice.
+
+## 197 — « 1 but toutes les X′ » is also said about what a player *did*
+
+**2026-10-12** · accepted · the owner's fourth backlog (#222) · `lib/stats/aggregate.ts`,
+`lib/stats/format.ts`, `app/(app)/stats/_components/rate-board.tsx`,
+`app/(app)/joueur/_components/stats-card.tsx` · no migration
+
+The owner: « We need to add those stats : "X but score every X minutes" and "X passe D every X
+minutes" (per player). These are personal stats, meaning that it is not "a goal scored by the team",
+but "I scored a goal". »
+
+**His goals, over his minutes — never `goalsForWhileOn`.** The confusion the owner names is already in
+the model as two different columns: `match_player_stats.goals` is what he scored, `goals_for_while_on`
+is what the team scored while he was on the pitch (decision 160), and the second is the impact card's
+business. `scoringRate` and `assistRate` read the first, over his **total** minutes, goal time
+included: a keeper who comes up for a corner and scores did it in a match he played, and inventing a
+third denominator for one event a season would be a precision nobody can check.
+
+**The same two lines and the same unit as the conceded boards** (decision 195): « 1 but toutes les 43′ »
+over « 3 buts en 128′ ». `eventRateFr` words both kinds of event out of one `everyFr`, with the French
+of the thing counted passed in (`GOAL_WORDS_FR`, `ASSIST_WORDS_FR`) — « passe déc. » abbreviated,
+because the figure sits in a 110 px column and the profile card already abbreviates it that way.
+
+**The man it never happened to is in the list, last.** « aucun but marqué » over « en 20′ », the exact
+mirror of decision 177's « aucun but encaissé », and never a division. Where never conceding is the
+best record there is, never scoring is the worst, so those rows sort below everybody with a figure —
+and among themselves **shortest record first**, so the man with the most minutes and nothing to show
+for them is the bottom of the card rather than lost in the middle of it. He is not cut from the list:
+the card is read as « où est-ce que je suis », and a player who has played five matches without scoring
+is somewhere, not nowhere.
+
+**Nobody without a minute is listed at all**, on either board: a rate over no time is not a figure.
+And a count over no *whole* minute — the cache floors minutes, so a forty-second cameo that scored is
+`0′` — prints the count alone rather than « toutes les 1′ », the third refusal of decision 184.
+
+**On the profile card**, the same pair as a `Figure` each: « Un but marqué · toutes les 78′ · sur 155′ »
+and « Une passe déc. · jamais · sur 155′ ». Both carry their denominator, because his minutes appear
+once at the top of the card and a rate two grids below it would otherwise be a rate over an unstated
+stretch of time. The whole block is omitted for a man with no minutes, which is what Raphaël's profile
+shows: « Minutes 0′ » and no rate at all, rather than « jamais sur 0′ ».

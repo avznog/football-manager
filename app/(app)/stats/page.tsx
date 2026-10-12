@@ -26,8 +26,9 @@ import {
   equipeTypeHref,
 } from "@/lib/stats/best-seven-copy";
 import {
-  cleanShareFr,
-  concededRateLineFr,
+  ASSIST_WORDS_FR,
+  GOAL_WORDS_FR,
+  concededCountRowFr,
   formatMinutes,
   formatRating,
   matchCount,
@@ -44,10 +45,9 @@ import {
   type StatsQuery,
 } from "./_components/filters";
 import { ImpactByPosition } from "./_components/impact";
-import { Keepers } from "./_components/keepers";
 import { Leaderboard } from "./_components/leaderboard";
 import { PlayerList } from "./_components/player-list";
-import { RateBoard } from "./_components/rate-board";
+import { EventRateBoard, RateBoard } from "./_components/rate-board";
 import { TeamSummary } from "./_components/team-summary";
 
 export const metadata = { title: "Stats" };
@@ -175,7 +175,13 @@ function SeasonCards({
 
       {/* Grouped the way the cahier lists them — Attaque · Défense · Gardiens · Temps de jeu · Impact par
           poste — then the notes, then the whole squad. One giant table does not fit a phone; five short
-          sections with a heading each do (decision 162). */}
+          sections with a heading each do (decision 162).
+
+          **Inside a section: the totals first, then the frequencies** (decision 195). « Meilleurs
+          buteurs » then « Qui marque le plus souvent »; « Buts encaissés sur le terrain » then « Qui
+          encaisse le moins souvent sur le terrain ». Two cards of each pair would otherwise read as two
+          answers to one question — and the heading is where the reader is told which: a plain noun
+          heads a count, « Qui … le plus / le moins souvent » heads a rate, everywhere on the page. */}
       <Section title="Attaque">
         <Leaderboard
           title="Meilleurs buteurs"
@@ -194,74 +200,92 @@ function SeasonCards({
           valueLabel={(entry) => plural(entry.value, "passe décisive", "passes décisives")}
           emptyMessage="Aucune passe décisive saisie sur cette sélection. Elle est optionnelle au moment du but."
         />
+        {/* His own goals over his own minutes (decision 197) — not the team's while he was on, which
+            is the « Impact par poste » card further down. */}
+        <EventRateBoard
+          title="Qui marque le plus souvent"
+          description="Du plus fréquent au moins fréquent : 1 but marqué toutes les X minutes jouées"
+          board={stats.scoringRate}
+          words={GOAL_WORDS_FR}
+          emptyMessage="Personne n’a encore de minutes sur cette sélection."
+        />
+        <EventRateBoard
+          title="Qui fait marquer le plus souvent"
+          description="Du plus fréquent au moins fréquent : 1 passe décisive toutes les X minutes jouées"
+          board={stats.assistRate}
+          words={ASSIST_WORDS_FR}
+          emptyMessage="Personne n’a encore de minutes sur cette sélection."
+        />
       </Section>
 
       <Section title="Défense">
         <Leaderboard
           title="Buts encaissés sur le terrain"
-          description="Joueur de champ : les buts pris pendant qu’il jouait, hors temps au goal"
+          /* Fewest first since decision 195, and the heading says so: a list of totals that starts at
+             the top is read as a ranking of the worst, and this one is the opposite. */
+          description="Du total le plus faible au plus élevé : les buts pris pendant qu’il jouait, hors temps au goal"
           entries={stats.topConcededOutfield}
-          valueLabel={(entry) => plural(entry.value, "but")}
+          valueLabel={(entry) => concededCountRowFr(entry.value, entry.count).value}
           /* The rate under the total, with the minutes it is a rate over (decision 184). The card is
-             ranked on the count above — « le moins de buts encaissés » below ranks on the rate. */
-          countLabel={(entry) => concededRateLineFr(entry.value, entry.count)}
-          emptyMessage="Aucun but encaissé sur cette sélection pendant qu’un joueur de champ était sur le terrain."
+             ranked on the count above — « qui encaisse le moins souvent » below ranks on the rate. */
+          countLabel={(entry) => concededCountRowFr(entry.value, entry.count).detail}
+          emptyMessage="Personne n’a encore de minutes de joueur de champ sur cette sélection."
         />
+        {/* « … sur le terrain » is in the description and not in the heading: a `Card` title is one
+            truncated line, and at 390 px the longer wording came out as « Qui encaisse le moins
+            souvent sur le te… ». The section is « Défense » and the keeper card carries « au goal »,
+            so the pair still reads unambiguously. */}
         <RateBoard
-          title="Le moins de buts encaissés"
-          description="Joueur de champ : 1 but encaissé toutes les X minutes sur le terrain"
+          title="Qui encaisse le moins souvent"
+          description="Joueur de champ, du plus rare au plus fréquent : 1 but encaissé toutes les X minutes sur le terrain"
           board={stats.outfieldConcededRate}
           emptyMessage="Personne n’a encore de minutes de joueur de champ sur cette sélection."
         />
       </Section>
 
       <Section title="Gardiens">
+        <Leaderboard
+          title="Buts encaissés au goal"
+          description="Du total le plus faible au plus élevé : les buts pris pendant qu’il était dans les buts"
+          entries={stats.topConcededGk}
+          valueLabel={(entry) => concededCountRowFr(entry.value, entry.count).value}
+          countLabel={(entry) => concededCountRowFr(entry.value, entry.count).detail}
+          emptyMessage="Personne n’a encore joué dans les buts sur cette sélection."
+        />
         <RateBoard
-          title="Le moins de buts encaissés au goal"
-          description="Gardien : 1 but encaissé toutes les X minutes dans les buts"
+          title="Qui encaisse le moins souvent au goal"
+          description="Du plus rare au plus fréquent : 1 but encaissé toutes les X minutes dans les buts"
           board={stats.keeperConcededRate}
           emptyMessage="Personne n’a encore joué dans les buts sur cette sélection."
         />
-        <Leaderboard
-          title="Buts encaissés au goal"
-          /* The description carries « dans les buts », so the rate line under each total does not
-             have to repeat it in a column 110 px wide. */
-          description="Gardien : les buts pris pendant qu’il était dans les buts, et à quelle fréquence"
-          entries={stats.topConcededGk}
-          valueLabel={(entry) => plural(entry.value, "but")}
-          countLabel={(entry) => concededRateLineFr(entry.value, entry.count)}
-          emptyMessage="Aucun but encaissé dans les buts sur cette sélection."
-        />
-        <Keepers keepers={stats.keepers} />
       </Section>
 
+      {/* Three populations, three lists (decision 196): the whole time played, then the two halves it
+          is made of. A player with no minute in one of them is not in its list at all. */}
       <Section title="Temps de jeu">
         <Leaderboard
-          title="Minutes jouées"
+          title="Toutes les minutes jouées"
+          description="Dans les buts et sur le terrain, additionnées"
           entries={stats.topMinutes}
           valueLabel={(entry) => formatMinutes(entry.value)}
           countLabel={(entry) => matchCount(entry.count)}
           emptyMessage="Personne n’a encore de minutes sur cette sélection."
         />
         <Leaderboard
-          title="Minutes au goal"
+          title="Minutes jouées sur le terrain"
+          description="Hors temps au goal"
+          entries={stats.topOutfieldMinutes}
+          valueLabel={(entry) => formatMinutes(entry.value)}
+          countLabel={(entry) => matchCount(entry.count)}
+          emptyMessage="Personne n’a encore de minutes de joueur de champ sur cette sélection."
+        />
+        <Leaderboard
+          title="Minutes jouées au goal"
+          description="Le temps passé dans les buts, qui vient du poste occupé et non de la feuille de match"
           entries={stats.topGkMinutes}
           valueLabel={(entry) => formatMinutes(entry.value)}
           countLabel={(entry) => matchCount(entry.count)}
           emptyMessage="Personne n’a encore joué dans les buts sur cette sélection."
-        />
-        <Leaderboard
-          title="Minutes d’invincibilité"
-          description="Minutes sans que l’équipe encaisse, gardien compris, et leur part du temps de jeu"
-          entries={stats.topCleanMinutes}
-          valueLabel={(entry) => formatMinutes(entry.value)}
-          /* The percentage under the minutes, with the minutes played it is a part of (decision 184).
-             The ranking stays on the minutes themselves: a man who played six clean minutes is at
-             100 % and would otherwise head the card, which is the whole point of decision 162. */
-          countLabel={(entry) =>
-            cleanShareFr(entry.value, entry.count) ?? `sur ${formatMinutes(entry.count)} jouées`
-          }
-          emptyMessage="Personne n’a encore de minutes sans encaisser sur cette sélection."
         />
       </Section>
 
