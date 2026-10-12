@@ -5171,3 +5171,60 @@ and its 390 px screenshots, committed, rebased onto the previous merge and re-ra
   each one a keep-both. The M9 roadmap heading, created by two agents, merged as one.
 
 Files: `COORDINATION.md`, `docs/SESSIONS.md`.
+
+## 2026-10-12 — The preview becomes a copy of production, and three paper sheets are transcribed
+
+**Reviewed the other machine's work first.** #188 moved the cahier into `backlogs/`, #189–#191 are the
+owner's second backlog, #192 the handover. Gates re-run here on `main`: typecheck and eslint clean,
+**1449 tests in 70 files**. One note in `COORDINATION.md` was wrong and is corrected: it said the
+preview did not carry #189–#191 and needed `gh run rerun --failed`. It does carry them — the #192 push
+ran green and its `deploy preview` deployed `874d475`, which contains all three.
+
+**The preview database is now a copy of production**, at the owner's request, so he can test against
+real data. In his order: preview dumped, that dump committed (#193), then production restored over it,
+then the migration gap closed.
+
+- The dump went in **redacted**, because this repository is **public** — 16 password hashes including
+  the super admin's, and **272 `sessions` rows, which are live bearer tokens** (a session cookie in
+  this app *is* the `sessions.id`). `db/snapshots/README.md` writes that rule down. The data was the
+  seeded demo season, not real teammates, so no real personal data was involved either way.
+- `public` and `drizzle` were dropped and restored from the production dump; **`neon_auth` was left
+  alone** (Neon's own schema, no cross-schema foreign keys — checked). `public`'s ACL was reproduced
+  exactly (`pg_database_owner`, `GRANT USAGE … TO PUBLIC`).
+- All 22 tables then matched the production dump row for row.
+
+**The finding worth keeping: run migrations against Neon's direct endpoint, never `-pooler`.** After
+the restore, `0011`'s `DROP TABLE "training_attendance"` failed on a table that `to_regclass` said was
+right there, and `select count(*) from positions` failed too — while `show search_path` came back
+**empty**. The cause is in every `pg_dump`: line 16 is
+`SELECT pg_catalog.set_config('search_path', '', false)`, session-scoped, and Neon's pooler handed that
+server connection to the next client. Production, unpolluted, showed the normal `"$user", public`. The
+only persistent override on either database belongs to the `neon_auth` role, identically. Dropping
+`-pooler` from the host fixed it; `0011`–`0014` and `db:refreeze` then ran clean. **The app never
+noticed, because Drizzle qualifies every table with its schema** — it is unqualified DDL in a migration
+that breaks. Verified after: 15 migration rows, trainings and availability gone, `AIL` present,
+`match_player_positions` filled (24 player rows, 36 position rows), per-position minutes summing to
+each player's minutes, `GB` minutes equal to `gk_minutes`, and the deployed preview answering a login
+attempt from the new data with no 5xx.
+
+**The three paper sheets** are transcribed into `backlogs/matches-1-3.md` by a subagent that read the
+photographs. They are not team sheets: **no date, no opponent, no home/away, no competition and no
+final score on any of the three**, and **matches 1 and 2 record no goal at all** — they are
+position-and-minute sheets. Only match 3 has goals (2 for, 5 against, implying 2–5, unconfirmed).
+
+What they do carry is the thing the owner said mattered: **who played where**. Each sheet draws the
+seven as four lines which read `1-3-2-1` downwards — the repo's `1-2-3-1` upside down, so top is `AT`
+and bottom is `GB`. That reading is confirmed independently rather than assumed: Samuel is the bottom
+name in all nine blocks of sheet 3 (one keeper all match), and sheet 2's bottom name is Lucas for every
+first-half block then Samuel for every second-half one, a half-time keeper change. Twenty-one open
+questions are listed at the end of the file; the blocking ones are the dates, the opponents and the
+entire result of matches 1 and 2. **Nothing was imported.** Importing as it stands would put two 0–0
+matches on the calendar, which is exactly the « screen stating something untrue » the definition of
+done warns about.
+
+One thing the transcription needs that the app may not express: the sheets hold **seven goalkeeper
+changes and many outfield shifts with no substitution attached**. A pure position move is expressible
+as a post-match change with nobody in and nobody out (S10, decision 169) — a full-pitch snapshot — but
+no test pins that case, so it should be verified before an import leans on it.
+
+Files: `COORDINATION.md`, `docs/SESSIONS.md`, `backlogs/matches-1-3.md`.
