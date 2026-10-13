@@ -28,9 +28,17 @@ in.
 | File | What it is |
 |---|---|
 | `preview-20261012.sql` | The preview database on 2026-10-12, taken immediately before production's data was restored over it. The demo season « AS Dimanche », at migration `0014`. |
-| `matches-1-3-rebuilt.sql` | The first three matches rebuilt from the owner's paper sheets, plus the preferred positions derived from them (decisions 179 and 180). **Meant to be applied to production**, after the next tag has run migrations `0011`–`0014`. Carries no credentials, so nothing needed redacting. |
+| `matches-1-3-rebuilt.sql` | The first three matches rebuilt from the owner's paper sheets, plus the preferred positions derived from them (decisions 179 and 180). **Spent: production received this data on 2026-10-12**, through the full restore from preview and not by applying this file. It stays here as the record of what was reviewed on preview. Carries no credentials, so nothing needed redacting. |
+
+**No future dump goes in the other direction.** Production has been in real use since 2026-10-12 and
+is the authoritative copy of the season; data flows production → preview only. Decision **201** is the
+rule and the reason.
 
 ## `matches-1-3-rebuilt.sql`, and why it is here rather than only in a script
+
+Written while production still needed this data; it got it another way on 2026-10-12. What follows is
+why the file was trustworthy, kept because it is the record of the review — not an instruction to run
+it anywhere.
 
 The rebuild is reproducible — `scripts/rebuild-matches.mts` and
 `scripts/assign-positions-from-play.mts`, driven by `backlogs/matches-1-3-blocks.json` — and either

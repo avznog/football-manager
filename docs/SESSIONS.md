@@ -6065,3 +6065,90 @@ and none are owed.
 Files: `lib/auth/password.ts`, `lib/auth/actions.ts`, `lib/auth/password.test.ts` (new),
 `lib/auth/actions.test.ts` (new), `package.json` and `package-lock.json` (`@node-rs/bcrypt`),
 `docs/DECISIONS.md` (200), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-10-13 — `v1.0.1` ships, production becomes the real season, and the data direction is fixed
+
+**`v1.0.1` is out.** PR #230 — decision **200**, bcrypt read and upgraded on the way through — was
+squash-merged as `4c0dd85` and the owner hand-cut `v1.0.1` at that commit. `release.yml` ran green end
+to end: the gate, typecheck/lint/vitest, the browser happy path, the production migrations, the
+production deployment. **1.0.1 carried no migration**: production was already at **15** applied
+migration rows, which is the committed head (`0014` is the last file), so `db:migrate` had nothing to
+do and the schema did not move.
+
+**The old app's passwords are in.** 15 bcrypt hashes exported from `info-radarlocal` (Supabase) were
+written onto the matching **preview** accounts by `scripts/import-passwords.mts`. Two were excluded at
+the owner's request: `potter`, his own, and `admin`, the super admin. A third, `raphael`, **does not
+exist in the old app at all**, so his hash was left as production's own rather than invented. Preview
+afterwards: `$2a$06$` ×1, `$2a$10$` ×14, `$argon2` ×3.
+
+**Production was dumped, then restored from preview — the one-off of decision 201.** 2026-10-12 at
+19:52 Paris. A full backup of production was taken **first**,
+`audit/db-swap-20261012/prod-before-restore-20261012-1952.dump` (107 100 bytes); the source was
+`audit/db-swap-20261012/preview-for-prod-20261012-1952.dump` (111 902 bytes), taken with
+`pg_dump --exclude-table-data='public.sessions'`. That exclusion is security-critical rather than
+tidiness: a session cookie in this app **is** `sessions.id`, so preview's 30 live sessions — all of
+them this session's own — would have landed on production as 30 working bearer tokens. It was verified
+absent from the dump's table of contents before the restore, and production ended with **0** session
+rows. Only the app's own schemas were replaced: `public` and `drizzle` dropped and recreated, then
+`pg_restore --schema=public --schema=drizzle`. Neon's managed **`neon_auth` was deliberately left
+alone** — this app has self-written auth and does not read it, and recreating it would have needed a
+role the restore does not own.
+
+**Three things a future session would otherwise rediscover painfully.**
+
+1. **Neon now serves PostgreSQL 18.6, so the client has to be 18.** The machine's Homebrew `libpq` is
+   17.3 and both `pg_dump` and `pg_restore` refuse outright — « aborting because of server version
+   mismatch ». A `postgres:18` Docker container was used for both rather than upgrading the owner's
+   local toolchain.
+2. **`pg_restore --schema=X` filters out its own `CREATE SCHEMA X`.** So `drizzle` had to be created by
+   hand before the restore, or the restore puts nothing in it and says nothing about why.
+3. **Everything on the direct endpoint, never `-pooler`, and then clear up after the dump.** Afterwards
+   6 backends were terminated on the direct endpoint to flush the empty `search_path` every `pg_dump`
+   leaves behind (its line 16 is `set_config('search_path','',false)`), and the **pooled** host was
+   then checked five times in a row: `search_path` read `"$user", public` and an unqualified
+   `select count(*) from users` answered 18 every time. That is the exact failure which took the
+   preview app down on 2026-10-12, and it did not recur.
+
+**The restore was verified, not assumed.** Nine fingerprints — a count plus an md5 of ordered rows —
+compared between preview and production afterwards, **identical on every table but `sessions`**:
+`users` 18, `team_members` 18, `matches` 4, `match_events` 76, `ratings` 342,
+`match_player_positions` 57, `player_positions` 30, `match_squad` 37, `match_player_stats` 37. The
+before picture is what makes that mean something: `users` and `team_members` already had identical
+md5s on both sides — the same identities, which is why the swap was applicable at all — while **every
+behavioural table differed**. Production held 200 fabricated ratings against preview's 342 real ones,
+3 position wishes against 30, and Bayern still `live` rather than `finished`.
+
+**Then behaviour, in a real browser against `https://7orteils.bgonzva.fr`, logged in at 390 px rather
+than read off status codes.** Login landed off `/connexion`; `/`, `/calendrier`, `/equipe`, `/stats`
+and `/moi` each rendered their own heading (« Calendrier », « Les 7 orteils de la main »,
+« Statistiques », « admin »), no error on any page, none bouncing back to the login form. The three
+finished matches show **3–9** (Galacticos de Balard), **3–2** (FC Hexagone) and **2–5** (Bayern
+Barbecue Club), on `/match/<id>` and on `/match/<id>/recap` alike; Atletico supporters de Nice
+(13/10 18:45) correctly shows **no score**, being still `scheduled`. « pas son poste » is gone from
+`/stats`. Galacticos records **four** goalkeepers — Léo M 20′, Samuel 19′, Lucas 11′, Thomas 10′,
+summing to the full 60 — and **Nicolas played DC 41′ and MC 9′ and never stood in goal**, which is
+precisely what production had wrong before the rebuild. All 15 members with positions have exactly one
+`primary`, the `docs/DATA_MODEL.md` invariant.
+
+**Decision 200 is now proved in production, on a real account.** It could not be at release time and
+the session said so rather than claiming the path worked: it had the teammates' bcrypt hashes and none
+of their plaintext passwords. On 2026-10-13 the account **`leo`** (Léo C) has moved from bcrypt to
+`$argon2`, having signed in with the password he knew from the old app. Production now holds
+`$2a$06$` ×1, `$2a$10$` ×13, `$argon2` ×4 (`admin`, `leo`, `potter`, `raphael`), and 6 live sessions
+with the newest at 07:41 on 13/10. The 14 accounts still on bcrypt: `benoit`, `charles`, `clement`,
+`edouard`, `leom`, `lucas`, `lucien`, `maxime`, `nicodeme`, `nicolas`, `pierre`, `remi`, `samuel`,
+`thomas`.
+
+**And the standing rule that comes out of all of it, decision 201.** The owner is using production as
+production from 2026-10-12, so **production is the authoritative copy of the team's season and preview
+is not**. Data flows **production → preview and never again preview → production**: a restore in that
+direction would now destroy real recorded football, and the Atletico match is played tonight. The
+2026-10-12 swap was the one-off migration of the rebuilt first three matches, the 342 real ratings and
+the inherited passwords, and it is spent. A session that wants real data restores production into
+preview or into a local database, works there, and carries the result over as a reviewed artefact the
+way `db/snapshots/matches-1-3-rebuilt.sql` was. The three scripts that refuse the production endpoint
+by name must keep refusing it.
+
+Files: `docs/DECISIONS.md` (201), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `db/snapshots/README.md`,
+`COORDINATION.md`. No source change, so no gate was owed beyond what `release.yml` had already run on
+the tag.

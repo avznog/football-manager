@@ -7795,3 +7795,49 @@ read both algorithms. The owner chose the third.
   owner's teammates have all signed in at least once.
 
 ---
+
+## 201 — Production is the authoritative copy, and data only ever flows production → preview
+
+**2026-10-13** · accepted · the owner has started using production as production · supersedes nothing;
+it ends the 2026-10-12 one-off swap rather than amending it · affects every `scripts/*.mts` that writes
+to a deployed database, and `db/snapshots/`
+
+**Since 2026-10-12 production holds the team's real season, and preview does not.** The owner is
+signing in at `7orteils.bgonzva.fr`, his teammates are signing in behind him (decision 200 is proved
+there on a real account), and the Atletico supporters de Nice match is played the evening of
+2026-10-13. From now on **a restore of preview over production destroys recorded football that exists
+nowhere else** — possibly within hours of this entry being written.
+
+So the direction is fixed, one way, and it is not a preference:
+
+- **production → preview is the only legal direction.** Restore production into preview, or into a
+  local database, as often as is useful. The reverse is never run again.
+- **The 2026-10-12 swap was a one-off, and it is spent.** It carried exactly three things into
+  production: the first three matches rebuilt from the owner's paper sheets (decisions 179 and 181),
+  the 342 real ratings that replaced 200 fabricated rows (decision 188), and the bcrypt hashes
+  imported from `info-radarlocal` (decision 200). All three were work that could only be done against
+  real identities and could not be redone cheaply; none of them is a reason to do it a second time.
+  Its own protections are worth keeping if anything like it is ever authorised again:
+  `pg_dump --exclude-table-data='public.sessions'`, because a session cookie in this app *is*
+  `sessions.id` and the dump would otherwise be a list of working bearer tokens, verified absent from
+  the table of contents before the restore; and only `public` and `drizzle` replaced, Neon's managed
+  `neon_auth` left untouched.
+- **What to do instead, when a session wants to work on real data.** Take production into preview or
+  into a local database and work there. Then carry the *result* to production as a reviewed artefact —
+  the way `db/snapshots/matches-1-3-rebuilt.sql` was written, rehearsed against a local restore of
+  production, and compared fingerprint by fingerprint before anybody proposed applying it — rather
+  than by overwriting production with the database you happened to be working in. A reviewed artefact
+  names what it changes; a restore names nothing and takes everything with it.
+- **The scripts already refuse production by name, and this decision is why they must keep doing so.**
+  `scripts/rebuild-matches.mts`, `scripts/assign-positions-from-play.mts` and
+  `scripts/import-passwords.mts` each refuse any `DATABASE_URL` that is not the Neon preview endpoint
+  or a localhost one, refuse the production endpoint by name, and refuse a `-pooler` host. That guard
+  was a precaution while production held nothing anybody owned. It is now the protection of the only
+  copy of the season, and removing it from any of the three — or writing a fourth script without it —
+  is a change to argue for in a new entry here, not a tidy-up.
+
+The operational rule that travels with all of this is unchanged and is in `COORDINATION.md`: dump,
+restore and migrate on the **direct** endpoint only, never through `-pooler`, and re-check
+`search_path` on the pooled host before believing the app is up.
+
+---
