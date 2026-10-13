@@ -113,8 +113,9 @@ where they disagree.**
   on `/joueur/[id]`. Only Lucas has them in production, so six of seven discs read « pas son poste »
   in every seven.
 - **Decision numbers in use**: 145–147 (the plan), 150–153, 155–166, 169–172. 148, 149, 154, 167 and
-  168 were reserved and never used; 173–178 are backlog 2. **The highest on `main` is 201** — the
-  production → preview rule above — so **the next free number is 202**. `grep -c '^## ' docs/DECISIONS.md`
+  168 were reserved and never used; 173–178 are backlog 2. **The highest on `main` is 202** — the cost of
+  the project is re-measured every session by `scripts/cost.mjs` and never hand-edited (issue #232) —
+  so **the next free number is 203**. `grep -c '^## ' docs/DECISIONS.md`
   on an up-to-date `main` is still the only answer worth believing.
 
 Keep it to these labelled lines, and keep them short. The 200 lines this section replaced were a

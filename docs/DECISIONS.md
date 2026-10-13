@@ -7841,3 +7841,42 @@ restore and migrate on the **direct** endpoint only, never through `-pooler`, an
 `search_path` on the pooled host before believing the app is up.
 
 ---
+
+## 202 — The cost is re-measured every session by a script, and `docs/COST.md` is a dated snapshot
+
+**2026-10-14** · accepted · the owner's request, issue #232 « Update the cost spent of the project
+every session » · affects `docs/COST.md`, `scripts/cost.mjs` and `CLAUDE.md`'s definition of done
+
+The owner wants to know what this project costs, and he wants the figure to be current rather than
+archaeology: « I need to know the cost of the project, so you need to update it frequently ».
+`docs/COST.md` had been written once, on 2026-10-05, and was nine days and $585.77 out of date by the
+time anybody looked at it again — which is exactly the failure mode of a number that lives only in
+prose.
+
+- **The measurement is a command, not a memory.** `node scripts/cost.mjs` prints every figure
+  `docs/COST.md` contains: the per-session costs from Claude Code's own `cost-state` records, the
+  denominators (commits, merged pull requests, tracked lines, days), the token split, and the
+  infrastructure checks it can actually make. Sessions in this repository share no memory, so a rule
+  of the form « remember to update the cost » is not implementable; a rule of the form « run this »
+  is. That is why the instrument is committed.
+- **The number is never hand-edited.** Every figure in `docs/COST.md` is the script's output or
+  arithmetic on it. A hand-written cost cannot be checked, and an unchecked cost is believed anyway,
+  which is worse than no cost at all.
+- **The refresh is in `CLAUDE.md`'s definition of done**, beside the roadmap, sessions and decisions
+  bullets. That list is read on every wake-up, and it is the only place a per-session obligation can
+  live and be seen.
+- **`docs/COST.md` is a dated snapshot**, like `COORDINATION.md`'s `## NOW` and unlike the rest of
+  `docs/`: it is expected to go stale, it names the day and the commit it was taken at, and it keeps
+  the previous snapshot's figures so the trend is readable. A cost with no denominator — 202 commits,
+  twenty-two days — says nothing, and a cost with no predecessor says nothing about where it is going.
+- **The figure is API list price on this machine only, and it is not an invoice.** It excludes the
+  other machine's sessions entirely, because transcripts are local and `COORDINATION.md` exists
+  precisely because the two machines cannot see each other. And a subscription is not a bill: if the
+  work was done under a Claude subscription, that money was never charged, and the honest total is the
+  pro-rated fee. `docs/COST.md` keeps those caveats next to the headline rather than in a footnote,
+  and the script prints its own « not measured » block for the same reason.
+- **One gap stays open and is stated rather than papered over**: Neon's plan is unverified, because
+  reading it needs a Neon API key nobody has. Holding the database connection strings is not the same
+  credential, and a Postgres password cannot read an account's billing.
+
+---
