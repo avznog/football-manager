@@ -2319,8 +2319,14 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       that share no memory. **$1332.82** across 6 sessions on 2026-10-14, `main` at `6d9bfdf`: 202
       commits, 198 merged pull requests, 99 312 tracked lines, 22 days — $6.60 per commit, $60.58 per
       day, against $747.05 and $57.47 per day at the 2026-10-05 snapshot. No session reports
-      `hasUnknownModelCost`, so it is an accounting and not an estimate; it is API list price on this
-      machine only, and the other machine's sessions are not in it
+      `hasUnknownModelCost`, so it is an accounting and not an estimate; it is API list price. That was
+      the Linux machine alone; **the macOS machine added $529.93 the same day**, so the headline is
+      **$1862.75** across 8 sessions — $9.22 per commit, $84.67 per day — and the script now finds the
+      transcripts from the home directory rather than a hard-coded `/home/bgonzva`, which on macOS
+      would have printed $0.00
+- [ ] **One macOS session, `1a3e8cd8` (2026-10-09 → 10-13), records `totalCostUSD: 0`** across 149
+      Opus 5.5 messages, so the total is a floor by its worth. Ran through a regional model id, which
+      is the likely cause and is not verified. The script deliberately does not estimate it
 - [ ] **Verify Neon's plan, and write it in `docs/COST.md` with the date.** It is the one
       infrastructure line that has never been checked, through two snapshots now, and the reason has
       not changed: reading an account's plan needs a **Neon API key**, which nobody has. Holding the

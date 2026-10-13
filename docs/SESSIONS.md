@@ -6210,3 +6210,40 @@ cannot tell which applies), and nobody's hours are counted on either side.
 Files: `docs/COST.md` (rewritten), `scripts/cost.mjs` (new), `CLAUDE.md` (definition of done),
 `docs/DECISIONS.md` (202), `docs/ROADMAP.md`, `COORDINATION.md`. No source change and no migration, so
 nothing was owed beyond the docs themselves.
+
+## 2026-10-14 — The macOS machine's share of the cost, added to #234 before it merged
+
+The owner asked for the open cost pull request (#234, written on the Linux machine) to be updated with
+what the project cost **on this computer**, the macOS one, and then merged.
+
+**The script as written would have measured nothing here.** `scripts/cost.mjs` globbed
+`/home/bgonzva/.claude/projects/…`, the Linux home, and on macOS that matches no file — so it would have
+printed **$0.00** with a table, a token split and every appearance of a measurement. It now builds the
+glob from `os.homedir()` and prints the hostname next to the date, so two runs cannot be mistaken for
+each other.
+
+**This machine: $529.93**, two sessions in one transcript directory (the main checkout). `e0c60542`
+ran 2026-09-22 → 2026-10-06 and is the whole of it; `1a3e8cd8` ran 2026-10-09 → 2026-10-13 and its two
+`cost-state` records both say **0** with `hasUnknownModelCost: false`, despite 149 `claude-opus-5-5`
+messages and three subagent worktrees. It ran through `eu.anthropic.claude-opus-5-5[1m]`, which is the
+likeliest reason it went unpriced; that is inferred and is said to be. Not estimated, on purpose. This
+session (`b90dfd89`) had no `cost-state` yet when the script ran, so it is not counted either.
+
+**Both machines: $1862.75** across 8 sessions — Linux $1332.82 (72 %), macOS $529.93 (28 %). $9.22 per
+commit, $9.41 per merged pull request, $0.0188 per line, $84.67 per day over 22 days. Tokens:
+11 590 319 output, 80 298 691 cache write, 2 185 966 021 cache read, 31 984 uncached input (0.0014 %).
+The macOS figure **cannot be placed either side of the 2026-10-05 snapshot** — a `cost-state` carries
+no timestamp — but its priced session ended on 2026-10-06, so nearly all of it predates that snapshot,
+which was therefore low by about that much. The « pace went up » comparison in `docs/COST.md` is kept
+and now says it is the Linux machine against itself.
+
+Two more things the script now prints in its « not measured » block, both found here: the token split
+reads `<session>.jsonl` and not `<session>/subagents/*.jsonl` (twenty on this machine), and a session
+can record $0 while its transcript holds priced messages. `docs/COST.md` keeps a row per machine, and
+**a refresh from one machine replaces only its own rows** — CLAUDE.md's bullet and decision 202 say so,
+because overwriting the table from one machine silently drops the other's share from the headline.
+Vercel reads `unread` here (no CLI login on this machine); the Linux run's `hobby` / `active` stands.
+
+Files: `scripts/cost.mjs`, `docs/COST.md`, `docs/DECISIONS.md` (202, amended before merge),
+`docs/ROADMAP.md`, `CLAUDE.md`, `COORDINATION.md`. `npx eslint scripts/cost.mjs` is clean; no source
+change, so no other gate was owed.

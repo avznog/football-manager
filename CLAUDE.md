@@ -148,7 +148,8 @@ calling `tsc` directly: `PageProps<"/route">` does not exist until the route typ
   extended if a decision was made
 - **`docs/COST.md` refreshed, every session, from `node scripts/cost.mjs`** — the owner asked to know
   what this project costs and to have it kept current (issue #232, decision 202). The number is never
-  hand-edited and never carried over from memory: run the script, paste what it says, date it
+  hand-edited and never carried over from memory: run the script, paste what it says, date it. It sees
+  only the machine it runs on, so update that machine's rows and keep the other machine's, dated
 - migrations committed alongside the schema change that produced them
 - **the work is committed and pushed to `origin`** — see below
 

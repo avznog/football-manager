@@ -11,9 +11,10 @@
  * nobody can reproduce rots into a number nobody believes, so every figure `docs/COST.md` prints is
  * this script's output or arithmetic on it. Run it, then update the file from what it says.
  *
- * It reads **only** things it can verify on this machine: Claude Code's own `cost-state` records,
- * git, the GitHub CLI and the Vercel CLI. It asserts nothing it cannot measure — see the « not
- * measured » block it prints at the end, which is the honest part.
+ * It reads **only** things it can verify on the machine it runs on: Claude Code's own `cost-state`
+ * records, git, the GitHub CLI and the Vercel CLI. Transcripts are local, so it prints **that
+ * machine's** share — run it on each machine and add the totals. It asserts nothing it cannot
+ * measure — see the « not measured » block it prints at the end, which is the honest part.
  *
  * ## The one trap
  *
@@ -27,9 +28,12 @@
 import { execFileSync } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { glob } from "node:fs/promises";
+import { homedir, hostname } from "node:os";
 import { createInterface } from "node:readline";
 
-const TRANSCRIPTS = "/home/bgonzva/.claude/projects/*football-manager*/*.jsonl";
+// The home directory, not a literal: the two machines are `/home/bgonzva` (Linux) and
+// `/Users/benjamingonzva` (macOS), and a hard-coded path silently measures $0 on the other one.
+const TRANSCRIPTS = `${homedir()}/.claude/projects/*football-manager*/*.jsonl`;
 /** The repository was created on this day; the first commit landed the day after. */
 const START = "2026-09-22";
 
@@ -130,7 +134,7 @@ if (vercelRaw) {
 // Europe/Paris, not UTC: late on a Paris evening the two disagree about the day, and every other
 // date in this repository is Paris (`CLAUDE.md`).
 const today = new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris" }).format(new Date());
-console.log(`\nmeasured ${today} · main ${head} · version ${version}\n`);
+console.log(`\nmeasured ${today} on ${hostname()} · main ${head} · version ${version}\n`);
 console.log("session   cost (USD)");
 console.log("--------  ----------");
 for (const [id, cost] of [...perSession].sort((a, b) => b[1] - a[1])) {
@@ -159,7 +163,12 @@ console.log(`workflow runs      ${runs}, ~${seconds}s average → ~${Math.round(
 
 console.log(`
 not measured, and do not let the table imply otherwise:
-  - the other machine's sessions (transcripts are local — COORDINATION.md)
+  - any other machine's sessions: transcripts are local (COORDINATION.md), so run
+    this on each machine and add the totals — docs/COST.md keeps one row per machine
+  - subagent tokens: the token split reads <session>.jsonl, not <session>/subagents/
+    (totalCostUSD is the session's own running total, believed but not checked to include them)
+  - a session whose cost-state says 0 while its transcript holds priced messages, and
+    the session running this script, whose cost-state may not exist yet
   - whether any of this was actually billed: totalCostUSD is API list price, and a
     subscription is not a bill
   - Neon's plan, which needs a Neon API key this script does not have

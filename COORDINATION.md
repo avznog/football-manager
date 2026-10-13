@@ -1675,3 +1675,10 @@ nothing here needs rewriting — it is dated history either way.
   `<PositionPicker … readOnly />` with « Chaque joueur choisit ses postes lui-même. » below the fold
   (`positions-editor.tsx:66`). Next: nothing open from this work. **`package.json` is `1.0.0-beta.8` and
   the tag is still uncut**, so #150's three migrations and this all ship together when the owner cuts it.
+
+### From the macOS machine (`/Users/benjamingonzva`)
+
+- **2026-10-14 · macOS · `docs/cost-every-session`** — Ran `scripts/cost.mjs` here at the owner's
+  request and added this machine's **$529.93** to #234, so `docs/COST.md`'s headline is **$1862.75**
+  for both machines. The script had `/home/bgonzva` hard-coded and would have printed $0 on macOS; it
+  now uses the home directory. **When you refresh the cost, replace only your own machine's rows.**

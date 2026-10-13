@@ -7869,9 +7869,12 @@ prose.
   `docs/`: it is expected to go stale, it names the day and the commit it was taken at, and it keeps
   the previous snapshot's figures so the trend is readable. A cost with no denominator — 202 commits,
   twenty-two days — says nothing, and a cost with no predecessor says nothing about where it is going.
-- **The figure is API list price on this machine only, and it is not an invoice.** It excludes the
-  other machine's sessions entirely, because transcripts are local and `COORDINATION.md` exists
-  precisely because the two machines cannot see each other. And a subscription is not a bill: if the
+- **The figure is API list price, measured one machine at a time, and it is not an invoice.**
+  Transcripts are local and `COORDINATION.md` exists precisely because the two machines cannot see
+  each other, so the script prints only the share of the machine it runs on. `docs/COST.md` keeps one
+  set of rows per machine and a refresh replaces only its own machine's, keeping the other's with its
+  date: the first snapshot under this rule was the Linux machine alone, and the macOS machine added
+  $529.93 to it the same day. And a subscription is not a bill: if the
   work was done under a Claude subscription, that money was never charged, and the honest total is the
   pro-rated fee. `docs/COST.md` keeps those caveats next to the headline rather than in a footnote,
   and the script prints its own « not measured » block for the same reason.

@@ -4,10 +4,12 @@ Measured on **2026-10-14**, with `main` at `6d9bfdf` (version `1.0.1`, 202 commi
 requests, 99 312 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
 2026-09-22 and its first commit landed on 2026-09-23, so everything below covers **twenty-two days**.
 
-**The headline, and read the next sentence with it: $1332.82.** That is the cost of the model tokens
-this project consumed, **at API list prices, on this machine only**. It is not an invoice, nobody
-necessarily paid it, and the three sections after the table are not footnotes — they are the
-difference between this figure and what left anyone's bank account.
+**The headline, and read the next sentence with it: $1862.75.** That is the cost of the model tokens
+this project consumed, **at API list prices, on both machines** — $1332.82 on the Linux one
+(`/home/bgonzva`) and $529.93 on the macOS one (`/Users/benjamingonzva`), each measured by running
+`node scripts/cost.mjs` there. It is not an invoice, nobody necessarily paid it, it is still a floor
+(one macOS session reports $0, see below), and the sections after the table are not footnotes — they
+are the difference between this figure and what left anyone's bank account.
 
 **This file is re-measured every session** (decision 202, issue #232): `node scripts/cost.mjs` prints
 every figure in it. It is a snapshot, and the measurement is a command precisely because a snapshot
@@ -17,25 +19,49 @@ rots.
 
 ## The measured figure
 
-| session | where it ran | cost (USD) |
-|---|---|---|
-| `7054d16c` | the main checkout | 1048.85 |
-| `62dacd8d` | worktree `binary-spinning-hickey` | 152.34 |
-| `efba1c3d` | worktree `ux-analyser` | 96.63 |
-| `cbd8a8a5` | worktree `iphone-analyser` | 31.50 |
-| `7dc058d6` | `tmp/football-manager` | 3.49 |
-| `81055d9b` | `tmp/football-manager` | 0.01 |
-| **total** | **6 sessions** | **1332.82** |
+| session | machine | where it ran | cost (USD) |
+|---|---|---|---|
+| `7054d16c` | Linux | the main checkout | 1048.85 |
+| `e0c60542` | macOS | the main checkout, 2026-09-22 → 2026-10-06 | 529.93 |
+| `62dacd8d` | Linux | worktree `binary-spinning-hickey` | 152.34 |
+| `efba1c3d` | Linux | worktree `ux-analyser` | 96.63 |
+| `cbd8a8a5` | Linux | worktree `iphone-analyser` | 31.50 |
+| `7dc058d6` | Linux | `tmp/football-manager` | 3.49 |
+| `81055d9b` | Linux | `tmp/football-manager` | 0.01 |
+| `1a3e8cd8` | macOS | the main checkout, 2026-10-09 → 2026-10-13 | 0.00 — **reported, not real** |
+| **total** | | **8 sessions** | **1862.75** |
+
+The Linux machine is **$1332.82 (72 %)** and the macOS machine **$529.93 (28 %)**.
+
+**`1a3e8cd8` is the one figure in the table that is wrong, and it is wrong low.** Both of its
+`cost-state` records say `totalCostUSD: 0` with `hasUnknownModelCost: false`, yet its transcript holds
+149 `claude-opus-5-5` messages — 104 440 output tokens, 1.10 million cache writes, 11.3 million cache
+reads — and three subagent worktrees. The session ran through a regional model id
+(`eu.anthropic.claude-opus-5-5[1m]`), which is the likeliest reason it went unpriced, but that is
+inferred, not checked. The script does not estimate a price for it, on purpose: it is an accounting,
+and an invented number would be the first thing in it nobody could re-derive. Read the total as a
+floor by that session's worth, which its token counts put at a small fraction of `e0c60542`'s.
+
+The session that wrote this refresh (`b90dfd89`, macOS, 2026-10-14) is not in the table either: a
+session's `cost-state` is written as it goes, and none existed yet when the script ran. The next
+refresh on this machine picks it up.
 
 Divided by what it bought, which is the only form of this number that is any use when deciding
 whether to spend more:
 
-- **$6.60 per commit** (202)
-- **$6.73 per merged pull request** (198)
-- **$0.0134 per line** of committed TypeScript, SQL, CSS and Markdown — still under two cents
-- **$60.58 per day** across the twenty-two days
+- **$9.22 per commit** (202) — the Linux machine alone was $6.60
+- **$9.41 per merged pull request** (198) — was $6.73
+- **$0.0188 per line** of committed TypeScript, SQL, CSS and Markdown — still under two cents
+- **$84.67 per day** across the twenty-two days — was $60.58
 
 ### Against the last snapshot, which is the only way to read the trend
+
+**This comparison is the Linux machine against itself**, because the 2026-10-05 snapshot was taken
+there and nowhere else. The macOS figure cannot be split across that date: a `cost-state` record
+carries no timestamp, only a running total. What can be said is that its one priced session ran from
+2026-09-22 to 2026-10-06, so nearly all of its $529.93 belongs *before* the last snapshot — the
+2026-10-05 figure was low by roughly that much, and the combined pace was front-loaded rather than
+accelerating.
 
 The 2026-10-05 measurement was **$747.05** over thirteen days, at `0e5b619` / `1.0.0-beta.7`, with
 149 commits and 147 merged pull requests. So the nine days since added **$585.77**, **53 commits** and
@@ -51,13 +77,14 @@ FSGT.
 ### How to re-derive it rather than trusting this file
 
 ```bash
-node scripts/cost.mjs
+node scripts/cost.mjs     # on each machine, then add the totals
 ```
 
 Claude Code writes a `cost-state` record into its own transcript as it goes. Each one carries a
-running `totalCostUSD` for that session and a `hasUnknownModelCost` flag; **all six sessions here
+running `totalCostUSD` for that session and a `hasUnknownModelCost` flag; **all eight sessions
 report `false`**, which is what makes the figure an accounting rather than an estimate — no message
-was priced at a rate the tool did not know.
+was priced at a rate the tool did not know. `1a3e8cd8` shows that the flag is not the whole story: a
+session can report `false` and still record nothing.
 
 The script exists because that record has one trap in it, and it is the kind that produces a confident
 wrong number. `totalCostUSD` is **cumulative** and is rewritten through the session, so the **last**
@@ -65,46 +92,56 @@ record per `sessionId` is the session's cost and summing every record double-cou
 session is filed under the directory it ran in — five transcript directories match this project, the
 main checkout, three `.claude/worktrees/*` and `tmp/football-manager` — so a glob over
 `~/.claude/projects/*football-manager*` is the right instrument and `ls` on one directory is not.
+The glob starts from the **home directory, not a literal**: the first version of the script
+hard-coded `/home/bgonzva`, and on the macOS machine it would have found no transcript at all and
+printed **$0.00** with every appearance of a measurement.
 
 ### Where the tokens went, which is the interesting part
 
-| | tokens |
-|---|---|
-| output | 7 750 952 |
-| cache write | 64 671 018 |
-| cache read | 1 547 119 669 |
-| input, uncached | 19 552 |
+| | Linux | macOS | both |
+|---|---|---|---|
+| output | 7 750 952 | 3 839 367 | 11 590 319 |
+| cache write | 64 671 018 | 15 627 673 | 80 298 691 |
+| cache read | 1 547 119 669 | 638 846 352 | 2 185 966 021 |
+| input, uncached | 19 552 | 12 432 | 31 984 |
 
-**Uncached input is 0.0012 % of all input.** Essentially every request read its context from the
-prompt cache instead of paying full rate for it, and that is the single reason the total is $1332 and
+These count the sessions' own transcripts and **not their subagents'**, which Claude Code files under
+`<session>/subagents/` where the script's glob does not reach (twenty of them on macOS alone). The
+dollar figures are each session's own running total, which is believed — not checked — to include its
+subagents, so the token table is the smaller of the two measurements and should not be priced by hand
+to second-guess the dollar one.
+
+**Uncached input is 0.0014 % of all input.** Essentially every request read its context from the
+prompt cache instead of paying full rate for it, and that is the single reason the total is $1862 and
 not several times that: a cache read costs a fraction of a fresh input token, and this project read
-1.55 **billion** of them against 64.7 million written. The practical consequence for anyone working
+2.19 **billion** of them against 80.3 million written. The practical consequence for anyone working
 here is that **long sessions are cheap and cold starts are not** — the expensive act is
 re-establishing context, not continuing to use it.
 
-Output is the other half of the bill and it is the half that correlates with work actually done: 7.75
-million output tokens across 9 772 assistant messages.
+Output is the other half of the bill and it is the half that correlates with work actually done: 11.6
+million output tokens across 15 981 assistant messages (9 772 on Linux, 6 209 on macOS).
 
 ---
 
 ## What this number does not include
 
-### 1. The other machine
+### 1. A machine that has not run the script
 
 `COORDINATION.md` exists because **more than one session works this repository, sometimes on
-machines that cannot see each other at all.** Transcripts are local, so a session that ran on the
-other machine left its `cost-state` records there. Of the 198 merged pull requests, several are
-recorded in `docs/SESSIONS.md` as the other machine's work, and **none of their cost is in the table
-above**.
+machines that cannot see each other at all.** Transcripts are local, so each machine's `cost-state`
+records exist only on that machine, and the script can only ever print **its own machine's** share.
 
-So $1332.82 is a floor, not a total. To close the gap, run `node scripts/cost.mjs` on the other
-machine and add the two.
+Both known machines are now in the table — the macOS one was added on 2026-10-14 by running the
+script there. **A refresh from one machine must keep the other machine's last figure** and say how
+old it is, rather than drop it: replacing the whole table with one machine's output would quietly
+take $529.93 or $1332.82 off the headline. If a third machine ever works here, it is absent until it
+runs the script.
 
 ### 2. A subscription is not a bill
 
 `totalCostUSD` is computed from token counts at **API list prices**. If the work was done under a
 Claude subscription rather than API billing, that money was never charged — the real outlay was the
-subscription fee for the period, and $1332.82 is then better read as *what this project would have
+subscription fee for the period, and $1862.75 is then better read as *what this project would have
 cost at list prices*, which is a useful number for a different question (is this worth automating,
 what would it cost someone else) and the wrong one for « what did I spend ».
 
@@ -155,7 +192,8 @@ It is a snapshot, like `COORDINATION.md`'s `## NOW` and unlike the rest of `docs
 the same way. Three rules, and the first is now in `CLAUDE.md`'s definition of done:
 
 1. **Refresh it every session.** The owner asked for the cost to be known and current (issue #232,
-   decision 202). A session that changed anything runs the script and updates this file.
+   decision 202). A session that changed anything runs the script and updates **its own machine's
+   rows** in this file, keeping the other machine's last figures and their date.
 2. **Run `node scripts/cost.mjs`, do not edit the number.** Every figure above is either that
    script's output or arithmetic on one, which is why the script is in the repository rather than in
    somebody's shell history.
