@@ -6152,3 +6152,98 @@ by name must keep refusing it.
 Files: `docs/DECISIONS.md` (201), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `db/snapshots/README.md`,
 `COORDINATION.md`. No source change, so no gate was owed beyond what `release.yml` had already run on
 the tag.
+
+## 2026-10-14 — What the project costs, measured by a script and owed every session
+
+The owner opened issue **#232**, « Update the cost spent of the project every session »: « I need to
+know the cost of the project, so you need to update it frequently ». `docs/COST.md` existed but was a
+single snapshot dated 2026-10-05, nine days and $585.77 stale, which is what a number written once in
+prose does in a repository whose sessions share no memory.
+
+**The instrument is now committed: `scripts/cost.mjs`.** It prints every figure the file holds — the
+per-session costs read out of Claude Code's own `cost-state` records, the denominators from git and
+`gh`, the token split, and the infrastructure it can actually check (`vercel api /v2/user`,
+`gh repo view --json visibility`, `gh run list`). It supersedes the inline python snippet the file used
+to carry. Two traps are in its header comment because both produce a confident wrong answer:
+`totalCostUSD` is **cumulative** and rewritten through a session, so the **last** record per
+`sessionId` is that session's cost and summing every record double-counts wildly; and a session is
+filed under the directory it ran in, so five transcript directories match this project — the main
+checkout, three `.claude/worktrees/*` and `tmp/football-manager` — and a glob is the right instrument
+where one `ls` is not.
+
+**The headline, measured 2026-10-14 with `main` at `6d9bfdf` and version `1.0.1`: $1332.82**, across
+6 sessions. Denominators, because a cost without them says nothing: **202 commits**, **198 merged pull
+requests**, **99 312 lines** of tracked `.ts`/`.tsx`/`.sql`/`.css`/`.md`, **22 days** since the
+repository was created. That is **$6.60 per commit**, **$6.73 per merged pull request**, **$0.0134 per
+line** and **$60.58 per day**. **No session reports `hasUnknownModelCost`**, so it is an accounting and
+not an estimate. Tokens: 7 750 952 output, 64 671 018 cache write, 1 547 119 669 cache read, and
+**19 552 uncached input — 0.0012 % of all input**, which is the whole reason the total is $1332 and not
+several times it. 9 772 assistant messages carried usage.
+
+**Against the previous snapshot**, which is the part worth keeping: 2026-10-05 measured **$747.05**
+over thirteen days at `0e5b619` / `1.0.0-beta.7`, 149 commits and 147 merged pull requests. The nine
+days since added **$585.77**, 53 commits and 51 merged pull requests — **$65.09 per day** in that
+window against **$57.47** before it, so the pace went up. What it bought: the thirteen-slice
+cahier-des-charges rework, backlogs 3 and 4, the first three matches rebuilt from the owner's paper
+sheets, the 342 real ratings recovered from the old app, `v1.0.0` and `v1.0.1`, production becoming the
+team's real season, and the eighteen championship fixtures imported from the FSGT.
+
+**Infrastructure, re-measured and still zero where it can be checked.** Vercel is `hobby` / `active`,
+so **$0**. GitHub Actions is **$0** because the repository is **public** and standard runners have no
+minute cap there — but the usage has grown to **462 workflow runs** (was 343), ~194 s average, roughly
+**1 494 minutes** (was ~1 130), which is the bill the day it is made private and no longer far from the
+2 000-minute allowance. **Neon is still unverified, for the same reason as last time and stated rather
+than hedged**: this session holds the *database* connection strings and **no Neon API key**, and a
+Postgres password cannot read an account's plan. The domain is unchanged — `bgonzva.fr` is shared with
+the `portfolio` project and attributed here at zero by convention, said out loud so a reader knows it
+is a choice.
+
+**Decision 202 is the rule, and `CLAUDE.md` is where it bites.** The refresh is now a bullet in the
+definition of done beside the roadmap/sessions/decisions one: `docs/COST.md` is refreshed every session
+from `node scripts/cost.mjs`, and the number is never hand-edited. That is the half of the issue that
+actually satisfies it — a per-session obligation has to live in the file every session reads, because
+« remember to update the cost » is not implementable for sessions with no memory. The file keeps its
+three caveats next to the headline rather than in footnotes: the other machine's sessions are not in
+it, a subscription is not a bill (`totalCostUSD` is API list price either way, and the transcript
+cannot tell which applies), and nobody's hours are counted on either side.
+
+Files: `docs/COST.md` (rewritten), `scripts/cost.mjs` (new), `CLAUDE.md` (definition of done),
+`docs/DECISIONS.md` (202), `docs/ROADMAP.md`, `COORDINATION.md`. No source change and no migration, so
+nothing was owed beyond the docs themselves.
+
+## 2026-10-14 — The macOS machine's share of the cost, added to #234 before it merged
+
+The owner asked for the open cost pull request (#234, written on the Linux machine) to be updated with
+what the project cost **on this computer**, the macOS one, and then merged.
+
+**The script as written would have measured nothing here.** `scripts/cost.mjs` globbed
+`/home/bgonzva/.claude/projects/…`, the Linux home, and on macOS that matches no file — so it would have
+printed **$0.00** with a table, a token split and every appearance of a measurement. It now builds the
+glob from `os.homedir()` and prints the hostname next to the date, so two runs cannot be mistaken for
+each other.
+
+**This machine: $529.93**, two sessions in one transcript directory (the main checkout). `e0c60542`
+ran 2026-09-22 → 2026-10-06 and is the whole of it; `1a3e8cd8` ran 2026-10-09 → 2026-10-13 and its two
+`cost-state` records both say **0** with `hasUnknownModelCost: false`, despite 149 `claude-opus-5-5`
+messages and three subagent worktrees. It ran through `eu.anthropic.claude-opus-5-5[1m]`, which is the
+likeliest reason it went unpriced; that is inferred and is said to be. Not estimated, on purpose. This
+session (`b90dfd89`) had no `cost-state` yet when the script ran, so it is not counted either.
+
+**Both machines: $1862.75** across 8 sessions — Linux $1332.82 (72 %), macOS $529.93 (28 %). $9.22 per
+commit, $9.41 per merged pull request, $0.0188 per line, $84.67 per day over 22 days. Tokens:
+11 590 319 output, 80 298 691 cache write, 2 185 966 021 cache read, 31 984 uncached input (0.0014 %).
+The macOS figure **cannot be placed either side of the 2026-10-05 snapshot** — a `cost-state` carries
+no timestamp — but its priced session ended on 2026-10-06, so nearly all of it predates that snapshot,
+which was therefore low by about that much. The « pace went up » comparison in `docs/COST.md` is kept
+and now says it is the Linux machine against itself.
+
+Two more things the script now prints in its « not measured » block, both found here: the token split
+reads `<session>.jsonl` and not `<session>/subagents/*.jsonl` (twenty on this machine), and a session
+can record $0 while its transcript holds priced messages. `docs/COST.md` keeps a row per machine, and
+**a refresh from one machine replaces only its own rows** — CLAUDE.md's bullet and decision 202 say so,
+because overwriting the table from one machine silently drops the other's share from the headline.
+Vercel reads `unread` here (no CLI login on this machine); the Linux run's `hobby` / `active` stands.
+
+Files: `scripts/cost.mjs`, `docs/COST.md`, `docs/DECISIONS.md` (202, amended before merge),
+`docs/ROADMAP.md`, `CLAUDE.md`, `COORDINATION.md`. `npx eslint scripts/cost.mjs` is clean; no source
+change, so no other gate was owed.

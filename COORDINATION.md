@@ -113,8 +113,9 @@ where they disagree.**
   on `/joueur/[id]`. Only Lucas has them in production, so six of seven discs read « pas son poste »
   in every seven.
 - **Decision numbers in use**: 145–147 (the plan), 150–153, 155–166, 169–172. 148, 149, 154, 167 and
-  168 were reserved and never used; 173–178 are backlog 2. **The highest on `main` is 201** — the
-  production → preview rule above — so **the next free number is 202**. `grep -c '^## ' docs/DECISIONS.md`
+  168 were reserved and never used; 173–178 are backlog 2. **The highest on `main` is 202** — the cost of
+  the project is re-measured every session by `scripts/cost.mjs` and never hand-edited (issue #232) —
+  so **the next free number is 203**. `grep -c '^## ' docs/DECISIONS.md`
   on an up-to-date `main` is still the only answer worth believing.
 
 Keep it to these labelled lines, and keep them short. The 200 lines this section replaced were a
@@ -1674,3 +1675,10 @@ nothing here needs rewriting — it is dated history either way.
   `<PositionPicker … readOnly />` with « Chaque joueur choisit ses postes lui-même. » below the fold
   (`positions-editor.tsx:66`). Next: nothing open from this work. **`package.json` is `1.0.0-beta.8` and
   the tag is still uncut**, so #150's three migrations and this all ship together when the owner cuts it.
+
+### From the macOS machine (`/Users/benjamingonzva`)
+
+- **2026-10-14 · macOS · `docs/cost-every-session`** — Ran `scripts/cost.mjs` here at the owner's
+  request and added this machine's **$529.93** to #234, so `docs/COST.md`'s headline is **$1862.75**
+  for both machines. The script had `/home/bgonzva` hard-coded and would have printed $0 on macOS; it
+  now uses the home directory. **When you refresh the cost, replace only your own machine's rows.**
