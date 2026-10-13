@@ -1,0 +1,26 @@
+{
+  "source": "http://www.footidf.fr/calendriers.php?e=14933 — the FSGT IDF calendar of « LES 7 ORTEILS DE LA MAIN », group FOOT A 7 · MARDI · Groupe B (g=7870), team e=14933",
+  "readOn": "2026-10-13",
+  "competition": "Ligue",
+  "note": "The 18 championship rounds. The four Coupe Automne ties of the same calendar (22/09, 29/09, 06/10, 13/10) are already in the database and are deliberately absent here. Times are Europe/Paris local; the importer converts them, so the DST change on 2026-10-25 is handled by Postgres rather than by hand. « home » is the FSGT listing order — the team it lists first — which agrees with how the four played matches are already recorded; the team has no ground of its own (« SANS TERRAIN - VOIR COMITE 75 »), so the venue is what actually matters.",
+  "fixtures": [
+    { "round": 1, "date": "2026-10-20", "time": "21:05", "opponent": "Coptic Team C", "isHome": true, "venue": "Choisy 21 B" },
+    { "round": 2, "date": "2026-10-27", "time": "19:45", "opponent": "FC Copains du Dimanche", "isHome": false, "venue": "Choisy 23 B" },
+    { "round": 3, "date": "2026-11-03", "time": "19:45", "opponent": "Paris Boys AS", "isHome": true, "venue": "Choisy 23 B" },
+    { "round": 4, "date": "2026-11-10", "time": "21:05", "opponent": "Grand Paris Football Club", "isHome": false, "venue": "Choisy 3 A" },
+    { "round": 5, "date": "2026-11-17", "time": "21:05", "opponent": "Inter Minable", "isHome": true, "venue": "Choisy 3 B" },
+    { "round": 6, "date": "2026-11-24", "time": "21:05", "opponent": "Minchester Paris", "isHome": false, "venue": "Choisy 21 A" },
+    { "round": 7, "date": "2026-12-01", "time": "19:45", "opponent": "Payots FC", "isHome": false, "venue": "Choisy 3 B" },
+    { "round": 8, "date": "2026-12-08", "time": "19:45", "opponent": "UEASASFC", "isHome": true, "venue": "Choisy 23 A" },
+    { "round": 9, "date": "2026-12-15", "time": "20:45", "opponent": "Allez Football Club", "isHome": false, "venue": "Île de Puteaux 3A" },
+    { "round": 10, "date": "2027-01-12", "time": "20:45", "opponent": "Coptic Team C", "isHome": false, "venue": "Île de Puteaux 3A" },
+    { "round": 11, "date": "2027-01-19", "time": "19:45", "opponent": "FC Copains du Dimanche", "isHome": true, "venue": "Île de Puteaux 3A" },
+    { "round": 12, "date": "2027-01-26", "time": "21:05", "opponent": "Paris Boys AS", "isHome": false, "venue": "Choisy 3 B" },
+    { "round": 13, "date": "2027-02-16", "time": "20:45", "opponent": "Grand Paris Football Club", "isHome": true, "venue": "Île de Puteaux 3A" },
+    { "round": 14, "date": "2027-02-23", "time": "19:45", "opponent": "Inter Minable", "isHome": false, "venue": "Choisy 3 B" },
+    { "round": 15, "date": "2027-03-09", "time": "19:45", "opponent": "Minchester Paris", "isHome": true, "venue": "Choisy 21 B" },
+    { "round": 16, "date": "2027-03-16", "time": "19:45", "opponent": "Payots FC", "isHome": true, "venue": "Île de Puteaux 3A" },
+    { "round": 17, "date": "2027-03-23", "time": "21:05", "opponent": "UEASASFC", "isHome": false, "venue": "Choisy 21 B" },
+    { "round": 18, "date": "2027-03-30", "time": "21:05", "opponent": "Allez Football Club", "isHome": true, "venue": "Choisy 3 B" }
+  ]
+}
