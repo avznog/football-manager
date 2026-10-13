@@ -2065,8 +2065,15 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       **181**). Not 179's one-rule alternative: the log keeps the paper's wings, and `pitchEventFr`
       stops calling a slot change a change of post. 11 lines before (1 · 6 · 4), 0 after, counted on
       the three rebuilt matches both times
-- [ ] **Open for the owner · production.** Decision 179 is preview-only by its own guard. The
-      rehearsal is now done and reversible; running it on production is his word plus a code change
+- [x] **Production has it — 2026-10-12.** Not by running the script there and not by applying
+      `db/snapshots/matches-1-3-rebuilt.sql`: production was restored from preview whole, at 19:52
+      Paris, after a full backup of it was taken. Nine fingerprints compared afterwards are identical
+      on both sides on every table but `sessions`, and the three matches read 3–9, 3–2 and 2–5 in the
+      browser on production, with Galacticos' four goalkeepers and Nicolas never in goal. Decision
+      **201** is the rule that follows: that swap was a one-off and the direction is now
+      production → preview only. `scripts/rebuild-matches.mts` and
+      `scripts/assign-positions-from-play.mts` still refuse the production endpoint by name, and are
+      to keep refusing it
 
 ## From the owner's third backlog — 2026-10-12
 
@@ -2132,8 +2139,11 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       restated. Idempotent: the old note `id` is the row's `id` and `created_at` is carried over, so a
       second `--commit` leaves the fingerprint at `b9229c86789fb489`. Looked at at 390 px in both
       themes on the deployed preview, Galacticos published and Bayern hidden
-      (`audit/ratings-import/`). **Production still holds the fabrication**; applying this there is
-      the owner's deliberate act
+      (`audit/ratings-import/`). **Production has the 342 real notes since 2026-10-12**, carried by
+      the one-off restore from preview rather than by running the importer there: the `ratings`
+      fingerprint is identical on both sides, 342 rows against the 200 fabricated ones production
+      held. Decision **201** closes that route — production is the authoritative copy now, and no
+      dump goes that way again
 
 ## From the owner's fourth backlog — 2026-10-12
 
@@ -2283,8 +2293,18 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       request, once, the first time its owner signs in. `hashPassword` stays argon2id only: bcrypt
       is read here and never written. A failed upgrade is swallowed and logged without the password,
       the hash or the Drizzle error, because the user has already proved the password
+- [x] **The hashes are imported** — 15 bcrypt hashes exported from `info-radarlocal` (Supabase)
+      written onto the matching accounts by `scripts/import-passwords.mts`. `potter` (the owner's own)
+      and `admin` (the super admin) excluded at the owner's request; `raphael` **does not exist in the
+      old app**, so his hash was left as production's own rather than invented. They reached production
+      with the 2026-10-12 restore from preview (decision **201**), not by running the script there —
+      it refuses the production endpoint by name, and must keep doing so
 - [ ] **Delete the bcrypt branch when nothing needs it.** `select count(*) from users where
       password_hash like '$2%'` on production is the whole test; when it answers zero, the branch,
       `@node-rs/bcrypt` and the `needsUpgrade` field all go and `verifyPassword` is a boolean again.
-      Deliberately not automated — it is a deletion to make once the owner's teammates have each
-      signed in at least once
+      **It answers 14 as of 2026-10-13** — was 15; `leo` has signed in with the password he knew from
+      the old app and his row is `$argon2` now, which is decision 200 proved in production on a real
+      account. Still on bcrypt: `benoit`, `charles`, `clement`, `edouard`, `leom`, `lucas`, `lucien`,
+      `maxime`, `nicodeme`, `nicolas`, `pierre`, `remi`, `samuel`, `thomas`.
+      Deliberately not automated — **nothing counts down to zero and nothing will tell you it has** —
+      it is a deletion to make once the owner's teammates have each signed in at least once

@@ -16,6 +16,33 @@ appended to and never edited.** Those are the two halves of the protocol, and th
 interchangeable: this section says what is *true now*, the Log says what *happened*. So when you change
 a fact here you still leave a dated line in your own Log lane.
 
+**2026-10-13 — read this block first. It is the newest, and where the blocks below disagree with it
+they are stale.**
+
+- **Production is live and in real use, since 2026-10-12.** The owner signs in at
+  `7orteils.bgonzva.fr`, his teammates sign in behind him, and the Atletico supporters de Nice match
+  is played the evening of 13/10. **Production is therefore the authoritative copy of the season and
+  preview is not.**
+- **Never restore preview over production. Ever again** (decision **201**). The data direction is
+  one-way, **production → preview**, and a restore the other way would now destroy recorded football
+  that exists nowhere else. The 2026-10-12 swap was a one-off that carried the rebuilt first three
+  matches, the 342 real ratings and the inherited bcrypt hashes into production, and it is **spent**.
+  If you want real data: restore production into preview or into a local database, work there, and
+  carry the result back as a reviewed artefact the way `db/snapshots/matches-1-3-rebuilt.sql` was —
+  never by overwriting. `scripts/rebuild-matches.mts`, `scripts/assign-positions-from-play.mts` and
+  `scripts/import-passwords.mts` all refuse the production endpoint by name; that is the protection
+  now, not a precaution.
+- **The shipped tag is `v1.0.1`**, hand-cut on `4c0dd85` (the squash of #230, decision 200 — a
+  password from the old app works and becomes argon2 on first use). `release.yml` ran green end to
+  end. **No migration in it**: production is at **15** migration rows, through `0014`, which is the
+  committed head — so the « production is still at 11 » line further down is stale.
+- **Three operational facts if you touch a deployed database.** Neon now serves PostgreSQL **18.6**,
+  so `pg_dump`/`pg_restore` must be **18** — a 17.3 client refuses with « aborting because of server
+  version mismatch »; a `postgres:18` Docker container is the cheap answer. `pg_restore --schema=X`
+  filters out its own `CREATE SCHEMA X`, so create the schema by hand first. And still: direct
+  endpoint only, never `-pooler`, then terminate the backends and re-check `search_path` **on the
+  pooled host** before believing the app is up.
+
 **2026-10-09, evening — read this block first; the lines under it predate the rework and are stale
 where they disagree.**
 
@@ -86,7 +113,9 @@ where they disagree.**
   on `/joueur/[id]`. Only Lucas has them in production, so six of seven discs read « pas son poste »
   in every seven.
 - **Decision numbers in use**: 145–147 (the plan), 150–153, 155–166, 169–172. 148, 149, 154, 167 and
-  168 were reserved and never used; 173–178 are backlog 2; the next free number is **179**.
+  168 were reserved and never used; 173–178 are backlog 2. **The highest on `main` is 201** — the
+  production → preview rule above — so **the next free number is 202**. `grep -c '^## ' docs/DECISIONS.md`
+  on an up-to-date `main` is still the only answer worth believing.
 
 Keep it to these labelled lines, and keep them short. The 200 lines this section replaced were a
 beautifully written snapshot from 2026-09-23 that nobody updated, because updating it meant re-reading
