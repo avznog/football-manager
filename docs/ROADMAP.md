@@ -2356,3 +2356,26 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       who never played in that version. The guard worked; what it found is that preview has drifted.
       Until the refresh happens, every ratings import against preview keeps refusing. **Not started:
       it overwrites preview, so it waits on the owner's go-ahead**
+
+## The fifth backlog: the frequency boards are about time on the pitch — 2026-10-15
+
+- [x] **« Qui marque le plus souvent » and « Qui fait marquer le plus souvent » divide by the outfield
+      minutes** (decision **203**, which narrows decision 197's denominator). The owner: « il faut
+      exclure le temps joué au goal, c'est le nombre de buts mis par temps de jeu sur le terrain »,
+      « Idem pour les passes décisives ». Two call sites in `seasonStats` now pass `outfieldMinutes`,
+      the figure rules 10, 177 and 196 already rank on, so no new quantity was invented. Both
+      subtitles say « …toutes les X minutes sur le terrain, hors temps au goal », reusing the
+      vocabulary `/stats` already had for the two populations, because a card whose words outlive its
+      arithmetic is the defect this change is about. The profile card's « Un but marqué · toutes les
+      57′ · sur 57′ sur le terrain » moved to the same denominator, so `/joueur` and `/stats` cannot
+      disagree about one man's own rate. A man who only ever kept goal has no denominator and is off
+      both boards, which is 197's own « a rate over no time is not a figure » applied to the narrower
+      population; unreachable in today's data, tested anyway
+- [ ] **Attribute a goal or a pass to the spell it happened in.** The denominator now excludes the
+      time in goal but the **numerator does not**: `match_player_stats` holds `goals`, `assists` and
+      `gk_minutes`, never « a pass given while in goal », so Lucas's assist on the 4th minute against
+      Atletico — given while he was the goalkeeper for that whole match — is divided by the outfield
+      minutes he earned in other matches. His « 1 passe déc. toutes les 85′ » is wrong in a way the
+      card cannot show. Fixing it needs the reducer to emit per-spell attribution and a column to
+      hold it; **not started, and not worth a migration for one event a season** unless the owner
+      asks

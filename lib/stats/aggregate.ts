@@ -267,7 +267,10 @@ export type TeamSeasonStats = {
  * never is the best possible figure, never is the *worst* here: those rows sort last.
  */
 export type MinutesPerEventEntry = RankedMember & {
-  /** The minutes the rate is over — his whole time on the pitch, goal included. */
+  /**
+   * The minutes the rate is over. For the conceded boards that is the whole population they are over;
+   * for the boards of what a player *did*, it is his outfield minutes alone (decision 203).
+   */
   minutes: number;
   count: number;
   minutesPerEvent: number | null;
@@ -356,7 +359,10 @@ export type SeasonStats = {
   topMinutes: LeaderboardEntry[];
   topGkMinutes: LeaderboardEntry[];
   topOutfieldMinutes: LeaderboardEntry[];
-  /** « 1 but marqué toutes les X′ », his own goals over his own minutes (decision 197). */
+  /**
+   * « 1 but marqué toutes les X′ », his own goals over his **outfield** minutes (decision 197,
+   * narrowed by 203): time in goal is not time in which he could have scored.
+   */
   scoringRate: MinutesPerEventBoard;
   /** The same for the passes he gave. Never `goalsForWhileOn`, which is the team's. */
   assistRate: MinutesPerEventBoard;
@@ -766,16 +772,30 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     countOf: (player) => player.matchesPlayed,
   });
   /*
-   * His own goals and his own passes, over his own minutes (decision 197) — never `goalsForWhileOn`,
-   * which counts what the team did while he was on and is the impact card's business.
+   * His own goals and his own passes, over his own **outfield** minutes (decision 197, narrowed by
+   * 203) — never `goalsForWhileOn`, which counts what the team did while he was on and is the impact
+   * card's business.
+   *
+   * The denominator excludes his time in goal, which is not time in which he could have scored. The
+   * numerator is **not** filtered the same way, and cannot be: `match_player_stats` holds `goals`,
+   * `assists` and `gk_minutes`, never « a pass given while in goal », so a keeper's goal kick turned
+   * assist still counts against his outfield minutes elsewhere. One real case in the data (Lucas, 4′
+   * v Atletico). Attributing an event to a spell would need the reducer to emit it.
+   *
+   * A man whose every minute was in goal has no outfield time, so `minutesPerEventBoard` drops him:
+   * a rate over no time is not a figure.
    */
   const scoringRate = minutesPerEventBoard(
-    players.map((player) => ({ ...memberOf(player), minutes: player.minutes, count: player.goals })),
+    players.map((player) => ({
+      ...memberOf(player),
+      minutes: player.outfieldMinutes,
+      count: player.goals,
+    })),
   );
   const assistRate = minutesPerEventBoard(
     players.map((player) => ({
       ...memberOf(player),
-      minutes: player.minutes,
+      minutes: player.outfieldMinutes,
       count: player.assists,
     })),
   );

@@ -952,11 +952,10 @@ describe("the reshaped rankings of the owner's fourth backlog", () => {
         entry.minutesPerEvent,
       ]),
     ).toEqual([
-      // One goal every sixty minutes, then the two men who have never scored — shortest record first,
-      // so the longest goalless run is last rather than lost in the middle.
+      // One goal every sixty minutes, then Rémi, who has never scored. Momo's whole hour was in goal,
+      // so he has no outfield minute and the board has no denominator for him (decision 203).
       ["nina", 2, 120, 60],
       ["remi", 0, 20, null],
-      ["momo", 0, 60, null],
     ]);
 
     expect(eventRateFr(2, 120, GOAL_WORDS_FR)).toEqual({
@@ -975,10 +974,53 @@ describe("the reshaped rankings of the owner's fourth backlog", () => {
     ).toEqual([
       ["nina", 1, 120],
       ["remi", 0, 20],
-      ["momo", 0, 60],
     ]);
     // The team's own figure is a different number and stays where it was.
     expect(playerNamed(stats.players, "nina").goalsForWhileOn).toBe(0);
+  });
+
+  /*
+   * Decision 203: the denominator of these two boards is the outfield minutes alone. Time in goal is
+   * not time in which a man could have scored, so a keeper who also plays outfield is rated on the
+   * part of his afternoon the figure is about.
+   */
+  it("rates a part-time goalkeeper on his outfield minutes, not his whole afternoon", () => {
+    const mixed = season({
+      members: [member("sam", "Sam"), member("pierre", "Pierre")],
+      matches: [match("m1", { score: { goalsFor: 3, goalsAgainst: 0 } })],
+      lines: [
+        // Sam: ninety minutes, sixty of them in goal, two goals — one every fifteen outfield minutes.
+        line("m1", "sam", { minutes: 90, gkMinutes: 60, goals: 2 }),
+        // Pierre never kept goal, so his figure is identical either way: one goal every ninety minutes.
+        line("m1", "pierre", { minutes: 90, goals: 1 }),
+      ],
+    });
+    expect(
+      mixed.scoringRate.entries.map((entry) => [
+        entry.teamMemberId,
+        entry.minutes,
+        entry.minutesPerEvent,
+      ]),
+    ).toEqual([
+      // The ordering is the point: over total minutes both men would read one goal per 45′ and 90′,
+      // which is the same order, but Sam's own figure would be wrong by a factor of three.
+      ["sam", 30, 15],
+      ["pierre", 90, 90],
+    ]);
+  });
+
+  it("leaves a man who only ever kept goal off both boards", () => {
+    const keeperOnly = season({
+      members: [member("momo", "Momo")],
+      matches: [match("m1", { score: { goalsFor: 1, goalsAgainst: 1 } })],
+      // A goal kick turned assist still counts in the numerator — nothing stored attributes an event
+      // to a spell — but there is no outfield time to divide it by, so there is no row at all.
+      lines: [line("m1", "momo", { minutes: 60, gkMinutes: 60, assists: 1 })],
+    });
+    expect(keeperOnly.scoringRate.entries).toEqual([]);
+    expect(keeperOnly.assistRate.entries).toEqual([]);
+    // He is still in the table, with the pass to his name: only the rate boards have nothing to say.
+    expect(playerNamed(keeperOnly.players, "momo").assists).toBe(1);
   });
 
   it("lists nobody without a minute on either rate board", () => {

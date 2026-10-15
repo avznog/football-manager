@@ -1,0 +1,2 @@
+- Dans les stats : "Qui marque le plus souvent Du plus fréquent au moins fréquent : 1 but marqué toutes les X minutes jouées" @-> il faut exclure le temps joué au goal, c'est le nombre de buts mis par temps de jeu sur le terrain 
+- Idem pour les passes décisives

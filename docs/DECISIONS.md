@@ -7883,3 +7883,55 @@ prose.
   credential, and a Postgres password cannot read an account's billing.
 
 ---
+
+## 203 — The personal frequency boards are over the minutes on the pitch, not the minutes in goal
+
+**2026-10-15** · accepted · the owner's fifth backlog · `lib/stats/aggregate.ts`,
+`app/(app)/stats/page.tsx`, `app/(app)/stats/_components/rate-board.tsx`,
+`app/(app)/joueur/_components/stats-card.tsx` · no migration · **amends decision 197**
+
+The owner, about « Qui marque le plus souvent »: « il faut exclure le temps joué au goal, c'est le
+nombre de buts mis par temps de jeu sur le terrain », and « Idem pour les passes décisives ».
+
+**This narrows decision 197's denominator and nothing else.** 197 defined these two boards as his own
+goals over *his own* minutes, against `goals_for_while_on`, and that distinction stands: the numerator
+is still `match_player_stats.goals` and `assists`, never the team's. What 197 got wrong is the
+denominator it chose — « his **total** minutes, goal time included » — on the argument that inventing a
+third denominator for a keeper's corner would be an unverifiable precision. The owner's reason is the
+better one, and it is about what the figure means rather than about precision: **time in goal is not
+time in which you could have scored.** Dividing by it answers a question nobody asked.
+
+**`outfieldMinutes` already existed** — `minutes − gkMinutes`, rule 10, the denominator decisions 177
+and 196 already rank on — so this is two call sites in `seasonStats`, not a new figure.
+
+**What it does to the real season** (production, 2026-10-15): Samuel moves sharply up the scoring
+board, 2 goals over 79′ on the pitch instead of over 188′ of which 109′ were in goal, and Lucas moves
+up the assists the same way, 1 over 85′ instead of 189′. Every outfield-only player's figure is
+identical: Pierre's 4 goals are still over 163′. Nobody in the data has zero outfield minutes, so
+nobody drops off the board today.
+
+**The copy had to change with the arithmetic**, which is the point of doing both in one go: a card
+reading « 1 but marqué toutes les X minutes jouées » over a rate that is no longer per minute played
+is a screen stating something untrue, and no test would have caught it. Both subtitles now read
+« …toutes les X minutes sur le terrain, hors temps au goal », reusing the vocabulary `/stats` already
+has for the two populations — « Buts encaissés sur le terrain » against « au goal » — rather than
+inventing a phrase. The profile card's « Un but marqué · toutes les 46′ » moved to the same
+denominator and says « sur 79′ sur le terrain », because the same player's own rate must not differ
+between `/joueur` and `/stats`.
+
+**A man who only ever kept goal is now absent from these two boards**, where 197 put everybody with a
+minute on them, last. That follows from 197's own rule that nobody without a minute is listed — a rate
+over no time is not a figure — applied to the narrowed population. It is unreachable in today's data
+and tested anyway.
+
+**The numerator is not filtered, and this is a real inexactitude rather than an oversight.** A goal or
+a pass made *while the player was in goal* still counts, because nothing stored attributes an
+individual event to a goalkeeping spell: `match_player_stats` holds `goals`, `assists` and
+`gk_minutes`, never « a pass given while in goal ». There is one instance in the season — Lucas's
+assist on the 4th minute against Atletico, given while he was the goalkeeper for the whole of that
+match — and it is divided by the outfield minutes he earned in *other* matches. So his « 1 passe déc.
+toutes les 85′ » is wrong in a way the figure cannot show. Fixing it properly needs the reducer to
+emit per-spell attribution, which is a much larger change and is not in scope; the figure is the
+owner's question answered on the data that exists, and the code says so where it is computed.
+
+---

@@ -8,8 +8,9 @@
  *
  * Two boards, one shape, one unit (decision 195): `RateBoard` for what a player took, `EventRateBoard`
  * for what he did (decision 197). The screen tells them apart by the heading — « Qui encaisse le moins
- * souvent », « Qui marque le plus souvent » — and never by the arithmetic, which is the same minutes
- * over count in both.
+ * souvent », « Qui marque le plus souvent ». The arithmetic is the same minutes over count in both,
+ * but no longer over the same minutes: since decision 203 an `EventRateBoard` is over the outfield
+ * minutes alone, so each card's subtitle has to name the population its figure is a rate over.
  */
 
 import { Card } from "@/components/ui/card";
@@ -50,12 +51,13 @@ export function RateBoard({
 }
 
 /**
- * « Qui marque le plus souvent » — his own goals, or his own assists, over his own minutes
- * (decision 197).
+ * « Qui marque le plus souvent » — his own goals, or his own assists, over the minutes he spent on the
+ * pitch outside the goal (decision 197, narrowed by 203).
  *
  * The men it never happened to are at the bottom with « aucun but marqué » over the minutes it did not
  * happen in, rather than cut from the list: the card is read as « où est-ce que je suis », and a man
- * who has played five matches without scoring is somewhere, not nowhere.
+ * who has played five matches without scoring is somewhere, not nowhere. A man who only ever kept goal
+ * is the one exception, and he is absent: the board has no denominator for him.
  */
 export function EventRateBoard({
   title,

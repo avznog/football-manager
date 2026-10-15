@@ -87,21 +87,23 @@ export async function PlayerStatsCard({
       </FigureGrid>
 
       {/* What he does, as a frequency: « Un but marqué · toutes les 46′ · sur 138′ » (decision 197).
-          His own goals and his own passes, over his own minutes — never the team's goals while he was
-          on the pitch. Each rate carries the minutes it is over (decision 184), and a man who has
-          never scored reads « jamais » rather than a division. */}
-      {player.minutes > 0 ? (
+          His own goals and his own passes, over his minutes **on the pitch outside the goal** since
+          decision 203 — never the team's goals while he was on. The denominator is the same one
+          `/stats` ranks him on, so the two screens cannot disagree about his own rate. Each rate
+          carries the minutes it is over (decision 184), and a man who has never scored reads
+          « jamais » rather than a division. */}
+      {player.outfieldMinutes > 0 ? (
         <FigureGrid className="mt-3">
           <Figure
             label="Un but marqué"
-            value={everyFr(player.minutes, player.goals)}
-            hint={`sur ${formatMinutes(player.minutes)}`}
+            value={everyFr(player.outfieldMinutes, player.goals)}
+            hint={`sur ${formatMinutes(player.outfieldMinutes)} sur le terrain`}
             tone="muted"
           />
           <Figure
             label="Une passe déc."
-            value={everyFr(player.minutes, player.assists)}
-            hint={`sur ${formatMinutes(player.minutes)}`}
+            value={everyFr(player.outfieldMinutes, player.assists)}
+            hint={`sur ${formatMinutes(player.outfieldMinutes)} sur le terrain`}
             tone="muted"
           />
         </FigureGrid>
