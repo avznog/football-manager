@@ -2334,3 +2334,25 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       billing — so this is not a thing to try harder at from a session. Either the owner reads it in
       the Neon console, or he puts a `NEON_API_KEY` where a session can use it. Vercel ($0, `hobby`)
       and GitHub Actions ($0, public repository) are both measured; this is the gap
+
+## The team keeps voting in the old app — 2026-10-15
+
+- [x] **The fourth match's ratings are in production, and they are unpublished.** 121 notes for
+      **Atletico supporters de Nice, 13/10/2026** — 12 raters, 11 rated, mean **6.40** — written by
+      `scripts/import-ratings-from-old-app.mts`, which is a **recurring** import and not
+      `scripts/import-ratings.mts`: it only ever inserts, never deletes and never updates, keys on
+      the old app's own note id so a second run writes nothing, reads Supabase live over the
+      Management API rather than a dumped file, and matches a match by Paris calendar day + opponent
+      name. It refuses any note the app would refuse and **asks the app rather than restating it** —
+      `eligibleRaterIds` for who may vote (decision **159**), `minutes > 0` for who may be rated
+      (decision **137**). Verified per player against Supabase: the eleven means are identical.
+      Production holds **463 notes** over four matches. **`ratings_published_at` is untouched and
+      that is asserted after the write** (decisions **139**, **145**, **180**) — the notes are hidden
+      and **publishing them is the owner's switch in the app**, not a thing a script does
+- [ ] **Refresh preview from production, which is the only direction allowed** (decision **201**).
+      The same run pointed at preview **aborted on 85 notes without writing anything**: preview's
+      Atletico fixture still holds the **two-minute rehearsal match** — Léo C a starter, Clément and
+      Charles in the squad, nobody over 2 minutes — so the notes would have been attached to players
+      who never played in that version. The guard worked; what it found is that preview has drifted.
+      Until the refresh happens, every ratings import against preview keeps refusing. **Not started:
+      it overwrites preview, so it waits on the owner's go-ahead**
