@@ -6315,3 +6315,60 @@ Gates: `npm run typecheck` clean, `npx eslint scripts/import-ratings-from-old-ap
 
 Files: `scripts/import-ratings-from-old-app.mts` (new), `docs/COST.md`, `docs/ROADMAP.md`,
 `docs/SESSIONS.md`.
+
+## 2026-10-15 — The scoring and assist rates are per minute on the pitch (decision 203)
+
+The owner's fifth backlog, two lines of it: « Dans les stats : "Qui marque le plus souvent […] 1 but
+marqué toutes les X minutes jouées" @-> il faut exclure le temps joué au goal, c'est le nombre de buts
+mis par temps de jeu sur le terrain », and « Idem pour les passes décisives ».
+
+**The change is two call sites.** `seasonStats` built `scoringRate` and `assistRate` over
+`player.minutes`; they are now over `player.outfieldMinutes` — `minutes − gkMinutes`, rule 10, which
+already existed and is what decisions 177 and 196 rank on, so nothing new was computed. Decision
+**203** records it as an **amendment to decision 197**, which had deliberately chosen the total
+minutes « goal time included » on the grounds that a third denominator for a keeper's corner would be
+unverifiable precision. The owner's reason is the better one and it is about meaning rather than
+precision: time in goal is not time in which you could have scored.
+
+**The copy moved with the arithmetic, which was half the work.** « 1 but marqué toutes les X minutes
+jouées » over a rate that is no longer per minute played is a screen stating something untrue, and no
+test would have failed. Both subtitles now read « Du plus fréquent au moins fréquent : 1 but marqué
+toutes les X minutes sur le terrain, hors temps au goal » — « sur le terrain » is the phrase `/stats`
+already uses against « au goal », not a new one. The empty state is « Sur cette sélection, personne
+n'a encore de minutes sur le terrain. » The doc comments that asserted the old denominator were
+corrected in `lib/stats/aggregate.ts` (the entry type, the two board fields, the comment above the
+calls) and in `rate-board.tsx`, whose header claimed the two card kinds never differ « by the
+arithmetic » — they now differ by the population of minutes, which is exactly what each subtitle has
+to name. `lib/stats/format.ts` needed no change: `eventRateFr` words « 3 buts en 72′ » without
+claiming what the 72′ are.
+
+**One thing the brief did not list and the change needed anyway**: `app/(app)/joueur/_components/stats-card.tsx`
+built the same two rates off `player.minutes`. Left alone, a part-time keeper's own figure would have
+read one thing on `/stats` and another on his profile. It is on `outfieldMinutes` now, hinted « sur
+57′ sur le terrain », and the block's guard moved from `player.minutes > 0` to
+`player.outfieldMinutes > 0` for the same reason the boards drop a keeper-only man.
+
+**The honest limitation, in the decision and in the code**: the **numerator is not filtered**. A goal
+or a pass made while the player was in goal still counts, because nothing stored attributes an event
+to a spell. There is one real instance — Lucas's assist on the 4th minute against Atletico, given
+while he kept goal for that entire match — divided by outfield minutes from other matches. Per-spell
+attribution would need the reducer to emit it; it is on the roadmap, unstarted, and the figure is not
+pretended to be exact.
+
+**Verified on the local restore of production** (`football_prod`, which holds two of the four matches
+production now has). Nicolas, 87′ of which 30′ in goal, 1 goal: the card went from « toutes les 87′ »
+to « **1 but toutes les 57′** », and his profile from « sur 87′ » to « **sur 57′ sur le terrain** ».
+Nicodème, 35′ with 8′ in goal: « toutes les 27′ ». Samuel, 95′ none of it in goal, 2 goals: « 1 but
+toutes les 48′ · 2 buts en 95′ », unchanged, which is the control. Read at **390 px in both themes and
+in both roles in one pass** (coach `admin`, player `samuel`): the two cards are identical in the two
+roles — there is no role branch in them — and the three-line subtitle fits.
+
+Gates: `npm run typecheck` clean, `npx eslint app components lib e2e db scripts proxy.ts proxy.test.ts`
+clean, `npm test` **1526 passed** (two new cases: a part-time keeper ranked on his outfield minutes
+with the ordering asserted, and a keeper-only man absent from both boards while his assist stays in the
+table). No schema change, so no migration. The e2e suite was not run: no Server Action and no match
+flow was touched, and the happy path asserts no copy on these two cards.
+
+Files: `lib/stats/aggregate.ts`, `lib/stats/aggregate.test.ts`, `app/(app)/stats/page.tsx`,
+`app/(app)/stats/_components/rate-board.tsx`, `app/(app)/joueur/_components/stats-card.tsx`,
+`docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.

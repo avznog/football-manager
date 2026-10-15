@@ -200,21 +200,22 @@ function SeasonCards({
           valueLabel={(entry) => plural(entry.value, "passe décisive", "passes décisives")}
           emptyMessage="Aucune passe décisive saisie sur cette sélection. Elle est optionnelle au moment du but."
         />
-        {/* His own goals over his own minutes (decision 197) — not the team's while he was on, which
-            is the « Impact par poste » card further down. */}
+        {/* His own goals over his own outfield minutes (decision 197, narrowed by 203) — not the
+            team's while he was on, which is the « Impact par poste » card further down. The subtitle
+            says « sur le terrain » because the time in goal is out of the denominator. */}
         <EventRateBoard
           title="Qui marque le plus souvent"
-          description="Du plus fréquent au moins fréquent : 1 but marqué toutes les X minutes jouées"
+          description="Du plus fréquent au moins fréquent : 1 but marqué toutes les X minutes sur le terrain, hors temps au goal"
           board={stats.scoringRate}
           words={GOAL_WORDS_FR}
-          emptyMessage="Personne n’a encore de minutes sur cette sélection."
+          emptyMessage="Sur cette sélection, personne n’a encore de minutes sur le terrain."
         />
         <EventRateBoard
           title="Qui fait marquer le plus souvent"
-          description="Du plus fréquent au moins fréquent : 1 passe décisive toutes les X minutes jouées"
+          description="Du plus fréquent au moins fréquent : 1 passe décisive toutes les X minutes sur le terrain, hors temps au goal"
           board={stats.assistRate}
           words={ASSIST_WORDS_FR}
-          emptyMessage="Personne n’a encore de minutes sur cette sélection."
+          emptyMessage="Sur cette sélection, personne n’a encore de minutes sur le terrain."
         />
       </Section>
 
