@@ -6247,3 +6247,71 @@ Vercel reads `unread` here (no CLI login on this machine); the Linux run's `hobb
 Files: `scripts/cost.mjs`, `docs/COST.md`, `docs/DECISIONS.md` (202, amended before merge),
 `docs/ROADMAP.md`, `CLAUDE.md`, `COORDINATION.md`. `npx eslint scripts/cost.mjs` is clean; no source
 change, so no other gate was owed.
+
+## 2026-10-15 — The fourth match's ratings, brought over from the old app as a recurring job
+
+The team still votes in `info-radarlocal` (Supabase) after every match, so the owner asked for the
+**fourth match's** notes to be put into production. That is not a migration, it is a job that will be
+run again after the fifth match and the sixth, and the script is written to be run again.
+
+**`scripts/import-ratings-from-old-app.mts` is new, and it is deliberately not `import-ratings.mts`.**
+The predecessor was a one-off: it retired the fabricated means of decision 145 in favour of the 342
+real notes, is pinned to those three matches by name and by note count, cross-checks them against the
+owner's hand-typed means, and **deletes** a match's ratings before writing. Every one of those
+properties is wrong now that production is the only copy of the season (decision **201**). The new one
+**only ever inserts** — never deletes, never updates — and `ratings.id` is the old app's own note id,
+so a second run recognises every row it already wrote: the three earlier matches report `0 to write,
+342 already there`. It reads Supabase **live** over the Management API rather than a dumped file,
+because the whole point is the notes added since the last dump; **463 notes** are there now, across
+four matches. A Supabase match is matched to this database by **Paris calendar day + opponent name**,
+accent- and case-insensitively, and one that resolves to no row or to several is reported and skipped
+rather than guessed at.
+
+**It refuses to write a note the app itself would refuse, and it asks the app rather than restating
+it.** Who may vote comes from `eligibleRaterIds` in `lib/rating/progress.ts` — the same function the
+screens ask (decision **159**) — and who may be rated is `minutes > 0` in that match (decision
+**137**), a fact about the event log and not about the sheet. The three database constraints
+(`ratings_no_self`, `ratings_score_range`, `ratings_score_one_decimal`) are checked first anyway. A
+failure aborts before a single row is written. Guards: it refuses a `-pooler` host, a dry run is the
+default and `--commit` is the opt-in, and **production additionally requires `--production` spelled
+out on the command line** (decision 201).
+
+**Production: 121 notes written for Atletico supporters de Nice, 13/10/2026** — 12 raters, 11 rated,
+mean **6.40**. Léo COACH is the supporter and gave 11 notes; each of the 11 players gave 10, everyone
+but himself; no self-ratings; every score a half-point between 3.5 and 9.0. Verified by comparing
+per-player means against Supabase, which is the check that would catch a name mapped to the wrong man:
+**identical for all eleven** — Pierre 7.18, Lucas 6.95, Nicolas 6.82, Maxime 6.77, Édouard 6.68,
+Nicodème 6.64, Benjamin 6.36, Léo M 6.32, Thomas 5.91, Samuel 5.82, Rémi 4.91. Production now holds
+**463 notes** over four matches.
+
+**`matches.ratings_published_at` is never touched, and the script asserts that after the write.**
+Publishing is the coach's switch (decisions **139**, **145**, **180**), so the imported notes landed
+**hidden** and the Atletico match is still unpublished. Nothing in this session makes them visible to
+the team; that remains the owner's to do in the app.
+
+**The guard earned its place on the first run.** Pointed at the **preview** database it aborted on
+**85 notes** without writing anything: preview's Atletico fixture still holds a **two-minute rehearsal
+match** — Léo C as a starter, Clément and Charles in the squad, nobody with more than 2 minutes —
+rather than the real one, so those notes would have been attached to players who never played in that
+version of the match. That is the `minutes > 0` rule doing exactly what it is for. It also says plainly
+that **preview has drifted from production**, and the fix is a refresh in the sanctioned direction,
+**production → preview** (decision 201). It is not done: it overwrites preview, so it needs the owner's
+go-ahead, and until it happens every ratings import against preview will keep refusing.
+
+**Cost refreshed**, per `CLAUDE.md`'s definition of done, from `node scripts/cost.mjs` on **this**
+machine (`benjamingonzva`, the Linux one). Linux is **$1365.73**, up **$32.91** from the $1332.82
+published on 2026-10-14, all of it in `7054d16c`. The macOS rows are carried unchanged with their date
+— a refresh replaces only its own machine's rows (decision **202**) — so the headline is **$1895.66**
+across 8 sessions, against $1862.75 yesterday: Linux 72 %, macOS 28 %. Denominators measured today:
+**203 commits**, **199 merged pull requests**, **99 538 lines**, **24 days** since 2026-09-22, giving
+**$9.34 per commit** ($6.73 on Linux alone), **$9.53 per merged pull request**, **$0.0190 per line**
+and **$78.99 per day** — the per-day figure is *down* from $84.67 because two more days divide a total
+that barely moved. Tokens on this machine: 7 838 373 output, 68 047 385 cache write. Every caveat in
+the file still stands, including `1a3e8cd8`'s reported-not-real $0 and Neon's unverified plan.
+
+No decision was taken: the script follows 137, 159, 139/145/180 and 201 as they already stand.
+Gates: `npm run typecheck` clean, `npx eslint scripts/import-ratings-from-old-app.mts` clean,
+`npm test` **1524 passed**. No schema change, so no migration; no screen changed, so no e2e run owed.
+
+Files: `scripts/import-ratings-from-old-app.mts` (new), `docs/COST.md`, `docs/ROADMAP.md`,
+`docs/SESSIONS.md`.
