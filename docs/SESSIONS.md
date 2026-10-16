@@ -6491,3 +6491,69 @@ Files, this second pass: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.
 `lib/stats/seven-llm.ts`, `lib/stats/seven-cache.ts`, `lib/stats/best-seven-copy.ts`,
 `lib/stats/actions.ts`, `app/(app)/stats/equipe-type/page.tsx` and their tests — was changed alongside
 by the session that owns the branch).
+
+**Then the owner redefined what three of the four sevens measure** (decision **206**, same day, a
+third pass). « pour la meilleure attaque, il faut que ce soit les joueurs, qui, lorsqu'à chaque poste,
+l'équipe marque le plus. […] Enfin, le 7 de légende, c'est chaque meilleur à chaque poste […] Le modèle
+ne doit pas prendre en compte les notes. » Three clarifications were taken from him rather than
+guessed: « ailier → meilleur ratio » is the team's goals while he is on, per minute, at the wing; « MC
+meilleur organisateur » he delegated, and the answer is the goal difference per minute at MC; the notes
+seven keeps its algorithm.
+
+**Offensive** now ranks the **team's** goals scored while he is on, per minute, shrunk
+(`goalsForWhileOn`, a new `SevenFigure` value `teamGoalsFor`), tie-broken on his own goals, with
+**assists dropped entirely**. **Défensive** is unchanged, because it was already the team's goals
+conceded while he is on. **Légende** became five criteria, one per post — GB fewest conceded in goal,
+DC fewest team goals conceded at DC, MC the goal difference at MC (198's raw impact, kept here alone),
+AIL most team goals at AIL, AT his own goals per outfield minute — each shrunk criterion fitted **over
+its own population**, the men with minutes at that post, never the whole squad. 198's « has he played
+this post at all » first key survives for GB/DC/MC/AIL. This **supersedes 197's criterion** (which said
+in as many words « never `goalsForWhileOn` ») and **198's single figure**; 171, 172 and 187 stand.
+
+**The data justifies the instinct, which is worth repeating because it decided a second question
+too.** All season: **11** personal goals, **5** assists, **77** team goals scored while a player was
+on, **119** conceded. Eleven goals cannot separate fifteen players and five assists cannot rank
+anybody — so the team figures are better-powered, not merely preferred, and that is why **MC is judged
+on goal difference rather than on passes**, even though « organisateur » would naturally be the passes.
+
+**One criterion cannot be measured where the owner put it, and the code says so.**
+`match_player_positions` stores the **team's** goals for and against per position, never the player's
+own, so « attaquant → plus de buts marqués » is his **season** goals over his outfield minutes while the
+other four are measured at the post. Recorded as a limitation of the data model, in the decision and in
+the prompt.
+
+**The shrinkage does not absorb his own example, and this was measured.** Eight team goals in five
+minutes is 96 per 60; shrunk it is **10.7**, against **5.8** for 60 goals in 600 minutes — the prior is
+clamped (`PRIOR_STRENGTH_CLAMP`, 1–6 blocks) so a very short record keeps about **8 %** weight, and 8 %
+of 96 beats everybody. A *plausible* thin record does lose: 2 goals in 5′, eight times the squad rate,
+lands at 3.9 behind 5.3. So it is the extreme outlier alone that survives. **Told this, the owner chose
+to leave the arithmetic alone and let the model discount it**, rather than add the minimum-minutes
+threshold he refused in 187. The guard is therefore an **instruction in the prompt** — the smoothing
+does not correct everything, eight goals over five minutes stays top of the smoothed figure and is not
+representative, read the raw record and set a man aside when his figure rests on a few minutes **even if
+he ranks first** — pinned by a test that also asserts the prompt does **not** say « le lissé classe ».
+**The weakness stays in the algorithmic fallback, which has no judgement.** Known, accepted, on the
+roadmap.
+
+**Two things that needed no new code and one bug that did.** « Si le gardien est aussi le meilleur
+attaquant, prendre le deuxième meilleur gardien » is what the bitmask DP's exact assignment already
+does — it optimises the seven, not each post greedily — and is now pinned by a test; the model cannot
+infer it, so the prompt states it. The bug: **the notes seven was still being sent to the model** after
+the ratings were withheld from the prompt, so it would have been asked a question whose figures were
+deliberately removed, burned two calls and fallen back every time. It is gated out before the call and
+says so on screen: « Ce sept se classe sur les notes, et le modèle ne les voit jamais : c'est
+l'algorithme qui le compose, sur la meilleure moyenne à chaque poste. »
+
+**The readability risk, recorded honestly rather than claimed resolved: the légende's discs are now
+heterogeneous.** An AIL disc « 1 but/133′ » means the team **scored**, a DC disc « 1 but/24′ » means it
+**conceded**, and only the record line underneath distinguishes them. Being judged at 390 px by the
+session that owns the branch; a thing to watch.
+
+Tests: **1593** passing, up from 1581. Several existing tests encoded the old criteria and were
+**rewritten to the new specification rather than weakened** — the offensive seven's assist cases, since
+assists are no longer a key, and the légende's per-post fixtures.
+
+Files, this third pass: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md` (the code —
+`lib/stats/sevens.ts`, `lib/stats/seven-prompt.ts`, `lib/stats/best-seven-copy.ts`,
+`lib/stats/best-seven-input.ts`, `lib/stats/actions.ts` and their tests — by the session that owns the
+branch).

@@ -28,6 +28,7 @@ function player(overrides: Partial<SevenCandidate> & { displayName: string }): S
     outfieldMinutes: 0,
     concededOutfield: 0,
     concededWhileGk: 0,
+    goalsForWhileOn: 0,
     positions: [],
   };
   const merged = { ...base, ...overrides };
@@ -60,42 +61,108 @@ const keeper = (name: string, gkMinutes: number, conceded: number, extra: Partia
 describe("the offensive seven", () => {
   const slots = [slot("gb", "GB"), slot("at", "AT")];
 
-  it("puts the most goals per hour up front, and the keeper who concedes least in goal", () => {
+  it("puts the man the team scores most with up front, and the keeper who concedes least in goal", () => {
     const result = solveSeven("offensive", {
       slots,
       candidates: [
-        player({ displayName: "Buteur", minutes: 600, goals: 8, declarations: { AT: "primary" } }),
-        player({ displayName: "Passeur", minutes: 600, goals: 2, assists: 9, declarations: { AT: "primary" } }),
+        player({ displayName: "Déclencheur", minutes: 600, goals: 0, goalsForWhileOn: 20, declarations: { AT: "primary" } }),
+        player({ displayName: "Suiveur", minutes: 600, goals: 5, goalsForWhileOn: 6, declarations: { AT: "primary" } }),
         keeper("Passoire", 300, 15),
         keeper("Mur", 300, 3),
       ],
     });
-    expect(pickedName(result, "at")).toBe("Buteur");
+    expect(pickedName(result, "at")).toBe("Déclencheur");
     expect(pickedName(result, "gb")).toBe("Mur");
-    expect(result.picks.find((pick) => pick.slotId === "at")?.cell?.figure).toBe("goals");
+    expect(result.picks.find((pick) => pick.slotId === "at")?.cell?.figure).toBe("teamGoalsFor");
     expect(result.picks.find((pick) => pick.slotId === "gb")?.cell?.figure).toBe("keeperConceded");
   });
 
-  it("lets assists decide between two scorers the screen prints alike", () => {
-    const result = solveSeven("offensive", {
-      slots: [slot("at", "AT")],
-      candidates: [
-        player({ displayName: "Sans passe", minutes: 600, goals: 4, assists: 0, declarations: { AT: "primary" } }),
-        player({ displayName: "Avec passes", minutes: 600, goals: 4, assists: 5, declarations: { AT: "primary" } }),
-      ],
-    });
-    expect(pickedName(result, "at")).toBe("Avec passes");
+  /**
+   * The whole point of the change. « Il faut que ce soit les joueurs, qui, lorsqu'à chaque poste,
+   * l'équipe marque le plus » — so the man who scores most himself loses to the man the team scores
+   * most with, and the disc carries the team's record rather than his own.
+   */
+  it("ranks on the team's goals, not his own, when the two disagree", () => {
+    const candidates = [
+      player({ displayName: "Buteur solitaire", minutes: 600, goals: 12, goalsForWhileOn: 13, declarations: { AT: "primary" } }),
+      player({ displayName: "Fait jouer", minutes: 600, goals: 1, goalsForWhileOn: 25, declarations: { AT: "primary" } }),
+    ];
+    const result = solveSeven("offensive", { slots: [slot("at", "AT")], candidates });
+    expect(pickedName(result, "at")).toBe("Fait jouer");
+    // And the old criterion would have said the opposite: he is the better scorer of the two.
+    const cellOf = (name: string) => result.cells[result.candidates.findIndex((c) => c.id === name)][0];
+    expect(cellOf("Fait jouer").observed.numerator).toBe(25);
+    expect(cellOf("Fait jouer").observed.secondary).toBe(1);
+    expect(cellOf("Buteur solitaire").adjusted!).toBeLessThan(cellOf("Fait jouer").adjusted!);
   });
 
-  it("does not let assists outweigh a goal rate the screen prints higher", () => {
+  /** A squad of ten, so the shrinkage has a real squad to measure a prior strength from. */
+  const squadOfTen = (thin: SevenCandidate) => [
+    thin,
+    player({ displayName: "Toute la saison", minutes: 600, goalsForWhileOn: 60, declarations: { AT: "primary" } }),
+    ...Array.from({ length: 8 }, (_, index) =>
+      player({ displayName: `Banal ${index}`, minutes: 600, goalsForWhileOn: 28 + index, declarations: { AT: "primary" } }),
+    ),
+  ];
+
+  /**
+   * « Si je joue 5 mn, et qu'il y a 8 buts, ça n'est pas représentatif. » The shrinkage is the answer
+   * and it is continuous — no minimum-minutes gate, which the owner refused (decision 187).
+   *
+   * A plausible thin record loses: two team goals in five minutes is eight times the squad's rate and
+   * still ends up below a whole season at twice it.
+   */
+  it("does not let a thin record win the attack on a rate it cannot support", () => {
+    const result = solveSeven("offensive", {
+      slots: [slot("at", "AT")],
+      candidates: squadOfTen(
+        player({ displayName: "Cinq minutes", minutes: 5, goalsForWhileOn: 2, declarations: { AT: "primary" } }),
+      ),
+    });
+    expect(pickedName(result, "at")).toBe("Toute la saison");
+  });
+
+  /**
+   * The owner's own arithmetic, as a limit rather than as a promise.
+   *
+   * Eight team goals in five minutes is 96 per 60 — a rate no 7-a-side match has ever produced — and the
+   * shrinkage pulls it 89 % of the way back to the squad, to about 10,7. That is the « relativiser »
+   * he asked for, and it is **not** enough to put him behind a full season at 6,0: a prior worth one to
+   * six 60-minute blocks cannot absorb an outlier that large. The guard against it is the one he chose
+   * himself — the real record is printed under the name, « 8 buts de l'équipe sur 5′ », so a reader can
+   * see what the figure rests on. Pinned here so that nobody reads the sentence above as a stronger
+   * claim than the code makes.
+   */
+  it("pulls a five-minute record almost all the way back, without pretending it vanishes", () => {
+    const thin = player({ displayName: "Cinq minutes", minutes: 5, goalsForWhileOn: 8, declarations: { AT: "primary" } });
+    const result = solveSeven("offensive", { slots: [slot("at", "AT")], candidates: squadOfTen(thin) });
+    const cell = result.cells[result.candidates.findIndex((c) => c.id === "Cinq minutes")][0];
+    expect(cell.observed.rate).toBeCloseTo(96);
+    expect(cell.adjusted!).toBeLessThan(12);
+    expect(cell.observed.numerator).toBe(8);
+    expect(cell.observed.denominator).toBe(5);
+  });
+
+  it("lets his own goals decide between two men the screen prints alike", () => {
     const result = solveSeven("offensive", {
       slots: [slot("at", "AT")],
       candidates: [
-        player({ displayName: "Passeur", minutes: 600, goals: 1, assists: 20, declarations: { AT: "primary" } }),
-        player({ displayName: "Buteur", minutes: 600, goals: 9, assists: 0, declarations: { AT: "primary" } }),
+        player({ displayName: "Sans but", minutes: 600, goals: 0, goalsForWhileOn: 10, declarations: { AT: "primary" } }),
+        player({ displayName: "Avec buts", minutes: 600, goals: 6, goalsForWhileOn: 10, declarations: { AT: "primary" } }),
       ],
     });
-    expect(pickedName(result, "at")).toBe("Buteur");
+    expect(pickedName(result, "at")).toBe("Avec buts");
+  });
+
+  it("does not let his own goals outweigh a team rate the screen prints higher", () => {
+    const result = solveSeven("offensive", {
+      slots: [slot("at", "AT")],
+      candidates: [
+        player({ displayName: "Buteur", minutes: 600, goals: 20, goalsForWhileOn: 21, declarations: { AT: "primary" } }),
+        player({ displayName: "Catalyseur", minutes: 600, goals: 0, goalsForWhileOn: 40, declarations: { AT: "primary" } }),
+      ],
+    });
+    expect(pickedName(result, "at")).toBe("Catalyseur");
   });
 
   it("keeps goal for somebody who has played there, even one the coach set elsewhere", () => {
@@ -186,36 +253,146 @@ describe("the 7 de légende", () => {
     expect(pickedName(result, "mc")).toBe("Dix minutes");
   });
 
-  it("is exactly zero at a post where nothing happened either way", () => {
+  it("is exactly zero at MC where nothing happened either way", () => {
     const result = solveSeven("legende", {
-      slots: [slot("dc", "DC")],
+      slots: [slot("mc", "MC")],
       candidates: [
         player({
           displayName: "Six minutes",
           minutes: 600,
-          declarations: { DC: "primary" },
-          positions: [at("DC", 6, 0, 0)],
+          declarations: { MC: "primary" },
+          positions: [at("MC", 6, 0, 0)],
         }),
       ],
     });
     expect(result.cells[0][0].adjusted).toBe(0);
   });
 
+  /* ---- one criterion per post: one test each --------------------------------- */
+
+  it("ranks AT on his own goals per outfield minute, not on anything measured at the post", () => {
+    const result = solveSeven("legende", {
+      slots: [slot("at", "AT")],
+      candidates: [
+        // The team scores far more with him at AT, and that is not what this post is judged on:
+        // `match_player_positions` holds no per-player goal, so « plus de buts marqués » is his own.
+        player({
+          displayName: "Porté par l’équipe",
+          minutes: 600,
+          goals: 2,
+          declarations: { AT: "primary" },
+          positions: [at("AT", 600, 40, 5)],
+        }),
+        player({
+          displayName: "Vrai buteur",
+          minutes: 600,
+          goals: 14,
+          declarations: { AT: "primary" },
+          positions: [at("AT", 600, 15, 5)],
+        }),
+      ],
+    });
+    expect(pickedName(result, "at")).toBe("Vrai buteur");
+    const pick = result.picks.find((p) => p.slotId === "at");
+    expect(pick?.cell?.figure).toBe("goals");
+    // The record is his goals over his outfield minutes, which is the denominator the copy promises.
+    expect(pick?.cell?.observed.numerator).toBe(14);
+    expect(pick?.cell?.observed.denominator).toBe(600);
+  });
+
+  it("ranks AIL on the team's goals while he holds that post", () => {
+    const result = solveSeven("legende", {
+      slots: [slot("ail", "AIL")],
+      candidates: [
+        player({
+          displayName: "Buteur ailleurs",
+          minutes: 600,
+          goals: 20,
+          declarations: { AIL: "primary" },
+          positions: [at("AIL", 600, 8, 4)],
+        }),
+        player({
+          displayName: "Équipe qui marque",
+          minutes: 600,
+          goals: 0,
+          declarations: { AIL: "primary" },
+          positions: [at("AIL", 600, 30, 4)],
+        }),
+      ],
+    });
+    expect(pickedName(result, "ail")).toBe("Équipe qui marque");
+    const pick = result.picks.find((p) => p.slotId === "ail");
+    expect(pick?.cell?.figure).toBe("teamGoalsFor");
+    expect(pick?.cell?.observed.numerator).toBe(30);
+  });
+
+  it("ranks DC on the goals the team conceded at that post, fewest first", () => {
+    const result = solveSeven("legende", {
+      slots: [slot("dc", "DC")],
+      candidates: [
+        // A better goal difference at DC, and more conceded there: the old criterion took him, the
+        // owner's « celui qui a le moins de buts pris » does not.
+        player({
+          displayName: "Grosse différence",
+          minutes: 600,
+          declarations: { DC: "primary" },
+          positions: [at("DC", 600, 30, 12)],
+        }),
+        player({
+          displayName: "Rempart",
+          minutes: 600,
+          declarations: { DC: "primary" },
+          positions: [at("DC", 600, 2, 3)],
+        }),
+      ],
+    });
+    expect(pickedName(result, "dc")).toBe("Rempart");
+    const pick = result.picks.find((p) => p.slotId === "dc");
+    expect(pick?.cell?.figure).toBe("outfieldConceded");
+    expect(pick?.cell?.observed.numerator).toBe(3);
+  });
+
+  it("ranks MC on the goal difference at that post", () => {
+    const result = solveSeven("legende", {
+      slots: [slot("mc", "MC")],
+      candidates: [
+        player({
+          displayName: "Organisateur",
+          minutes: 600,
+          declarations: { MC: "primary" },
+          positions: [at("MC", 600, 20, 5)],
+        }),
+        // Concedes less at MC, but the team scores almost nothing with him there: the difference is
+        // what « meilleur organisateur » was delegated to, and it prefers the first.
+        player({
+          displayName: "Stérile",
+          minutes: 600,
+          declarations: { MC: "primary" },
+          positions: [at("MC", 600, 2, 2)],
+        }),
+      ],
+    });
+    expect(pickedName(result, "mc")).toBe("Organisateur");
+    expect(result.picks[0].cell?.figure).toBe("impact");
+  });
+
   it("fills the attack first, even when the total would rather have him at the back", () => {
     const result = solveSeven("legende", {
       slots: [slot("dc", "DC"), slot("at", "AT")],
       candidates: [
-        // Star: best at AT and even better at DC. Second: nearly as good at AT, poor at DC. The sum
-        // wants Star at DC and Second up front; « en commençant par l'attaque » wants Star up front.
+        // Star scores more than Second and also concedes far less at DC. The sum of the two posts
+        // wants Star at DC; « en commençant par l'attaque » wants Star up front.
         player({
           displayName: "Star",
           minutes: 6000,
+          goals: 300,
           declarations: { AT: "primary", DC: "secondary" },
-          positions: [at("AT", 3000, 150, 50), at("DC", 3000, 200, 50)],
+          positions: [at("AT", 3000, 150, 50), at("DC", 3000, 200, 2)],
         }),
         player({
           displayName: "Second",
           minutes: 6000,
+          goals: 290,
           declarations: { AT: "primary", DC: "secondary" },
           positions: [at("AT", 3000, 140, 50), at("DC", 3000, 50, 100)],
         }),
@@ -223,7 +400,8 @@ describe("the 7 de légende", () => {
     });
     expect(pickedName(result, "at")).toBe("Star");
     expect(pickedName(result, "dc")).toBe("Second");
-    expect(result.picks.find((pick) => pick.slotId === "at")?.cell?.figure).toBe("impact");
+    expect(result.picks.find((pick) => pick.slotId === "at")?.cell?.figure).toBe("goals");
+    expect(result.picks.find((pick) => pick.slotId === "dc")?.cell?.figure).toBe("outfieldConceded");
   });
 
   it("refuses a keeper worse than the squad's average, for a better outfielder with minutes in goal", () => {
@@ -257,10 +435,10 @@ describe("the 7 de légende", () => {
    */
   it("gives a man with no minutes at a post no figure at all, and prefers the man who played it", () => {
     const result = solveSeven("legende", {
-      slots: [slot("at", "AT")],
+      slots: [slot("mc", "MC")],
       candidates: [
-        player({ displayName: "Habitué", minutes: 600, declarations: { AT: "primary" }, positions: [at("AT", 600, 2, 10)] }),
-        player({ displayName: "Nouveau", minutes: 600, declarations: { AT: "primary" } }),
+        player({ displayName: "Habitué", minutes: 600, declarations: { MC: "primary" }, positions: [at("MC", 600, 2, 10)] }),
+        player({ displayName: "Nouveau", minutes: 600, declarations: { MC: "primary" } }),
       ],
     });
     const cellOf = (name: string) => result.cells[result.candidates.findIndex((c) => c.id === name)][0];
@@ -268,7 +446,69 @@ describe("the 7 de légende", () => {
     expect(cellOf("Nouveau").adjusted).toBeNull();
     // Habitué is at −0,8 per 60 and still goes in: measured beats unmeasured.
     expect(cellOf("Habitué").adjusted).toBeCloseTo(-0.8);
-    expect(pickedName(result, "at")).toBe("Habitué");
+    expect(pickedName(result, "mc")).toBe("Habitué");
+  });
+
+  it("gives no figure at AIL or DC either to a man who never held the post", () => {
+    for (const [code, figure] of [
+      ["AIL", "teamGoalsFor"],
+      ["DC", "outfieldConceded"],
+    ] as const) {
+      const result = solveSeven("legende", {
+        slots: [slot("s", code)],
+        candidates: [
+          player({ displayName: "Habitué", minutes: 600, declarations: { [code]: "primary" }, positions: [at(code, 600, 1, 30)] }),
+          player({ displayName: "Nouveau", minutes: 600, declarations: { [code]: "primary" } }),
+        ],
+      });
+      const cellOf = (name: string) => result.cells[result.candidates.findIndex((c) => c.id === name)][0];
+      expect(cellOf("Nouveau").adjusted, code).toBeNull();
+      expect(cellOf("Habitué").adjusted, code).not.toBeNull();
+      expect(cellOf("Habitué").figure, code).toBe(figure);
+      // Even a dreadful record at the post beats having never held it — the same house rule as MC,
+      // and the reason the DC key is negated rather than left as « fewest is a small number ».
+      expect(pickedName(result, "s"), code).toBe("Habitué");
+    }
+  });
+
+  /**
+   * « Si le gardien est aussi le meilleur attaquant, prendre le deuxième meilleur gardien. »
+   *
+   * No code answers this: the bitmask DP of `best-seven.ts` assigns exactly, so one man takes one slot
+   * and the rest of the seven is re-optimised around him. The test is here to pin that the owner's rule
+   * falls out of the existing machine, and to catch the day somebody replaces it with a greedy fill.
+   */
+  it("gives the goal to the second-best keeper when the best one is also the best striker", () => {
+    const result = solveSeven("legende", {
+      slots: [slot("gb", "GB"), slot("at", "AT")],
+      candidates: [
+        // Best keeper of the squad *and* the best scorer by a distance.
+        player({
+          displayName: "Phénomène",
+          minutes: 1200,
+          goals: 40,
+          gkMinutes: 600,
+          concededWhileGk: 2,
+          declarations: { GB: "primary", AT: "primary" },
+          positions: [at("AT", 600, 45, 10)],
+        }),
+        player({
+          displayName: "Deuxième gardien",
+          minutes: 600,
+          goals: 0,
+          gkMinutes: 600,
+          concededWhileGk: 6,
+          declarations: { GB: "primary" },
+        }),
+        player({ displayName: "Troisième gardien", minutes: 600, gkMinutes: 600, concededWhileGk: 40, declarations: { GB: "primary" } }),
+      ],
+    });
+    // The lexicographic keys put AT first, so he goes up front and the goal falls to the next keeper.
+    expect(pickedName(result, "at")).toBe("Phénomène");
+    expect(pickedName(result, "gb")).toBe("Deuxième gardien");
+    // Complete and valid: seven would be seven here too — two slots, two different men, no empty one.
+    expect(result.picks.every((pick) => pick.player !== null)).toBe(true);
+    expect(new Set(result.picks.map((pick) => pick.player?.id)).size).toBe(2);
   });
 });
 

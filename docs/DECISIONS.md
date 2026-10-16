@@ -8087,3 +8087,97 @@ and no better anywhere else. **The comparison between the two sevens on the same
 not been made**, and the algorithm stays in the tree until it is.
 
 ---
+
+## 206 — The offensive seven is the team's goals while he is on, and the légende is five different criteria
+
+**2026-10-16** · accepted · owner's request, same backlog as 204/205 · `lib/stats/sevens.ts`,
+`lib/stats/seven-prompt.ts`, `lib/stats/best-seven-copy.ts`, `lib/stats/best-seven-input.ts`,
+`lib/stats/actions.ts` · no migration · **supersedes decision 197's criterion for the attack seven
+and decision 198's single figure for the légende** · leaves 171, 172 and 187 standing
+
+**The owner redefined what three of the four sevens measure.** His words: « pour la meilleure attaque,
+il faut que ce soit les joueurs, qui, lorsqu'à chaque poste, l'équipe marque le plus. Il faut aussi
+relativiser avec le nombre de minutes jouées (si je joue 5 mn, et qu'il y a 8 buts, ça n'est pas
+représentatif). Pour la meilleure défense, c'est pareil […] Enfin, le 7 de légende, c'est chaque
+meilleur à chaque poste : attaquant -> plus de but marqué. Ailier -> meilleur ratio. DC -> moins de
+buts pris le terrain. Goal -> moins de buts pris. MC meilleur organisateur. Si le gardien est aussi le
+meilleur attaquant, prendre le deuxième meilleur gardien. […] Le modèle ne doit pas prendre en compte
+les notes. » Clarified with him: « ailier → meilleur ratio » is the team's goals while he is on, per
+minute, judged at the wing; « MC meilleur organisateur » he delegated, and the answer is the goal
+difference per minute at MC; the notes seven **keeps its algorithm** and the model is shown no mark at
+all.
+
+**The data agrees with his instinct, and that is why this is not merely a preference.** Across the
+whole season there are **11** personal goals, **5** assists, **77** goals the team scored while a given
+player was on the pitch and **119** it conceded. Eleven goals cannot separate fifteen players and five
+assists cannot rank anybody — the team figures are simply better-powered by an order of magnitude. It
+is also the reason **MC is judged on goal difference rather than on assists**: « organisateur » would
+naturally be the passes, and the passes do not exist in usable quantity.
+
+| seven | outfield criterion | goalkeeper |
+| --- | --- | --- |
+| **offensive** | **the team's goals scored while he is on, per minute, shrunk** (`goalsForWhileOn`), tie-broken on his own goals. **Assists are dropped entirely.** | fewest conceded in goal, shrunk — unchanged |
+| **defensive** | unchanged: the team's goals conceded while he is on | unchanged |
+| **légende** | five criteria, one per post, below | fewest conceded in goal, keeping 172's Q8 floor |
+| **notes** | unchanged — and **never asked of the model** | unchanged |
+
+Légende, per post: **GB** fewest conceded in goal · **DC** fewest team goals conceded while he plays
+DC · **MC** best goal difference while he plays MC, which is decision 198's raw impact kept for this
+one post · **AIL** most team goals while he plays AIL · **AT** his own goals per outfield minute.
+`SevenFigure` gains `teamGoalsFor`, and **every shrunk criterion is fitted over its own population** —
+the men with minutes at that post, never the whole squad. Decision **198**'s first sort key, « has he
+played this post at all », survives for GB, DC, MC and AIL.
+
+**What this supersedes, said plainly.** Decision **197** chose the player's *own* goals for the attack
+seven and stated in as many words « never `goalsForWhileOn`, which is the team's ». **That is
+reversed**: a reader should not come away thinking 197 still governs the criterion. Decision **198**
+made the légende one uniform raw-impact figure; it is now **five** different figures, and 198 survives
+only as the MC criterion and as the « has he played this post » key. Decisions **171** and **172** —
+the four sevens, their structure, the Q8 keeper floor, the notes seven — stand untouched, and so does
+**187**'s « no minutes, not a candidate » together with its refusal of a minimum-minutes threshold.
+
+**First honest limit: « attaquant → plus de buts marqués » cannot be measured at the post, and this is
+the data model's fault.** `match_player_positions` stores the **team's** goals for and against per
+position, never the player's own. So the AT criterion is his **season** goals over his outfield
+minutes, where the other four are measured at the post. That asymmetry is recorded as a limitation,
+not as a choice, and the prompt says it to the model in the same words.
+
+**Second honest limit: the shrinkage does not absorb the owner's own example, and this was measured
+rather than assumed.** Eight team goals in five minutes is 96 per 60; shrunk it is **10.7**, against
+**5.8** for a full season of 60 goals in 600 minutes. The prior is clamped — `PRIOR_STRENGTH_CLAMP`,
+1 to 6 blocks — so a very short record keeps roughly **8 %** weight, and 8 % of 96 beats everybody. A
+*plausible* thin record does lose: 2 goals in 5′, eight times the squad rate, lands at **3.9** behind
+**5.3**. It is only the extreme outlier that survives, and his example is exactly that outlier.
+
+**Shown this, the owner chose to leave the arithmetic alone and let the model discount it**, rather
+than add the minimum-minutes threshold he refused when the sevens were built (187). So the guard is an
+**instruction in the prompt**: it tells the model that the smoothing does not correct everything, that
+eight goals over five minutes stays at the top of the smoothed figure and is not representative, and
+that it must read the raw record and set aside a man whose figure rests on a few minutes **even when he
+ranks first**. A test pins that instruction and asserts the prompt does **not** say « le lissé classe ».
+**The weakness therefore remains in the algorithmic fallback, which has no judgement** — the DP ranks
+the clamped figure and nothing stops the outlier there. That is a known and accepted hole, written down
+here so nobody rediscovers it as a bug, and it is on the roadmap.
+
+**The keeper/striker conflict needed no new code.** « Si le gardien est aussi le meilleur attaquant,
+prendre le deuxième meilleur gardien » is what the bitmask DP's **exact** assignment has always done —
+it optimises the seven, not each post greedily — and it is now pinned by a test. The model cannot infer
+it from a list of per-post figures, so the prompt states it.
+
+**A bug found and fixed in the same pass.** The notes seven was still being sent to the model after the
+ratings had been withheld from the prompt: it would have been asked a question whose figures were
+deliberately removed, burning two calls and falling back every time. It is **gated out before the
+call**, with its own sentence on screen: « Ce sept se classe sur les notes, et le modèle ne les voit
+jamais : c'est l'algorithme qui le compose, sur la meilleure moyenne à chaque poste. »
+
+**Third honest limit, a readability risk and not a defect yet: the légende's discs are now
+heterogeneous.** An AIL disc reading « 1 but/133′ » means the team **scored**; a DC disc reading
+« 1 but/24′ » means it **conceded**; only the record line underneath distinguishes them. That is the
+cost of five criteria on one pitch, it is being judged at 390 px in both themes, and it is recorded as
+a thing to watch rather than as resolved.
+
+**1593** tests pass, against 1581 before. Several existing tests encoded the old criteria and were
+**rewritten to the new specification rather than weakened** — notably the offensive seven's assist
+cases, since assists are no longer a key at all, and the légende's per-post fixtures.
+
+---

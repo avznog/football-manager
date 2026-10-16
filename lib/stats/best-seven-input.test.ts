@@ -89,6 +89,9 @@ describe("toBestSevenSquad", () => {
       outfieldMinutes: 340,
       concededOutfield: 3,
       concededWhileGk: 2,
+      // The team's goals while he was on — 4 — beside his own 11. The pair the offensive seven
+      // depends on, and the one it would be easiest to swap.
+      goalsForWhileOn: 4,
       positions: [{ group: "AT", minutes: 340, goalsFor: 4, goalsAgainst: 3 }],
     });
   });

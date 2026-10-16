@@ -143,7 +143,10 @@ export async function askSeven(ask: SevenAsk): Promise<SevenAnswerView> {
     y: slot.y,
   }));
 
-  type ModelFailure = "rateLimited" | "httpError" | "timedOut" | "invalidAnswer" | "noKey";
+  // Derived from the copy's own union, so a failure added there cannot be forgotten here. `Extract`
+  // rather than a conditional type: `SevenSource` is a union and a bare `extends` would not distribute
+  // over it, collapsing the whole thing to `never`.
+  type ModelFailure = Extract<SevenSource, { path: "algorithm" }>["failure"];
   const fallback = (failure: ModelFailure) =>
     ({
       source: { path: "algorithm", failure } as const,
@@ -154,6 +157,18 @@ export async function askSeven(ask: SevenAsk): Promise<SevenAnswerView> {
       squad,
       slots: slotViews,
     }) satisfies SevenAnswerView;
+
+  /*
+   * The notes seven never reaches the model, because the model is never given a mark to reason about:
+   * the owner's instruction is « le modèle ne doit pas prendre en compte les notes », and
+   * `buildSevenPrompt` withholds every rating accordingly (decision 206). Asking it for this seven
+   * anyway would be asking a question we have deliberately removed the figures for — it would answer
+   * from the names, or refuse, and either way the validator would spend two calls finding out.
+   *
+   * It is also the one seven that needs no judgement: the best mean at each post is a ranking, and the
+   * dynamic program already solves it exactly.
+   */
+  if (ask.seven === "notes") return fallback("notRequested");
 
   const fingerprint = sevenFingerprint(ask.seven, ask.competitionId, ask.context, candidates);
 

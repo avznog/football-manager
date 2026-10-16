@@ -214,11 +214,24 @@ describe("naming the controls", () => {
     expect(Object.keys(SEVEN_OPTION_FR)).toEqual(["offensive", "defensive", "legende", "notes"]);
     expect(SEVEN_OPTION_FR.legende).toBe("7 de légende");
     // Decision 199: no rule names a « /h » any more — the attack's is a waiting time in minutes.
-    expect(SEVEN_RULE_FR.offensive).toContain("attend le moins de minutes entre deux buts");
     expect(SEVEN_RULE_FR.offensive).not.toContain("par heure");
+    // The attack is the team's goals while he is on, and the rule has to say so: « celui qui marque le
+    // plus » would be a claim about a different figure from the one the discs carry.
+    expect(SEVEN_RULE_FR.offensive).toContain("l’équipe marque le plus souvent quand il est sur le terrain");
+    expect(SEVEN_RULE_FR.offensive).not.toContain("passes décisives");
     expect(SEVEN_RULE_FR.defensive).toContain("encaisse le moins souvent");
     expect(SEVEN_RULE_FR.legende).toContain("de l’attaque vers la défense");
     expect(SEVEN_RULE_FR.legende).toContain("moyenne des gardiens");
+    // Five criteria, each named with the post it belongs to.
+    for (const clause of [
+      "en AT le plus de buts à lui",
+      "en AIL les buts de l’équipe quand il y joue",
+      "en MC la meilleure différence de buts à ce poste",
+      "en DC le moins encaissé à ce poste",
+      "au goal le moins encaissé",
+    ]) {
+      expect(SEVEN_RULE_FR.legende).toContain(clause);
+    }
   });
 
   /**
@@ -261,13 +274,20 @@ describe("naming the controls", () => {
 describe("printing a figure", () => {
   it("writes each cell's figure in its own scale", () => {
     // Decision 199: a rate of countable events is the wait between two, « X but every X minutes ».
-    expect(formatSevenFigure("goals", 0.45)).toBe("1 but toutes les 133′");
+    // And since decision 206 the **noun carries the polarity**: the légende puts a striker's scored
+    // rate and a keeper's conceded rate on one pitch, where « 1 but toutes les 17′ » under the keeper
+    // and « 1 but toutes les 91′ » under the striker read as the same claim and meant the opposite.
+    expect(formatSevenFigure("goals", 0.45)).toBe("1 but marqué toutes les 133′");
     expect(formatSevenFigure("goals", 0.45, true)).toBe("1 but/133′");
     expect(formatSevenFigure("ratings", 7.04)).toBe("7,0");
-    // A conceded rate per 60 is read as minutes per goal, as on `/stats` (decision 162).
-    expect(formatSevenFigure("keeperConceded", 2.5)).toBe("1 but toutes les 24′");
-    expect(formatSevenFigure("keeperConceded", 2.5, true)).toBe("1 but/24′");
-    expect(formatSevenFigure("outfieldConceded", 0)).toBe("aucun but");
+    // A conceded rate per 60 is read as minutes per goal, as on `/stats` (decision 162) — and says so.
+    expect(formatSevenFigure("keeperConceded", 2.5)).toBe("1 but encaissé toutes les 24′");
+    // « pris » on the disc, not « encaissé »: four characters, and already the word the record line
+    // under it uses. The caption's budget is 104 px.
+    expect(formatSevenFigure("keeperConceded", 2.5, true)).toBe("1 pris/24′");
+    expect(formatSevenFigure("outfieldConceded", 2.5, true)).toBe("1 pris/24′");
+    expect(formatSevenFigure("outfieldConceded", 0)).toBe("aucun but encaissé");
+    expect(formatSevenFigure("goals", 0)).toBe("aucun but");
     // The impact is a difference: no waiting time, so it names the stretch it is divided over. Raw
     // since decision 198, so the two counts and the minutes under the name reproduce it.
     expect(formatSevenFigure("impact", 6)).toBe("+6,0 pour 60′");
@@ -282,7 +302,8 @@ describe("printing a figure", () => {
    */
   it("words a rate with format.ts's one sentence, and abbreviates the same number", () => {
     for (const rate of [0.45, 2.5, 6, 0.07]) {
-      expect(formatSevenFigure("goals", rate)).toBe(`1 but ${everyFr(60, rate)}`);
+      expect(formatSevenFigure("goals", rate)).toBe(`1 but marqué ${everyFr(60, rate)}`);
+      expect(formatSevenFigure("keeperConceded", rate)).toBe(`1 but encaissé ${everyFr(60, rate)}`);
       expect(formatSevenFigure("goals", rate, true)).toBe(`1 but/${minutesPerCount(rate)}′`);
       expect(everyFr(60, rate)).toContain(`${minutesPerCount(rate)}′`);
     }
@@ -296,12 +317,20 @@ describe("printing a figure", () => {
 
   it("prints the raw record beside it, and « aucun but encaissé » rather than infinity", () => {
     const base = { rate: 1, denominatorUnit: "minutes" as const, exposure: 1 };
-    expect(sevenObservedFr("goals", { ...base, numerator: 3, denominator: 240, secondary: 1 })).toBe(
-      "3 buts, 1 passe décisive sur 240′",
+    // His own goals, with no assists any more: five in the whole season rank nobody, and « 0 passe
+    // décisive » under a name was a figure about nothing.
+    expect(sevenObservedFr("goals", { ...base, numerator: 3, denominator: 240 })).toBe("3 buts sur 240′");
+    expect(sevenObservedFr("goals", { ...base, numerator: 3, denominator: 240 }, true)).toBe(
+      "3 buts · 240′",
     );
+    // The team's goals, which is a different claim and says so — and « dont X de lui », because a man
+    // can lead this seven without having scored one of them.
     expect(
-      sevenObservedFr("goals", { ...base, numerator: 3, denominator: 240, secondary: 1 }, true),
-    ).toBe("3 buts · 1 p.d. · 240′");
+      sevenObservedFr("teamGoalsFor", { ...base, numerator: 12, denominator: 240, secondary: 2 }),
+    ).toBe("12 buts de l’équipe sur 240′, dont 2 de lui");
+    expect(
+      sevenObservedFr("teamGoalsFor", { ...base, numerator: 12, denominator: 240 }, true),
+    ).toBe("12 buts éq. · 240′");
     expect(sevenObservedFr("keeperConceded", { ...base, numerator: 0, denominator: 35 })).toBe(
       "aucun but encaissé en 35′",
     );
@@ -426,14 +455,25 @@ describe("who may keep goal (decision 172)", () => {
   });
 
   it("states each new seven's smoothing and its one surprising rule", () => {
-    expect(sevenSmoothingFr("offensive")).toContain("départagés par leurs passes décisives");
+    // The attack's big figure is the team's goals, and the sentence has to say « pas forcément le
+    // sien » or the disc reads as his own scoring record.
+    expect(sevenSmoothingFr("offensive")).toContain("un but que l’équipe marque pendant qu’il est sur le terrain");
+    expect(sevenSmoothingFr("offensive")).toContain("pas forcément le sien");
+    expect(sevenSmoothingFr("offensive")).toContain("départagés par les buts qu’ils ont mis eux-mêmes");
     // Decision 199: the sentence reads the unit out loud before it explains the smoothing.
     expect(sevenSmoothingFr("offensive")).toContain("1 but toutes les X minutes de jeu");
     expect(sevenSmoothingFr("offensive")).toContain("lissé vers la moyenne de l’équipe");
-    // Decision 198: the légende says the opposite, because nothing is smoothed there.
-    expect(sevenSmoothingFr("legende")).toContain("Rien n’est lissé");
-    expect(sevenSmoothingFr("legende")).toContain("ramenée à 60 minutes de jeu");
-    expect(sevenSmoothingFr("legende")).not.toContain("moyenne du poste");
+    // Five criteria, so five clauses — and the AT one says why it is the only figure not read at the
+    // post, because the schema holds no per-player goal per position.
+    const legende = sevenSmoothingFr("legende")!;
+    for (const clause of ["En AT", "En AIL", "En MC", "En DC et au goal"]) {
+      expect(legende).toContain(clause);
+    }
+    expect(legende).toContain("les buts ne sont pas rattachés à un poste");
+    // Decision 198: the MC figure is still the raw division, checkable by hand.
+    expect(legende).toContain("ramenée à 60 minutes");
+    expect(legende).toContain("brut, et le calcul se refait à la main");
+    expect(legende).not.toContain("moyenne du poste");
     expect(sevenSmoothingFr("notes")).toBeNull();
   });
 });

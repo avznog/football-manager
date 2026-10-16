@@ -9,19 +9,53 @@
  * one after the other (`SquadCell.keys`). That generalises the one special case the old file had — the
  * GB slot reading the keeper's clean-sheet pair — into a rule per seven:
  *
- * | seven      | outfield slots                                         | GB slot                         |
- * |------------|--------------------------------------------------------|---------------------------------|
- * | offensive  | goals per 60, then assists per 60                      | fewest conceded per 60 in goal  |
- * | défensive  | fewest conceded per 60 as an outfielder                | fewest conceded per 60 in goal  |
- * | légende    | raw impact at that post, AT → AIL → MC → DC            | in goal, never below average    |
- * | notes      | average rating received (the old `ratings` criterion)  | the same                        |
+ * | seven      | outfield slots                                          | GB slot                        |
+ * |------------|---------------------------------------------------------|--------------------------------|
+ * | offensive  | the **team's** goals per 60 while he is on, shrunk       | fewest conceded per 60 in goal |
+ * | défensive  | fewest conceded per 60 as an outfielder                 | fewest conceded per 60 in goal |
+ * | légende    | **one criterion per post**, see below, AT → AIL → MC → DC | in goal, never below average  |
+ * | notes      | average rating received (the old `ratings` criterion)   | the same                       |
  *
- * **No new model.** Goals and assists are `best-seven.ts`'s own Gamma–Poisson cells (`evaluateSquad`
- * on `goals` and `assists`); the conceded rates are S12's (`lib/stats/impact.ts`): the same
- * `fitShrinkage` on the `goals` criterion, fed a different count. **The impact is not a model at all
- * since decision 198** — it is the raw goal difference per 60 at the post, which is what the owner
- * reads in the table on `/stats`, and the two screens may not print different numbers for the same
- * man at the same post.
+ * ## What « la meilleure attaque » counts, and why it is not his own goals
+ *
+ * The owner's words: « pour la meilleure attaque, il faut que ce soit les joueurs, qui, lorsqu'à chaque
+ * poste, l'équipe marque le plus. » So the offensive seven ranks on `goalsForWhileOn` — the goals **the
+ * team** scored while he was on the pitch, over his own minutes — and not on the goals he scored
+ * himself. A right back who never shoots and whose presence turns an attack on is the man this seven is
+ * looking for, and the old criterion could not see him. His own goals survive as the tie-break, in the
+ * only place a tie-break is honest: between two men the screen prints the same waiting time for.
+ *
+ * ## Légende: one criterion per post, « chaque meilleur à chaque poste »
+ *
+ * | post | criterion                                                                      |
+ * |------|--------------------------------------------------------------------------------|
+ * | AT   | **his own goals**, per outfield minute, shrunk — the one figure not read at the post |
+ * | AIL  | the team's goals **at AIL**, per minute there, shrunk                          |
+ * | MC   | the goal difference **at MC**, per minute there, raw (`rawImpactPer60`)         |
+ * | DC   | the goals conceded **at DC**, per minute there, shrunk — fewest wins            |
+ * | GB   | fewest conceded in goal, per minute, shrunk, never below the keepers' average   |
+ *
+ * **AT is the one that cannot be measured at the post, and that is a data-model fact, not a choice.**
+ * `match_player_positions` stores `minutes`, `goalsFor` and `goalsAgainst` per position group — the
+ * **team's** goals, both ways, never the player's own. There is nowhere in this schema that says « he
+ * scored this one while he was playing AT », so « attaquant → plus de buts marqués » is his season's
+ * goals over his outfield minutes, and the copy says « ses buts » rather than « ses buts à ce poste ».
+ * The other four are read at the post, from `PositionSeason`.
+ *
+ * **No new model.** Every shrunk rate above is `fitCountModel` / `shrunkPer60` (`lib/stats/impact.ts`)
+ * — the same `fitShrinkage` on the `goals` criterion, fed a different count over a different stretch of
+ * minutes. **The impact is not a model at all since decision 198** — it is the raw goal difference per
+ * 60 at the post, which is what the owner reads in the table on `/stats`, and the two screens may not
+ * print different numbers for the same man at the same post. Each of the légende's shrunk criteria is
+ * fitted over **its own population**: the men with minutes at that post, never the whole squad, because
+ * the squad mean a thin record is pulled towards has to be the mean of the thing being measured.
+ *
+ * ## « Relativiser avec le nombre de minutes », which is the shrinkage and not a threshold
+ *
+ * « Si je joue 5 mn, et qu'il y a 8 buts, ça n'est pas représentatif » — the Gamma–Poisson shrinkage is
+ * the answer, and it is continuous: five minutes is pulled almost all the way back to the mean and
+ * fifteen a little less. There is no minimum-minutes gate anywhere here, and decision 187's note says
+ * why the owner refused one.
  *
  * ## The order of the keys, which is the order of the cahier's sentences
  *
@@ -32,17 +66,17 @@
  * the men left. A man who is both the best scorer and the best keeper plays outfield, as the cahier
  * says.
  *
- * - **Offensive, goals then assists.** The goals key is the shrunk rate **as the screen prints it**:
- *   the whole minutes between two goals (`scoringKey`, and `minutesPerCount` is the one conversion).
- *   Unrounded, two shrunk rates are never equal, so « puis de passes D » would never decide anything;
- *   at the resolution the reader sees, two men both shown « 1 but toutes les 133′ » are equal scorers
- *   for him, and the one with more assists goes first. A combined figure (goals + k × assists) was the
- *   alternative and was refused: any k lets enough assists outweigh a goal, which is not « buts, puis
- *   passes ». The key used to be the rate rounded to the tenth of a goal per hour, which was the
- *   resolution of a figure the screen stopped printing with decision 199 — a tie-break has to be in
- *   the unit the reader is looking at, or it breaks ties he cannot see and keeps ties he can.
+ * - **Offensive, the team's goals then his own.** The first key is the shrunk team rate **as the screen
+ *   prints it**: the whole minutes between two of the team's goals while he is on (`scoringKey`, and
+ *   `minutesPerCount` is the one conversion). Unrounded, two shrunk rates are never equal, so a second
+ *   key would never decide anything; at the resolution the reader sees, two men both shown « 1 but
+ *   toutes les 133′ » are equally good for the attack, and the one who scored more of those goals
+ *   himself goes first. **Assists are not a key any more**: there are five in the whole season, so they
+ *   cannot rank anybody, and the owner's sentence about this seven does not mention them. A combined
+ *   figure (team goals + k × his own) is refused for the reason it always was: any k lets the second
+ *   figure outweigh the first, which is not « puis ».
  * - **Légende, attack first.** Two keys per position group, in the order AT, AIL, MC, DC, GB: the DP
- *   maximises the striker's impact first, then the wingers', and so on down to the goal. This is the
+ *   maximises the striker's figure first, then the wingers', and so on down to the goal. This is the
  *   cahier's fill order **without** greedy's failure: the positional objective still comes first, so
  *   the attack can never take a man the defence needed to have its posts declared, and within a group
  *   of two slots (two DC, two AIL) the pair is still chosen exactly. `best-seven.test.ts` keeps its
@@ -88,8 +122,19 @@ import { positionGroupOf, type PositionGroup } from "./positions";
 export const SEVEN_KINDS = ["offensive", "defensive", "legende", "notes"] as const;
 export type SevenKind = (typeof SEVEN_KINDS)[number];
 
-/** What a cell's figure is, which is what the screen formats it as. */
-export type SevenFigure = "goals" | "keeperConceded" | "outfieldConceded" | "impact" | "ratings";
+/**
+ * What a cell's figure is, which is what the screen formats it as.
+ *
+ * `goals` is the man's own goals; `teamGoalsFor` is **the team's**, scored while he was on — two
+ * different claims that happen to be printed in the same unit, so they are two names and never one.
+ */
+export type SevenFigure =
+  | "goals"
+  | "teamGoalsFor"
+  | "keeperConceded"
+  | "outfieldConceded"
+  | "impact"
+  | "ratings";
 
 /** A candidate with the season figures the new sevens read on top of `best-seven.ts`'s. */
 export type SevenCandidate = BestSevenCandidate & {
@@ -98,11 +143,19 @@ export type SevenCandidate = BestSevenCandidate & {
   /** `concededWhileOn − concededWhileGk`. */
   concededOutfield: number;
   concededWhileGk: number;
+  /**
+   * The goals **the team** scored while he was on the pitch — `goalsForWhileOn`, never his own
+   * `goals`. The offensive seven ranks on this.
+   */
+  goalsForWhileOn: number;
   /** Per position group, from `match_player_positions` (decision 160). */
   positions: readonly PositionSeason[];
 };
 
-/** The raw record behind a cell. `secondary` is assists on a goals cell and goals against on impact. */
+/**
+ * The raw record behind a cell. `secondary` is his own goals on a `teamGoalsFor` cell and the goals
+ * against on an `impact` one.
+ */
 export type SevenObserved = ObservedFigure & { secondary?: number };
 
 export type SevenCell = SquadCell & {
@@ -294,20 +347,40 @@ export function buildCells(
   /* ---- offensive ---------------------------------------------------------- */
 
   if (kind === "offensive") {
-    const goals = evaluateSquad(candidates, slots, "goals");
-    const assists = evaluateSquad(candidates, slots, "assists");
+    /**
+     * The team's goals while he was on, over his own minutes, shrunk towards the squad's rate.
+     *
+     * Over **all** his minutes, not only his outfield ones: `goalsForWhileOn` counts what the team did
+     * whenever he was on the pitch, the goal included, and splitting it would need a numerator this
+     * schema does not hold. A keeper's hour in goal is an hour the team was scoring or not.
+     */
+    const teamModel = fitCountModel(
+      candidates
+        .filter((candidate) => candidate.minutes > 0)
+        .map((candidate) => ({
+          ...identityOf(candidate),
+          minutes: candidate.minutes,
+          count: candidate.goalsForWhileOn,
+        })),
+    );
+    /** His own goals per outfield minute, the tie-break only. */
+    const ownGoals = evaluateSquad(candidates, slots, "goals");
     const cells = candidates.map((candidate, c) =>
       slots.map((slot, s): SevenCell => {
         if (slot.isGoalkeeper) {
           return keeperCell(candidate, slot, [0, 0, -(keeperRate(candidate) ?? 0)]);
         }
-        const goalCell = goals.cells[c][s];
-        const assistCell = assists.cells[c][s];
+        const rate = shrunkPer60(candidate.goalsForWhileOn, candidate.minutes, teamModel);
         return {
-          ...goalCell,
-          figure: "goals",
-          observed: { ...goalCell.observed, secondary: candidate.assists },
-          keys: [scoringKey(goalCell.adjusted), assistCell.adjusted ?? 0, 0],
+          fit: fitOf(candidate, slot),
+          figure: "teamGoalsFor",
+          adjusted: rate,
+          observed: {
+            ...observedCount(candidate.goalsForWhileOn, candidate.minutes),
+            secondary: candidate.goals,
+          },
+          figureSource: "allPitch",
+          keys: [scoringKey(rate), ownGoals.cells[c][s].adjusted ?? 0, 0],
           allowed: true,
         };
       }),
@@ -349,17 +422,42 @@ export function buildCells(
   /* ---- légende ------------------------------------------------------------ */
 
   /**
-   * Two keys per position group since decision 198, and the pair is what replaces the shrinkage.
+   * One criterion per post (the table at the top of this file), and **two keys per post** since
+   * decision 198: whether he has played it at all, then his figure there.
    *
-   * The impact is raw now, so a man with no minute at the post has **no figure at all** rather than the
-   * post's mean difference. The mean used to order him among the men who had played there — below them,
-   * as it happens, since it was negative — and with it gone a bare `0` would promote him above every
-   * real record that is negative, putting a disc reading « — » in a seven whose whole claim is « le
-   * meilleur à ce poste ». So the first key of each group is **whether he has played the post at all**
-   * and the second is his figure: measured men first, then the best of them. That is the same house rule
-   * as before (unknown is neither best nor worst) stated in the one way left that does not invent a
-   * number.
+   * The first key is the house rule « unknown is neither best nor worst », stated in the one way that
+   * does not invent a number. A man with no minute at the post has **no figure at all** — the impact is
+   * raw, and the three shrunk criteria are fitted over the men who have played the post, so neither has
+   * a mean that is *his* to print. A bare `0` in its place would promote him above every real record
+   * below zero (or every real conceded rate above zero), putting a disc reading « — » in a seven whose
+   * whole claim is « le meilleur à ce poste ».
+   *
+   * The second key is always « more is better », so the two conceded criteria are negated: fewest
+   * conceded at DC, fewest conceded in goal.
    */
+  const strikerModel = fitCountModel(
+    candidates
+      .filter((candidate) => candidate.outfieldMinutes > 0)
+      .map((candidate) => ({
+        ...identityOf(candidate),
+        minutes: candidate.outfieldMinutes,
+        count: candidate.goals,
+      })),
+  );
+  /**
+   * AT: his own goals per outfield minute. **Not measured at the post**, because
+   * `match_player_positions` holds only the team's goals for and against per position group and never
+   * the player's own — see this file's header. The post's minutes are therefore not the denominator
+   * here; his outfield minutes are.
+   */
+  const strikerRate = (candidate: SevenCandidate) =>
+    candidate.outfieldMinutes > 0
+      ? shrunkPer60(candidate.goals, candidate.outfieldMinutes, strikerModel)
+      : null;
+  /** AIL: the team's goals at AIL. DC: the goals conceded at DC. Both per minute there, both shrunk. */
+  const wingerRate = fitGroupRate(candidates, "AIL", (season) => season.goalsFor);
+  const centreBackRate = fitGroupRate(candidates, "DC", (season) => season.goalsAgainst);
+
   const keyIndex = (group: PositionGroup) => LEGEND_ORDER.indexOf(group) * 2;
   const cells = candidates.map((candidate) =>
     slots.map((slot): SevenCell => {
@@ -370,20 +468,18 @@ export function buildCells(
         return keeperCell(candidate, slot, keys);
       }
       const group = positionGroupOf(slot.positionCode);
-      const season = group ? candidate.positions.find((position) => position.group === group) : undefined;
-      const impact = group ? rawImpactPer60(season) : null;
-      if (group !== null && impact !== null) {
+      const measured = group === null ? null : legendOutfieldCell(candidate, group);
+      if (group !== null && measured !== null && measured.adjusted !== null) {
         keys[keyIndex(group)] = 1;
-        keys[keyIndex(group) + 1] = impact;
+        keys[keyIndex(group) + 1] = measured.key;
       }
       return {
         fit: fitOf(candidate, slot),
-        figure: "impact",
-        adjusted: impact,
-        observed: {
-          ...observedCount(season?.goalsFor ?? 0, season?.minutes ?? 0),
-          secondary: season?.goalsAgainst ?? 0,
-        },
+        // A slot whose code belongs to no group has no criterion to be judged on; it reads as the
+        // impact with no figure, which is what the screen already knows how to print.
+        figure: measured?.figure ?? "impact",
+        adjusted: measured?.adjusted ?? null,
+        observed: measured?.observed ?? observedCount(0, 0),
         figureSource: "allPitch",
         keys,
         allowed: true,
@@ -391,6 +487,96 @@ export function buildCells(
     }),
   );
   return { cells, keeperModel, keepersConsidered: keepers.length, keepersRefused, ratingsModel: null };
+
+  /** The figure, the record and the « more is better » key of one outfield post of the légende. */
+  function legendOutfieldCell(
+    candidate: SevenCandidate,
+    group: PositionGroup,
+  ): { figure: SevenFigure; adjusted: number | null; observed: SevenObserved; key: number } {
+    const season = seasonAt(candidate, group);
+    switch (group) {
+      case "AT": {
+        const rate = strikerRate(candidate);
+        return {
+          figure: "goals",
+          adjusted: rate,
+          observed: observedCount(candidate.goals, candidate.outfieldMinutes),
+          key: rate ?? 0,
+        };
+      }
+      case "AIL": {
+        const rate = wingerRate(candidate);
+        return {
+          figure: "teamGoalsFor",
+          adjusted: rate,
+          observed: observedCount(season?.goalsFor ?? 0, season?.minutes ?? 0),
+          key: rate ?? 0,
+        };
+      }
+      case "DC": {
+        const rate = centreBackRate(candidate);
+        return {
+          figure: "outfieldConceded",
+          adjusted: rate,
+          observed: observedCount(season?.goalsAgainst ?? 0, season?.minutes ?? 0),
+          key: -(rate ?? 0),
+        };
+      }
+      case "MC":
+      case "GB": {
+        // MC is the raw goal difference at the post, decision 198's own figure. GB never reaches this
+        // function — a goalkeeper slot is answered above — but a `MC`-shaped default is the honest one
+        // for a `GB` code sitting in a non-goalkeeper slot.
+        const impact = rawImpactPer60(season);
+        return {
+          figure: "impact",
+          adjusted: impact,
+          observed: {
+            ...observedCount(season?.goalsFor ?? 0, season?.minutes ?? 0),
+            secondary: season?.goalsAgainst ?? 0,
+          },
+          key: impact ?? 0,
+        };
+      }
+    }
+  }
+}
+
+/** His season at one post, or undefined when he has never held it. Zero minutes is « never ». */
+function seasonAt(candidate: SevenCandidate, group: PositionGroup): PositionSeason | undefined {
+  const season = candidate.positions.find((position) => position.group === group);
+  return season !== undefined && season.minutes > 0 ? season : undefined;
+}
+
+/**
+ * A shrunk count-per-60 at one post, fitted over **the men who have played that post** and nobody
+ * else.
+ *
+ * The population matters as much as the arithmetic: the mean a thin record is pulled towards has to be
+ * the mean of the same thing. Pooling the whole squad would drag a winger's rate towards a figure that
+ * includes men who have never stood there, and the shrinkage would then be stating something about the
+ * squad under his name — the defect decision 198 removed from the impact.
+ *
+ * Returns null for a man with no minute at the post: there is no figure of his to print, and the
+ * légende's first key is what orders him.
+ */
+function fitGroupRate(
+  candidates: readonly SevenCandidate[],
+  group: PositionGroup,
+  count: (season: PositionSeason) => number,
+): (candidate: SevenCandidate) => number | null {
+  const model = fitCountModel(
+    candidates.flatMap((candidate) => {
+      const season = seasonAt(candidate, group);
+      return season === undefined
+        ? []
+        : [{ ...identityOf(candidate), minutes: season.minutes, count: count(season) }];
+    }),
+  );
+  return (candidate) => {
+    const season = seasonAt(candidate, group);
+    return season === undefined ? null : shrunkPer60(count(season), season.minutes, model);
+  };
 }
 
 function identityOf(candidate: SevenCandidate) {

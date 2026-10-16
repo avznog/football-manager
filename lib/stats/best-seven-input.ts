@@ -123,6 +123,7 @@ const NO_SEASON = {
   outfieldMinutes: 0,
   concededOutfield: 0,
   concededWhileGk: 0,
+  goalsForWhileOn: 0,
   positions: [],
 } as const;
 
@@ -175,6 +176,9 @@ export function toBestSevenSquad(
         outfieldMinutes: figures.outfieldMinutes,
         concededOutfield: figures.concededOutfield,
         concededWhileGk: figures.concededWhileGk,
+        // The team's goals while he was on, which is what the offensive seven ranks on: never
+        // `goals`, which is his own, and the pair is as easy to swap as decision 011's two readings.
+        goalsForWhileOn: figures.goalsForWhileOn,
         positions: figures.positions,
       };
     });
