@@ -73,14 +73,34 @@ export const users = pgTable(
   "users",
   {
     id: uuid().primaryKey().defaultRandom(),
-    /** Lowercase. This is the login — there is no email (decision 008). */
+    /** Lowercase. The login the app has always had (decision 008). */
     username: text().notNull(),
+    /**
+     * The address this man logged in with on the team's previous app, lowercased — a **second way to
+     * name the same account**, never a second account and never a second password (decision 208,
+     * which narrows 008's « there is no email »).
+     *
+     * Nullable on purpose and expected to stay so: it is filled for the sixteen people who came from
+     * `info-radarlocal`, and `admin` and `raphael` have none because there is none to have. Nothing
+     * reads it but the login lookup.
+     *
+     * It is **not** a contact address and nothing sends to it. The app still has no « mot de passe
+     * oublié » (decision 200's whole premise), and adding one is a slice of its own: a sender, a
+     * single-use token with an expiry, a rate limit. Until that exists this column is an identifier
+     * and nothing more.
+     */
+    email: text(),
     passwordHash: text().notNull(),
     displayName: text().notNull(),
     isSuperAdmin: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique("users_username_unique").on(t.username)],
+  (t) => [
+    unique("users_username_unique").on(t.username),
+    // Two men cannot share an address, but many rows may have none: Postgres treats NULLs as
+    // distinct in a unique index, so this constrains the sixteen without blocking the two.
+    unique("users_email_unique").on(t.email),
+  ],
 );
 
 export const sessions = pgTable(
