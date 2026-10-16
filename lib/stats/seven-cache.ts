@@ -26,8 +26,8 @@
  * - **`candidate.id`**. It is a uuid the model never sees; two squads identical in every printed figure
  *   are the same question for the model, and the stored answer is keyed on shirt numbers anyway.
  * - **the model id**. Which model answered is *recorded* (`seven_suggestions.model`) and shown on
- *   screen, but free models are retired without notice, so putting it in the key would throw away every
- *   row the day the pin moves — and the previous answer over the same figures is still the answer the
+ *   screen, but the pin does move (it already has once), so putting it in the key would throw away every
+ *   row the day it does — and the previous answer over the same figures is still the answer the
  *   screen already showed. A deliberate stale-tolerance, not an oversight.
  * - **the slots**. There is one formation (decision 157); when there are two, add it.
  */

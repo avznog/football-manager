@@ -1,5 +1,5 @@
 /**
- * The LLM path of the équipes types (decision 204): OpenRouter, a free model, and a validator that
+ * The LLM path of the équipes types (decision 204): OpenRouter, one paid model, and a validator that
  * does not believe a word of what comes back.
  *
  * `strict: true` on the wire is a guardrail, **not** a guarantee. `minItems` is unevenly enforced
@@ -31,8 +31,37 @@ import {
 
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
-/** Pinned: free models only, and the owner picked this one (decision 204). */
-export const SEVEN_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+/**
+ * Pinned, and paid: $0.10 in / $0.40 out per million tokens, which is about $0.00042 a call — roughly
+ * 24 000 sevens for $10, and the cache means the same squad is never asked twice. One path, no
+ * free-tier fallback chain.
+ *
+ * It replaces `nvidia/nemotron-3-super-120b-a12b:free`, which failed the first live call: two invalid
+ * sevens in a row and 53 seconds doing it. The lesson worth keeping is about the *flag*, not that
+ * model — OpenRouter's model list advertises `structured_outputs` for it, and **the flag describes the
+ * model, not the free endpoint serving it**. A free endpoint can ignore `response_format` entirely.
+ * Do not trust that flag again when picking a model here.
+ */
+export const SEVEN_MODEL = "google/gemini-2.5-flash-lite";
+
+/**
+ * How long one attempt may hang before it is aborted, and how long both attempts may take together.
+ *
+ * This exists because of one incident: the previous model took **53 seconds** against a `maxDuration`
+ * of 60, so the route was a few seconds from being killed by the platform — which the reader meets as
+ * a crash rather than as the algorithm's seven. A fetch with no timeout has no ceiling of its own.
+ *
+ * **12 s an attempt.** Flash Lite answers this prompt in a second or two, so 12 s is five to ten times
+ * the expected wait — long enough that a slow-but-working call is never cut off, short enough that a
+ * hung one is given up on while there is still time to render something true.
+ *
+ * **24 s for the whole call**, because `solveSevenWithModel` retries once and two 12-second attempts
+ * must not add up past the route's ceiling. Each attempt gets whatever is smaller: its own 12 s, or
+ * what is left of the budget. With `maxDuration = 30` that leaves the reads, the DP and the render
+ * their own margin.
+ */
+export const SEVEN_ATTEMPT_TIMEOUT_MS = 12_000;
+export const SEVEN_TOTAL_TIMEOUT_MS = 24_000;
 
 /** Seven slots, a sentence each and a summary — generous, but nowhere near a runaway. */
 const MAX_TOKENS = 1200;
@@ -240,6 +269,8 @@ export type SevenModelDeps = {
   fetch?: typeof globalThis.fetch;
   apiKey?: string;
   model?: string;
+  /** Injected so the timeout budget can be tested without waiting for it. Milliseconds. */
+  now?: () => number;
 };
 
 export type SevenModelOutcome =
@@ -257,6 +288,8 @@ export type SevenModelOutcome =
     }
   | { ok: false; failure: "rateLimited"; status: number; message: string }
   | { ok: false; failure: "httpError"; status: number; message: string }
+  /** The attempt was aborted on the timeout above. Its own failure: the screen words it differently. */
+  | { ok: false; failure: "timedOut"; message: string }
   | { ok: false; failure: "invalidAnswer"; message: string }
   | { ok: false; failure: "noKey"; message: string };
 
@@ -264,49 +297,68 @@ type Message = { role: "system" | "user" | "assistant"; content: string };
 
 type CallOutcome =
   | { ok: true; content: string; model: string }
-  | { ok: false; failure: "rateLimited" | "httpError"; status: number; message: string };
+  | { ok: false; failure: "rateLimited" | "httpError"; status: number; message: string }
+  | { ok: false; failure: "timedOut"; message: string };
 
 async function callOpenRouter(
   messages: readonly Message[],
   model: string,
   apiKey: string,
   doFetch: typeof globalThis.fetch,
+  timeoutMs: number,
 ): Promise<CallOutcome> {
-  const response = await doFetch(ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://7orteils.bgonzva.fr",
-      "X-Title": "Les 7 orteils de la main",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      // As deterministic as a free endpoint allows: the same squad should give the same seven.
-      temperature: 0,
-      max_tokens: MAX_TOKENS,
-      response_format: sevenResponseFormat(),
-    }),
-  });
+  // `AbortSignal.timeout` would read better, but a timer we own is a timer the tests can advance.
+  // It is cleared only once the body has been read: a response whose stream never ends is as much a
+  // hang as a request that never gets one.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(timeoutMs, 0));
+  try {
+    const response = await doFetch(ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://7orteils.bgonzva.fr",
+        "X-Title": "Les 7 orteils de la main",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        // The same squad should give the same seven: nothing here is meant to be creative.
+        temperature: 0,
+        max_tokens: MAX_TOKENS,
+        response_format: sevenResponseFormat(),
+      }),
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    // A rate limit is not a bad answer, and the caller wants to tell them apart: one is worth saying
-    // out loud (« réessaie dans un moment »), the other is worth falling back from.
-    const failure = response.status === 429 ? "rateLimited" : "httpError";
-    return { ok: false, failure, status: response.status, message: body.slice(0, 500) };
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      // A rate limit is not a bad answer, and the caller wants to tell them apart: one is worth
+      // saying out loud (« réessaie dans un moment »), the other is worth falling back from.
+      const failure = response.status === 429 ? "rateLimited" : "httpError";
+      return { ok: false, failure, status: response.status, message: body.slice(0, 500) };
+    }
+
+    const payload: unknown = await response.json();
+    const content = (payload as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]
+      ?.message?.content;
+    const answered = (payload as { model?: unknown })?.model;
+    return {
+      ok: true,
+      content: typeof content === "string" ? content : "",
+      model: typeof answered === "string" ? answered : model,
+    };
+  } catch (error) {
+    // Only our own abort becomes `timedOut`. A DNS failure or a dropped socket is not a slow model,
+    // and folding the two together would have the screen say something it does not know.
+    if (controller.signal.aborted) {
+      return { ok: false, failure: "timedOut", message: `No answer within ${timeoutMs} ms.` };
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
-
-  const payload: unknown = await response.json();
-  const content = (payload as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]?.message
-    ?.content;
-  const answered = (payload as { model?: unknown })?.model;
-  return {
-    ok: true,
-    content: typeof content === "string" ? content : "",
-    model: typeof answered === "string" ? answered : model,
-  };
 }
 
 /** `content` is a JSON *string*: a parse failure is a bad answer, not a crash. */
@@ -325,6 +377,9 @@ function parseContent(content: string): { ok: true; value: unknown } | { ok: fal
  * conversation, so the second attempt is told what was wrong rather than asked again blind. After
  * that it gives up and returns a typed failure — the caller chooses between the cache and the
  * algorithmic seven.
+ *
+ * Both attempts share one time budget (`SEVEN_TOTAL_TIMEOUT_MS`), so a retry cannot push the route
+ * past its `maxDuration`. Running out of it is its own failure, `timedOut`, and never an `httpError`.
  */
 export async function solveSevenWithModel(
   kind: SevenKind,
@@ -349,10 +404,26 @@ export async function solveSevenWithModel(
     { role: "user", content: prompt.user },
   ];
 
+  // One budget for the whole call, so the retry cannot double the ceiling. `deps.now` is injected for
+  // the tests only; nothing in the result depends on the clock.
+  const now = deps.now ?? (() => Date.now());
+  const startedAt = now();
+
   let lastReason = "";
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const call = await callOpenRouter(messages, model, apiKey, doFetch);
-    if (!call.ok) return { ok: false, failure: call.failure, status: call.status, message: call.message };
+    const left = SEVEN_TOTAL_TIMEOUT_MS - (now() - startedAt);
+    const call = await callOpenRouter(
+      messages,
+      model,
+      apiKey,
+      doFetch,
+      Math.min(SEVEN_ATTEMPT_TIMEOUT_MS, left),
+    );
+    if (!call.ok) {
+      return call.failure === "timedOut"
+        ? { ok: false, failure: "timedOut", message: call.message }
+        : { ok: false, failure: call.failure, status: call.status, message: call.message };
+    }
 
     const parsed = parseContent(call.content);
     const validation = parsed.ok

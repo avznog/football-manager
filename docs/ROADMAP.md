@@ -2401,6 +2401,31 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       keyed on a fingerprint of the candidate figures, the seven, the competition filter and the typed
       context, recording the `context` the answer was reasoned from and the `model` that actually
       answered — free endpoints are retired without notice
+- [x] **The model is `google/gemini-2.5-flash-lite`, paid, and every call has a hard timeout**
+      (decision **205**, which supersedes 204's choice of provider model and nothing else in it).
+      The free model **failed on its first live call on the preview**: it returned an invalid seven,
+      the code fed the validation reason back, the second answer was invalid too, the page fell
+      through to the algorithm — and it took **53 seconds** against a `maxDuration` of 60. The lesson
+      is that OpenRouter's model list advertises `structured_outputs: true` for the *model*, **not for
+      the free endpoint serving it**, and 204 had read that flag as evidence the free route worked.
+      Shown the arithmetic — `$0.10`/`$0.40` per million tokens is about **$0.00042 a call** on this
+      prompt, **~24 000 calls for $10**, decades at forty taps a month — the owner dropped the free
+      model entirely and refused a free-first/paid-fallback chain: **one model, one code path**.
+      A timeout now exists where none did: **12 s per attempt, 24 s shared across the one retry**, so
+      a retry cannot double the ceiling, and `maxDuration` came **down from 60 to 30**. Flash Lite
+      answers in 1–2 s, so a working call is never cut and a hung one is abandoned with time left to
+      render something true. **`timedOut` is its own typed failure** — only `controller.signal.aborted`
+      becomes it, so a DNS failure is still reported as a DNS failure — and **a timeout is not
+      retried**: the retry loop only re-asks after an invalid answer. The **rate-limit sentence was
+      rewritten**: « réessaie demain » was written for a fifty-a-day free cap, and a paid 429 is
+      transient, so it now says « redemande son avis dans quelques minutes ». Four comments justifying
+      a choice by « free models are retired without notice » are corrected; **the determinism argument
+      for the cache is untouched and still stands**
+- [ ] **The owner adds credit to his OpenRouter account.** `OPENROUTER_API_KEY` is set in Vercel on
+      Preview and Production — that part is **done** — but Flash Lite is a paid model, so **without
+      credit every call returns 402**, the request takes the fallback path and the screen silently
+      serves the algorithm's seven for ever. $10 covers roughly 24 000 taps. His to do: a session
+      cannot top up an account
 - [ ] **Compare the model's seven against the algorithm's on the same selection, before anything is
       deleted.** Against a stated criterion the algorithm is an **exact optimum** — a bitmask DP — so
       with no context typed the model should be **worse** on « offensive » and no better elsewhere,
@@ -2409,7 +2434,3 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       `injuries` has one, availability went in S3) so his typed context is the only new information in
       the system. That makes the comparison the thing that says whether this feature earns its place.
       **Not started**, and the algorithm stays in the tree until it is done
-- [ ] **The owner sets `OPENROUTER_API_KEY` in Vercel, on Preview and Production.** It is in
-      `.env.example` **by name only** because the repository is public, and without it every request
-      takes the fallback path and the screen silently serves the algorithm's seven. His to do: a
-      session cannot hold the key

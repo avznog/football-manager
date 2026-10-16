@@ -28,7 +28,7 @@
  * navigation and the answer stays shareable and reloadable, exactly like the two selects next to it.
  *
  * Everything returned is plain and serialisable, and **no raw API error ever crosses this boundary**:
- * a status code and a provider's body are not copy, so the failure leaves here as one of four typed
+ * a status code and a provider's body are not copy, so the failure leaves here as one of five typed
  * words and `sevenSourceFr` is what the reader sees.
  */
 
@@ -143,7 +143,7 @@ export async function askSeven(ask: SevenAsk): Promise<SevenAnswerView> {
     y: slot.y,
   }));
 
-  type ModelFailure = "rateLimited" | "httpError" | "invalidAnswer" | "noKey";
+  type ModelFailure = "rateLimited" | "httpError" | "timedOut" | "invalidAnswer" | "noKey";
   const fallback = (failure: ModelFailure) =>
     ({
       source: { path: "algorithm", failure } as const,

@@ -99,17 +99,17 @@ export const metadata = { title: "Équipe type" };
  * Seconds this route is allowed to run for.
  *
  * Nothing set it before decision 204 and nothing needed to: the screen was four small reads and a
- * bitmask DP. It now asks a 120B model on OpenRouter's free tier, which answers in a handful of seconds
- * when it is warm and can take far longer when it is not — and with no `maxDuration` the platform
- * default (10 s for a Node function on the App Router) cut it off mid-call, which the reader met as a
- * crash rather than as a fallback.
+ * bitmask DP. It now asks a model on OpenRouter, and with no `maxDuration` the platform default (10 s
+ * for a Node function on the App Router) cut it off mid-call, which the reader met as a crash rather
+ * than as a fallback.
  *
- * **60**, because that is the ceiling on Vercel's **Hobby** plan, which is the plan this project is on
- * (`docs/DEPLOY.md`): asking for more is not a slower answer, it is a configuration the deployment
- * refuses. It is also comfortably more than two attempts need — `solveSevenWithModel` retries once,
- * and a run that reaches 60 s was never going to answer.
+ * **30.** It was 60 — the ceiling on Vercel's **Hobby** plan, which is the plan this project is on
+ * (`docs/DEPLOY.md`) — while the model was a free 120B that once took 53 seconds. Now the call owns a
+ * ceiling of its own: `SEVEN_TOTAL_TIMEOUT_MS` is 24 s across both attempts, so a hung model gives up
+ * here and the screen says so. 30 is that budget plus room for the reads, the DP and the render, and
+ * anything longer would only be waiting for a timeout that has already fired.
  */
-export const maxDuration = 60;
+export const maxDuration = 30;
 
 export default async function EquipeTypePage({
   searchParams,
@@ -393,8 +393,9 @@ async function Seven({
   return (
     <>
       {/* Whose seven this is, immediately above it and never behind a hover (decision 072). The three
-          model failures read as facts about the model with the algorithm's seven still on the pitch —
-          a rate limit in particular says « réessaie demain » rather than showing a status code. */}
+          model failures read as facts about the model with the algorithm's seven still on the pitch,
+          and never as a status code: a rate limit is a busy minute and a hang says only that the
+          model took too long. */}
       {answer.source !== null ? (
         <p className="text-xs leading-relaxed text-ink-muted">
           {sevenSourceFr(answer.source, whenFr(answer.computedAt))}
