@@ -171,22 +171,7 @@ export function solveSeven(
   const { slots } = input;
   const built = buildCells(kind, candidates, slots);
   const assignment = solveAssignment(built.cells, candidates, slots.length);
-
-  const picks: SevenPick[] = slots.map((slot, slotIndex) => {
-    const index = assignment.slotToCandidate[slotIndex];
-    if (index < 0) {
-      return { slotId: slot.id, positionCode: slot.positionCode, player: null, fit: "none", cell: null };
-    }
-    const candidate = candidates[index];
-    const cell = built.cells[index][slotIndex];
-    return {
-      slotId: slot.id,
-      positionCode: slot.positionCode,
-      player: { id: candidate.id, displayName: candidate.displayName, jerseyNumber: candidate.jerseyNumber },
-      fit: cell.fit,
-      cell,
-    };
-  });
+  const picks = assignmentToPicks(slots, candidates, built.cells, assignment.slotToCandidate);
 
   return {
     kind,
@@ -201,11 +186,47 @@ export function solveSeven(
   };
 }
 
+/**
+ * A solved assignment, as the picks the screen reads.
+ *
+ * Exported because the LLM path of decision 204 produces its own `slotToCandidate` — from a model's
+ * answer rather than from the DP — and must turn it into picks through this exact function. Two
+ * mappings would drift, and the drift would be a disc on the pitch whose figure is not the one the
+ * seven claims to rank on.
+ */
+export function assignmentToPicks(
+  slots: readonly BestSevenSlot[],
+  candidates: readonly SevenCandidate[],
+  cells: readonly SevenCell[][],
+  slotToCandidate: readonly number[],
+): SevenPick[] {
+  return slots.map((slot, slotIndex) => {
+    const index = slotToCandidate[slotIndex];
+    if (index < 0) {
+      return { slotId: slot.id, positionCode: slot.positionCode, player: null, fit: "none", cell: null };
+    }
+    const candidate = candidates[index];
+    const cell = cells[index][slotIndex];
+    return {
+      slotId: slot.id,
+      positionCode: slot.positionCode,
+      player: { id: candidate.id, displayName: candidate.displayName, jerseyNumber: candidate.jerseyNumber },
+      fit: cell.fit,
+      cell,
+    };
+  });
+}
+
 /* -------------------------------------------------------------------------- */
 /* The cells, seven by seven                                                  */
 /* -------------------------------------------------------------------------- */
 
-function buildCells(
+/**
+ * Exported for the LLM path of decision 204: the model is shown the very matrix the DP would have
+ * been scored on, so the two paths rank on the same figures and the screen can print either one's
+ * answer with the same cell under the name.
+ */
+export function buildCells(
   kind: SevenKind,
   candidates: readonly SevenCandidate[],
   slots: readonly BestSevenSlot[],
