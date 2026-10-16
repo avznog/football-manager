@@ -11,6 +11,7 @@ import "server-only";
  */
 
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/db/client";
 import { DEFAULT_FORMATION_LABEL, THE_FORMATION } from "@/db/reference";
@@ -42,8 +43,12 @@ export type FormationRow = {
  * `null` only on a database whose `formations` table is empty — `0009_seed_formations.sql` makes that
  * impossible after `db:migrate`, but the screens still have a sentence for it rather than a crash. No
  * `teamId`: the formation is shared, and a team-drawn shape is no longer something a team can have.
+ *
+ * `cache()`d per request, like `getSeasonStats`: `/stats/equipe-type` reads it twice in one render —
+ * once in the page, for the « aucune formation » empty state, and once in the Server Action that
+ * resolves the seven — and the shared formation cannot change between the two.
  */
-export async function getTheFormation(): Promise<FormationRow | null> {
+export const getTheFormation = cache(async (): Promise<FormationRow | null> => {
   const [row] = await db
     .select({ id: formations.id, name: formations.name, label: formations.label })
     .from(formations)
@@ -61,7 +66,7 @@ export async function getTheFormation(): Promise<FormationRow | null> {
     descriptionFr: THE_FORMATION.descriptionFr,
     slots: slots.get(row.id) ?? [],
   };
-}
+});
 
 /** The slots of an arbitrary set of formations, keyed by formation id. */
 export async function getFormationSlots(

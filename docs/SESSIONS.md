@@ -6372,3 +6372,65 @@ flow was touched, and the happy path asserts no copy on these two cards.
 Files: `lib/stats/aggregate.ts`, `lib/stats/aggregate.test.ts`, `app/(app)/stats/page.tsx`,
 `app/(app)/stats/_components/rate-board.tsx`, `app/(app)/joueur/_components/stats-card.tsx`,
 `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-10-16 — The four équipes types are picked by an LLM, not by the DP (decision 204)
+
+The owner's sixth backlog, one line of it, issue #237: « everything is done with a algo. But I think
+it is the wrong way, as there is a lot of details to take in account. » He was offered the narrow
+version — a fifth « sur mesure » seven beside the four computed ones — and chose the full replacement.
+Decision **204** records it, and every choice in it was challenged first: provider, who picks, what is
+sent, and what happens to the peer ratings.
+
+**What the exploration found, which shaped the design more than the brief did.** The database holds
+almost no prose. `ratings` is a bare `score` with no comment column; `REMARK` events are an enum
+(`GOOD_POSITIONING`, `GOOD_TRACK_BACK`, two rows all season); `injuries` has one row; match
+availability was deleted back in slice S3 (decision 156). **The « details » the algorithm misses are
+not recorded anywhere.** So the owner's typed context is the only genuinely new information the feature
+introduces, and a model handed today's data alone has exactly the information the DP has, in a less
+reliable form. That is in the decision in those words, because it is the thing that will be forgotten.
+
+**The seam is one function.** `solveSeven` is three steps and only the middle one picks anybody:
+`buildCells` → `solveAssignment` → map to `picks`. `buildCells` is what produces the
+`cells[candidate][slot]` matrix, the shrinkage reports and the keeper eligibility counts, and the
+screen's French sentences cannot be rendered without them — so **only `solveAssignment` is replaced**,
+by something returning the same `slotToCandidate: number[]`. `seven-pitch.tsx` and every sentence in
+`best-seven-copy.ts` were not touched.
+
+**The model's handles are shirt numbers**, never UUIDs and never names: « Léo C » and « Léo M » are two
+different men, and a name collision would attribute one man's season to the other with nothing failing
+anywhere. It is asked for **sets**, not for left and right — decision 157 made AIL one position, so the
+two DC are interchangeable and so are the two AIL, and the code maps a set onto concrete slots in a
+documented deterministic order.
+
+**Peer ratings are aggregated before the request is built**: each player's mean and the number of
+matches it rests on. None of the 463 individual notes leaves the owner's infrastructure. On training,
+he chose permissive account routing with a thin payload — refusing providers that train on inputs
+empties the free model list, and what actually travels is aggregates and shirt numbers.
+
+**The answer is not trusted.** `strict: true` on the wire is a guardrail: `minItems` is unevenly
+enforced across providers, and a shirt number that exists is not a candidate who is eligible. So the
+validator is pure and runs regardless — exactly seven entries, all distinct, all eligible, exact
+per-slot counts, and a GB who has actually kept goal — and the fallback is **one retry with the reason
+fed back, then the cached answer, then the algorithm**.
+
+**Already on the branch:** the cache table **`seven_suggestions`**, migration
+**`0015_romantic_shaman.sql`**, with a new `seven_kind` pg enum (`offensive, defensive, legende,
+notes`). It is keyed `unique(team_id, fingerprint)` over the candidate figures, the seven, the
+competition filter and the typed context; it stores the `context` so the screen can show what the
+answer was reasoned from, and the `model`, because free endpoints are routed and retired without
+notice and the disc footer must name the model that answered rather than the one that was asked.
+`OPENROUTER_API_KEY` is in `.env.example` **by name only** — the repository is public.
+
+**The model call is mocked in the unit tests**, so the whole path is verifiable with no key on the
+machine: the prompt builder (`lib/stats/seven-prompt.ts`) is pure, the validator in
+`lib/stats/seven-llm.ts` is pure and separate from the single `fetch`, and only that `fetch` is stood
+in for. Without a key set the feature takes the fallback every time and the screen serves the
+algorithm's seven, which is the state Preview and Production are in until the owner sets the variable.
+
+**What is honestly still open**, both on the roadmap: the algorithm is an **exact optimum** against a
+stated criterion — a bitmask DP — so with no context typed the model should be *worse* on « offensive »
+and no better elsewhere, and nobody should delete anything before the two sevens are compared on the
+same selection. And **non-determinism on a stats screen reads as a bug**: the cache hides it, but a
+miss can answer the same question two different ways, and the free tier gets no prompt caching.
+
+Files: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.

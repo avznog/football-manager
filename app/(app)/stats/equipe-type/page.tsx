@@ -14,16 +14,27 @@
  * 5. **Who was not in the running**: whoever has left, the encadrement, and — decision 187 — anybody
  *    with no minute of game time in this selection (`excludedFromSquadFr`). A post nobody is left for
  *    stays « Poste vide » and says why (`emptySlotsFr`), rather than being filled to look complete.
+ * 6. **Where the seven came from** (decision 204): the model that composed it and when, or that the
+ *    algorithm answered because the model could not — and in that case *why*, in plain French.
  *
  * Read-only, so no new permission: `team:read` (decision 002), and the layout guard has already
- * refused anybody with no team.
+ * refused anybody with no team. The Server Action that resolves the seven asserts the same one.
  *
  * ## The order of the screen
  *
  * Title and the seven's rule, then the pitch, then the controls, then the caveats. The controls used
  * to be four chip rows in the `<header>` — about 216 px of ways to ask the question above any answer
- * to it — and they are `SevenControls`' `<select>`s under the pitch now,
- * which is what the owner asked for and what `_components/controls.tsx` argues at length.
+ * to it — and they are `SevenControls`' `<select>`s under the pitch now, joined by the context field
+ * of decision 204, which is what the owner asked for and what `_components/controls.tsx` argues at
+ * length.
+ *
+ * ## Why the seven streams
+ *
+ * The answer may come from a 120-billion-parameter model on a free endpoint, so it can take seconds.
+ * Everything that does not depend on it — the header, the seven's rule, the match count, the selects,
+ * the context field — is rendered and usable at once, and only the pitch, its sentences and its caveats
+ * are inside a `<Suspense>`. `SevenSkeleton` holds the exact footprint of what is coming, controls
+ * included, so nothing jumps under a thumb when the model answers.
  *
  * ## The shape
  *
@@ -35,22 +46,27 @@
  *
  * The page queries, adapts and words. The arithmetic is `lib/stats/best-seven.ts` (pure, no imports),
  * the join is `lib/stats/best-seven-input.ts` (pure, tested field by field), every sentence is
- * `lib/stats/best-seven-copy.ts` (pure, tested) — decision 097's lesson is that a test on a pure
+ * `lib/stats/best-seven-copy.ts` (pure, tested), the choice between the cache, the model and the
+ * algorithm is `actions.ts` — decision 097's lesson is that a test on a pure
  * function proves nothing about a screen that never calls it, so the way to make the tests worth
  * something is for the screen to be nothing but calls to them.
  */
 
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { Card, EmptyState } from "@/components/ui";
 import { requireTeamContext } from "@/lib/auth/dal";
+import { formatDate, formatTime } from "@/lib/calendar/time";
 import { competitionLabelOf, statsFilterOptions } from "@/lib/competition/options";
 import { getTeamCompetitions } from "@/lib/competition/queries";
 import { aggregateSeven, hasOwnExposure } from "@/lib/stats/best-seven";
 import {
+  CONTEXT_PARAM,
   CRITERION_PARAM,
   SEVEN_OPTION_FR,
   SEVEN_RULE_FR,
+  SEVEN_SUMMARY_HEADING_FR,
   declaredPostsFr,
   emptySlotsFr,
   excludedFromSquadFr,
@@ -58,24 +74,42 @@ import {
   outOfPositionNoteFr,
   parseCompetitionId,
   parseSeven,
+  parseSevenContext,
   sevenQuestionKey,
   sevenSmoothingFr,
+  sevenSourceFr,
   shrinkageSentenceFr,
   squadMeanStandInFr,
   type BestSevenQuery,
 } from "@/lib/stats/best-seven-copy";
-import { solveSeven } from "@/lib/stats/sevens";
-import { toBestSevenSlots, toBestSevenSquad } from "@/lib/stats/best-seven-input";
 import { matchCount, pendingRatingMatchesNoteFr } from "@/lib/stats/format";
 import { getTheFormation } from "@/lib/formation/queries";
 import { getSeasonStats } from "@/lib/stats/queries";
-import { getSquad } from "@/lib/team/queries";
 
 import { COMPETITION_PARAM } from "../_components/filters";
+import { askSeven } from "@/lib/stats/actions";
+import { SevenContextField } from "./_components/context-field";
 import { SevenControls } from "./_components/controls";
+import { SevenSkeleton } from "./_components/seven-skeleton";
 import { SevenPitch, type SevenCell } from "./_components/seven-pitch";
 
 export const metadata = { title: "Équipe type" };
+
+/**
+ * Seconds this route is allowed to run for.
+ *
+ * Nothing set it before decision 204 and nothing needed to: the screen was four small reads and a
+ * bitmask DP. It now asks a 120B model on OpenRouter's free tier, which answers in a handful of seconds
+ * when it is warm and can take far longer when it is not — and with no `maxDuration` the platform
+ * default (10 s for a Node function on the App Router) cut it off mid-call, which the reader met as a
+ * crash rather than as a fallback.
+ *
+ * **60**, because that is the ceiling on Vercel's **Hobby** plan, which is the plan this project is on
+ * (`docs/DEPLOY.md`): asking for more is not a slower answer, it is a configuration the deployment
+ * refuses. It is also comfortably more than two attempts need — `solveSevenWithModel` retries once,
+ * and a run that reaches 60 s was never going to answer.
+ */
+export const maxDuration = 60;
 
 export default async function EquipeTypePage({
   searchParams,
@@ -87,13 +121,15 @@ export default async function EquipeTypePage({
   // `method="get"` form now, and a browser with no JavaScript submits `?critere=&competition=` for
   // whatever the reader left alone. All four are pinned in `best-seven-copy.test.ts`.
   const competitionId = parseCompetitionId(params[COMPETITION_PARAM], competitions);
+  // The free text of decision 204, clipped and whitespace-normalised: it reaches a prompt, so a forged
+  // URL may not stuff one.
+  const context = parseSevenContext(params[CONTEXT_PARAM]);
 
-  const [stats, formation, squad] = await Promise.all([
+  const [stats, formation] = await Promise.all([
     getSeasonStats(team.id, { competitionId }),
+    // `cache()`d, and read again inside `askSeven`: the empty state below needs it before the model is
+    // ever asked, and the shared formation cannot change between the two reads.
     getTheFormation(),
-    // Declared posts come from the **current** squad, which is what `getSquad` returns; the reason a
-    // departed player cannot be a candidate at all is argued in `best-seven-input.ts`.
-    getSquad(team.id),
   ]);
 
   const query: BestSevenQuery = {
@@ -116,13 +152,23 @@ export default async function EquipeTypePage({
    * competitions, so a team with one and a bookmarked `?competition=<id>` got the « Choisis « Toutes » »
    * sentence over a form with no competition select in it. `showsCompetitionSelect` now keeps it for a
    * reader who arrived filtered, which is the state that prints the sentence.
+   *
+   * It is also what the `<Suspense>` fallback renders, so the selects and the context field are on
+   * screen and working while the model is out, in the place they will still be when it answers.
    */
   const controls = (
-    <SevenControls
-      query={query}
-      competitions={competitions}
-      competitionParam={COMPETITION_PARAM}
-    />
+    <>
+      <SevenControls
+        query={query}
+        competitions={competitions}
+        competitionParam={COMPETITION_PARAM}
+      />
+      <SevenContextField
+        query={query}
+        context={context}
+        competitionParam={COMPETITION_PARAM}
+      />
+    </>
   );
 
   return (
@@ -152,9 +198,9 @@ export default async function EquipeTypePage({
       <Body
         controls={controls}
         query={query}
+        context={context}
         stats={stats}
-        formation={formation}
-        squad={squad}
+        hasFormation={formation !== null}
         kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
         filterLabel={filterLabel}
         scopeLabel={scopeLabel}
@@ -170,19 +216,19 @@ export default async function EquipeTypePage({
 function Body({
   controls,
   query,
+  context,
   stats,
-  formation,
-  squad,
+  hasFormation,
   kit,
   filterLabel,
   scopeLabel,
 }: {
-  /** `SevenControls`, placed under whatever this function decided to draw. */
+  /** The two forms, placed under whatever this function decided to draw. */
   controls: React.ReactNode;
   query: BestSevenQuery;
+  context: string;
   stats: Awaited<ReturnType<typeof getSeasonStats>>;
-  formation: Awaited<ReturnType<typeof getTheFormation>>;
-  squad: Awaited<ReturnType<typeof getSquad>>;
+  hasFormation: boolean;
   kit: { primaryColor: string; secondaryColor: string };
   filterLabel: string | null;
   scopeLabel: string;
@@ -234,7 +280,7 @@ function Body({
 
   // Only on a database that never loaded the formation (`0009_seed_formations.sql` makes that
   // impossible after `db:migrate`). Seven invented posts would be worse than saying so.
-  if (formation === null) {
+  if (!hasFormation) {
     return (
       <>
         <EmptyState
@@ -246,16 +292,46 @@ function Body({
     );
   }
 
-  const slots = toBestSevenSlots(formation.slots);
-  // `candidates` is the squad minus three exclusions the screen states rather than performs in
-  // silence: whoever has left, the encadrement, and — since decision 187 — anybody with no minute in
-  // this selection. The last one is why a post can now be empty on a squad of twelve.
-  const { candidates, departedWithData, nonPlayers, withoutMinutes, eligible } = toBestSevenSquad(
-    stats.players,
-    squad,
+  return (
+    /* Keyed to the question, context included: a new question is a new wait, so the skeleton has to
+       come back rather than the previous seven staying on screen under a new header. */
+    <Suspense
+      key={`${sevenQuestionKey(query)}|${context}`}
+      fallback={<SevenSkeleton controls={controls} />}
+    >
+      <Seven controls={controls} query={query} context={context} stats={stats} kit={kit} />
+    </Suspense>
   );
+}
 
-  const result = solveSeven(query.seven, { candidates, slots });
+/* -------------------------------------------------------------------------- */
+/* The seven itself — the one thing on this screen that is waited for         */
+/* -------------------------------------------------------------------------- */
+
+async function Seven({
+  controls,
+  query,
+  context,
+  stats,
+  kit,
+}: {
+  controls: React.ReactNode;
+  query: BestSevenQuery;
+  context: string;
+  stats: Awaited<ReturnType<typeof getSeasonStats>>;
+  kit: { primaryColor: string; secondaryColor: string };
+}) {
+  const answer = await askSeven({
+    seven: query.seven,
+    competitionId: query.competitionId,
+    context,
+  });
+
+  // `Body` has already drawn the « aucune formation » empty state, so this cannot be reached from the
+  // page. Narrowing rather than asserting: nothing below has seven posts to draw on.
+  if (answer.slots === null) return null;
+
+  const { result } = answer;
 
   // The whole table, in the DP's candidate order, so a swap on the client is a lookup rather than a
   // second implementation of the smoothing.
@@ -306,24 +382,36 @@ function Body({
       ? shrinkageSentenceFr("ratings", result.ratingsModel)
       : null,
     squadMeanStandInFr(squadMeanStandIns),
-    excludedFromSquadFr({ departedWithData, nonPlayers, withoutMinutes }),
-    emptySlotsFr({ count: emptySlots, eligible, withoutMinutes }),
+    excludedFromSquadFr(answer.squad),
+    emptySlotsFr({
+      count: emptySlots,
+      eligible: answer.squad.eligible,
+      withoutMinutes: answer.squad.withoutMinutes,
+    }),
   ].filter((note): note is string => note !== null);
 
   return (
     <>
-      {/* Keyed to the question, because the answer is state: `sevenQuestionKey` says why a `key` and not
-          an effect, and what a soft navigation printed without it. */}
+      {/* Whose seven this is, immediately above it and never behind a hover (decision 072). The three
+          model failures read as facts about the model with the algorithm's seven still on the pitch —
+          a rate limit in particular says « réessaie demain » rather than showing a status code. */}
+      {answer.source !== null ? (
+        <p className="text-xs leading-relaxed text-ink-muted">
+          {sevenSourceFr(answer.source, whenFr(answer.computedAt))}
+        </p>
+      ) : null}
+
+      {/* Still keyed to the question itself, and not only to the `<Suspense>` above — which carries the
+          same key plus the context, because a new context is a new wait. Both, deliberately: the
+          boundary's key is what brings the skeleton back, and `sevenQuestionKey` on the pitch is what
+          `best-seven-copy.test.ts` scans for and what the comment on that function argues. Either one
+          alone would throw the reader's own swaps away at the right moment; keeping the pitch's makes
+          the reason readable where the state lives. */}
       <SevenPitch
         key={sevenQuestionKey(query)}
         seven={query.seven}
         aggregation={aggregation}
-        slots={formation.slots.map((slot) => ({
-          slotId: slot.id,
-          positionCode: slot.positionCode,
-          x: slot.x,
-          y: slot.y,
-        }))}
+        slots={answer.slots}
         candidates={result.candidates.map((candidate) => ({
           id: candidate.id,
           displayName: candidate.displayName,
@@ -333,12 +421,23 @@ function Body({
         cells={cells}
         optimumBySlot={optimumBySlot}
         optimumAggregate={optimumAggregate}
+        whyByCandidateId={answer.whyByCandidateId}
         kit={kit}
       />
 
-      {/* The selects sit here, between the seven and the paragraphs about it: the reader meets the
-          answer first, then the ways of asking a different question. Four chip rows above the pitch put
-          about 216 px of controls before anything they control. */}
+      {/* The model's few sentences on the seven as a whole, right under the pitch it is about, and only
+          when a model wrote them: the algorithm has nothing to say and an empty card would read as one
+          the model declined to fill. */}
+      {answer.summary !== null ? (
+        <Card className="space-y-2">
+          <h2 className="text-base font-semibold text-ink">{SEVEN_SUMMARY_HEADING_FR}</h2>
+          <p className="text-sm leading-relaxed text-ink">{answer.summary}</p>
+        </Card>
+      ) : null}
+
+      {/* The selects and the context field sit here, between the seven and the paragraphs about it: the
+          reader meets the answer first, then the ways of asking a different question. Four chip rows
+          above the pitch put about 216 px of controls before anything they control. */}
       {controls}
 
       {/* One card, one paragraph per caveat. Printed, never hovered (decision 072), and never folded
@@ -352,7 +451,18 @@ function Body({
           </p>
         ))}
       </Card>
-
     </>
   );
+}
+
+/**
+ * When a cached answer was computed, in Paris (`CLAUDE.md`), as the fragment `sevenSourceFr` drops into
+ * « calculé … ». Null for an answer that has just arrived — there is nothing to date about « à
+ * l'instant ».
+ */
+function whenFr(iso: string | null): string | null {
+  if (iso === null) return null;
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return null;
+  return `le ${formatDate(instant)} à ${formatTime(instant)}`;
 }

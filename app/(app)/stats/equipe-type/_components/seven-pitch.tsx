@@ -101,6 +101,22 @@ export type SevenPitchProps = {
   optimumBySlot: Readonly<Record<string, string | null>>;
   /** `bestSeven().aggregate` — the figure « Ton équipe » is compared against after a swap. */
   optimumAggregate: number | null;
+  /**
+   * The model's one sentence per chosen man, by candidate id, when a model composed this seven
+   * (decision 204). Empty when the algorithm did.
+   *
+   * It is printed in `SlotList` and **not on the disc**, and that is measured rather than preferred: a
+   * caption on the grass has 104 px before two neighbours print over each other, which is why the
+   * figures there are abbreviated in the first place. A sentence does not fit in 104 px and a sentence
+   * cannot be abbreviated. `SlotList` is the row that already restates every disc's figure in full
+   * width and never abbreviates anything, so that is where the sentence goes — under the name it is
+   * about, beside the figure it cites. Not a tooltip, for the usual reason (decision 072).
+   *
+   * Only for the proposed seven: the reader's own swap puts a man in a slot no model spoke about, so
+   * the sentence travels with the *man* and disappears when he leaves the pitch, never re-labelling
+   * somebody else's disc.
+   */
+  whyByCandidateId?: Readonly<Record<string, string>>;
   kit: KitColors;
 };
 
@@ -116,6 +132,7 @@ export function SevenPitch({
   cells,
   optimumBySlot,
   optimumAggregate,
+  whyByCandidateId,
   kit,
 }: SevenPitchProps) {
   const [assignment, setAssignment] = useState<Record<string, string | null>>(
@@ -355,6 +372,7 @@ export function SevenPitch({
         assignment={assignment}
         candidateById={candidateById}
         cellFor={cellFor}
+        whyByCandidateId={whyByCandidateId}
       />
 
       {openSlot ? (
@@ -499,11 +517,13 @@ function SlotList({
   assignment,
   candidateById,
   cellFor,
+  whyByCandidateId,
 }: {
   slots: readonly SevenSlotView[];
   assignment: Readonly<Record<string, string | null>>;
   candidateById: Map<string, SevenCandidateView>;
   cellFor: (slotId: string, candidateId: string) => SevenCell | null;
+  whyByCandidateId?: Readonly<Record<string, string>>;
 }) {
   return (
     <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-surface">
@@ -512,8 +532,15 @@ function SlotList({
         const chosen = chosenId ? candidateById.get(chosenId) : undefined;
         const cell = chosenId ? cellFor(slot.slotId, chosenId) : null;
         const raw = cell ? sevenObservedFr(cell.figure, cell.observed) : null;
+        const why = chosenId ? whyByCandidateId?.[chosenId] : undefined;
+        // `items-start` only when there is a sentence: with two lines in the middle column the rest of
+        // the row would otherwise be centred against a block it has nothing to do with, and every row
+        // without one keeps the alignment it has always had.
         return (
-          <li key={slot.slotId} className="flex items-center gap-3 px-3 py-2">
+          <li
+            key={slot.slotId}
+            className={cn("flex gap-3 px-3 py-2", why ? "items-start" : "items-center")}
+          >
             <span className="w-11 shrink-0 text-xs font-semibold text-ink-subtle uppercase">
               {slot.positionCode}
             </span>
@@ -531,6 +558,14 @@ function SlotList({
               <span className="block text-xs text-ink-muted">
                 {positionLabelFr(slot.positionCode)}
               </span>
+              {/* The model's own sentence about this man, where his figure is already written in full.
+                  Printed, never hovered (decision 072), and never truncated: it cites the chiffre that
+                  put him in the seven, which is the only part of a model's answer worth keeping. */}
+              {why ? (
+                <span className="mt-0.5 block text-xs leading-relaxed text-ink-subtle italic">
+                  {why}
+                </span>
+              ) : null}
             </span>
             <span className="max-w-28 shrink-0 text-right text-xs text-ink-muted">
               {cell ? (

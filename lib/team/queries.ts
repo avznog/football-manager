@@ -6,6 +6,7 @@ import "server-only";
  */
 
 import { and, asc, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/db/client";
 import { isPositionCode } from "@/db/reference";
@@ -35,8 +36,11 @@ export type SquadMember = {
  *
  * Members who have left keep their history but disappear from here — that is the point of the
  * soft `leftAt`.
+ *
+ * `cache()`d per request: `/stats/equipe-type` reads it in the page and again in the Server Action
+ * that resolves the seven, and one render must see one squad.
  */
-export async function getSquad(teamId: string): Promise<SquadMember[]> {
+export const getSquad = cache(async (teamId: string): Promise<SquadMember[]> => {
   const rows = await db
     .select({
       membershipId: teamMembers.id,
@@ -105,7 +109,7 @@ export async function getSquad(teamId: string): Promise<SquadMember[]> {
     isInjured: Number(row.openInjuries) > 0,
     positions: sortPreferredPositions(positionsByMember.get(row.membershipId) ?? []),
   }));
-}
+});
 
 /**
  * The membership ids of the team's coaches who have not left.
