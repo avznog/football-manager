@@ -30,6 +30,7 @@ function player(overrides: Partial<SevenCandidate> & { displayName: string }): S
     outfieldMinutes: 0,
     concededOutfield: 0,
     concededWhileGk: 0,
+    goalsForWhileOn: 0,
     positions: [],
   };
   const merged = { ...base, ...overrides };
@@ -53,6 +54,7 @@ function squad(): SevenCandidate[] {
   return [
     player({
       displayName: "Gardien",
+      goalsForWhileOn: 12,
       minutes: 600,
       gkMinutes: 600,
       concededWhileGk: 9,
@@ -64,6 +66,7 @@ function squad(): SevenCandidate[] {
     }),
     player({
       displayName: "Défenseur",
+      goalsForWhileOn: 11,
       minutes: 540,
       concededOutfield: 7,
       declarations: { DC: "primary", MC: "secondary" },
@@ -74,6 +77,7 @@ function squad(): SevenCandidate[] {
     }),
     player({
       displayName: "Autre défenseur",
+      goalsForWhileOn: 9,
       minutes: 480,
       concededOutfield: 8,
       declarations: { DC: "primary" },
@@ -81,6 +85,7 @@ function squad(): SevenCandidate[] {
     }),
     player({
       displayName: "Ailier",
+      goalsForWhileOn: 13,
       minutes: 420,
       goals: 4,
       assists: 3,
@@ -92,6 +97,7 @@ function squad(): SevenCandidate[] {
     }),
     player({
       displayName: "Autre ailier",
+      goalsForWhileOn: 7,
       minutes: 300,
       goals: 2,
       assists: 5,
@@ -100,6 +106,7 @@ function squad(): SevenCandidate[] {
     }),
     player({
       displayName: "Milieu",
+      goalsForWhileOn: 15,
       minutes: 600,
       goals: 1,
       assists: 6,
@@ -110,6 +117,7 @@ function squad(): SevenCandidate[] {
     }),
     player({
       displayName: "Attaquant",
+      goalsForWhileOn: 16,
       minutes: 510,
       goals: 11,
       assists: 2,
@@ -120,7 +128,7 @@ function squad(): SevenCandidate[] {
       positions: [{ group: "AT", minutes: 510, goalsFor: 14, goalsAgainst: 7 }],
     }),
     // No shirt: he must still be representable, with a synthetic handle.
-    player({ displayName: "Sans maillot", minutes: 180, jerseyNumber: null, declarations: { AT: "secondary" } }),
+    player({ displayName: "Sans maillot", goalsForWhileOn: 3, minutes: 180, jerseyNumber: null, declarations: { AT: "secondary" } }),
   ];
 }
 
@@ -158,8 +166,28 @@ describe("buildSevenPrompt", () => {
     const { user } = built("offensive", "");
     expect(user).toContain("lissé");
     expect(user).toContain("brut");
-    // The attaquant's raw goal record, as the cells hold it: 11 goals over 510 minutes.
-    expect(user).toMatch(/11 sur 510′/);
+    // The attaquant's raw record on this seven, as the cells hold it: the team scored 16 over his 510
+    // minutes, and 11 of them were his.
+    expect(user).toMatch(/16 sur 510′, 11 de lui/);
+  });
+
+  /*
+   * The owner's own worry — « si je joue 5 mn, et qu'il y a 8 buts, ça n'est pas représentatif » — is
+   * **not** fully absorbed by the shrinkage: measured, eight team goals over five minutes still ranks
+   * first on the smoothed figure, because a clamped prior leaves a short record enough weight to win.
+   * He chose to let the model discount it rather than add the minimum-minutes threshold he refused
+   * when the sevens were built (decision 206), so this instruction is the whole guard and must not be
+   * softened into « trust the smoothed number » by a later edit.
+   */
+  it("tells the model the smoothing does not absorb a very short record, and to distrust it", () => {
+    const { user } = built("offensive", "");
+    expect(user).toMatch(/ne corrige pas tout/);
+    expect(user).toMatch(/cinq\s+minutes/);
+    expect(user).toMatch(/n’est pas représentatif/);
+    // And it must say what to do about it, not merely that it is true.
+    expect(user).toMatch(/écarte un joueur dont le chiffre ne repose/);
+    // It must not tell the model to rank on the smoothed figure unconditionally.
+    expect(user).not.toMatch(/Le lissé classe/);
   });
 
   it("says whether a man has ever kept goal", () => {
@@ -168,10 +196,42 @@ describe("buildSevenPrompt", () => {
     expect(user).toContain("a déjà gardé : non");
   });
 
-  it("gives the ratings mean with the number of matches it rests on, and never an individual mark", () => {
-    const { user } = built("notes", "");
-    expect(user).toContain("7.75 sur 9 matchs notés");
-    expect(user).toContain("notes : aucune");
+  /**
+   * « Le modèle ne doit pas prendre en compte les notes. » Taken literally: no mark, no mean, no count
+   * of rated matches, for any of the four sevens. The notes seven keeps the algorithm instead.
+   */
+  it("carries no rating at all, for any seven", () => {
+    for (const kind of ["offensive", "defensive", "legende", "notes"] as const) {
+      const { system, user } = built(kind, "");
+      const whole = `${system}\n${user}`;
+      expect(whole, kind).not.toContain("notes :");
+      expect(whole, kind).not.toContain("matchs notés");
+      expect(whole, kind).not.toContain("note moyenne");
+      // The fixture's three means, each spelled as the prompt used to spell it.
+      for (const mean of ["6.5", "7.25", "7.75"]) {
+        expect(whole, `${kind} ${mean}`).not.toContain(mean);
+      }
+      expect(system, kind).toContain("Les notes des joueurs ne te sont pas transmises");
+    }
+  });
+
+  it("states the criterion of each seven, and the légende's five", () => {
+    expect(built("offensive", "").user).toContain("buts de l’équipe /60 quand il est là");
+    expect(built("defensive", "").user).toContain("encaissés/60 (moins = mieux)");
+    const legende = built("legende", "").user;
+    expect(legende).toContain("- GB : buts encaissés /60 quand il est dans les buts");
+    expect(legende).toContain("- DC : buts encaissés par l’équipe /60 pendant qu’il joue DC");
+    expect(legende).toContain("- AIL : buts de l’équipe /60 pendant qu’il joue AIL");
+    expect(legende).toContain("- MC : différence de buts /60 pendant qu’il joue MC");
+    expect(legende).toContain("- AT : ses buts à lui /60 de jeu de champ");
+    // And the one thing the AT figure is not: measured at the post.
+    expect(legende).toContain("les buts ne sont rattachés à aucun poste");
+  });
+
+  it("states that one man fills one slot, and what to do when the best keeper is the best striker", () => {
+    const { system } = built("legende", "");
+    expect(system).toContain("Un joueur ne tient qu’une place");
+    expect(system).toContain("deuxième meilleur gardien");
   });
 
   it("includes the coach's context last, fenced, when he typed one", () => {
@@ -196,8 +256,8 @@ describe("buildSevenPrompt", () => {
       expect(user).not.toContain(candidate.id);
     }
     expect(user).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i);
-    // The only rating in the prompt is the mean and its count: no per-rater line exists at all.
-    expect(user.match(/notes :/g)?.length).toBe(candidates.length);
+    // No rating line exists at all any more — not a per-rater one, not even a mean.
+    expect(user.match(/notes :/g)).toBeNull();
   });
 
   it("tells the model its job, the hard rules and that it answers in French", () => {

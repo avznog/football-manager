@@ -180,15 +180,17 @@ export const SEVEN_OPTION_FR: Readonly<Record<SevenKind, string>> = {
  */
 export const SEVEN_RULE_FR: Readonly<Record<SevenKind, string>> = {
   offensive:
-    "La meilleure attaque : à chaque poste de champ, celui qui attend le moins de minutes entre deux " +
-    "buts, puis celui qui donne le plus de passes décisives ; au goal, celui qui y a joué et y " +
+    "La meilleure attaque : à chaque poste de champ, celui avec qui l’équipe marque le plus souvent " +
+    "quand il est sur le terrain, ramené à son temps de jeu ; au goal, celui qui y a joué et y " +
     "encaisse le moins souvent.",
   defensive:
     "La meilleure défense : à chaque poste de champ, celui qui encaisse le moins souvent quand il est " +
     "sur le terrain ; au goal, celui qui y a joué et y encaisse le moins souvent.",
   legende:
-    "Le meilleur à chaque poste, de l’attaque vers la défense, jugé sur la différence de buts brute " +
-    "quand il y joue ; au goal, jamais quelqu’un en dessous de la moyenne des gardiens.",
+    "Le meilleur à chaque poste, de l’attaque vers la défense, chacun sur son propre chiffre : en AT " +
+    "le plus de buts à lui, en AIL les buts de l’équipe quand il y joue, en MC la meilleure " +
+    "différence de buts à ce poste, en DC le moins encaissé à ce poste, au goal le moins encaissé — et " +
+    "jamais un gardien en dessous de la moyenne des gardiens.",
   notes: "La meilleure moyenne des notes reçues, à chaque poste.",
 };
 
@@ -592,7 +594,9 @@ const MINUTES_PER_HOUR = 60;
  * The ranked figure of one cell, in its own scale. Each slot of a seven can be scored by a different
  * figure now (decision 171), so the screen formats by the cell's `figure`, never by the seven:
  *
- * - goals: « 1 but/133′ », the shrunk rate read as a waiting time (decision 199);
+ * - goals: « 1 but/133′ », the shrunk rate of **his own** goals read as a waiting time (decision 199);
+ * - teamGoalsFor: the same reading of **the team's** goals while he is on, named as such in the long
+ *   form (« 1 but de l’équipe toutes les 133′ ») so the claim is not mistaken for his own record;
  * - conceded (in goal or outfield): the same reading, « 1 but/24′ », as it has been since S12;
  * - impact: the raw goal difference, signed, with the stretch it is over: « +6,0 pour 60′ »;
  * - ratings: a mark out of ten.
@@ -616,20 +620,45 @@ export function formatSevenFigure(
   compact = false,
 ): string {
   if (value === null) return NO_VALUE_FR;
-  // A shrunk rate of zero means the whole squad's is zero — nobody scored, or nobody conceded, in this
-  // selection — and « 1 but toutes les ∞ » is not a figure. The polarity of the noun reads off the
-  // seven's own rule sentence above the pitch, for the goals as for the conceded cells.
-  const every = (rate: number) =>
+  /*
+   * A shrunk rate of zero means the whole squad's is zero — nobody scored, or nobody conceded, in this
+   * selection — and « 1 but toutes les ∞ » is not a figure.
+   *
+   * **The noun has to carry the polarity, and it did not until decision 206.** The old comment here
+   * said it « reads off the seven's own rule sentence above the pitch », which was true while each
+   * seven had one polarity: everything on the offensive pitch was a goal scored, everything on the
+   * defensive one a goal conceded. The légende now mixes them — AT is judged on goals he scored and GB
+   * and DC on goals conceded — so « 1 but toutes les 17′ » under the keeper and « 1 but toutes les
+   * 91′ » under the striker sat side by side in identical type with **opposite** polarity, and the
+   * keeper read as the better scorer. That is the same defect decision 203 fixed on `/stats`, back
+   * through a different door, and no test catches it: the arithmetic was right both times.
+   *
+   * So « marqué » and « encaissé » in the full form, and « pris » on the disc — four characters, and
+   * already the word the record line under it uses (« 1 pris en 52′ »), where « encaissé » does not
+   * fit the caption's 104 px.
+   */
+  const every = (rate: number, noun: "marqué" | "encaissé") =>
     rate <= 0
-      ? "aucun but"
+      ? noun === "encaissé"
+        ? "aucun but encaissé"
+        : "aucun but"
       : compact
-        ? `1 but/${minutesPerCount(rate)}′`
-        : `1 but ${everyFr(MINUTES_PER_HOUR, rate)}`;
+        ? `1 ${noun === "encaissé" ? "pris" : "but"}/${minutesPerCount(rate)}′`
+        : `1 but ${noun} ${everyFr(MINUTES_PER_HOUR, rate)}`;
   switch (figure) {
     case "goals":
+      return every(value, "marqué");
     case "keeperConceded":
     case "outfieldConceded":
-      return every(value);
+      return every(value, "encaissé");
+    case "teamGoalsFor":
+      // The disc caption is 104 px and cannot hold « d’équipe »; the raw record printed right under it
+      // says « 12 buts de l’équipe sur 240′ », which is where the compact form gets its subject.
+      return value <= 0
+        ? "aucun but"
+        : compact
+          ? `1 but/${minutesPerCount(value)}′`
+          : `1 but de l’équipe ${everyFr(MINUTES_PER_HOUR, value)}`;
     case "impact":
       // Not abbreviated on the disc: « +6,0 » alone is the figure the owner could not read, and
       // « +1,8 pour 60′ » measures 82 px on the turf at the caption's 11 px — inside the 104 px
@@ -655,11 +684,20 @@ export function sevenObservedFr(
   if (observed.denominator <= 0) return null;
   const minutes = observed.denominator;
   switch (figure) {
-    case "goals": {
-      const assists = observed.secondary ?? 0;
+    // His own goals over his minutes. No assists any more: there are five in the whole season, they
+    // rank nobody, and « 0 passe décisive » under a man's name was a figure about nothing.
+    case "goals":
       return compact
-        ? `${plural(observed.numerator, "but")} · ${assists} p.d. · ${formatMinutes(minutes)}`
-        : `${plural(observed.numerator, "but")}, ${plural(assists, "passe décisive", "passes décisives")} sur ${formatMinutes(minutes)}`;
+        ? `${plural(observed.numerator, "but")} · ${formatMinutes(minutes)}`
+        : `${plural(observed.numerator, "but")} sur ${formatMinutes(minutes)}`;
+    case "teamGoalsFor": {
+      // « dont X de lui » is the one thing this record owes the reader that the figure cannot say: the
+      // seven ranks on the team's goals, and a man can lead it without having scored one.
+      const own = observed.secondary;
+      return compact
+        ? `${plural(observed.numerator, "but")} éq. · ${formatMinutes(minutes)}`
+        : `${plural(observed.numerator, "but")} de l’équipe sur ${formatMinutes(minutes)}` +
+            (own === undefined ? "" : `, dont ${own} de lui`);
     }
     case "keeperConceded":
     case "outfieldConceded":
@@ -701,7 +739,10 @@ export function keeperRuleFr(input: {
   return (
     `${base} ${input.refused} ${refusedMany ? "sont écartés" : "est écarté"} du 7 de légende : ` +
     `${refusedMany ? "ils encaissent" : "il encaisse"} plus que la moyenne des gardiens, ` +
-    `${formatSevenFigure("keeperConceded", input.average)}.`
+    // The bare rate, not `formatSevenFigure`: this clause has already said « il encaisse », and the
+    // formatter's own « encaissé » (decision 206, so a keeper's figure is never read as goals scored)
+    // would say it twice in six words. Same helper underneath, so the rounding cannot drift.
+    `1 but ${everyFr(MINUTES_PER_HOUR, input.average)}.`
   );
 }
 
@@ -711,9 +752,10 @@ export function keeperRuleFr(input: {
  * Two claims, and since decision 199 the first one comes first: the unit. « 0,49/h » was on screen and
  * the owner wrote twice that he did not understand it, so the sentence now reads the figure out loud —
  * « 1 but toutes les 133′ » is a goal every 133 minutes of his play — before it explains the smoothing.
- * And the légende says the opposite of the other three, because decision 198 took the smoothing out of
- * the impact: there the figure is the plain division, and a reader can check it against the counts
- * printed under the name.
+ * And the légende takes five sentences rather than one, because it now has **five criteria**, one per
+ * post: the reader cannot tell what a disc claims without being told which post it belongs to. Its MC
+ * figure is still the plain division decision 198 made it, checkable by hand against the counts printed
+ * under the name, and the sentence keeps saying so.
  */
 export function sevenSmoothingFr(seven: SevenKind): string | null {
   const smoothed =
@@ -721,14 +763,15 @@ export function sevenSmoothingFr(seven: SevenKind): string | null {
     "une saison entière. Sous chaque joueur, ce qu’il a vraiment fait.";
   switch (seven) {
     case "offensive":
-      // Both polarities are on this pitch — six men are read on the goals they score, the gardien on
-      // the ones he takes — so the sentence names them separately rather than leaving the reader to
-      // work out which of the two « 1 but toutes les X′ » he is looking at.
+      // Both polarities are on this pitch — six men are read on the goals the team scores with them,
+      // the gardien on the ones he takes — so the sentence names them separately rather than leaving
+      // the reader to work out which of the two « 1 but toutes les X′ » he is looking at.
       return (
         "Le gros chiffre se lit « 1 but toutes les X minutes de jeu » : pour un joueur de champ c’est " +
-        "un but qu’il marque, et plus l’attente est courte, mieux c’est ; pour le gardien c’est un " +
-        `but qu’il encaisse, et c’est l’inverse. ${smoothed} Deux joueurs dont l’attente s’affiche ` +
-        "pareil sont départagés par leurs passes décisives."
+        "un but que l’équipe marque pendant qu’il est sur le terrain — pas forcément le sien — et plus " +
+        "l’attente est courte, mieux c’est ; pour le gardien c’est un but qu’il encaisse, et c’est " +
+        `l’inverse. ${smoothed} Deux joueurs dont l’attente s’affiche pareil sont départagés par les ` +
+        "buts qu’ils ont mis eux-mêmes."
       );
     case "defensive":
       return (
@@ -737,12 +780,21 @@ export function sevenSmoothingFr(seven: SevenKind): string | null {
         "passé au goal n’est pas compté pour un joueur de champ : il a son propre chiffre."
       );
     case "legende":
+      // Five criteria on one pitch, so the sentence has to say which disc is which before it says
+      // anything about the arithmetic. The AT exception is spelled out rather than glossed: nothing in
+      // this schema knows which post a goal was scored from, and a reader who assumes otherwise reads
+      // that disc as a claim it is not making.
       return (
-        "Le gros chiffre est la différence de buts de l’équipe pendant qu’il tenait ce poste, ramenée " +
-        "à 60 minutes de jeu : +1 et 0 encaissé en 10′ donne « +6,0 pour 60′ ». Rien n’est lissé, et " +
-        "le calcul se refait à la main avec les chiffres écrits dessous. Le chiffre du gardien, lui, " +
-        "est l’attente entre deux buts encaissés, lissée vers la moyenne des gardiens. Un joueur qui " +
-        "n’a jamais tenu le poste n’y a aucun chiffre, et le sept place d’abord ceux qui y ont joué."
+        "Chaque poste a son propre chiffre. En AT, l’attente entre deux buts qu’il met lui-même, sur " +
+        "tout son temps de jeu de champ : les buts ne sont pas rattachés à un poste, c’est donc sa " +
+        "saison entière. En AIL, l’attente entre deux buts de l’équipe pendant qu’il tient ce poste. " +
+        "En MC, la différence de buts à ce poste ramenée à 60 minutes : +1 et 0 encaissé en 10′ donne " +
+        "« +6,0 pour 60′ », brut, et le calcul se refait à la main avec les chiffres écrits dessous. " +
+        "En DC et au goal, l’attente entre deux buts encaissés — plus elle est longue, mieux c’est. " +
+        "Ces attentes sont lissées vers la moyenne des joueurs du poste : quelques minutes ne " +
+        "suffisent pas pour passer devant une saison entière. Sous chaque joueur, ce qu’il a vraiment " +
+        "fait. Un joueur qui n’a jamais tenu le poste n’y a aucun chiffre, et le sept place d’abord " +
+        "ceux qui y ont joué."
       );
     case "notes":
       return null;
@@ -808,7 +860,14 @@ export type SevenSource =
   | { path: "cache"; model: string; computedAt: string }
   | {
       path: "algorithm";
-      failure: "rateLimited" | "httpError" | "timedOut" | "invalidAnswer" | "noKey";
+      failure:
+        | "rateLimited"
+        | "httpError"
+        | "timedOut"
+        | "invalidAnswer"
+        | "noKey"
+        /** The notes seven is never asked of the model: it is given no mark to reason about. */
+        | "notRequested";
     };
 
 /**
@@ -852,6 +911,11 @@ export function sevenSourceFr(source: SevenSource, when: string | null = null): 
           return (
             "Le modèle a répondu deux fois à côté de la question. Ce sept est celui de l’algorithme, " +
             "sur les mêmes chiffres."
+          );
+        case "notRequested":
+          return (
+            "Ce sept se classe sur les notes, et le modèle ne les voit jamais : c’est l’algorithme " +
+            "qui le compose, sur la meilleure moyenne à chaque poste."
           );
         case "noKey":
           return (

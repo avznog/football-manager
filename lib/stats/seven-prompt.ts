@@ -24,7 +24,7 @@
 
 import type { BestSevenSlot } from "./best-seven";
 import { SEVEN_RULE_FR } from "./best-seven-copy";
-import { positionGroupLabelFr, positionGroupOf } from "./positions";
+import { positionGroupLabelFr, positionGroupOf, type PositionGroup } from "./positions";
 import type { SevenCandidate, SevenCell, SevenKind } from "./sevens";
 
 export type SevenPromptMessages = { system: string; user: string };
@@ -42,20 +42,39 @@ export function sevenHandles(candidates: readonly SevenCandidate[]): number[] {
   });
 }
 
-/** What each figure of a cell is, in the one word the model needs to read the column. */
+/**
+ * What each figure of a cell is, in the few words the model needs to read the column, **and in which
+ * direction it is good**. A rate it cannot tell the polarity of is a rate it will rank backwards.
+ */
 const FIGURE_LABEL_FR: Readonly<Record<SevenCell["figure"], string>> = {
-  goals: "buts/60",
-  keeperConceded: "encaissés/60 au goal",
-  outfieldConceded: "encaissés/60 sur le terrain",
-  impact: "différence de buts/60 au poste",
-  ratings: "note moyenne",
+  goals: "ses buts à lui /60 de jeu de champ (plus = mieux)",
+  teamGoalsFor: "buts de l’équipe /60 quand il est là (plus = mieux)",
+  keeperConceded: "encaissés/60 au goal (moins = mieux)",
+  outfieldConceded: "encaissés/60 (moins = mieux)",
+  impact: "différence de buts/60 au poste (plus = mieux)",
+  // Unreachable: the `notes` seven is not asked of a model, and `RATINGS_WITHHELD_FR` is what this
+  // prompt says instead. Present because the record is exhaustive over `SevenFigure`.
+  ratings: "non communiqué",
 };
 
 /** The secondary of the raw record, when the cell carries one. */
 const SECONDARY_LABEL_FR: Readonly<Partial<Record<SevenCell["figure"], string>>> = {
-  goals: "passes D",
+  teamGoalsFor: "de lui",
   impact: "encaissés",
 };
+
+/**
+ * No rating ever leaves this function, for any seven.
+ *
+ * The owner's instruction is literal — « le modèle ne doit pas prendre en compte les notes » — and the
+ * notes seven answers it by **not asking a model at all**: it keeps the algorithm, which is a mean of
+ * marks and needs no judgement. So there is no kind of question for which a rating belongs on the wire,
+ * and this prompt holds none: not the squad's marks, not a mean, not a count of rated matches. A peer's
+ * mark is also the one figure in this app a player gave in confidence (decision 074's register), and it
+ * is the kind of thing that leaks once and forever.
+ */
+const RATINGS_WITHHELD_FR =
+  "Les notes des joueurs ne te sont pas transmises, volontairement : tu ne juges jamais sur elles.";
 
 function round(value: number | null, digits = 2): string {
   if (value === null) return "—";
@@ -72,6 +91,22 @@ function shapeOf(slots: readonly BestSevenSlot[]): { code: string; count: number
   });
   return shape;
 }
+
+/**
+ * The légende's criterion per post, spelled out (decision superseding 171/172/197/198).
+ *
+ * Its five posts are judged on five different things, and the cell's `figure` alone does not say so: a
+ * `DC` cell and the défensive seven's cells are both `outfieldConceded`, but one is measured at DC and
+ * the other over all his outfield minutes. « Il faut que le modèle puisse juger de tout ça » — so the
+ * question names the stretch of play each figure is over, post by post.
+ */
+const LEGEND_FIGURE_LABEL_FR: Readonly<Record<PositionGroup, string>> = {
+  GB: "buts encaissés /60 quand il est dans les buts, lissé (moins = mieux)",
+  DC: "buts encaissés par l’équipe /60 pendant qu’il joue DC, lissé (moins = mieux)",
+  MC: "différence de buts /60 pendant qu’il joue MC, brut (plus = mieux)",
+  AIL: "buts de l’équipe /60 pendant qu’il joue AIL, lissé (plus = mieux)",
+  AT: "ses buts à lui /60 de jeu de champ, lissé — les buts ne sont rattachés à aucun poste dans cette app, donc c’est toute sa saison de champ et pas seulement son temps en AT (plus = mieux)",
+};
 
 /** « GB×1, DC×2, AIL×2, MC×1, AT×1 » — the shape, as the question asks for it. */
 export function sevenShapeFr(slots: readonly BestSevenSlot[]): string {
@@ -98,6 +133,8 @@ function candidateLines(
   const figures = shape.map((entry) => {
     const cell = cellRow[entry.slotIndex];
     const observed = cell.observed;
+    // A ratings cell carries a mark, and no mark goes on the wire (`RATINGS_WITHHELD_FR`).
+    if (cell.figure === "ratings") return `${entry.code} non communiqué`;
     const unit = observed.denominatorUnit === "minutes" ? "′" : " matchs notés";
     const secondaryLabel = SECONDARY_LABEL_FR[cell.figure];
     const secondary =
@@ -114,7 +151,6 @@ function candidateLines(
     `  minutes ${candidate.minutes}′ (terrain ${candidate.outfieldMinutes}′, goal ${candidate.gkMinutes}′)` +
       ` · a déjà gardé : ${candidate.gkMinutes > 0 ? "oui" : "non"}` +
       ` · minutes par poste : ${perPost || "aucune"}`,
-    `  notes : ${candidate.ratingAverage === null ? "aucune" : `${round(candidate.ratingAverage, 2)} sur ${candidate.ratingCount} match${candidate.ratingCount > 1 ? "s" : ""} noté${candidate.ratingCount > 1 ? "s" : ""}`}`,
     `  ${figures.join(" · ")}`,
   ];
 }
@@ -133,9 +169,14 @@ export function buildSevenPrompt(
 ): SevenPromptMessages {
   const handles = sevenHandles(candidates);
   const shape = shapeOf(slots);
-  const figureOf = shape
-    .map((entry) => `${entry.code} : ${FIGURE_LABEL_FR[cells[0]?.[entry.slotIndex]?.figure ?? "ratings"]}`)
-    .join(" · ");
+  const labelOf = (entry: { code: string; slotIndex: number }) => {
+    const group = positionGroupOf(entry.code);
+    if (kind === "legende" && group !== null) return LEGEND_FIGURE_LABEL_FR[group];
+    return FIGURE_LABEL_FR[cells[0]?.[entry.slotIndex]?.figure ?? "ratings"];
+  };
+  // One line per post rather than one joined line: the légende's five criteria are a list, and a model
+  // reading five clauses separated by « · » loses which one belongs to which post.
+  const figureOf = shape.map((entry) => `- ${entry.code} : ${labelOf(entry)}`);
 
   const system = [
     "Tu es l’analyste d’une équipe de football à 7. On te donne la saison d’un effectif, chiffre par",
@@ -147,8 +188,15 @@ export function buildSevenPrompt(
     "- le gardien doit être quelqu’un qui a déjà gardé (minutes au goal > 0) ;",
     "- respecte le nombre de places par poste qu’on te demande.",
     "",
+    "Un joueur ne tient qu’une place : il ne peut pas être à la fois gardien et attaquant. Si le",
+    "meilleur gardien est aussi le meilleur attaquant, mets-le là où il fait gagner le plus de places à",
+    "l’équipe et prends le deuxième meilleur gardien pour l’autre — jamais un sept incomplet, jamais un",
+    "joueur deux fois.",
+    "",
     "Les deux DC sont interchangeables, les deux AIL aussi : réponds par des ensembles, pas par un",
     "gauche et un droit.",
+    "",
+    RATINGS_WITHHELD_FR,
     "",
     "Les champs `reasons` et `summary` que tu renvoies sont affichés tels quels à l’écran : écris-les",
     "en français, en tutoyant le lecteur, et sans jargon. Une phrase courte par joueur, qui cite le",
@@ -157,14 +205,27 @@ export function buildSevenPrompt(
 
   const user = [
     `Question : compose le sept « ${kind} ».`,
-    `Règle de ce sept : ${SEVEN_RULE_FR[kind]}`,
+    // The notes seven's rule is « la meilleure moyenne des notes », and no mark is on this wire — so
+    // the question would be unanswerable rather than merely hard. It is answered by the algorithm, not
+    // by a model; this line is what the prompt says if it is ever asked anyway.
+    kind === "notes"
+      ? `Règle de ce sept : ${RATINGS_WITHHELD_FR} Ce sept se calcule sans modèle.`
+      : `Règle de ce sept : ${SEVEN_RULE_FR[kind]}`,
     "",
     `Forme demandée : ${sevenShapeFr(slots)} — sept places en tout.`,
     "Les places de même poste sont interchangeables.",
     "",
-    `Chiffre de référence par poste : ${figureOf}`,
-    "Chaque poste donne un chiffre « lissé » (corrigé du peu de minutes jouées) et le « brut » qui est",
-    "derrière lui. Le lissé classe, le brut dit sur quoi il repose.",
+    "Chiffre de référence par poste :",
+    ...figureOf,
+    "",
+    "Chaque poste donne un chiffre « lissé » et le « brut » qui est derrière lui. Le lissé est déjà",
+    "ramené vers la moyenne de l’équipe en fonction du temps joué, mais il ne corrige pas tout : un",
+    "record très court garde assez de poids pour passer devant une saison entière. Huit buts sur cinq",
+    "minutes restent donc en tête du lissé, et ce n’est pas représentatif.",
+    "",
+    "C’est à toi de t’en méfier : lis toujours le brut, et écarte un joueur dont le chiffre ne repose",
+    "que sur quelques minutes à ce poste, même s’il est premier. Classe sur le lissé quand les deux",
+    "joueurs ont un temps de jeu comparable ; sinon, préfère celui dont le record est le plus solide.",
     "",
     "Les joueurs sont désignés par leur numéro de maillot. Un numéro négatif est un numéro de",
     "remplacement, pour un joueur qui n’a pas de maillot attribué : il désigne un vrai joueur.",

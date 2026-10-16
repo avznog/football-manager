@@ -35,6 +35,7 @@ function player(overrides: Partial<SevenCandidate> & { displayName: string; jers
     outfieldMinutes: 0,
     concededOutfield: 0,
     concededWhileGk: 0,
+    goalsForWhileOn: 0,
     positions: [],
   };
   const merged = { ...base, ...overrides };

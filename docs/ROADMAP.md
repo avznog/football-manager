@@ -2421,6 +2421,23 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       transient, so it now says « redemande son avis dans quelques minutes ». Four comments justifying
       a choice by « free models are retired without notice » are corrected; **the determinism argument
       for the cache is untouched and still stands**
+- [x] **Three of the four sevens measure something else now** (decision **206**, which supersedes
+      197's criterion for the attack seven and 198's single figure for the légende). The owner: « pour
+      la meilleure attaque, il faut que ce soit les joueurs, qui, lorsqu'à chaque poste, l'équipe
+      marque le plus », « le 7 de légende, c'est chaque meilleur à chaque poste ». **Offensive** now
+      ranks the **team's** goals scored while he is on, per minute, shrunk (`goalsForWhileOn`, new
+      `SevenFigure` value `teamGoalsFor`), tie-broken on his own goals, and **assists are dropped
+      entirely**. **Défensive** is unchanged. **Légende** is five criteria, one per post: GB fewest
+      conceded in goal, DC fewest team goals conceded at DC, MC best goal difference at MC (198's raw
+      impact, kept for this one post), AIL most team goals at AIL, AT his own goals per outfield
+      minute. Every shrunk criterion is fitted **over its own population**, the men with minutes at
+      that post. The data backs the switch: **11** personal goals and **5** assists all season against
+      **77** team goals for and **119** against — eleven goals cannot separate fifteen men, and that
+      is also why MC is judged on goal difference rather than on passes. 171, 172 (the Q8 keeper
+      floor, the notes seven) and 187 (« no minutes, not a candidate », no minimum-minutes threshold)
+      all stand. The **notes** seven keeps its algorithm and **is never asked of the model** — it was
+      still being sent after the ratings were withheld from the prompt, which is a bug fixed in the
+      same pass. **1593** tests, up from 1581
 - [ ] **The owner adds credit to his OpenRouter account.** `OPENROUTER_API_KEY` is set in Vercel on
       Preview and Production — that part is **done** — but Flash Lite is a paid model, so **without
       credit every call returns 402**, the request takes the fallback path and the screen silently
@@ -2434,3 +2451,12 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       `injuries` has one, availability went in S3) so his typed context is the only new information in
       the system. That makes the comparison the thing that says whether this feature earns its place.
       **Not started**, and the algorithm stays in the tree until it is done
+- [ ] **The algorithmic fallback has no guard against a thin record.** Measured, not assumed: eight
+      team goals in five minutes is 96 per 60 and **10.7** once shrunk, against **5.8** for 60 goals in
+      600 minutes — `PRIOR_STRENGTH_CLAMP` leaves a very short record roughly **8 %** weight and 8 % of
+      96 wins. A *plausible* thin record does lose (2 goals in 5′ lands at 3.9 behind 5.3); only the
+      extreme outlier survives. Shown this, the owner chose to **leave the arithmetic alone and let the
+      model discount it** rather than add the minimum-minutes threshold he refused in 187, so the guard
+      is an instruction in the prompt and a test pins it. **The fallback has no judgement**, so the hole
+      is open there whenever the model is unavailable. Known and accepted, not an oversight (decision
+      **206**)
