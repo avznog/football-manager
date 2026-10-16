@@ -1,8 +1,8 @@
 # COST.md — what this project has cost, and what that number is not
 
-Measured on **2026-10-16**, with `main` at `fc35fa0` (version `1.0.1`, 205 commits, 201 merged pull
-requests, 102 451 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
-2026-09-22 and its first commit landed on 2026-09-23, so everything below covers **twenty-four days**.
+Measured on **2026-10-16**, with `main` at `3408ef0` (version `1.1.2`, 213 commits, 208 merged pull
+requests, 104 640 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
+2026-09-22 and its first commit landed on 2026-09-23, so everything below covers **twenty-five days**.
 
 **The headline, and read the next sentence with it: $1929.96.** That is the cost of the model tokens
 this project consumed, **at API list prices, on both machines** — $1400.03 on the Linux one
@@ -52,18 +52,26 @@ refresh on this machine picks it up.
 Divided by what it bought, which is the only form of this number that is any use when deciding
 whether to spend more:
 
-- **$9.41 per commit** (205) — the Linux machine alone was $6.83
-- **$9.60 per merged pull request** (201)
-- **$0.0188 per line** of committed TypeScript, SQL, CSS and Markdown — still under two cents
-- **$80.42 per day** across the twenty-four days — was $78.99 yesterday
+- **$9.06 per commit** (213) — the Linux machine alone was $6.57
+- **$9.28 per merged pull request** (208)
+- **$0.0184 per line** of committed TypeScript, SQL, CSS and Markdown — still under two cents
+- **$77.20 per day** across the twenty-five days — was $80.42 earlier today
 
 ### Against the last snapshot, which is the only way to read the trend
 
-The previously published combined total was **$1862.75** on 2026-10-14. This machine has added
-**$34.30** since, almost all of it in `7054d16c`, which is why the per-day figure moved back up: no new days
-divided into a total that barely moved. The macOS machine has not run the script since, so its share
-is unchanged by construction and none of the day's work is missing from the headline — it all happened
-here.
+The previously published combined total was **$1862.75** on 2026-10-14, and this machine added
+**$34.30** on 2026-10-16 to reach $1929.96.
+
+**This refresh, later the same day, moved no money at all** — `7054d16c` still reads $1113.18 — while
+the denominators moved a lot: eight more merged pull requests and 2 189 more lines. So every rate fell:
+**$9.41 → $9.06 per commit**, **$80.42 → $77.20 per day** as the day rolled over into a
+twenty-fifth. That is the one direction worth watching, and the only way to see it is to keep the
+denominators current even on a refresh where the total does not budge.
+
+Why the total holds still: Claude Code flushes a `cost-state` record as a session goes rather than on
+every message, so a figure read twice in an afternoon can legitimately repeat. It is not evidence the
+work was free. The macOS machine has not run the script since 2026-10-14, so its share is unchanged by
+construction.
 
 **This comparison is the Linux machine against itself**, because the 2026-10-05 snapshot was taken
 there and nowhere else. The macOS figure cannot be split across that date: a `cost-state` record
@@ -160,7 +168,7 @@ cost at list prices*, which is a useful number for a different question (is this
 what would it cost someone else) and the wrong one for « what did I spend ».
 
 **This file cannot tell which case applies**, because the transcript records the computed cost either
-way. Check the billing mode, and if it is a subscription, the honest total for the twenty-four days is
+way. Check the billing mode, and if it is a subscription, the honest total for the twenty-five days is
 the pro-rated fee.
 
 ### 3. Time
@@ -212,5 +220,5 @@ the same way. Three rules, and the first is now in `CLAUDE.md`'s definition of d
    script's output or arithmetic on one, which is why the script is in the repository rather than in
    somebody's shell history.
 3. **Date the measurement, name the commit it was taken at, and keep the previous snapshot's
-   figures.** A cost without a denominator — 205 commits, twenty-four days — says nothing at all, and a
+   figures.** A cost without a denominator — 213 commits, twenty-five days — says nothing at all, and a
    cost without its predecessor says nothing about where it is going.
