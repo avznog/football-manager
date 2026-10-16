@@ -2460,3 +2460,45 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       is an instruction in the prompt and a test pins it. **The fallback has no judgement**, so the hole
       is open there whenever the model is unavailable. Known and accepted, not an oversight (decision
       **206**)
+
+## Vercel Web Analytics and Speed Insights — 2026-10-16
+
+- [x] **Both of Vercel's analytics are in, per the official quickstarts** (decision **207**).
+      `@vercel/analytics@2.0.1` and `@vercel/speed-insights@2.0.0`, with `<Analytics />` and
+      `<SpeedInsights />` as the last children of `<body>` in `app/layout.tsx`. Next is **16.3.6**, well
+      past the 13.5 cutoff, so the plain `/next` imports are the right ones and the `usePathname`
+      wrapper the docs keep for older versions is not needed. `npm i` **fails with `ERESOLVE`** on this
+      project — `@vercel/analytics` has a `peerOptional` on `@sveltejs/kit` whose own peer range
+      collides with `vite@8`, neither of which is in this tree — so it went in with
+      **`--legacy-peer-deps`**, two packages added to the lockfile; **`npm ci` from a clean tree exits
+      0**, verified, so the four workflows that run it are unaffected
+- [x] **The middleware matcher no longer swallows the beacons.** `proxy.ts` excluded `_next/static`,
+      `_next/image` and anything with a file extension, but **not `/_vercel/…`** — and the guard
+      307-redirects any extension-less path with no session cookie to `/connexion`.
+      `/_vercel/insights/view` and `/_vercel/speed-insights/vitals` are extension-less, so every event
+      from `/connexion` and `/rejoindre`, the pages a visitor sees *before* logging in, would have been
+      answered with HTML. The scripts (`…/script.js`) were already excluded, so it would have failed
+      **partially and quietly**. Matcher is now
+      `["/((?!_next/static|_next/image|_vercel|.*\\.[a-zA-Z0-9]+$).*)"]` — fixed in the matcher, not in
+      `PUBLIC_PATHS`, because nothing under `/_vercel/` is an application route and there is no
+      permission decision to make. **Second time that regex has bitten**: `/api/dev/trace` is
+      whitelisted for the same trap, and that comment is what made this findable
+- [x] **The pathname is redacted before it leaves.** Our URLs are `/match/<uuid>`, `/joueur/<uuid>`,
+      `/match/<uuid>/composition/<uuid>`; unredacted they fill a third-party dashboard with match and
+      player ids, which leaks and aggregates nothing. A pure, tested `redactPathname`
+      (`lib/analytics/redact.ts`) rewrites them to `/match/[id]`, `/joueur/[id]`,
+      `/match/[id]/composition/[lineupId]` from `beforeSend`, and **redacts and returns** rather than
+      returning `null`, which would drop the view. Keyed on the **parent segment, never the shape of
+      the value**: a UUID regex silently stops redacting the day an id looks different.
+      `/match/nouveau` and `/match/<id>/composition/nouvelle` are **real static pages in a dynamic
+      position**, so a `STATIC_SIBLINGS` table sits beside the dynamic one, and a test **walks `app/`
+      on disk** and fails until both tables know about any new `[param]` directory or routable static
+      sibling. **Speed Insights needs none of this**: its wrapper's `Props` is
+      `Omit<SpeedInsightsProps, "route">` and it computes the route itself. **This redaction is a
+      choice made on the owner's behalf** — deleting `beforeSend` is the whole reversal if he would
+      rather see raw paths. **1611** tests, up from 1593
+- [ ] **The owner enables Web Analytics in the Vercel dashboard** (project → Analytics → Enable). The
+      component is deployed and collects **nothing** until he does; Speed Insights needs no toggle and
+      is on every plan. **Custom events are Pro and above**, so on this `hobby` plan the data is page
+      views and Core Web Vitals only — no « a coach opened game mode » — the same plan ceiling decision
+      **127** recorded for Skew Protection. His to do: a session cannot click it

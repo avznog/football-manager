@@ -1,4 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+
+import { WebAnalytics } from "@/components/analytics/web-analytics";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -51,6 +55,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col bg-canvas font-sans text-ink antialiased">
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {children}
+        {/*
+          Vercel Web Analytics and Speed Insights. Both render nothing and only inject a script,
+          and both are no-ops off Vercel, so a local `npm run dev` is unaffected. `WebAnalytics`
+          wraps `<Analytics />` to strip the ids out of the path before the beacon leaves the
+          browser; Speed Insights needs no wrapper, its `/next` entry point already reports the
+          route pattern (`/match/[id]/jeu`) rather than the resolved URL. Their beacons are also
+          the reason `proxy.ts` excludes `/_vercel/` from its matcher — see the comment there.
+        */}
+        <WebAnalytics />
+        <SpeedInsights />
       </body>
     </html>
   );

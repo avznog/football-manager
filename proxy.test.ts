@@ -43,6 +43,16 @@ describe("proxy matcher — static files", () => {
     expect(MATCHER.test("/_next/static/chunks/main.js")).toBe(false);
     expect(MATCHER.test("/_next/image")).toBe(false);
   });
+
+  it("does not match Vercel's own beacon endpoints, which carry no session and no extension", () => {
+    // Web Analytics and Speed Insights `POST` these from every page, `/connexion` included. They
+    // are extension-less, so without the `_vercel` exclusion the guard would 307 them and the
+    // browser would send the measurement to an HTML login page. Same trap as `/api/dev/trace`.
+    expect(MATCHER.test("/_vercel/insights/view")).toBe(false);
+    expect(MATCHER.test("/_vercel/insights/event")).toBe(false);
+    expect(MATCHER.test("/_vercel/speed-insights/vitals")).toBe(false);
+    expect(MATCHER.test("/_vercel/speed-insights/script.js")).toBe(false);
+  });
 });
 
 describe("proxy matcher — routes", () => {
