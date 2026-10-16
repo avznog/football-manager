@@ -9,7 +9,7 @@
 
 import { randomBytes } from "node:crypto";
 
-import { and, eq, isNull, sql as raw } from "drizzle-orm";
+import { and, eq, isNull, or, sql as raw } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -27,21 +27,32 @@ import {
   toFormState,
 } from "./validation";
 
-/** Uniform message: never reveal whether a username exists. */
-const BAD_CREDENTIALS = "Nom d'utilisateur ou mot de passe incorrect.";
+/** Uniform message: never reveal whether an account exists, by username or by address. */
+const BAD_CREDENTIALS = "Identifiant ou mot de passe incorrect.";
 
 export async function login(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = loginSchema.safeParse({
-    username: formData.get("username"),
+    identifier: formData.get("identifier"),
     password: formData.get("password"),
   });
   if (!parsed.success) return toFormState(parsed.error);
 
+  // One query over both columns rather than two sequential ones: an unknown identifier then costs
+  // one round trip whatever it looked like, and nothing in the response time says which column
+  // matched (decision 208).
+  //
+  // Nothing in the schema forbids a username being equal to *another* man's address, so the match
+  // could in principle be ambiguous. It cannot be with these sixteen addresses — a username is at
+  // most 20 characters and may not contain an `@` — but the code must not be silently ambiguous
+  // anyway, so the username wins: it is the identifier this app issued and the one its owner alone
+  // controls, where the address merely came in with an import. `orderBy` makes that deterministic
+  // instead of leaving it to whichever row Postgres happens to return first.
   const user = await db.query.users.findFirst({
-    where: eq(users.username, parsed.data.username),
+    where: or(eq(users.username, parsed.data.identifier), eq(users.email, parsed.data.identifier)),
+    orderBy: raw`case when ${users.username} = ${parsed.data.identifier} then 0 else 1 end`,
   });
 
-  // Always run a real verification, even when the username does not exist, so the response
+  // Always run a real verification, even when the identifier names no account, so the response
   // time cannot be used to discover which accounts are real.
   const storedHash = user?.passwordHash ?? (await getDecoyHash());
   const { ok, needsUpgrade } = await verifyPassword(storedHash, parsed.data.password);

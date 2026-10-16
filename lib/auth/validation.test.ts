@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   fieldErrorsUnder,
   inviteCodeSchema,
+  loginIdentifierSchema,
   joinWithNewAccountSchema,
   loginSchema,
   toFormState,
@@ -22,6 +23,31 @@ describe("usernameSchema", () => {
   it("accepts the punctuation people actually use", () => {
     expect(usernameSchema.parse("karim.b_7-fc")).toBe("karim.b_7-fc");
   });
+
+  it("still refuses an address: it governs what a *new* username may be, not how you log in", () => {
+    expect(usernameSchema.safeParse("tsarkrek@gmail.com").success).toBe(false);
+  });
+});
+
+describe("loginIdentifierSchema", () => {
+  it("accepts both ways of naming the same account", () => {
+    expect(loginIdentifierSchema.parse("pierre")).toBe("pierre");
+    expect(loginIdentifierSchema.parse("tsarkrek@gmail.com")).toBe("tsarkrek@gmail.com");
+  });
+
+  it("trims and lowercases, because both columns are stored lowercased", () => {
+    expect(loginIdentifierSchema.parse("  TsarKrek@Gmail.com ")).toBe("tsarkrek@gmail.com");
+  });
+
+  it("does not judge email syntax — a wrong identifier is a wrong credential", () => {
+    expect(loginIdentifierSchema.safeParse("pierre@").success).toBe(true);
+    expect(loginIdentifierSchema.safeParse("ab").success).toBe(true);
+  });
+
+  it("still requires something to be typed, and refuses the absurd", () => {
+    expect(loginIdentifierSchema.safeParse("   ").success).toBe(false);
+    expect(loginIdentifierSchema.safeParse("a".repeat(255)).success).toBe(false);
+  });
 });
 
 describe("inviteCodeSchema", () => {
@@ -40,11 +66,11 @@ describe("loginSchema", () => {
   it("does not apply the password policy to an existing password", () => {
     // A password set before a rule change must still let its owner in; a wrong one is
     // reported uniformly by the action instead.
-    expect(loginSchema.safeParse({ username: "karim", password: "old" }).success).toBe(true);
+    expect(loginSchema.safeParse({ identifier: "karim", password: "old" }).success).toBe(true);
   });
 
   it("still requires a password to be typed", () => {
-    expect(loginSchema.safeParse({ username: "karim", password: "" }).success).toBe(false);
+    expect(loginSchema.safeParse({ identifier: "karim", password: "" }).success).toBe(false);
   });
 });
 

@@ -15,15 +15,19 @@ export function LoginForm({ next }: { next?: string }) {
       <FormError state={state} />
 
       <Field
-        label="Nom d’utilisateur"
-        name="username"
+        label="Nom d’utilisateur ou e-mail"
+        name="identifier"
+        hint="Ton e-mail est celui de l’ancienne appli."
         type="text"
+        // Still `username`: that is the autofill token for « the thing you log in with », and it is
+        // what a password manager has already saved for this form. `email` would be a lie for the
+        // two accounts that have none.
         autoComplete="username"
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
         required
-        errors={state?.fieldErrors?.username}
+        errors={state?.fieldErrors?.identifier}
       />
       <Field
         label="Mot de passe"

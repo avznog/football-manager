@@ -25,8 +25,14 @@ export default async function LoginPage({ searchParams }: PageProps<"/connexion"
   return (
     <div className="rounded-2xl border border-border/60 bg-surface p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-ink">Connexion</h2>
+      {/*
+        « les identifiants que tu as choisis en rejoignant l'équipe » was true of nobody by the time
+        decision 208 landed: sixteen of the eighteen accounts were created from the old app rather than
+        by invitation, so they chose neither their username nor the address they can now type. The
+        sentence names both ways in instead of describing how the account came to exist.
+      */}
       <p className="mt-1 mb-6 text-sm text-ink-muted">
-        Entre les identifiants que tu as choisis en rejoignant l’équipe.
+        Ton nom d’utilisateur ou ton e-mail, et ton mot de passe.
       </p>
 
       {expired ? (
