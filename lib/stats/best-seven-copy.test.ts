@@ -673,35 +673,52 @@ describe("the tutoiement (decision 074)", () => {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The three model failures are the branches worth pinning, for the same reason the shrinkage sentence
- * is: the free tier allows fifty questions a day and free models are retired without notice, so these
- * are the sentences the owner will read most — and each one has to say both what happened *and* that
- * the pitch above it is still a real seven.
+ * The model failures are the branches worth pinning, for the same reason the shrinkage sentence is:
+ * a call to somebody else's machine fails in several ways, so these are sentences the owner will
+ * actually read — and each one has to say both what happened *and* that the pitch above it is still a
+ * real seven. No sentence may promise a delay the code cannot know: the model is paid by the call, so
+ * a 429 is a busy minute, not a quota that lifts tomorrow.
  */
 describe("sevenSourceFr", () => {
   it("names the model and the date of a cached answer", () => {
     const sentence = sevenSourceFr(
-      { path: "cache", model: "nvidia/nemotron", computedAt: "x" },
+      { path: "cache", model: "google/gemini-2.5-flash-lite", computedAt: "x" },
       "le 12 octobre à 18:04",
     );
-    expect(sentence).toContain("nvidia/nemotron");
+    expect(sentence).toContain("google/gemini-2.5-flash-lite");
     expect(sentence).toContain("le 12 octobre à 18:04");
   });
 
   it("names the model of a fresh answer and dates nothing", () => {
-    expect(sevenSourceFr({ path: "model", model: "nvidia/nemotron" })).toContain("à l’instant");
+    expect(sevenSourceFr({ path: "model", model: "google/gemini-2.5-flash-lite" })).toContain("à l’instant");
   });
 
-  it("tells the reader to come back tomorrow when the quota is gone, and never shows a code", () => {
+  it("calls a rate limit a busy moment rather than a daily quota, and never shows a code", () => {
     const sentence = sevenSourceFr({ path: "algorithm", failure: "rateLimited" });
-    expect(sentence).toContain("réessaie demain");
+    expect(sentence).toContain("minutes");
+    expect(sentence).not.toContain("demain");
+    expect(sentence).not.toContain("quota");
     expect(sentence).toContain("algorithme");
     expect(sentence).not.toMatch(/\b429\b|erreur|Error/);
   });
 
+  it("says the model was too slow without naming a number of seconds", () => {
+    const sentence = sevenSourceFr({ path: "algorithm", failure: "timedOut" });
+    expect(sentence).toContain("trop de temps");
+    expect(sentence).toContain("algorithme");
+    expect(sentence).not.toMatch(/\d/);
+    expect(sentence).not.toMatch(/erreur|Error|timeout|abort/i);
+  });
+
   it("says the algorithm answered, whichever way the model failed", () => {
-    for (const failure of ["rateLimited", "httpError", "invalidAnswer", "noKey"] as const) {
+    for (const failure of ["rateLimited", "httpError", "timedOut", "invalidAnswer", "noKey"] as const) {
       expect(sevenSourceFr({ path: "algorithm", failure })).toContain("algorithme");
+    }
+  });
+
+  it("tutoies the reader in every failure sentence and never vouvoies", () => {
+    for (const failure of ["rateLimited", "httpError", "timedOut", "invalidAnswer", "noKey"] as const) {
+      expect(sevenSourceFr({ path: "algorithm", failure })).not.toMatch(/\bvous\b|\bvotre\b/i);
     }
   });
 });

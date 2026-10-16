@@ -8017,3 +8017,73 @@ real season is production: the fingerprint and the cache are per team and carry 
 environments, and nothing here writes to the season.
 
 ---
+
+## 205 — The équipe type model is `gemini-2.5-flash-lite`, paid, with a hard timeout
+
+**2026-10-16** · accepted · follows the first live call of decision 204 · `lib/stats/seven-llm.ts`,
+`lib/stats/seven-cache.ts`, `lib/stats/best-seven-copy.ts`, `app/(app)/stats/equipe-type/page.tsx` ·
+no migration · **supersedes decision 204's choice of provider model, and nothing else in it**
+
+**Read the scope first, because it is narrow.** Decision **204** stands whole: the architecture, the
+seam at `solveAssignment`, `buildCells` producing the cells matrix and the shrinkage reports, shirt
+numbers as the model's only handles, sets rather than sides, the aggregated peer ratings, the pure
+validator, the one retry with the reason fed back, the `seven_suggestions` cache and its fingerprint.
+Nothing was reverted. **One line changed: which model is asked.**
+
+**The thing not to trust again: OpenRouter's model list advertises `structured_outputs: true` for
+`nvidia/nemotron-3-super-120b-a12b:free`, and that flag describes the *model*, not the *free endpoint*
+serving it.** 204 read it as evidence the free route was viable. It is not evidence of that. The first
+live call on the preview failed in exactly the way the validator was built for: the model returned an
+invalid seven, the code fed the validation reason back, the second answer was invalid too, and the
+page fell through to the algorithm — « Le modèle a répondu deux fois à côté de la question. Ce sept
+est celui de l'algorithme, sur les mêmes chiffres. » The page took **53 seconds**, against a
+`maxDuration` of 60. Four seconds from the cliff. A capability flag on a model is not a promise about
+the endpoint, and the only thing that settles it is one live call.
+
+**The owner's decision, shown the numbers: drop the free model entirely and use
+`google/gemini-2.5-flash-lite`. No free fallback chain, one code path.** The arithmetic he was shown:
+`$0.10` in and `$0.40` out per million tokens is about **$0.00042 a call** on this prompt (~1 800
+tokens in, ~600 out) — **roughly 24 000 calls for $10**, or $0.00068 and ~15 000 calls if every answer
+hits the 1 200-token cap. At forty taps a month, $10 lasts decades. He was also offered « free first,
+paid fallback », and told that $10 of all-time credit permanently raises OpenRouter's **free** cap from
+50 to 1 000 requests a day. He chose Flash Lite alone anyway: one path, nothing to reason about, ~2 s.
+
+**His OpenRouter account needs credit or every call returns 402** and the feature silently serves the
+algorithm's seven. That is an item for him, not a code change, and it is on the roadmap beside the
+`OPENROUTER_API_KEY` variable he has now set.
+
+**A hard timeout, which did not exist before, and is why the 53 seconds cannot recur.**
+`SEVEN_ATTEMPT_TIMEOUT_MS = 12_000` per attempt and `SEVEN_TOTAL_TIMEOUT_MS = 24_000` shared across
+the one retry, so each attempt gets `min(12 s, budget remaining)` and **a retry cannot double the
+ceiling**. Flash Lite answers in 1–2 s, so 12 s is five to ten times the headroom: a slow-but-working
+call is never cut off, and a hung one is abandoned with time left to render something true.
+`maxDuration` on the route comes **down from 60 to 30** — 24 s of model budget plus margin for the
+reads, the DP and the render.
+
+**`timedOut` is a typed failure of its own and is deliberately not folded into `httpError`.** Only
+`controller.signal.aborted` becomes `timedOut`, so a DNS failure or a dropped socket is still reported
+as what it is rather than as slowness. Its sentence: « Le modèle a mis trop de temps à répondre. Ce
+sept est celui de l'algorithme, sur les mêmes chiffres — redemande son avis si tu veux réessayer. »
+And one correction worth recording precisely: **a timeout is not retried.** The retry loop only
+re-asks after an *invalid answer*. The shared budget is still real and still tested, because a slow
+first answer followed by a hanging second attempt does reach it.
+
+**The rate-limit sentence was wrong and is rewritten.** It said « réessaie demain », which was written
+for a fifty-a-day free cap that no longer applies; a paid 429 is transient and tomorrow is the wrong
+advice. It now reads « Le modèle refuse les questions pour le moment : il en reçoit trop. Ce sept est
+celui de l'algorithme, sur les mêmes chiffres — redemande son avis dans quelques minutes. »
+
+**Four places justified a design choice by « free models are retired without notice »** —
+`seven-llm.ts`, `seven-cache.ts`, `best-seven-copy.ts` and the page's own JSX comment — and all four
+are corrected. **The determinism argument for the cache is untouched and still stands**: a stats screen
+that answers the same question two ways reads as a bug, and the cache is what hides it. Only the cost
+and rate-limit arguments changed. The recorded `model` column keeps its purpose too: the footer names
+the model that **answered**.
+
+**204's own open limit is intact and still unmet.** Against a stated criterion the algorithm is an
+**exact optimum** — a bitmask DP, not a heuristic — so the model's edge is reasoning over the owner's
+typed context and nothing else, and with no context typed expect it to be **worse** on « offensive »
+and no better anywhere else. **The comparison between the two sevens on the same selection has still
+not been made**, and the algorithm stays in the tree until it is.
+
+---

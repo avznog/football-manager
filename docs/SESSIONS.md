@@ -6434,3 +6434,60 @@ same selection. And **non-determinism on a stats screen reads as a bug**: the ca
 miss can answer the same question two different ways, and the free tier gets no prompt caching.
 
 Files: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+**Then it was called for real, and the free model failed on the first attempt** (decision **205**,
+same day, an hour later). On the preview the model returned an **invalid seven**, the code fed the
+validation reason back, the **second** answer was invalid too, and the page fell through to the
+algorithm: « Le modèle a répondu deux fois à côté de la question. Ce sept est celui de l'algorithme,
+sur les mêmes chiffres. » The fallback chain worked exactly as designed, which is the only consolation
+in it. The page took **53 seconds**, against a `maxDuration` of 60 — four seconds from the cliff.
+
+**The lesson is a capability flag that is not about the endpoint.** OpenRouter's model list advertises
+`structured_outputs: true` for `nvidia/nemotron-3-super-120b-a12b:free`, and that describes the
+**model**, not the **free endpoint serving it**. 204 had taken it as evidence the free route was
+viable. It is not evidence of that, and nothing but a live call settles it. Recorded in 205 as a thing
+not to trust again.
+
+**Shown the arithmetic, the owner dropped the free model entirely**: `google/gemini-2.5-flash-lite`,
+**no free fallback chain, one code path**. `$0.10` in and `$0.40` out per million tokens is about
+**$0.00042 a call** on this prompt (~1 800 tokens in, ~600 out) — **roughly 24 000 calls for $10**, or
+~15 000 if every answer hits the 1 200-token cap; at forty taps a month $10 lasts decades. He was
+offered « free first, paid fallback » and told that $10 of all-time credit permanently raises the
+**free** cap from 50 to 1 000 requests a day, and chose Flash Lite alone anyway: simplest, one path,
+~2 s. **His account needs credit or every call is a 402** and the screen serves the algorithm's seven
+in silence — on the roadmap, his to do. `OPENROUTER_API_KEY` itself is set in Vercel now, so that item
+is closed.
+
+**A hard timeout exists where none did**, and the 53 seconds are why: **12 s per attempt**, **24 s
+shared across the one retry**, each attempt getting `min(12 s, budget remaining)` so a retry cannot
+double the ceiling. Flash Lite answers in 1–2 s, so 12 s is five to ten times the headroom — a
+slow-but-working call is never cut, a hung one is abandoned with time left to render something true.
+`maxDuration` came **down from 60 to 30**. **`timedOut` is a typed failure of its own**, deliberately
+not folded into `httpError`: only `controller.signal.aborted` becomes it, so a DNS failure or a
+dropped socket is still reported as what it is. And **a timeout is not retried** — the retry loop only
+re-asks after an *invalid answer*; the shared budget is still real and still tested, because a slow
+first answer followed by a hanging second attempt reaches it.
+
+**Two pieces of copy were wrong and are rewritten.** The rate-limit sentence said « réessaie demain »,
+which was written for a fifty-a-day free cap; a paid 429 is transient, so it now reads « Le modèle
+refuse les questions pour le moment : il en reçoit trop. […] redemande son avis dans quelques
+minutes. » The new timeout says « Le modèle a mis trop de temps à répondre. […] redemande son avis si
+tu veux réessayer. » Four comments justifying a design choice by « free models are retired without
+notice » — in `seven-llm.ts`, `seven-cache.ts`, `best-seven-copy.ts` and the page's own JSX — are
+corrected. **The determinism argument for the cache is untouched and still stands**; only the cost and
+rate-limit arguments changed.
+
+**Unresolved, and left open on purpose: React error #412.** The owner reported it on the preview
+during the failed call. It was **not reproduced** — zero console errors in a scripted run. The
+suspicion is the Suspense boundary aborting during the 53-second stream, which the timeout removes the
+*condition* for rather than fixing the cause. So if it reappears with a 2-second call, the hypothesis
+is wrong and nothing has been diagnosed. Not closed.
+
+The open limit of 204 is unchanged: against a stated criterion the algorithm is an **exact optimum**,
+so the model's edge is reasoning over the typed context, and **the comparison has still not been
+made**.
+
+Files, this second pass: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md` (the code —
+`lib/stats/seven-llm.ts`, `lib/stats/seven-cache.ts`, `lib/stats/best-seven-copy.ts`,
+`lib/stats/actions.ts`, `app/(app)/stats/equipe-type/page.tsx` and their tests — was changed alongside
+by the session that owns the branch).

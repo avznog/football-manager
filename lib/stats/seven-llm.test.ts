@@ -1,7 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { BestSevenSlot } from "./best-seven";
-import { solveSevenWithModel, validateSevenAnswer, type SevenAnswer } from "./seven-llm";
+import {
+  SEVEN_ATTEMPT_TIMEOUT_MS,
+  SEVEN_MODEL,
+  SEVEN_TOTAL_TIMEOUT_MS,
+  solveSevenWithModel,
+  validateSevenAnswer,
+  type SevenAnswer,
+} from "./seven-llm";
 import type { SevenCandidate } from "./sevens";
 
 /* The fixture style of `sevens.test.ts`. */
@@ -191,7 +198,7 @@ describe("validateSevenAnswer", () => {
 /* The call                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function reply(content: unknown, model = "nvidia/nemotron-3-super-120b-a12b:free") {
+function reply(content: unknown, model = SEVEN_MODEL) {
   return {
     ok: true,
     status: 200,
@@ -227,7 +234,7 @@ describe("solveSevenWithModel", () => {
     expect(outcome.result.picks.map((pick) => pick.player?.jerseyNumber)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(outcome.result.picks[0].cell?.figure).toBe("keeperConceded");
     expect(outcome.summary).toBe("Un sept qui attaque.");
-    expect(outcome.model).toBe("nvidia/nemotron-3-super-120b-a12b:free");
+    expect(outcome.model).toBe(SEVEN_MODEL);
     expect(outcome.attempts).toBe(1);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
@@ -328,7 +335,9 @@ describe("solveSevenWithModel", () => {
       response_format: { json_schema: { strict: boolean; schema: { properties: { slots: { properties: Record<string, { minItems: number }> } } } } };
       messages: { role: string; content: string }[];
     };
-    expect(body.model).toBe("nvidia/nemotron-3-super-120b-a12b:free");
+    // Written out rather than compared to the constant: the point of this line is to notice the pin
+    // moving. No `:free` suffix — see the comment on `SEVEN_MODEL`.
+    expect(body.model).toBe("google/gemini-2.5-flash-lite");
     expect(body.temperature).toBe(0);
     expect(body.max_tokens).toBeGreaterThan(0);
     expect(body.response_format.json_schema.strict).toBe(true);
@@ -336,5 +345,138 @@ describe("solveSevenWithModel", () => {
     expect([slotsSchema.GB.minItems, slotsSchema.DC.minItems, slotsSchema.AIL.minItems, slotsSchema.MC.minItems, slotsSchema.AT.minItems]).toEqual([1, 2, 2, 1, 1]);
     expect(body.messages.map((message) => message.role)).toEqual(["system", "user"]);
     expect(body.messages[1].content).toContain("Coupe, on joue serré.");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The timeout                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A fetch that never answers, and rejects the way a real one does once the signal is aborted. Nothing
+ * here waits: the clock is Vitest's and it is advanced by hand.
+ */
+function hangingFetch() {
+  return vi.fn(
+    (_url: string, init: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      }),
+  );
+}
+
+describe("solveSevenWithModel, when the model hangs", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("aborts the attempt on the timeout and reports it as its own failure", async () => {
+    const fetcher = hangingFetch();
+    const pending = solveSevenWithModel("offensive", input, "", {
+      fetch: fetcher as unknown as typeof fetch,
+      apiKey: "k",
+    });
+    const init = fetcher.mock.calls[0][1];
+    expect(init.signal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(SEVEN_ATTEMPT_TIMEOUT_MS);
+    const outcome = await pending;
+
+    expect(init.signal?.aborted).toBe(true);
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    // The distinction the screen depends on: « trop de temps » is not « n'a pas répondu ».
+    expect(outcome.failure).toBe("timedOut");
+    expect(outcome.failure).not.toBe("httpError");
+    expect("status" in outcome).toBe(false);
+    // A hang is not retried: there is nothing to tell the model it got wrong.
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds on until the timeout rather than giving up early", async () => {
+    const fetcher = hangingFetch();
+    const pending = solveSevenWithModel("notes", input, "", {
+      fetch: fetcher as unknown as typeof fetch,
+      apiKey: "k",
+    });
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(SEVEN_ATTEMPT_TIMEOUT_MS - 1);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(settled).toBe(true);
+  });
+
+  it("spends one budget across the retry, so two attempts cannot outlast the ceiling", async () => {
+    // The first attempt answers badly after 11 s, which earns the retry; the second never answers.
+    let clock = 0;
+    const fetcher = vi
+      .fn<(url: string, init: RequestInit) => Promise<Response>>()
+      .mockImplementationOnce(async () => {
+        clock = 11_000;
+        return reply("pas du json {");
+      })
+      .mockImplementationOnce((_url, init) => {
+        return new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        });
+      });
+
+    const pending = solveSevenWithModel("defensive", input, "", {
+      fetch: fetcher as unknown as typeof fetch,
+      apiKey: "k",
+      now: () => clock,
+    });
+
+    // Whatever the second attempt is allowed, it is over by the time the budget is: advancing only
+    // what is left of `SEVEN_TOTAL_TIMEOUT_MS` is enough to settle it.
+    await vi.advanceTimersByTimeAsync(SEVEN_TOTAL_TIMEOUT_MS - 11_000);
+    const outcome = await pending;
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.failure).toBe("timedOut");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives the second attempt only what is left of the budget", async () => {
+    let clock = 0;
+    const fetcher = vi
+      .fn<(url: string, init: RequestInit) => Promise<Response>>()
+      .mockImplementationOnce(async () => {
+        // A first attempt that very nearly ate the lot: 1 s remains, not another full 12.
+        clock = SEVEN_TOTAL_TIMEOUT_MS - 1_000;
+        return reply("pas du json {");
+      })
+      .mockImplementationOnce((_url, init) => {
+        return new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        });
+      });
+
+    const pending = solveSevenWithModel("legende", input, "", {
+      fetch: fetcher as unknown as typeof fetch,
+      apiKey: "k",
+      now: () => clock,
+    });
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    const outcome = await pending;
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.failure).toBe("timedOut");
   });
 });

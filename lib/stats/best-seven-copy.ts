@@ -806,15 +806,19 @@ export const SEVEN_SUMMARY_HEADING_FR = "Ce que le modèle en dit";
 export type SevenSource =
   | { path: "model"; model: string }
   | { path: "cache"; model: string; computedAt: string }
-  | { path: "algorithm"; failure: "rateLimited" | "httpError" | "invalidAnswer" | "noKey" };
+  | {
+      path: "algorithm";
+      failure: "rateLimited" | "httpError" | "timedOut" | "invalidAnswer" | "noKey";
+    };
 
 /**
  * One sentence saying where the seven came from — printed, never hovered (decision 072).
  *
- * The three failures are not edge cases: the free tier allows fifty calls a day and free models are
- * retired without notice, so the owner meets them. Each one therefore reads as a fact about the model
- * plus the reassurance that the pitch above is still a real seven, and the rate limit says what to do
- * about it. None of them is ever a status code, a stack or the word « erreur » on its own.
+ * The failures are not edge cases: a model is a network call to somebody else's machine, so a refusal,
+ * a hang and a nonsense answer all happen. Each one therefore reads as a fact about the model plus the
+ * reassurance that the pitch above is still a real seven. None of them is ever a status code, a stack
+ * or the word « erreur » on its own — and none of them promises a delay it cannot know: the model is
+ * paid for by the call, so a 429 is a busy minute and **not** a daily ceiling that lifts tomorrow.
  *
  * `when` is already formatted — `lib/calendar/time.ts` pins Europe/Paris, and this module is pure.
  */
@@ -831,8 +835,13 @@ export function sevenSourceFr(source: SevenSource, when: string | null = null): 
       switch (source.failure) {
         case "rateLimited":
           return (
-            "Le modèle a épuisé son quota de questions pour aujourd’hui : réessaie demain. " +
-            "En attendant, ce sept est celui de l’algorithme, sur les mêmes chiffres."
+            "Le modèle refuse les questions pour le moment : il en reçoit trop. Ce sept est celui de " +
+            "l’algorithme, sur les mêmes chiffres — redemande son avis dans quelques minutes."
+          );
+        case "timedOut":
+          return (
+            "Le modèle a mis trop de temps à répondre. Ce sept est celui de l’algorithme, sur les " +
+            "mêmes chiffres — redemande son avis si tu veux réessayer."
           );
         case "httpError":
           return (
