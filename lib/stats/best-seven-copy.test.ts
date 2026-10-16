@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ObservedFigure, ShrinkageReport } from "./best-seven";
 import {
+  CONTEXT_MAX_LENGTH,
   CRITERION_PARAM,
   DECLARED_POSTS_FR,
   DEFAULT_SEVEN,
@@ -33,6 +34,8 @@ import {
   optimumComparisonFr,
   outOfPositionNoteFr,
   parseCompetitionId,
+  parseSevenContext,
+  sevenSourceFr,
   parseSeven,
   resetLabelFr,
   sevenObservedFr,
@@ -662,5 +665,61 @@ describe("the tutoiement (decision 074)", () => {
     ].join(" ");
 
     expect(everything).not.toMatch(/\bvous\b|\bvotre\b|\bvos\b/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Where the seven came from (decision 204)                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The three model failures are the branches worth pinning, for the same reason the shrinkage sentence
+ * is: the free tier allows fifty questions a day and free models are retired without notice, so these
+ * are the sentences the owner will read most — and each one has to say both what happened *and* that
+ * the pitch above it is still a real seven.
+ */
+describe("sevenSourceFr", () => {
+  it("names the model and the date of a cached answer", () => {
+    const sentence = sevenSourceFr(
+      { path: "cache", model: "nvidia/nemotron", computedAt: "x" },
+      "le 12 octobre à 18:04",
+    );
+    expect(sentence).toContain("nvidia/nemotron");
+    expect(sentence).toContain("le 12 octobre à 18:04");
+  });
+
+  it("names the model of a fresh answer and dates nothing", () => {
+    expect(sevenSourceFr({ path: "model", model: "nvidia/nemotron" })).toContain("à l’instant");
+  });
+
+  it("tells the reader to come back tomorrow when the quota is gone, and never shows a code", () => {
+    const sentence = sevenSourceFr({ path: "algorithm", failure: "rateLimited" });
+    expect(sentence).toContain("réessaie demain");
+    expect(sentence).toContain("algorithme");
+    expect(sentence).not.toMatch(/\b429\b|erreur|Error/);
+  });
+
+  it("says the algorithm answered, whichever way the model failed", () => {
+    for (const failure of ["rateLimited", "httpError", "invalidAnswer", "noKey"] as const) {
+      expect(sevenSourceFr({ path: "algorithm", failure })).toContain("algorithme");
+    }
+  });
+});
+
+describe("parseSevenContext", () => {
+  it("degrades a missing, repeated or empty value to no context at all", () => {
+    expect(parseSevenContext(undefined)).toBe("");
+    expect(parseSevenContext("")).toBe("");
+    expect(parseSevenContext("   ")).toBe("");
+    expect(parseSevenContext(["sans Karim", "sans Momo"])).toBe("sans Karim");
+  });
+
+  it("collapses the whitespace a textarea leaves behind", () => {
+    expect(parseSevenContext(" sans  Karim \n ni Momo ")).toBe("sans Karim ni Momo");
+  });
+
+  it("cuts an oversized value rather than refusing it", () => {
+    const long = "a".repeat(CONTEXT_MAX_LENGTH + 200);
+    expect(parseSevenContext(long)).toHaveLength(CONTEXT_MAX_LENGTH);
   });
 });

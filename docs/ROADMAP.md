@@ -2379,3 +2379,37 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       card cannot show. Fixing it needs the reducer to emit per-spell attribution and a column to
       hold it; **not started, and not worth a migration for one event a season** unless the owner
       asks
+
+## The sixth backlog: an LLM picks the équipes types — 2026-10-16
+
+- [x] **The four sevens are chosen by a language model, over the figures the code already smooths**
+      (issue #237, decision **204**). The owner: « everything is done with a algo. But I think it is
+      the wrong way, as there is a lot of details to take in account. » OpenRouter, **free models
+      only**, pinned to `nvidia/nemotron-3-super-120b-a12b:free` — 120B MoE, 262k context, structured
+      outputs; the free tier allows 20 requests a minute and 50 a day below ten all-time credits,
+      1 000 a day at or above. The seam is **`solveAssignment` alone**: `buildCells` still produces
+      the cells matrix, the shrinkage reports and the keeper eligibility counts that the screen's
+      French sentences are rendered from, so `seven-pitch.tsx` and `best-seven-copy.ts` are untouched
+      and the model returns one `slotToCandidate: number[]`. It is addressed **shirt numbers, never
+      names and never UUIDs** — « Léo C » and « Léo M » are two different men — and asked for **sets**
+      rather than sides, because decision **157** made AIL one position. Peer ratings go as **each
+      player's mean and its match count**: none of the 463 individual notes leaves the owner's
+      infrastructure. The answer is validated in code whatever `strict: true` promised — seven
+      distinct eligible entries, exact per-slot counts, a GB who has actually kept goal — then **one
+      retry with the reason fed back, then the cache, then the algorithm**. Cached in
+      **`seven_suggestions`** (migration **`0015_romantic_shaman.sql`**, new `seven_kind` enum),
+      keyed on a fingerprint of the candidate figures, the seven, the competition filter and the typed
+      context, recording the `context` the answer was reasoned from and the `model` that actually
+      answered — free endpoints are retired without notice
+- [ ] **Compare the model's seven against the algorithm's on the same selection, before anything is
+      deleted.** Against a stated criterion the algorithm is an **exact optimum** — a bitmask DP — so
+      with no context typed the model should be **worse** on « offensive » and no better elsewhere,
+      and the whole gain is reasoning over what the owner types. The database holds almost no prose to
+      reason over (`ratings` has no comment column, `REMARK` is an enum with two rows all season,
+      `injuries` has one, availability went in S3) so his typed context is the only new information in
+      the system. That makes the comparison the thing that says whether this feature earns its place.
+      **Not started**, and the algorithm stays in the tree until it is done
+- [ ] **The owner sets `OPENROUTER_API_KEY` in Vercel, on Preview and Production.** It is in
+      `.env.example` **by name only** because the repository is public, and without it every request
+      takes the fallback path and the screen silently serves the algorithm's seven. His to do: a
+      session cannot hold the key

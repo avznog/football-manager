@@ -72,9 +72,15 @@ travaillez ».
 
 ## Conventions
 
-- Server Actions live next to the route that uses them, in `actions.ts`.
-- Queries live in `lib/queries/` and return plain serialisable objects, never Drizzle rows with
-  Date objects crossing the RSC boundary unformatted.
+- **Server Actions and queries live by domain under `lib/<domain>/`**, as `actions.ts` and
+  `queries.ts` — `lib/match/actions.ts`, `lib/stats/queries.ts`, and so on. This describes the code
+  rather than an intention: these two lines used to say actions sat next to their route and queries
+  lived in `lib/queries/`, and **all nineteen files contradicted both** — there has never been a
+  `lib/queries/` directory, and until decision 204 not one `app/**/actions.ts`. Checked 2026-10-16
+  when a session dutifully followed the old wording and produced the only file in the repository that
+  obeyed it.
+- A query returns plain serialisable objects, never Drizzle rows with Date objects crossing the RSC
+  boundary unformatted.
 - Dates are stored as `timestamptz` and always handled in `Europe/Paris` for display.
 - Match minutes are **continuous**: with 2×30, the second half runs 30'→60'. Never display a
   reset clock.

@@ -7935,3 +7935,85 @@ emit per-spell attribution, which is a much larger change and is not in scope; t
 owner's question answered on the data that exists, and the code says so where it is computed.
 
 ---
+
+## 204 — An LLM picks the four sevens, over the figures the code already smooths
+
+**2026-10-16** · accepted · the owner's sixth backlog, issue #237 · `lib/stats/seven-prompt.ts`,
+`lib/stats/seven-llm.ts`, `app/(app)/stats/equipe-type/`, `db/schema.ts` ·
+migration `0015_romantic_shaman.sql` · **amends nothing, narrows the reach of 171/172**
+
+The owner, about the four équipes types: « everything is done with a algo. But I think it is the wrong
+way, as there is a lot of details to take in account. » So the four sevens — offensive, défensive, 7
+de légende, notes — are now chosen by a language model. He was offered the narrower option of a fifth
+« sur mesure » seven beside the four computed ones and chose the full replacement.
+
+- **Provider: OpenRouter, free models only**, model pinned to
+  `nvidia/nemotron-3-super-120b-a12b:free` — a 120B MoE with a 262k context that supports structured
+  outputs. The free tier is **20 requests per minute and 50 per day** below ten all-time credits,
+  1 000 per day at or above, which is the budget the cache is sized against. The key is
+  `OPENROUTER_API_KEY`, in `.env.example` **by name only**: this repository is public.
+- **Code smooths, the model judges.** The empirical-Bayes shrinkage stays exactly where it is, and
+  the model is handed the smoothed figure *and* the raw record behind it. The owner chose this over
+  handing it raw numbers: a model asked to reconcile 1 goal in 1 match against 6 in 12 invents its own
+  prior, and this project already has one it can defend.
+- **Peer ratings are aggregated before they leave the building.** Each player's mean and the number of
+  matches it rests on, and nothing else: **none of the 463 individual peer ratings is sent.** A dozen
+  men scoring each other out of ten is the most sensitive data in this app.
+- **Training policy: permissive account routing, thin payload.** The owner accepted that OpenRouter
+  may route to providers that train on inputs — refusing them shrinks the free model list to
+  nothing — on the explicit understanding that what travels is aggregates and shirt numbers.
+- **Shirt numbers are the model's only handles**, never UUIDs and never names. « Léo C » and « Léo M »
+  are two different men; a name collision would hand one man's season to the other and nothing in the
+  system would fail.
+- **The model replaces `solveAssignment` alone.** `solveSeven` is three steps and only the middle one
+  picks anybody: `buildCells` → `solveAssignment` → map to `picks`. `buildCells` produces the
+  `cells[candidate][slot]` matrix, the shrinkage reports and the keeper eligibility counts, and the
+  screen's French sentences cannot render without them. So the seam is one function returning
+  `slotToCandidate: number[]`. `seven-pitch.tsx` and every sentence in `best-seven-copy.ts` are
+  untouched, which is why this is a swap and not a rewrite.
+- **The model is asked for sets, not for sides.** Seven slots over five position codes — `GB`×1,
+  `DC`×2, `AIL`×2, `MC`×1, `AT`×1 — and decision **157** made left and right one position, so the two
+  DC are interchangeable and so are the two AIL. Asking for « left winger » would invite a distinction
+  the data does not carry; the code assigns a returned set to concrete slots in a documented
+  deterministic order.
+- **`strict: true` on the wire is a guardrail, not a guarantee**, so the answer is validated in code
+  regardless. `minItems` is unevenly enforced across providers, and a shirt number that exists is not
+  the same thing as a candidate who is eligible. The validator requires exactly seven entries, all
+  distinct, all eligible, the exact per-slot counts, and a `GB` who has actually kept goal. On
+  failure: **one retry with the reason fed back, then the cached answer, then the algorithm.**
+- **The answer is cached, in `seven_suggestions`** (migration `0015_romantic_shaman.sql`, new
+  `seven_kind` enum: `offensive, defensive, legende, notes`), keyed `unique(team_id, fingerprint)`
+  where the fingerprint covers the candidate figures, the seven, the competition filter and the typed
+  context. It records the `context` so the screen can show what the answer was reasoned from, and the
+  `model`, because a free endpoint is routed and retired without notice — the disc footer must name
+  the model that **answered**, not the one that was asked.
+
+**What the database does not hold, which is the whole point of the feature.** There is almost no prose
+in it. `ratings` is a bare `score` with no comment column; `REMARK` events are an enum
+(`GOOD_POSITIONING`, `GOOD_TRACK_BACK` — two rows all season); `injuries` has one row; match
+availability was deleted in slice S3 (decision **156**). **So the « details » the owner says the
+algorithm misses are not recorded anywhere.** His typed context is the only genuinely new information
+entering the system, and the feature is worth exactly what he types into it. Stated plainly because it
+is easy to forget: **a model handed today's data alone has precisely the information the algorithm
+has, in a less reliable form.**
+
+**The limits, which are real.** Against a stated criterion the algorithm is an **exact optimum** — a
+bitmask DP, not a heuristic — so with no context typed, expect the model to be **worse** on
+« offensive » and no better anywhere else. The gain is reasoning over the prose, and it is worth
+**measuring before anything is deleted**. Second, **non-determinism on a stats screen reads as a bug**:
+the cache is what hides it, and without a cache hit the same question can return two different sevens.
+The free tier gets no prompt caching, so there is no cheaper middle ground. Third, free models are
+retired without notice, which is what the pinned id, the recorded answering model and the three-step
+fallback are for.
+
+**It amends nothing, and narrows the reach of several.** Decisions **171** and **172** still define
+*what* the four sevens mean — which figure each slot is scored by, and the légende's attack-first,
+no-below-average-keeper rule — but they no longer describe *how* a seven is chosen; 172's ordering now
+lives in the prompt as an instruction rather than in the DP's key order. **157** is why the model
+answers in sets. **163** keeps the preferred positions the coach's, so eligibility is still the coach's
+data and not the model's opinion. **187** still decides who is a candidate at all — no minutes, not a
+candidate — and the model never sees anyone it excludes. **201** matters because the only copy of the
+real season is production: the fingerprint and the cache are per team and carry no data between
+environments, and nothing here writes to the season.
+
+---

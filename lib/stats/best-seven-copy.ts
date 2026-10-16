@@ -764,3 +764,91 @@ export const KEEPER_REFUSED_BADGE_FR = "écarté du goal";
 export function squadMeanStandInShortFr(figure: SevenFigure): string {
   return figure === "keeperConceded" ? "moyenne des gardiens" : "moyenne de l’équipe";
 }
+
+/* -------------------------------------------------------------------------- */
+/* Where the seven came from, and the context it was asked with (decision 204) */
+/* -------------------------------------------------------------------------- */
+
+/** `?contexte=` — the free text the owner types under the pitch. */
+export const CONTEXT_PARAM = "contexte";
+
+/**
+ * Long enough for « sans Karim ni Momo, on joue le premier du championnat et Théo revient de blessure »
+ * and short enough that a forged URL cannot stuff a prompt. A longer value is **cut, not refused**:
+ * the reader's sentence is not an error, and losing the tail of it is better than losing the screen.
+ */
+export const CONTEXT_MAX_LENGTH = 500;
+
+/** Same tolerance as every other parser here: missing, repeated, empty or oversized all degrade. */
+export function parseSevenContext(value: string | string[] | undefined): string {
+  const raw = firstOf(value);
+  if (typeof raw !== "string") return "";
+  return raw.slice(0, CONTEXT_MAX_LENGTH).replace(/\s+/gu, " ").trim();
+}
+
+export const SEVEN_CONTEXT_LABEL_FR = "Ce que les chiffres ne savent pas";
+export const SEVEN_CONTEXT_PLACEHOLDER_FR =
+  "L’adversaire, qui est absent, qui revient de blessure…";
+export const SEVEN_CONTEXT_HINT_FR =
+  "Écris-le et le sept est redemandé en en tenant compte ; laissé vide, il ne juge que les chiffres de la saison.";
+export const SEVEN_CONTEXT_SUBMIT_FR = "Redemander le sept";
+
+/**
+ * While the model is out. Said once, in words, and never as a progress bar: the wait is not measurable
+ * from here and a bar that cannot progress is a lie.
+ */
+export const SEVEN_PENDING_FR = "Le modèle compose le sept…";
+
+/** The heading over the model's few sentences on the seven as a whole. */
+export const SEVEN_SUMMARY_HEADING_FR = "Ce que le modèle en dit";
+
+/** Which of the three paths produced the seven on screen. */
+export type SevenSource =
+  | { path: "model"; model: string }
+  | { path: "cache"; model: string; computedAt: string }
+  | { path: "algorithm"; failure: "rateLimited" | "httpError" | "invalidAnswer" | "noKey" };
+
+/**
+ * One sentence saying where the seven came from — printed, never hovered (decision 072).
+ *
+ * The three failures are not edge cases: the free tier allows fifty calls a day and free models are
+ * retired without notice, so the owner meets them. Each one therefore reads as a fact about the model
+ * plus the reassurance that the pitch above is still a real seven, and the rate limit says what to do
+ * about it. None of them is ever a status code, a stack or the word « erreur » on its own.
+ *
+ * `when` is already formatted — `lib/calendar/time.ts` pins Europe/Paris, and this module is pure.
+ */
+export function sevenSourceFr(source: SevenSource, when: string | null = null): string {
+  switch (source.path) {
+    case "model":
+      return `Ce sept est celui du modèle ${source.model}, demandé à l’instant.`;
+    case "cache":
+      return (
+        `Ce sept est celui du modèle ${source.model}, calculé ${when ?? "plus tôt"}. ` +
+        "Même effectif, mêmes chiffres, même contexte : il n’est pas redemandé."
+      );
+    case "algorithm":
+      switch (source.failure) {
+        case "rateLimited":
+          return (
+            "Le modèle a épuisé son quota de questions pour aujourd’hui : réessaie demain. " +
+            "En attendant, ce sept est celui de l’algorithme, sur les mêmes chiffres."
+          );
+        case "httpError":
+          return (
+            "Le modèle n’a pas répondu. Ce sept est celui de l’algorithme, sur les mêmes chiffres — " +
+            "réessaie plus tard si tu veux son avis."
+          );
+        case "invalidAnswer":
+          return (
+            "Le modèle a répondu deux fois à côté de la question. Ce sept est celui de l’algorithme, " +
+            "sur les mêmes chiffres."
+          );
+        case "noKey":
+          return (
+            "Aucun modèle n’est branché sur cette installation : ce sept est celui de l’algorithme, " +
+            "qui est celui du reste de l’écran."
+          );
+      }
+  }
+}
