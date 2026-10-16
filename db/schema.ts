@@ -37,6 +37,8 @@ export const matchStatus = pgEnum("match_status", ["scheduled", "live", "finishe
 export const entryMode = pgEnum("entry_mode", ["live", "retro"]);
 export const positionLine = pgEnum("position_line", ["GB", "DEF", "MIL", "ATT"]);
 export const positionPreference = pgEnum("position_preference", ["primary", "secondary"]);
+/** The four « équipe type » sevens. Values must stay identical to `SEVEN_KINDS` in `lib/stats/sevens.ts`. */
+export const sevenKind = pgEnum("seven_kind", ["offensive", "defensive", "legende", "notes"]);
 
 /**
  * Match event types. See `docs/DATA_MODEL.md` for each one's payload shape.
@@ -601,6 +603,57 @@ export const ratings = pgTable(
     check("ratings_score_range", sql`${t.score} between 0 and 10`),
     check("ratings_score_one_decimal", sql`(${t.score} * 10) = floor(${t.score} * 10)`),
     check("ratings_no_self", sql`${t.raterMemberId} <> ${t.ratedMemberId}`),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
+/* Seven suggestions                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The cache of the LLM-written « équipe type » sevens (decision 204, issue #237).
+ *
+ * The sevens moved from a local algorithm to an OpenRouter call on a free model, and the free tier
+ * allows **50 requests a day**. So an answer is asked for once and read from here afterwards: without
+ * that, opening the stats screen a few times exhausts the day's quota. It also settles the other half
+ * of the problem — a model is not deterministic, and a stats screen that reshuffles its seven on every
+ * reload is a screen nobody trusts. `fingerprint` hashes the candidate figures, the kind, the
+ * competition and the typed context, so a cached row is only reused while all four are unchanged.
+ *
+ * **This is a cache and may be emptied at any time without loss.** Every row is reproducible from the
+ * match data, and nothing else in the schema points at it.
+ *
+ * `model` records the model id read back from the API response rather than the one we asked for: free
+ * endpoints are routed elsewhere and retired without notice, so the screen names whichever model
+ * actually answered, and a row written by a model that no longer exists is still honest about itself.
+ */
+export const sevenSuggestions = pgTable(
+  "seven_suggestions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    teamId: uuid()
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    kind: sevenKind().notNull(),
+    /** `null` means « toutes compétitions », which is the screen's default filter. */
+    competitionId: uuid().references(() => competitions.id, { onDelete: "cascade" }),
+    /** The cache key: a hash of the candidate figures, the kind, the competition and the context. */
+    fingerprint: text().notNull(),
+    /** The free text the owner typed, kept so the screen can show what the answer was reasoned from. */
+    context: text().notNull().default(""),
+    /** The slot assignment the model returned: which candidate plays where. */
+    slots: jsonb().notNull(),
+    /** French prose, per player, shown next to his card. */
+    reasons: jsonb(),
+    /** French prose, a few sentences on the seven as a whole. */
+    summaryFr: text(),
+    /** The model id the API answered with — not necessarily the one asked for. */
+    model: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("seven_suggestions_fingerprint_unique").on(t.teamId, t.fingerprint),
+    index("seven_suggestions_lookup_idx").on(t.teamId, t.kind, t.competitionId),
   ],
 );
 
