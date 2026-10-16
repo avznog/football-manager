@@ -24,6 +24,26 @@ export const usernameSchema = z
     "Le nom d'utilisateur ne peut contenir que des lettres, chiffres, points, tirets et tirets bas.",
   );
 
+/**
+ * What someone may type in the login field: a username **or** the address he used on the team's
+ * previous app (decision 208). Deliberately **not** `usernameSchema`, for exactly the reason the
+ * password field is not `passwordSchema`: an identifier that already names an account must not be
+ * rejected by a rule written after it was handed out. An email is longer than 20 characters and
+ * contains an `@`, both of which `usernameSchema` refuses — and that schema stays as it is, because
+ * it still governs what a *new* username may be at `joinWithNewAccount`.
+ *
+ * So this trims and lowercases (both columns are stored lowercased) and then only asks that
+ * something was typed and that it is not absurdly long. Email syntax is **not** checked: the form's
+ * job is to accept what is typed and let the credential check decide. A wrong identifier is a wrong
+ * credential and is reported uniformly, never as « ce n'est pas un e-mail ».
+ */
+export const loginIdentifierSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(1, "Entre ton nom d'utilisateur ou ton e-mail.")
+  .max(254, "Cet identifiant est trop long.");
+
 export const passwordSchema = z
   .string()
   .min(PASSWORD_MIN_LENGTH, `Le mot de passe doit faire au moins ${PASSWORD_MIN_LENGTH} caractères.`)
@@ -49,7 +69,7 @@ export const inviteCodeSchema = z
   );
 
 export const loginSchema = z.object({
-  username: usernameSchema,
+  identifier: loginIdentifierSchema,
   // Deliberately not `passwordSchema`: an existing password must not be rejected by a rule
   // introduced after it was set. Wrong credentials are reported uniformly instead.
   password: z.string().min(1, "Entre ton mot de passe."),
