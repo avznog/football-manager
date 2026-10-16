@@ -6557,3 +6557,67 @@ Files, this third pass: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.m
 `lib/stats/sevens.ts`, `lib/stats/seven-prompt.ts`, `lib/stats/best-seven-copy.ts`,
 `lib/stats/best-seven-input.ts`, `lib/stats/actions.ts` and their tests — by the session that owns the
 branch).
+
+**Then the owner asked for Vercel's two analytics** (decision **207**, same day, a fourth pass),
+pointing at the official quickstarts. `@vercel/analytics@2.0.1` and `@vercel/speed-insights@2.0.0`,
+`<Analytics />` and `<SpeedInsights />` as the last children of `<body>` in `app/layout.tsx`. Next is
+**16.3.6**, well past the 13.5 cutoff, so the plain `/next` imports are correct and the `usePathname`
+wrapper the docs describe for older versions is not needed. That was ten lines; the rest of the pass
+was four things none of which the quickstarts mention.
+
+**The middleware was about to swallow the beacons, partially and without a symptom.** `proxy.ts`'s
+matcher excluded `_next/static`, `_next/image` and anything with a file extension — but **not
+`/_vercel/…`** — and the guard 307-redirects any extension-less path with no session cookie to
+`/connexion`. `/_vercel/insights/view` and `/_vercel/speed-insights/vitals` are extension-less, so
+every event sent from `/connexion` and `/rejoindre`, the pages a visitor sees **before** logging in,
+would have been redirected and answered with HTML — while the scripts (`…/script.js`) loaded fine,
+being extension-excluded already. The matcher is now
+`["/((?!_next/static|_next/image|_vercel|.*\\.[a-zA-Z0-9]+$).*)"]`, fixed **in the matcher rather than
+in `PUBLIC_PATHS`**: nothing under `/_vercel/` is an application route, so there is no permission
+decision to make and the middleware should not run. **It is the second time that regex has bitten** —
+`/api/dev/trace` is whitelisted for exactly this trap, and that comment is what made the hole
+findable.
+
+**The URLs carry identifiers, so the pathname is redacted before it leaves.** Ours are `/match/<uuid>`,
+`/joueur/<uuid>`, `/match/<uuid>/composition/<uuid>`; raw, a third-party dashboard fills with match and
+player ids — a leak, and *less* useful, since a row per match aggregates nothing. A pure
+`redactPathname` in `lib/analytics/redact.ts` rewrites them to `/match/[id]`, `/joueur/[id]`,
+`/match/[id]/composition/[lineupId]` from `beforeSend`, and **redacts and returns** rather than
+returning `null`, which would drop the view entirely. Keyed on the **parent segment, not the shape of
+the value**: a UUID-or-digits regex silently stops redacting the day an id looks different, and
+silently-stops is the failure mode that leaks, whereas a position in the path cannot change without
+`app/` changing. **This is a choice made on the owner's behalf and he can reverse it** — deleting
+`beforeSend` is the entire change.
+
+**The trap inside that:** `/match/nouveau` and `/match/<id>/composition/nouvelle` are **real static
+pages sitting in a dynamic position**, both verified to have a `page.tsx`. Naive positional redaction
+would have renamed « nouveau match » and « nouvelle composition » into `[id]` and `[lineupId]` and
+merged two of the app's most interesting screens into the per-match aggregate. Hence a
+`STATIC_SIBLINGS` table beside the dynamic one — and because that table duplicates the filesystem, **a
+test walks `app/` on disk** and fails until both tables know about any new `[param]` directory or
+routable static sibling.
+
+**Speed Insights needs no redaction, and the types say so more strongly than the docs.** Its Next
+wrapper's public `Props` is `Omit<SpeedInsightsProps, "route">`: the prop is *removed* from the surface
+because the wrapper supplies it, running `computeRoute(usePathname(), useParams())`, so it already
+reports `/match/[id]/jeu`.
+
+**Two operational facts worth the next person's time.** **`npm i` fails with `ERESOLVE`** on this
+project: `@vercel/analytics` declares a `peerOptional` on `@sveltejs/kit` and npm's attempt to resolve
+that optional peer collides with `vite@8` inside SvelteKit's own peer range — neither package is in
+this tree. Installed with **`--legacy-peer-deps`**, lockfile up by **exactly two** packages, and
+**`npm ci` from a clean tree exits 0**, verified, so the four workflows that run it are unaffected. And
+**Web Analytics collects nothing until the owner enables it in the dashboard** (project → Analytics →
+Enable); Speed Insights needs no toggle and is on every plan, while **custom events are Pro and
+above**, so on this `hobby` plan the data is page views and Core Web Vitals only — the same plan
+ceiling decision **127** recorded for Skew Protection. The dashboard toggle is on the roadmap as his.
+
+Gates: `npm run typecheck`, eslint, `npm test` **1611 passed** (1593 → +17 redaction, +1 proxy),
+`npm run test:e2e` **11 passed** including `e2e/offline.spec.ts`, and `npm run build` green with the
+**route table unchanged** — 27 entries, same static/dynamic split. That last one earns its line:
+Speed Insights' wrapper calls `useSearchParams()` in the root layout, the classic way to force pages
+out of static prerendering, and it did not here, so no `Suspense` boundary was needed.
+
+Files, this fourth pass: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md` (the code —
+`app/layout.tsx`, `proxy.ts`, `lib/analytics/redact.ts`, `components/analytics/` and their tests — by
+the session that owns the branch).

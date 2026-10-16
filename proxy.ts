@@ -77,6 +77,16 @@ export const config = {
    * ending in `.<ext>` loses nothing routable, and a fourth file dropped into `public/` is
    * served without this file having to be edited. `proxy.test.ts` asserts that by reading the
    * directory rather than naming its contents.
+   *
+   * `_vercel` is the second exclusion, and it is there for the `/api/dev/trace` reason one level
+   * up: Web Analytics beacons `POST /_vercel/insights/view` and Speed Insights beacons
+   * `POST /_vercel/speed-insights/vitals`, both **extension-less**, so the guard below would
+   * 307 them to `/connexion` and answer HTML to a `fetch` — on `/connexion` and `/rejoindre`
+   * above all, the two pages a visitor sees before there is any session to find, and the only
+   * pages where a first-visit measurement can be taken at all. The scripts themselves end in
+   * `.js` and were already excluded by the rule above. Nothing under `/_vercel/` is an
+   * application route, so this is not a permission decision made in the matcher: there is simply
+   * nothing here for the guard to decide.
    */
-  matcher: ["/((?!_next/static|_next/image|.*\\.[a-zA-Z0-9]+$).*)"],
+  matcher: ["/((?!_next/static|_next/image|_vercel|.*\\.[a-zA-Z0-9]+$).*)"],
 };
