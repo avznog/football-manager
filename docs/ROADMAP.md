@@ -2502,3 +2502,48 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       is on every plan. **Custom events are Pro and above**, so on this `hobby` plan the data is page
       views and Core Web Vitals only — no « a coach opened game mode » — the same plan ceiling decision
       **127** recorded for Skew Protection. His to do: a session cannot click it
+
+## Logging in with the old app's e-mail — 2026-10-16
+
+- [x] **An old-app address is a second name for the same account** (decision **208**, which narrows
+      008's « no email provider is involved »). The owner: « I want people to be able to connect with
+      their username for our current production AND with their usernames (email address if I am not
+      wrong ?) of info-radaralocal ». It is small because **the passwords were already shared**:
+      decision **200** imported `info-radarlocal`'s bcrypt hashes on 2026-10-12, so for fourteen of
+      these men the password here already *is* their old-app one. So this is an **identifier** change
+      — one row in `users`, one `password_hash`, two strings that reach it — never a second account.
+      `users.email` is `text`, **nullable**, unique, lowercased (migration **`0016_aspiring_glorian.sql`**,
+      two statements, additive); nullable on purpose and expected to stay so, because `admin` and
+      `raphael` have no address to have, and Postgres treats NULLs as distinct in a unique index
+- [x] **The login screen accepts either, and validates the identifier's syntax not at all.** The
+      blocker was `loginSchema` running the identifier through `usernameSchema` — 3–20 characters,
+      `^[a-z0-9._-]+$` — so **an address was rejected before any password was checked**. The new
+      `loginIdentifierSchema` trims, lowercases, demands non-empty and caps at **254** (RFC 5321) and
+      asserts nothing else: a wrong identifier is a **wrong credential**, reported uniformly, never
+      « ce n'est pas un e-mail ». `usernameSchema` is **untouched**, because a *new* username must
+      still refuse an `@`. **One query over both columns** (`or(eq(username, id), eq(email, id))`), so
+      an unknown identifier costs one round trip and **200's argon2id timing decoy survives**; the
+      collision is resolved in code — **the username wins**, being the identifier this app issued.
+      Copy: « Nom d'utilisateur ou e-mail » with the hint « Ton e-mail est celui de l'ancienne
+      appli. », the page's « les identifiants que tu as choisis en rejoignant l'équipe » (**true of
+      nobody**) replaced, failure now « Identifiant ou mot de passe incorrect. », `autoComplete` still
+      `username`. **1622** tests, up from 1611; e2e **11 passed with no spec edited**
+- [x] **`scripts/import-emails.mts`, the fourth importer**, sharing `scripts/radarlocal-names.mts`.
+      Convergent, **never clears** an address, and **refuses to move one onto a different account**
+      rather than letting the unique index find out at write time. **Masks every address it prints**
+      (`pie***@outlook.fr`), refuses a `-pooler` host, needs `--production` spelled out (decision
+      **201**). Mapping is **16 of 17** — « Alexis CHARRIER » maps to nobody, as the name table
+      already said — with two aliases declared where the spellings differ by more than accents
+- [ ] **Run the import on production, after a tag has migrated it.** `0016` reaches production only
+      when `release.yml` runs `migrate-production` (decision **119**), so a dry run against production
+      failed with `column "email" does not exist` — the correct ordering, not a defect. Dry-run
+      against the local database instead: **16 to write, 0 already identical**. Until it runs there,
+      nobody on production can log in with an address. Note the one exception that will survive it:
+      **`potter`'s password was deliberately not imported** (decision 200), so the owner's address
+      identifies his account but the password behind it is his 7orteils one
+- [ ] **The join form and `/moi` have no e-mail field, so a new member is username-only.** The
+      feature covers the sixteen who were imported and **decays as the squad changes**. The owner's
+      explicit scope choice, confirmed when asked. Whoever picks it up: an address on the join form is
+      not the same question as « mot de passe oublié », which stays **shut** — that needs a sender, a
+      single-use token with an expiry and a rate limit, and a coach can already reset a member's
+      password from the team screen

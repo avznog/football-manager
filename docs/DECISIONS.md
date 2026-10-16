@@ -8271,3 +8271,116 @@ drag every page out of static prerendering, and it did not here. No `Suspense` b
 the build output is the proof rather than the assumption.
 
 ---
+
+## 208 — An old-app e-mail is a second name for the same account, not a second account
+
+**2026-10-16** · accepted · the owner's request, « I want people to be able to connect with their
+username for our current production AND with their usernames (email address if I am not wrong ?) of
+info-radaralocal » · **narrows decision 008's « no email provider is involved »** · leans on **200**
+and **201** · `db/schema.ts`, migration **`0016_aspiring_glorian.sql`**, `app/connexion/`,
+`scripts/import-emails.mts`
+
+**The reframing that makes this small: the passwords were already shared.** Decision 200 imported
+`info-radarlocal`'s bcrypt hashes into production on 2026-10-12, so for fourteen of these men the
+password they type here already **is** their old-app password, and two of them (`leo`, `lucas`) have
+since signed in and been silently upgraded to argon2id without changing a character of what they
+type. So this is **not** the integration of two authentication systems. It is **a second way to name
+the same account** — never a second account, never a second password, never a second credential
+store. One row in `users`, one `password_hash`, two strings that reach it.
+
+**What of 008 still stands.** The username is still the identifier *this app issues*: it is what
+`joinWithNewAccount` creates, what a coach sees on the team screen, what `usernameSchema` still
+governs — and `usernameSchema` is deliberately **untouched**, because a *new* username must still
+refuse an `@`. There is still **no email-based account creation** (the join form has no email field)
+and still **no email-based recovery**: the app has no sender, no token table, and no « mot de passe
+oublié ». What 008 said about email was « it is not infrastructure we want for password resets », and
+that is still true. What it did not anticipate is an address arriving as an *identifier* from a
+database we were already importing from. That narrowing is the whole of this entry.
+
+**The blocker was narrow, concrete and upstream of every password check.** `loginSchema` ran the
+submitted identifier through `usernameSchema`: lowercased, 3–20 characters, `^[a-z0-9._-]+$`. An
+e-mail is longer than twenty characters and `@` is not in that class, so **an address was rejected
+before any password was verified** — and rejected with a validation error, which is a different
+answer from « wrong credentials ». A new `loginIdentifierSchema` trims, lowercases, demands non-empty
+and caps at **254** characters, the RFC 5321 maximum for an address, and **validates no syntax at
+all**: `pierre`, `pierre@` and an address all pass it. That is the point. **A wrong identifier is a
+wrong credential** and must be reported uniformly — never « ce n'est pas un e-mail », which both
+leaks the shape of what the server expected and makes a typo feel like a different kind of failure.
+`loginSchema`'s key is renamed `username` → `identifier` to stop the code claiming otherwise.
+
+**The reasoning was borrowed, not invented, and that is worth recording.** The password field in the
+same schema already carried the comment « Deliberately not `passwordSchema`: an existing password
+must not be rejected by a rule introduced after it was set. » The identifier is the same argument one
+field to the left — an existing *identifier* must not be rejected by a rule written when the only
+identifiers were ones this app had issued. The comment is what made the fix obvious instead of a
+hunt, which is the case for writing that kind of comment at all.
+
+**One query over both columns.** `or(eq(username, id), eq(email, id))`, so an unknown identifier
+costs **exactly one round trip** whatever it looked like, and nothing in the timing reveals which
+column matched — nor whether the thing typed was ever treated as an address. **Decision 200's
+argon2id timing decoy survives untouched**: an unknown account is still verified against a real
+argon2id hash of a random value, so an unknown e-mail costs what an unknown username costs. Two
+sequential lookups would have undone that for free.
+
+**The collision is resolved in code rather than left to Postgres: the username wins.** If a string
+ever matched one row by `username` and a different row by `email`, the match on `username` is the one
+taken. It is the identifier this app issued and that its owner alone controls; the address arrived by
+import. The case **cannot arise with these sixteen** — a username is at most twenty characters and
+may contain no `@` — but code whose behaviour depends on row order is ambiguous even when the
+ambiguity happens to be unreachable, and the next import is the moment that stops being true.
+
+**`users.email`: `text`, nullable, unique, lowercased.** Migration `0016_aspiring_glorian.sql`, two
+statements, purely additive. **Nullable on purpose and expected to stay so**: `admin` and `raphael`
+have no address because there is none to have, and a `NOT NULL` here would mean inventing one.
+Postgres treats NULLs as distinct in a unique index, so the sixteen real addresses are constrained
+against each other while the two accounts without one are not blocked.
+
+**`scripts/import-emails.mts` is the fourth importer, and it shares the third's name table.**
+`scripts/radarlocal-names.mts` is where « Léo COACH » and the other spellings live, so this script
+adds mappings rather than a second copy of the squad. It is convergent — running it twice writes
+nothing the second time — it **never clears** an address, and it **refuses to move one onto a
+different account** rather than letting the unique index discover the conflict at write time. It
+**masks every address it prints** (`pie***@outlook.fr`), refuses a `-pooler` host, and requires
+`--production` spelled out, which is decision **201**'s guard and not a new one.
+
+**The mapping is 16 of 17.** « Alexis CHARRIER » maps to nobody here, as the shared name table
+already recorded. Two aliases are declared because the spellings differ by more than accents: « Léo
+COACH » → « Léo C », and the old app's `profiles.full_name` for the owner now reads « Benjamin »
+where the table knows him as « Benjamin Gonzva ».
+
+**Two sentences on the login screen had become half-truths.** The field said « Nom d'utilisateur »;
+it now says « Nom d'utilisateur ou e-mail », with the hint « Ton e-mail est celui de l'ancienne
+appli. » The page said « Entre les identifiants que tu as choisis en rejoignant l'équipe » — which
+was **true of nobody**: sixteen of the eighteen accounts were created from the old app and chose
+neither their username nor their address. It now reads « Ton nom d'utilisateur ou ton e-mail, et ton
+mot de passe. » The failure message became « Identifiant ou mot de passe incorrect. » And
+`autoComplete` **stays `username`**: that is the autofill token for « the thing you log in with », it
+is what a password manager has already saved against this form, and `email` would be a lie for
+`admin` and `raphael`.
+
+**The limits, recorded because each of them will look like a bug to somebody.**
+
+- **`potter` is the exception.** The owner's own password was deliberately not imported, at his
+  request (decision 200), so his address identifies his account but the password behind it is his
+  7orteils one and **not** his old-app one. For everyone else the two are the same string.
+- **A new member joining by invite gets no address**, because the join form has no e-mail field and
+  neither does `/moi`. The feature therefore **decays as the squad changes**: it covers the sixteen
+  who were imported and nobody after them. This is the owner's explicit scope choice, confirmed when
+  asked, not an oversight — it is on the roadmap as a follow-up, not as a defect.
+- **Nothing sends to this column.** It is an identifier, not a contact address. There is still no
+  « mot de passe oublié » — that was decision 200's whole premise — and opening that door needs a
+  sender, a single-use token with an expiry, and a rate limit. The owner chose to keep it shut. A
+  coach can already reset a member's password from the team screen, which is 008's answer and remains
+  the answer.
+- **The addresses are personal data.** They are never printed in full by the importer, never
+  committed to git, and live only in the database and in the old app.
+- **The import has not run on production yet**, and the ordering is correct rather than broken:
+  migration `0016` reaches production only when a tag runs `migrate-production` (decision 119), so a
+  dry run against production failed with `column "email" does not exist`. It was dry-run against the
+  local database instead — **16 to write, 0 already identical**.
+
+**Gates.** `npm run typecheck` and eslint clean, `npm test` **1622 passed** (1611 → +11), and
+`npm run test:e2e` **11 passed with no spec edited** — `getByLabel("Nom d'utilisateur")` is a
+substring match, so the longer label still matches it. Looked at at 390 px in light and dark.
+
+---
