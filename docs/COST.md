@@ -1,8 +1,9 @@
 # COST.md — what this project has cost, and what that number is not
 
-Measured on **2026-10-21** (second pass, after the old-app import), with `main` at `bb3e987`
-(version `1.1.2`, 216 commits, 211 merged pull requests, 105 613 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
-2026-09-22 and its first commit landed on 2026-09-23, so everything below covers **twenty-nine days**.
+Measured on **2026-10-21** (third pass, after the supporters and decisives slices), with `main` at
+`96f7db5` (version `1.1.2`, 218 commits, 213 merged pull requests, 106 498 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
+2026-09-22 and its first commit landed on 2026-09-23, so everything below covers the **thirty days**
+the script counts.
 
 **The headline, and read the next sentence with it: $2113.87.** That is the cost of the model tokens
 this project consumed, **at API list prices, on both machines** — $1583.94 on the Linux one
@@ -54,10 +55,10 @@ reason); a long-lived session merely under-reports its tail instead.
 Divided by what it bought, which is the only form of this number that is any use when deciding
 whether to spend more:
 
-- **$9.79 per commit** (216) — the Linux machine alone was $7.33
-- **$10.02 per merged pull request** (211) — just over ten dollars a PR, first crossed earlier today
-- **$0.0200 per line** of committed TypeScript, SQL, CSS and Markdown — two cents, up from 1.84
-- **$72.89 per day** across the twenty-nine days — was $77.20 on 2026-10-16
+- **$9.70 per commit** (218) — the Linux machine alone was $7.27
+- **$9.92 per merged pull request** (213) — back under ten dollars a PR, which it crossed earlier today
+- **$0.0198 per line** of committed TypeScript, SQL, CSS and Markdown — just under two cents
+- **$70.46 per day** across the thirty days — was $77.20 on 2026-10-16
 
 ### Against the last snapshot, which is the only way to read the trend
 
@@ -78,11 +79,16 @@ optimise and the per-day one is worth watching.
 The rate per line held up better than the rate per commit because the two commits in that window were
 large: the clock fix alone is 833 lines, over half of them tests.
 
-**Re-measured later the same day, after the old-app import: the total did not move at all.**
-`7054d16c` still reads $1297.08, while the denominators gained a commit, a merged pull request and
-169 lines — so the rates eased to $9.79 per commit and $10.02 per PR. This is the lazy-flush
-behaviour described below rather than free work, and that session's tail is the known hole in the
-table: it is the session writing this file.
+**Measured three times on 2026-10-21, and the total never moved once.** `7054d16c` has read $1297.08
+all day, through the old-app import, the supporters slice and the decisives board, while the
+denominators went 215 → 218 commits and 105 444 → 106 498 lines. So the rates fell with every pass —
+$9.83 → $9.79 → **$9.70** per commit — on arithmetic alone.
+
+That is the lazy-flush behaviour described below and **not** evidence the afternoon was free. It is
+also the table's one structural hole doing its worst: the session being measured is the session
+running the script, so its tail is always missing, and on a long day the tail is most of the work.
+Read today's three passes as one measurement with a growing denominator, and expect the next session
+on this machine to absorb the difference in a single jump.
 
 **Every comparison in this section is the Linux machine against itself**, because that is the only
 machine any of these snapshots was taken on. The macOS figure cannot be split across that date: a `cost-state` record
@@ -130,10 +136,10 @@ printed **$0.00** with every appearance of a measurement.
 
 | | Linux | macOS | both |
 |---|---|---|---|
-| output | 8 811 365 | 3 839 367 | 12 650 732 |
-| cache write | 110 130 750 | 15 627 673 | 125 758 423 |
-| cache read | 2 012 772 668 | 638 846 352 | 2 651 619 020 |
-| input, uncached | 21 602 | 12 432 | 34 034 |
+| output | 8 941 511 | 3 839 367 | 12 780 878 |
+| cache write | 111 604 246 | 15 627 673 | 127 231 919 |
+| cache read | 2 069 047 709 | 638 846 352 | 2 707 894 061 |
+| input, uncached | 21 996 | 12 432 | 34 428 |
 
 The **Linux column is today's run**, all four rows. The **macOS column is the 2026-10-14
 measurement**, carried over and not re-derived, because only the machine the script runs on can be
@@ -186,12 +192,12 @@ cost at list prices*, which is a useful number for a different question (is this
 what would it cost someone else) and the wrong one for « what did I spend ».
 
 **This file cannot tell which case applies**, because the transcript records the computed cost either
-way. Check the billing mode, and if it is a subscription, the honest total for the twenty-nine days is
+way. Check the billing mode, and if it is a subscription, the honest total for the thirty days is
 the pro-rated fee.
 
 ### 3. Time
 
-Nobody's hours are in here, on either side. Twenty-nine days of review, phone testing and decisions is
+Nobody's hours are in here, on either side. Thirty days of review, phone testing and decisions is
 the largest uncosted input to the project and the one this file is least able to measure.
 
 ---
@@ -238,5 +244,5 @@ the same way. Three rules, and the first is now in `CLAUDE.md`'s definition of d
    script's output or arithmetic on one, which is why the script is in the repository rather than in
    somebody's shell history.
 3. **Date the measurement, name the commit it was taken at, and keep the previous snapshot's
-   figures.** A cost without a denominator — 215 commits, twenty-nine days — says nothing at all, and a
+   figures.** A cost without a denominator — 218 commits, thirty days — says nothing at all, and a
    cost without its predecessor says nothing about where it is going.

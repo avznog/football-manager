@@ -968,6 +968,77 @@ describe("the reshaped rankings of the owner's fourth backlog", () => {
     });
   });
 
+  it("adds the goals and the passes together for the decisive board (decision 212)", () => {
+    expect(
+      stats.decisiveRate.entries.map((entry) => [
+        entry.teamMemberId,
+        entry.count,
+        entry.minutes,
+        entry.minutesPerEvent,
+      ]),
+    ).toEqual([
+      // Nina: two goals and one pass over the same 120 outfield minutes, so one action every forty —
+      // more frequent than either board alone says, which is the whole point of the card.
+      ["nina", 3, 120, 40],
+      ["remi", 0, 20, null],
+    ]);
+    // It is the sum of the two numerators over the denominator they already share, and nothing else.
+    for (const entry of stats.decisiveRate.entries) {
+      const scoring = stats.scoringRate.entries.find((e) => e.teamMemberId === entry.teamMemberId)!;
+      const assists = stats.assistRate.entries.find((e) => e.teamMemberId === entry.teamMemberId)!;
+      expect(entry.count).toBe(scoring.count + assists.count);
+      expect(entry.minutes).toBe(scoring.minutes);
+      expect(entry.minutes).toBe(assists.minutes);
+    }
+  });
+
+  /*
+   * The ranking it exists to produce: two men the goal board and the pass board both call ordinary,
+   * who are the two most decisive players on the team. Neither leads either single board.
+   */
+  it("puts a pure provider and a pure finisher above a man who does a little of each", () => {
+    const squad = season({
+      members: [member("ailier", "Ailier"), member("avant", "Avant"), member("milieu", "Milieu")],
+      matches: [match("m1", { score: { goalsFor: 9, goalsAgainst: 0 } })],
+      lines: [
+        // Four passes, no goal: last on the goal board, first on the pass board.
+        line("m1", "ailier", { minutes: 90, goals: 0, assists: 4 }),
+        // Four goals, no pass: the mirror image, and last on the pass board.
+        line("m1", "avant", { minutes: 90, goals: 4, assists: 0 }),
+        // One of each. He is *second* on both single boards — ahead of each specialist's zero — and
+        // last here, two actions against four over the same ninety minutes.
+        line("m1", "milieu", { minutes: 90, goals: 1, assists: 1 }),
+      ],
+    });
+    // Second on both boards taken separately…
+    expect(squad.scoringRate.entries.map((entry) => entry.teamMemberId)).toEqual([
+      "avant",
+      "milieu",
+      "ailier",
+    ]);
+    expect(squad.assistRate.entries.map((entry) => entry.teamMemberId)).toEqual([
+      "ailier",
+      "milieu",
+      "avant",
+    ]);
+    // …and last once they are added up. Equal rates keep the alphabetical tie-break.
+    expect(squad.decisiveRate.entries.map((entry) => [entry.teamMemberId, entry.count])).toEqual([
+      ["ailier", 4],
+      ["avant", 4],
+      ["milieu", 2],
+    ]);
+  });
+
+  /** A man with no outfield minute has no denominator here either (decision 203). */
+  it("drops a full-time goalkeeper from the decisive board", () => {
+    const keeper = season({
+      members: [member("gardien", "Gardien")],
+      matches: [match("m1", { score: { goalsFor: 1, goalsAgainst: 0 } })],
+      lines: [line("m1", "gardien", { minutes: 60, gkMinutes: 60, assists: 1 })],
+    });
+    expect(keeper.decisiveRate.entries).toEqual([]);
+  });
+
   it("counts the passes he gave, not the goals the team scored while he was on", () => {
     expect(
       stats.assistRate.entries.map((entry) => [entry.teamMemberId, entry.count, entry.minutes]),
