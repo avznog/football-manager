@@ -7061,3 +7061,25 @@ already on the roadmap as the retro sheet's title/field mismatch, and it is a pr
 elapsed minute into a field whose label is a display minute, not of the live path.
 
 Files: `lib/match/reducer.test.ts`, `docs/SESSIONS.md`.
+
+## 2026-10-21 — The Coptic Team C ratings, imported into production from the old app
+
+The owner asked for the ratings of the last game, still in the old app's Supabase, to be brought into
+production. `scripts/import-ratings-from-old-app.mts` did it unchanged: a dry run, then `--commit`, then
+a second dry run showing nothing left to write. **100 ratings** for Coptic Team C (2026-10-20,
+`30469c8f-…`): 11 raters, 10 rated, mean 6.55. The four earlier matches had 0 to write. Production now
+holds 563 ratings in total, and `ratings_published_at` for this match is still null, so the means stay
+hidden until the coach publishes them.
+
+- **Load the credentials with `--env-file`, never by sourcing the file.** `set -a; . ./.env.import.local`
+  fails to parse the `&` in a Neon URL, and when it does, the script silently falls back to
+  `.env.local` and the **local** database. The first attempt did exactly that. It only read, so it
+  harmed nothing, but a `--commit` run would have written to the wrong database without a word. The
+  form that reaches production is `env -u DATABASE_URL npx tsx --env-file=.env.import.local
+  --conditions=react-server scripts/import-ratings-from-old-app.mts --production [--commit]`. Check
+  that the header prints the `ep-gentle-cherry` host with `*** PRODUCTION ***` before trusting a run.
+- The URL the owner supplied was the `-pooler` one, which the script refuses. The direct endpoint is
+  the same host without `-pooler`.
+- Cosmetic: the script's closing line still says « sur les 4 matchs ».
+
+Files: `docs/SESSIONS.md`.
