@@ -39,4 +39,10 @@ export const OLD_TO_TARGET_DISPLAY_NAME: Readonly<Record<string, string | null>>
   "Thomas Brunet": "Thomas",
   "Benjamin Gonzva": "Benjamin",
   "Alexis CHARRIER": null,
+  // Added 2026-10-21. He is the one man this table could not name when it was written: decision 200
+  // recorded that `raphael` « does not exist in the old app at all », so his hash stayed production's
+  // own argon2id and he was the only non-admin account with no e-mail. The owner created him over
+  // there on 2026-10-21, as « Raph » — not a prefix of any other name here, so the mapping is safe in
+  // a way « Léo » would not be.
+  Raph: "Raphaël",
 };
