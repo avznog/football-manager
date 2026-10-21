@@ -6810,3 +6810,31 @@ that would actually prove the change — and here it was.
 Files, this pass: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md` (the code —
 `lib/match/clock.ts`, `lib/match/reducer.ts`, `lib/match/presenter.ts`, their tests and
 `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx` — by the session that owns the branch).
+
+### Cost refresh — 2026-10-21
+
+`node scripts/cost.mjs` on the Linux machine, with `main` at `23863e2`, which is the merge of the
+clock fix above. **$2113.87 combined**, $1583.94 of it this machine and $529.93 the macOS one carried
+unchanged from 2026-10-14. Five days since the last refresh added **$183.91** here.
+
+The number worth reading is not the total. Those five days produced **two commits and two merged pull
+requests**, so every per-unit rate rose — $9.06 → $9.83 per commit, $9.28 → $10.07 per merged PR,
+$0.0184 → $0.0200 per line — while the **per-day** spend fell to **$36.78**, half the lifetime
+average. Most of the $183.91 bought a decision not to build something: the sports-watch
+investigation that ended in Strava's 10-athlete cap and its redistribution clause, Garmin's
+business-use-only program, and HealthKit having no server API at all. **A « no » costs what a « yes »
+costs and leaves no denominator behind**, which is the argument against ever steering by the
+per-commit figure.
+
+The other line that moved: **cache writes 68.0 → 108.9 million, up 60 %, against 9 % more output.** A
+cache write is what a new or re-established context costs, so that ratio is this session's compaction
+and its subagents showing up in the bill — the same lesson as « long sessions are cheap, cold starts
+are not », read from the other side.
+
+Also brought current, since they are denominators and a cost without one says nothing: 215 commits,
+210 merged PRs, 105 444 lines, twenty-nine days, **492 workflow runs ≈ 1 607 minutes** (the bill the
+day this repository stops being public — still inside the 2 000-minute allowance, with less room than
+last time). Neon's plan is **still unverified** for the same reason as every previous refresh: it
+needs a Neon API key, which no session has had. It is a missing credential, not a forgotten task.
+
+Files: `docs/COST.md`, `docs/SESSIONS.md`.
