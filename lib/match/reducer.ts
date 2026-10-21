@@ -85,6 +85,7 @@ import {
   type ClockReading,
   type PeriodsConfig,
   type PlayInterval,
+  actualPeriodStarts,
   clockMsToMinute,
   formatMinuteLabelFr,
   msToWholeMinutes,
@@ -304,10 +305,14 @@ export type TimelineEntry = {
   clientEventId: string | null;
   type: MatchEventType;
   period: number;
+  /** Real elapsed match time, as the event was stamped. */
   clockMs: number;
-  /** Continuous minute (decision 009). */
+  /**
+   * Real elapsed minute — `clockMs` floored, the number the correction sheet round-trips. **Not for
+   * display**: after a period that overran, it is one thing and `minuteLabel` is another.
+   */
   minute: number;
-  /** `58’`, or `30’+2` in stoppage time. */
+  /** `58’`, or `30’+2` in stoppage time, counted from its own period's start. What a screen shows. */
   minuteLabel: string;
   /** French name of the event kind. Player names are the UI's job — the reducer knows none. */
   labelFr: string;
@@ -412,7 +417,7 @@ export type CompositionSnapshot = {
   /** `match_events.id` of the `LINEUP_APPLIED` — a stable React key, and the block's identity. */
   eventId: string;
   clockMs: number;
-  /** Continuous minute (decision 009). */
+  /** Real elapsed minute, like the timeline's — nothing displays it; `minuteLabel` is for that. */
   minute: number;
   /** `34’`, `30’+2` — the same label the timeline stamps on the event. */
   minuteLabel: string;
@@ -688,11 +693,22 @@ export function reduceMatch(
     }
   }
 
+  /*
+   * Where each period really began, which after an overrun is not where it nominally begins: a
+   * first half whistled at 33′40″ has its second half kicked off, and stamped, at 33′40″. Stored
+   * time stays that; only the display is put back on football's scale, and this map is the one
+   * extra input that takes it there (`displayClockMs`). Derived from the intervals above rather
+   * than tracked by hand, so it cannot drift from the spans minutes played are computed over.
+   */
+  const periodStarts = actualPeriodStarts(intervals);
+
   const lastLive = live[live.length - 1];
+  const anchorPeriod = Math.max(1, currentPeriod);
   const anchor: ClockAnchor = {
     phase,
-    period: Math.max(1, currentPeriod),
+    period: anchorPeriod,
     clockMs: lastLive ? lastLive.clockMs : 0,
+    periodStartedAtMs: periodStarts.get(anchorPeriod) ?? null,
     anchoredAtMs: lastLive ? lastLive.occurredAtMs : null,
     running: phase === "running",
   };
@@ -1129,8 +1145,14 @@ export function reduceMatch(
             compositions.push({
               eventId: event.id,
               clockMs,
+              // Real elapsed, like the timeline's, and for the same reason (see the note there).
               minute: clockMsToMinute(clockMs),
-              minuteLabel: formatMinuteLabelFr(clockMs, event.period, periods),
+              minuteLabel: formatMinuteLabelFr(
+                clockMs,
+                event.period,
+                periods,
+                periodStarts.get(event.period),
+              ),
               startingLineup,
               assignments: [...pitch]
                 .map(([memberId, entry]) => ({ memberId, slotId: entry.slotId }))
@@ -1188,8 +1210,24 @@ export function reduceMatch(
       type: event.type,
       period: event.period,
       clockMs,
+      /*
+       * `minute` stays **real elapsed** while `minuteLabel` is the display's: the two disagree only
+       * after an overrun, and they have different jobs. The label is read by a human; the number is
+       * round-tripped by the correction sheet — `lib/retro/queries.ts` pre-fills its minute field
+       * with it and `amendStamp` turns whatever comes back into `minuteToClockMs(minute)`. Hand it
+       * 38 for an event stored at 41′40″ and re-saving the correction moves the event.
+       *
+       * The label, in contrast, is read against **its own** period's real start, not the match's
+       * current one: this loop walks both halves, and the first half's own start (0) is what keeps a
+       * 33′40″ `PERIOD_END` reading « 30’+4 » on the same screen as a second half counted from 30′.
+       */
       minute: clockMsToMinute(clockMs),
-      minuteLabel: formatMinuteLabelFr(clockMs, event.period, periods),
+      minuteLabel: formatMinuteLabelFr(
+        clockMs,
+        event.period,
+        periods,
+        periodStarts.get(event.period),
+      ),
       labelFr: EVENT_LABELS_FR[event.type],
       voided,
       voidedByEventId: voidedBy.get(event.id) ?? null,
@@ -1269,6 +1307,11 @@ export function reduceMatch(
     .filter((entry) => entry.role !== "supporter" && !pitch.has(entry.teamMemberId))
     .map((entry) => entry.teamMemberId);
 
+  /*
+   * Real elapsed minutes, deliberately — not the display scale. « Due » decides when a plan's prompt
+   * appears, and a plan « à partir de la 45e » has to come due after 45 minutes of football have been
+   * played, whatever a period's overrun did to what the bar shows. The display fix is a display fix.
+   */
   const currentMinute = clockMsToMinute(boundaryMs);
   const squadIds = new Set((config.squad ?? []).map((entry) => entry.teamMemberId));
   const appliedIds = new Set(appliedLineupIds);
