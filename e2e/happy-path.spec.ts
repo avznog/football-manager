@@ -1052,7 +1052,15 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     await page.goto(matchUrl);
     await expect(page.locator("main").getByRole("heading", { level: 2 })).toHaveText([
       // He is on no sheet, so he owes nothing and gets no card about his own notes (decision 159).
-      ...AFTER_THE_MATCH,
+      "Homme du match",
+      "Les notes",
+      // Naming a supporter after the whistle is the coach's alone (decision 211), so this heading is
+      // the one difference between the two lists in this step and it is spelled out rather than
+      // folded into `AFTER_THE_MATCH`: the player's assertion below has to keep *not* containing it.
+      "Supporters",
+      "Temps de jeu",
+      "Déroulé du match",
+      "Les compositions",
       "Composition",
       "Corriger le match",
       "Mode match",
