@@ -320,6 +320,64 @@ export function minutesPerEventBoard(
   return { entries };
 }
 
+/**
+ * One player on « Les plus décisifs »: the two things he did, over the minutes he did them in.
+ *
+ * It carries the split as well as the sum because the row says « 2 buts et 1 passe décisive en 120′ »
+ * — the sum alone cannot be unpacked back into it, and the breakdown is what makes the card readable
+ * next to the two single boards above it (decision 212, amended).
+ */
+export type DecisiveEntry = RankedMember & {
+  /** His outfield minutes: time in goal is not time in which he could have been decisive (203). */
+  minutes: number;
+  goals: number;
+  assists: number;
+  /** `goals + assists`, and always at least 1 — a man with none is not on this board. */
+  count: number;
+  /** `minutes / count`, unrounded. Never null here, unlike `MinutesPerEventEntry`. */
+  minutesPerEvent: number;
+};
+
+export type DecisiveBoard = { entries: DecisiveEntry[] };
+
+/**
+ * « Les plus décisifs », most frequent first.
+ *
+ * **Nobody with no decisive action is listed**, which is the one place this board parts company with
+ * the two it sits under. Those keep their zero rows on purpose — « aucun but marqué » over the minutes
+ * it did not happen in is a real record, and a man who has played five matches without scoring is
+ * somewhere rather than nowhere. Here the owner asked for them gone, and the reason it is not a
+ * contradiction is that the row has nothing left to say: the detail line is a breakdown, and the
+ * breakdown of nothing is « 0 but et 0 passe décisive », which is noise in a list whose whole subject
+ * is who contributed.
+ *
+ * The ordering is `minutesPerEventBoard`'s, by delegation rather than by a second comparator: the
+ * integer `minutes × other's count` comparison and its tie-breaks are subtle enough that two copies
+ * would eventually disagree.
+ */
+export function decisiveBoard(
+  rows: readonly (RankedMember & { minutes: number; goals: number; assists: number })[],
+): DecisiveBoard {
+  const scoring = new Map(rows.map((row) => [row.teamMemberId, row]));
+  const ordered = minutesPerEventBoard(
+    rows
+      .filter((row) => row.goals + row.assists > 0)
+      .map((row) => ({ ...row, count: row.goals + row.assists })),
+  );
+  return {
+    entries: ordered.entries.map((entry): DecisiveEntry => {
+      const row = scoring.get(entry.teamMemberId)!;
+      return {
+        ...entry,
+        goals: row.goals,
+        assists: row.assists,
+        // `count > 0` is guaranteed by the filter above, so the rate is a number rather than null.
+        minutesPerEvent: entry.minutesPerEvent ?? 0,
+      };
+    }),
+  };
+}
+
 export type LeaderboardEntry = {
   teamMemberId: string;
   displayName: string;
@@ -375,7 +433,7 @@ export type SeasonStats = {
    * is the sum of the two numerators over the one denominator they already share, which is why it
    * needs no arithmetic of its own.
    */
-  decisiveRate: MinutesPerEventBoard;
+  decisiveRate: DecisiveBoard;
   /** The best at each position by smoothed goal difference per 60 (decision 162, Q7). */
   impact: PositionImpact[];
   /** True when not one match or rating survives the filter. */
@@ -819,11 +877,12 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
    * reading of « décisif » — but it means the board does not count goals, it counts contributions, and
    * `decisiveActionsFr` is the sentence that says so on the card.
    */
-  const decisiveRate = minutesPerEventBoard(
+  const decisiveRate = decisiveBoard(
     players.map((player) => ({
       ...memberOf(player),
       minutes: player.outfieldMinutes,
-      count: player.goals + player.assists,
+      goals: player.goals,
+      assists: player.assists,
     })),
   );
   const impact = impactByPosition(

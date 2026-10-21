@@ -972,24 +972,50 @@ describe("the reshaped rankings of the owner's fourth backlog", () => {
     expect(
       stats.decisiveRate.entries.map((entry) => [
         entry.teamMemberId,
+        entry.goals,
+        entry.assists,
         entry.count,
         entry.minutes,
         entry.minutesPerEvent,
       ]),
     ).toEqual([
       // Nina: two goals and one pass over the same 120 outfield minutes, so one action every forty —
-      // more frequent than either board alone says, which is the whole point of the card.
-      ["nina", 3, 120, 40],
-      ["remi", 0, 20, null],
+      // more frequent than either board alone says, which is the whole point of the card. Rémi has
+      // neither and is absent, unlike on the two boards above where he keeps a zero row.
+      ["nina", 2, 1, 3, 120, 40],
     ]);
     // It is the sum of the two numerators over the denominator they already share, and nothing else.
     for (const entry of stats.decisiveRate.entries) {
       const scoring = stats.scoringRate.entries.find((e) => e.teamMemberId === entry.teamMemberId)!;
       const assists = stats.assistRate.entries.find((e) => e.teamMemberId === entry.teamMemberId)!;
+      expect(entry.goals).toBe(scoring.count);
+      expect(entry.assists).toBe(assists.count);
       expect(entry.count).toBe(scoring.count + assists.count);
       expect(entry.minutes).toBe(scoring.minutes);
       expect(entry.minutes).toBe(assists.minutes);
     }
+  });
+
+  /**
+   * The owner's second rule: a man with no decisive action is not on this board at all. The two boards
+   * above keep him, deliberately — « aucun but marqué » over the minutes it did not happen in is a
+   * real record — so the three are asserted together, because the difference is the decision.
+   */
+  it("drops the men with neither a goal nor a pass, where the single boards keep them", () => {
+    expect(stats.decisiveRate.entries.map((entry) => entry.teamMemberId)).toEqual(["nina"]);
+    expect(stats.scoringRate.entries.map((entry) => entry.teamMemberId)).toContain("remi");
+    expect(stats.assistRate.entries.map((entry) => entry.teamMemberId)).toContain("remi");
+  });
+
+  it("is empty rather than a list of zeroes when nobody has contributed", () => {
+    const blank = season({
+      members: [member("a", "Alpha"), member("b", "Bravo")],
+      matches: [match("m1", { score: { goalsFor: 0, goalsAgainst: 2 } })],
+      lines: [line("m1", "a", { minutes: 60 }), line("m1", "b", { minutes: 60 })],
+    });
+    expect(blank.decisiveRate.entries).toEqual([]);
+    // The minutes are real, so the boards that keep zero rows still have two each.
+    expect(blank.scoringRate.entries).toHaveLength(2);
   });
 
   /*
@@ -1021,11 +1047,19 @@ describe("the reshaped rankings of the owner's fourth backlog", () => {
       "milieu",
       "avant",
     ]);
-    // …and last once they are added up. Equal rates keep the alphabetical tie-break.
-    expect(squad.decisiveRate.entries.map((entry) => [entry.teamMemberId, entry.count])).toEqual([
-      ["ailier", 4],
-      ["avant", 4],
-      ["milieu", 2],
+    // …and last once they are added up. Equal rates keep the alphabetical tie-break, and the split
+    // travels with the row so the card can print « 0 but et 4 passes décisives ».
+    expect(
+      squad.decisiveRate.entries.map((entry) => [
+        entry.teamMemberId,
+        entry.goals,
+        entry.assists,
+        entry.count,
+      ]),
+    ).toEqual([
+      ["ailier", 0, 4, 4],
+      ["avant", 4, 0, 4],
+      ["milieu", 1, 1, 2],
     ]);
   });
 

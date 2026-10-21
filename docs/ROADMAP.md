@@ -2632,4 +2632,9 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       because it counts contributions, not goals — a goal and the pass before it are two actions, so
       the card's total can exceed the team's score. **Raw, not smoothed** (decision 177): on the demo
       season Rayan's 2 in 60′ leads Karim's 9 in 360′. A minimum record would be a threshold on this
-      board, not a return to smoothing
+      board, not a return to smoothing.
+      **Amended the same day at the owner's request:** the line under each rate is now the breakdown,
+      « 3 buts et 6 passes décisives en 360′ », and a man with no decisive action is dropped from the
+      board instead of kept at the bottom — the one place this card diverges from decision 197, because
+      the breakdown of nothing is « 0 but et 0 passe décisive ». Both terms print at zero so the two
+      numbers line up down the column; French takes the singular after zéro

@@ -27,7 +27,6 @@ import {
 } from "@/lib/stats/best-seven-copy";
 import {
   ASSIST_WORDS_FR,
-  DECISIVE_WORDS_FR,
   GOAL_WORDS_FR,
   concededCountRowFr,
   formatMinutes,
@@ -48,7 +47,7 @@ import {
 import { ImpactByPosition } from "./_components/impact";
 import { Leaderboard } from "./_components/leaderboard";
 import { PlayerList } from "./_components/player-list";
-import { EventRateBoard, RateBoard } from "./_components/rate-board";
+import { DecisiveRateBoard, EventRateBoard, RateBoard } from "./_components/rate-board";
 import { TeamSummary } from "./_components/team-summary";
 
 export const metadata = { title: "Stats" };
@@ -224,12 +223,13 @@ function SeasonCards({
             both come out ahead of a man who does a little of each. The subtitle has to say « but ou
             passe décisive » rather than « action décisive » alone, because the sum is the whole
             definition and nothing else on the screen states it. */}
-        <EventRateBoard
+        <DecisiveRateBoard
           title="Les plus décisifs"
           description="Du plus fréquent au moins fréquent : 1 but ou passe décisive toutes les X minutes sur le terrain, hors temps au goal"
           board={stats.decisiveRate}
-          words={DECISIVE_WORDS_FR}
-          emptyMessage="Sur cette sélection, personne n’a encore de minutes sur le terrain."
+          /* Unlike its two neighbours, this board drops the men it never happened to, so its empty
+             state is about the team and not about minutes: nobody has scored or made a pass yet. */
+          emptyMessage="Sur cette sélection, personne n’a encore marqué ni fait marquer."
         />
       </Section>
 

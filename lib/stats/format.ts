@@ -336,6 +336,27 @@ export const DECISIVE_WORDS_FR: EventWordsFr = {
   none: "aucune action déc.",
 };
 
+/**
+ * The record under a « Les plus décisifs » rate: « 2 buts et 1 passe décisive en 120′ ».
+ *
+ * The breakdown rather than the sum, because « 3 actions déc. en 120′ » cannot be unpacked back into
+ * it and the two numbers are what the reader came for — the card sits under a goal board and a pass
+ * board, and the question it answers is which of the two a man is made of.
+ *
+ * **Both terms are always printed, zero included.** « 0 but et 4 passes décisives » reads oddly on its
+ * own and reads well in a column: every row parses the same way, so the goals and the passes line up
+ * down the card and can be compared without re-reading each sentence. A man with neither is not on
+ * this board at all, so « 0 but et 0 passe décisive » never appears.
+ *
+ * French takes the singular after zéro — « 0 but », « 0 passe décisive » — which is why this cannot be
+ * `plural()` twice over with a count of nothing.
+ */
+export function decisiveRecordFr(goals: number, assists: number, minutes: number): string {
+  const buts = `${goals} ${goals > 1 ? "buts" : "but"}`;
+  const passes = `${assists} ${assists > 1 ? "passes décisives" : "passe décisive"}`;
+  return `${buts} et ${passes} en ${formatMinutes(minutes)}`;
+}
+
 /** `1.24` → `+1,2`, `-0.04` → `0,0`: a goal difference per 60, signed, one decimal. */
 export function formatSignedDecimal(value: number): string {
   const rounded = Math.round(value * 10) / 10;

@@ -26,7 +26,7 @@ import {
   plural,
   resultLabelOf,
   resultLetterOf,
-} from "./format";
+  decisiveRecordFr,} from "./format";
 
 describe("formatMinutes", () => {
   it("writes a football minute with a prime", () => {
@@ -290,5 +290,28 @@ describe("the rate and impact copy (decisions 162 and 177)", () => {
     expect(formatSignedDecimal(-0.76)).toBe("−0,8");
     expect(formatSignedDecimal(-0.04)).toBe("0,0");
     expect(impactRecordFr(5, 2, 120)).toBe("+5 / −2 en 120′");
+  });
+});
+
+describe("decisiveRecordFr", () => {
+  it("spells out the two things he did, over the minutes he did them in", () => {
+    expect(decisiveRecordFr(2, 1, 120)).toBe("2 buts et 1 passe décisive en 120′");
+    expect(decisiveRecordFr(9, 4, 360)).toBe("9 buts et 4 passes décisives en 360′");
+  });
+
+  /** French takes the singular after zéro, which is why this is not `plural()` twice over. */
+  it("keeps the singular after zéro, and prints both terms anyway", () => {
+    expect(decisiveRecordFr(0, 4, 90)).toBe("0 but et 4 passes décisives en 90′");
+    expect(decisiveRecordFr(4, 0, 90)).toBe("4 buts et 0 passe décisive en 90′");
+    expect(decisiveRecordFr(1, 1, 90)).toBe("1 but et 1 passe décisive en 90′");
+  });
+
+  /**
+   * A man with neither is not on this board (decision 212, amended), so this string should never be
+   * rendered — pinned so that a change which starts listing him makes the nonsense visible here
+   * rather than on the card.
+   */
+  it("would read as nothing at all for a man with neither, which is why he is dropped upstream", () => {
+    expect(decisiveRecordFr(0, 0, 90)).toBe("0 but et 0 passe décisive en 90′");
   });
 });

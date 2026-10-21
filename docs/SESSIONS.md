@@ -6989,3 +6989,42 @@ the « parti » badge.
 Files: `lib/stats/aggregate.ts`, `lib/stats/aggregate.test.ts`, `lib/stats/format.ts`,
 `app/(app)/stats/page.tsx`, `docs/DECISIONS.md` (212), `docs/ROADMAP.md`, `docs/SESSIONS.md`,
 `docs/COST.md`.
+
+### « Les plus décisifs », amended: the breakdown, and no empty rows
+
+The owner read the card and asked for two things: the line under each rate should say « X but et X
+passe décisive en X minutes », and a player with no decisive action should not be shown at all.
+Decision **212** amended in place.
+
+**The breakdown is the point of the card, and the sum was hiding it.** « 9 actions déc. en 360′ » and
+« 3 buts et 6 passes décisives en 360′ » are the same figure, but only the second answers the question
+this board adds to the two above it — which of the two a man is made of. So the entry now carries the
+split as well as the sum, and `decisiveRecordFr` prints it.
+
+**Both terms are printed at zero**, « 0 but et 4 passes décisives ». Odd in isolation, right in a
+column: every row parses the same way, so the goals and the passes line up down the card and can be
+compared without re-reading each sentence. French takes the singular after zéro, so it is not
+`plural()` twice over, and there is a test for each of the three agreements.
+
+That made the board stop fitting `EventRateBoard`: it now differs in **both** halves of a row — a
+breakdown instead of a record, and no zero rows at all — so it got `DecisiveRateBoard` and
+`decisiveBoard` rather than a boolean. Two differences is one too many for a flag. The ordering is
+still `minutesPerEventBoard`'s by delegation, because the integer `minutes × other's count` comparison
+and its tie-breaks are subtle enough that two copies would drift.
+
+**Dropping the empty rows is a real divergence from decision 197 and is recorded as one.** The goal and
+pass boards keep a man with nothing, on purpose: « aucun but marqué » over the minutes it did not happen
+in is a record, and he is somewhere rather than nowhere. Here the row has nothing left to say, because
+the breakdown of nothing is « 0 but et 0 passe décisive ». The empty state changes subject with it —
+« personne n'a encore marqué ni fait marquer » (the team) where the neighbours say « personne n'a encore
+de minutes sur le terrain » (the denominator). The three boards are asserted **together** in one test,
+because the difference between them is the decision.
+
+Gates: typecheck clean, eslint clean on the changed files, `npm test` **1662 passed** (1657 → +5).
+Looked at at **390 px** in light and dark: the longest line in the demo season, « 3 buts et 6 passes
+décisives en 360′ », fits on one line without wrapping, and the board now folds at six entries instead
+of the full squad.
+
+Files: `lib/stats/aggregate.ts`, `lib/stats/aggregate.test.ts`, `lib/stats/format.ts`,
+`lib/stats/format.test.ts`, `app/(app)/stats/_components/rate-board.tsx`, `app/(app)/stats/page.tsx`,
+`docs/DECISIONS.md` (212, amended), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
