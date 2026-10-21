@@ -469,7 +469,9 @@ export function GameMode({ live, canOperate }: GameModeProps) {
   // `FOUL` stands in for "an action that takes the clock as it reads" — every type but `KICKOFF`
   // is stamped the same way, and this is only here to print the minute on the sheets.
   const stamp = nextEventStamp(state, "FOUL", tappedAtMs ?? nowMs ?? 0);
-  const stampLabel = `${minuteLabelFr(stamp.clockMs, stamp.period, periods)} · ${phaseLabelFr(state)}`;
+  // `stamp.period` is the period in progress for every type but `KICKOFF`, so the anchor's own
+  // start is the right offset: the sheets read 30′ in a second half that kicked off late, like the bar.
+  const stampLabel = `${minuteLabelFr(stamp.clockMs, stamp.period, periods, state.clock.periodStartedAtMs)} · ${phaseLabelFr(state)}`;
 
   const canAct = canOperate && state.started && !state.finished;
   /**

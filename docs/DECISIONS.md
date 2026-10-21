@@ -8384,3 +8384,124 @@ is what a password manager has already saved against this form, and `email` woul
 substring match, so the longer label still matches it. Looked at at 390 px in light and dark.
 
 ---
+
+## 209 — The clock is period-relative on screen and real elapsed in the database
+
+**2026-10-21** · accepted · the owner's report, « When we reach half time, with additional time in
+the first half, the time keeps going in the first half. That is good. But when we click on the half
+time button, and then start the second half, the timing starts back at the first half + additional
+time time. It should start at 30'. » · **narrows decision 009**, and reverts none of it ·
+`lib/match/clock.ts`, `lib/match/reducer.ts`, `lib/match/presenter.ts`,
+`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`
+
+**What he saw, exactly.** A 2×30 match whose first half ran to 33:40. The overrun itself was right:
+the clock kept going and the label read « 30'+3 », which is what football does and what invariant 2
+derives. He whistled half-time, started the second half — and the clock read **33'**. The second half
+of a 2×30 match begins at 30'. Nothing else was wrong: the score, the pitch, the minutes were all
+correct. The *number on screen* was three minutes and forty seconds ahead of the game.
+
+**The asymmetry was in one `Math.max`.** `nextEventStamp` in `lib/match/presenter.ts` stamps a
+kick-off at `Math.max(projected, periodStartMs(period, config))`, and that one expression had two
+jobs while only doing the first. A half ending **early** — the coach whistles at 2:14 — is clamped
+forward, so the second half correctly starts at 30:00. A half ending **late** at 33:40 keeps
+`projected`, and the overrun is carried into the second half and never paid back. The same line is
+both the fix for one case and the bug in the other, which is why it survived.
+
+### Why the fix is in the display, and `nextEventStamp` is untouched
+
+The obvious repair is to stamp the second-half kick-off at the nominal 30:00. It is the wrong one,
+and it breaks **three** separate things, each of which is worse than the symptom:
+
+1. **The kick-off would sort before the `PERIOD_END` that precedes it.** `compareMatchEvents` orders
+   by `clock_ms`, so a `KICKOFF` at 30:00 after a `PERIOD_END` at 33:40 lands earlier in the
+   sequence. The reducer then reaches its `kickoff-while-in-play` branch and **ignores the
+   kick-off**: the second half would never start at all.
+2. **The periods' played intervals would overlap.** `[0, 33:40]` and `[30:00, …]` share 3'40", so
+   `playedMsBetween` double-counts it and **every player's minutes inflate** — and with them every
+   per-60 rate built on top of them (decisions 195, 197, 199, 203).
+3. **A goal at 32' would be ambiguous**, readable either as first-half stoppage time or as the
+   second half. An append-only log must not hold a timestamp with two meanings.
+
+So **`clock_ms` and `minute` as stored remain real elapsed match time**, always, and the renumbering
+happens where it belongs: in the presentation.
+
+### The rule
+
+> displayed = nominal start of the period + (clockMs − where that period actually began)
+
+Which is what football itself does: 45+3, then a second half kicking off at 45. Here the first half
+runs 0→30 and then « 30+1 », and the second half runs **30→60** and then « 60+1 ».
+
+**This narrows decision 009 and reverts nothing.** 009 chose continuous minutes — no clock resetting
+to zero at half-time — and that is exactly what this produces. The narrowing is one word: minutes are
+continuous **within a period**, with stoppage notation past its nominal end, rather than continuous
+across an overrun. A reader who takes this as a return to a resetting second-half clock has it
+backwards; the second half still reads 30→60 and never 0→30.
+
+### How it is carried
+
+- **`lib/match/clock.ts`** gains `displayClockMs`, `displayMinute` and `actualPeriodStarts`.
+  `formatMinuteLabelFr` gains an **optional** fourth parameter `periodStartedAtMs`: omitted or
+  `null`, it is the **identity**, and that is what let every caller with no such information keep
+  working unchanged instead of being rewritten. `ClockAnchor` gains `periodStartedAtMs`, and
+  `readClock` derives everything it renders from a single `displayMs`.
+- **`lib/match/reducer.ts`** derives the period→start map from the **same `intervals`** that minutes
+  played are computed over, so display and minutes cannot drift apart. `actualPeriodStarts` takes
+  the **first** interval seen for each period — a period's first interval is opened by its
+  `KICKOFF`, any later one by a `RESUME`. The timeline and composition-snapshot loops pass **each
+  event's own period start**, so each half is read against its own kick-off rather than against the
+  match's.
+- **`lib/match/presenter.ts`** threads the parameter into `minuteLabelFr`.
+- **`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`**, one line: it is a **fifth** call site,
+  the one that builds the action sheet's header (« 33' · 2e période »).
+
+### Four things that were nearly got wrong
+
+- **`TimelineEntry.minute` and `CompositionSnapshot.minute` stay real elapsed, deliberately.**
+  `lib/retro/queries.ts` carries `minute` as a **number** into the retro correction sheet's minute
+  input, and `lib/retro/amend.ts` turns what comes back into a clock with `minuteToClockMs`. Making
+  either field period-relative would have **moved the event on a re-save** — a silent corruption of
+  an append-only log, by the one screen whose purpose is to correct it. Neither field is ever
+  displayed: both surfaces render `minuteLabel`.
+- **A residual inconsistency, left knowingly.** On an overrun match the correction sheet's title
+  reads « Corriger — But 38' » while the field below it holds `41`. That is **unchanged** from before
+  this fix, and resolving it means teaching the retro stamp about display minutes, which is its own
+  slice with its own round trip through `minuteToClockMs`. Recorded as known, not fixed.
+- **`ClockReading.clock` — the big `mm:ss` — had to move too.** It is literally the number the owner
+  read as « 33' ». So did `remainingMs` and `stoppageMs`: left on real elapsed, the « +N » badge
+  would appear 3'40" early in every overrun second half.
+- **`plannedLineups.due` stays on real elapsed, deliberately.** A plan « à partir de la 45e » should
+  come due after forty-five minutes of football, not after a renumbered 45. That is behaviour, not
+  display, and the two must not be confused because they happen to share a unit.
+
+**No existing test encoded the old overrun display.** The behaviour was simply untested, which is the
+whole reason the suite stayed green while this shipped — the clock had tests for early ends and none
+for late ones.
+
+**Gates.** `npm run typecheck` and eslint clean, `npm test` **1641 passed** (1622 → +19),
+`npm run test:e2e` **11 passed in 2.0 min**. The new tests cover: an overrun first half followed by a
+second half that displays **30'**, and +8' displaying **38'**; a half ending early still giving 30';
+**stored `clockMs` and `minute` untouched**; **exact per-player minutes over an overrun unchanged**,
+which is the strongest guard of the three reasons above; both halves labelled correctly in one
+timeline; a half-time break event; and the retro identity mapping.
+
+Observed in the browser at 390 px in both themes on a 2×5 match — `period_minutes` has a validation
+floor of 5, so a one-minute half cannot be created through the form:
+
+```
+after kick-off:       00:00     [Chrono 0’, en cours]
+first half, overrun:  05:59 +0  [Chrono 5’+1, en cours]
+half-time:            06:00 +1  [Chrono 5’+2]
+second-half kick-off: 05:00     [Chrono 5’, en cours]   ← the bug, fixed
+```
+
+**Two defects found while looking here, and left for their own slice.** `match-bar.tsx` **floors the
+stoppage badge while the label ceils it**, so the first minute of added time shows « +0 » beside an
+announced « 5'+1 » — visible in the second line above, pre-existing, and unrelated to this fix. And
+`CLAUDE.md`'s « ~25s » for `npm run test:e2e` was **wrong by a factor of five**: four measurements on
+2026-10-21 gave 1.8–5.2 minutes, and the line is corrected. That is worth a sentence rather than a
+silent edit, because a check believed to be free gets run reflexively on anything, while one known to
+cost two minutes gets run when it is the thing that would actually prove the change — and this is a
+change it proves.
+
+---

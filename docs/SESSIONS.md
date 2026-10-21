@@ -6714,3 +6714,99 @@ substring match, so the longer label still matches it. Looked at at 390 px in li
 Files, this fifth pass: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md` (the code —
 `db/schema.ts`, `db/migrations/0016_aspiring_glorian.sql`, the login schema and action,
 `app/connexion/` and `scripts/import-emails.mts` — by the session that owns the branch).
+
+## 2026-10-21 — The second half starts at 30', not at 33' (decision 209)
+
+**The owner's report, which is precise enough to be the test.** « When we reach half time, with
+additional time in the first half, the time keeps going in the first half. That is good. But when we
+click on the half time button, and then start the second half, the timing starts back at the first
+half + additional time time. It should start at 30'. » A 2×30 match: the first half overran to 33:40
+and showed « 30'+3 », which is correct and is what invariant 2 derives. He whistled, started the
+second half, and the clock read **33'**. Everything else was right — score, pitch, minutes. The
+number on screen was 3'40" ahead of the game.
+
+**One `Math.max` was doing two jobs and only one of them right.** `nextEventStamp` in
+`lib/match/presenter.ts` stamps a kick-off at `Math.max(projected, periodStartMs(period, config))`. A
+half ending **early** at 2:14 is clamped forward and the second half correctly starts at 30:00; a
+half ending **late** at 33:40 keeps `projected` and carries the overrun into the next period, where
+nothing ever pays it back. The same expression is the fix for one case and the bug in the other,
+which is why it was never noticed.
+
+**The fix is in the display, and `nextEventStamp` is untouched — three reasons, all worse than the
+symptom.** Stamping the second-half kick-off at the nominal 30:00 is the obvious repair and it breaks
+three things. `compareMatchEvents` sorts by `clock_ms`, so a `KICKOFF` at 30:00 following a
+`PERIOD_END` at 33:40 **sorts before it**, the reducer reaches its `kickoff-while-in-play` branch and
+**ignores the kick-off** — the second half never starts. The periods' played intervals **overlap**,
+`[0, 33:40]` and `[30:00, …]`, so `playedMsBetween` double-counts 3'40" and **inflates every player's
+minutes** and every per-60 rate built on them. And a goal at 32' becomes **ambiguous** between
+first-half stoppage and the second half, which an append-only log must never be. So **stored
+`clock_ms` and `minute` stay real elapsed match time** and the renumbering happens in presentation:
+*displayed = nominal start of the period + (clockMs − where that period actually began)*. First half
+0→30 then « 30+1 »; second half **30→60** then « 60+1 ». Which is what football does — 45+3, then a
+kick-off at 45.
+
+**This narrows decision 009 and reverts none of it.** 009 chose continuous minutes, no clock resetting
+to zero at half-time, and that is exactly what this produces. The narrowing is one word: continuous
+**within a period**, with stoppage notation past its nominal end, rather than continuous across an
+overrun.
+
+**How it is carried.** `lib/match/clock.ts` gains `displayClockMs`, `displayMinute` and
+`actualPeriodStarts`; `formatMinuteLabelFr` gains an **optional** fourth parameter
+`periodStartedAtMs` which is the **identity** when omitted or null, and that is what kept every
+caller with no such information working unchanged instead of being rewritten. `ClockAnchor` gains
+`periodStartedAtMs`, and `readClock` derives everything it renders from one `displayMs`.
+`lib/match/reducer.ts` builds the period→start map from the **same `intervals`** minutes played are
+computed over, so the two cannot drift; `actualPeriodStarts` takes the **first** interval seen per
+period, a period's first being opened by its `KICKOFF` and later ones by a `RESUME`. The timeline and
+composition-snapshot loops pass **each event's own** period start, so each half reads against its own
+kick-off. `lib/match/presenter.ts` threads it into `minuteLabelFr`, and
+`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx` is one line — a **fifth** call site, the one
+building the action sheet's header (« 33' · 2e période »).
+
+**The near-miss worth writing down: `TimelineEntry.minute` stays real elapsed, deliberately.** It
+looks like exactly the field that should become period-relative, and it must not.
+`lib/retro/queries.ts` carries `minute` as a **number** into the retro correction sheet's minute
+input, and `lib/retro/amend.ts` turns what comes back into a clock with `minuteToClockMs` — so making
+it period-relative would have **moved the event on a re-save**, a silent corruption of an append-only
+log by the one screen whose job is to correct it. Same for `CompositionSnapshot.minute`. Neither is
+ever displayed; both surfaces render `minuteLabel`. **The residual inconsistency is left knowingly**:
+on an overrun match the sheet's title reads « Corriger — But 38' » while the field holds `41` — which
+is unchanged from before this fix, and resolving it means teaching the retro stamp about display
+minutes in both directions, a separate slice, now on the roadmap. Two more that had to go the right
+way: **`ClockReading.clock`** — the big `mm:ss`, literally the number he read as « 33' » — had to
+move, along with `remainingMs` and `stoppageMs`, or the « +N » badge shows up 3'40" early in every
+overrun second half; and **`plannedLineups.due` stays real elapsed**, because a plan « à partir de la
+45e » should come due after forty-five minutes of football and not after a renumbered 45. That one is
+behaviour, not display.
+
+**No existing test encoded the old overrun display.** The clock had tests for a half ending early and
+none for one ending late, so the behaviour was untested and the suite stayed green while the bug
+shipped. The new ones cover: an overrun first half followed by a second half displaying **30'**, and
++8' displaying **38'**; a half ending early still giving 30'; **stored `clockMs` and `minute`
+untouched**; **exact per-player minutes over an overrun unchanged**, which is the strongest of them
+because it guards the second of the three reasons directly; both halves labelled in one timeline; a
+half-time break event; and the retro identity mapping.
+
+Gates: `npm run typecheck` and eslint clean, `npm test` **1641 passed** (1622 → +19),
+`npm run test:e2e` **11 passed in 2.0 min**. Looked at in the browser at 390 px in both themes on a
+2×5 match — `period_minutes` has a validation floor of 5, so a one-minute half cannot be made through
+the form:
+
+```
+after kick-off:       00:00     [Chrono 0’, en cours]
+first half, overrun:  05:59 +0  [Chrono 5’+1, en cours]
+half-time:            06:00 +1  [Chrono 5’+2]
+second-half kick-off: 05:00     [Chrono 5’, en cours]   ← the bug, fixed
+```
+
+**Two things found while looking, neither fixed here.** `match-bar.tsx` **floors the stoppage badge
+while the label ceils it** — visible on the second line above, « +0 » beside an announced « 5'+1 ».
+Pre-existing, unrelated, on the roadmap. And **`CLAUDE.md`'s « ~25s » for `npm run test:e2e` was
+wrong by a factor of five**: four measurements today gave **1.8–5.2 minutes**, and the line is
+corrected. Worth saying out loud rather than editing quietly, because a check believed to be free
+gets run reflexively on everything, while one known to cost two minutes gets run when it is the thing
+that would actually prove the change — and here it was.
+
+Files, this pass: `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/SESSIONS.md` (the code —
+`lib/match/clock.ts`, `lib/match/reducer.ts`, `lib/match/presenter.ts`, their tests and
+`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx` — by the session that owns the branch).

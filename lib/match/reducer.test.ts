@@ -68,6 +68,11 @@ const CONFIG: MatchReducerConfig = { slots: SLOTS, squad: SQUAD };
 type Fixture = {
   type: MatchEventType;
   min: number;
+  /**
+   * Seconds on top of `min`, for the one thing whole minutes cannot express: a half the coach let
+   * run to 33′40″. `clock_ms` takes them; `minute` stays the floored minute the device would store.
+   */
+  sec?: number;
   /** Defaults to the period the match time falls in; passed explicitly at a boundary. */
   period?: number;
   payload?: unknown;
@@ -82,18 +87,21 @@ type Fixture = {
  */
 function log(fixtures: Fixture[], periods?: Partial<PeriodsConfig>): MatchEventRecord[] {
   const config = periodsConfig(periods);
-  return fixtures.map((fixture, index) => ({
-    id: `e${index + 1}`,
-    clientEventId: `c${index + 1}`,
-    type: fixture.type,
-    period: fixture.period ?? periodOfClockMs(fixture.min * MIN, config),
-    minute: fixture.min,
-    clockMs: fixture.min * MIN,
-    occurredAt: new Date(T0 + fixture.min * MIN),
-    payload: fixture.payload ?? {},
-    voidsEventId: fixture.voids === undefined ? null : `e${fixture.voids}`,
-    seq: index + 1,
-  }));
+  return fixtures.map((fixture, index) => {
+    const clockMs = fixture.min * MIN + (fixture.sec ?? 0) * 1_000;
+    return {
+      id: `e${index + 1}`,
+      clientEventId: `c${index + 1}`,
+      type: fixture.type,
+      period: fixture.period ?? periodOfClockMs(clockMs, config),
+      minute: Math.floor(clockMs / MIN),
+      clockMs,
+      occurredAt: new Date(T0 + clockMs),
+      payload: fixture.payload ?? {},
+      voidsEventId: fixture.voids === undefined ? null : `e${fixture.voids}`,
+      seq: index + 1,
+    };
+  });
 }
 
 const lineupPayload = (pairs: Record<string, string>, lineupId?: string) => ({
@@ -910,6 +918,187 @@ describe("a match in progress", () => {
       { type: "PERIOD_END", min: 60, period: 2 },
     ]);
     expect(reduceMatch(fullTime, [], CONFIG).reading.awaitingFinalWhistle).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* A period that ran past its nominal end                                     */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The bug of 2026-10-21, hit in a real match: the coach let the first half run to 33′40″ — which the
+ * bar correctly showed as « 30’+3 » — whistled, started the second half, and read « 33’ » for a half
+ * that starts at 30′. The second-half kick-off really is *stored* at 33′40″ and must stay there
+ * (`nextEventStamp`): the log is sorted by `clock_ms`, so a kick-off stamped at 30′ after a period
+ * end at 33′40″ would replay before it and the half would never start, and the two halves' played
+ * intervals would overlap and pay everybody twice for the same 3′40″. So only the display moves.
+ */
+describe("a first half that ran long", () => {
+  const LATE = log([
+    { type: "KICKOFF", min: 0, period: 1 },
+    { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+    { type: "GOAL_FOR", min: 11, payload: { scorerId: "julien" } },
+    // Added time of the first half: 32′ of match time is « 30’+2 », never « 32’ ».
+    { type: "GOAL_FOR", min: 32, period: 1, payload: { scorerId: "karim" } },
+    { type: "PERIOD_END", min: 33, sec: 40, period: 1 },
+    // Half-time, during the break: the composition drawn for the second half walks on.
+    {
+      type: "LINEUP_APPLIED",
+      min: 33,
+      sec: 40,
+      period: 1,
+      payload: lineupPayload({ ...STARTING_ELEVEN, [SLOT.mc1]: "yanis" }),
+    },
+    { type: "KICKOFF", min: 33, sec: 40, period: 2 },
+    // Eight minutes of football later.
+    { type: "GOAL_FOR", min: 41, sec: 40, payload: { scorerId: "yanis" } },
+    { type: "PERIOD_END", min: 63, sec: 40, period: 2 },
+    { type: "FINAL_WHISTLE", min: 63, sec: 40, period: 2 },
+  ]);
+
+  const LATE_END_MS = 33 * MIN + 40_000;
+  const state = reduceMatch(LATE, [], CONFIG);
+  const labelOf = (eventId: string) =>
+    state.timeline.find((entry) => entry.eventId === eventId)!.minuteLabel;
+
+  it("starts the second half at 30′, not at the first half's final reading", () => {
+    // e7 is the second-half kick-off, stamped at 33′40″ like the period end it follows.
+    expect(labelOf("e7")).toBe("30’");
+    // And eight minutes into that half — 41′40″ stored — the screen says 38′.
+    expect(labelOf("e8")).toBe("38’");
+    /*
+     * The entry's `minute` is *not* that 38: it stays the real elapsed minute, because the
+     * correction sheet pre-fills its minute field with it and sends it back through
+     * `minuteToClockMs`. A display minute there would move the event on a re-save.
+     */
+    expect(state.timeline.find((entry) => entry.eventId === "e7")!.minute).toBe(33);
+    expect(state.timeline.find((entry) => entry.eventId === "e8")!.minute).toBe(41);
+  });
+
+  it("keeps the first half's added time in stoppage notation, on the same timeline", () => {
+    // Each line is read against its own period's real start: both halves, in one pass.
+    expect(labelOf("e3")).toBe("11’");
+    expect(labelOf("e4")).toBe("30’+2");
+    expect(labelOf("e5")).toBe("30’+4");
+    // The second half's own end: thirty minutes of football after a kick-off at 33′40″.
+    expect(labelOf("e9")).toBe("60’");
+  });
+
+  it("puts an event during the break in the half that had just ended", () => {
+    // The half-time composition carries period 1, so it reads « 30’+4 » — not « 30’ », which would
+    // claim something that happened after the 30th minute happened on it.
+    expect(labelOf("e6")).toBe("30’+4");
+    const composition = state.compositions.find((entry) => entry.eventId === "e6")!;
+    expect(composition.minuteLabel).toBe("30’+4");
+    // Real elapsed, like the timeline's: 33′40″ floored.
+    expect(composition.minute).toBe(33);
+    // The starting composition, and the rest of the strip, are unmoved.
+    expect(state.compositions.map((entry) => entry.minuteLabel)).toEqual(["0’", "30’+4"]);
+  });
+
+  it("stores the real elapsed time and changes nothing about it", () => {
+    const kickoff = LATE.find((event) => event.id === "e7")!;
+    expect(kickoff.clockMs).toBe(LATE_END_MS);
+    expect(kickoff.minute).toBe(33);
+    // The timeline carries the stored millisecond untouched beside the display's minute.
+    expect(state.timeline.find((entry) => entry.eventId === "e7")!.clockMs).toBe(LATE_END_MS);
+    expect(state.playIntervals).toEqual([
+      { period: 1, startMs: 0, endMs: LATE_END_MS },
+      { period: 2, startMs: LATE_END_MS, endMs: 63 * MIN + 40_000 },
+    ]);
+  });
+
+  it("hands out exactly the minutes the two halves were played for", () => {
+    // 33′40″ then 30′00″ of football: 63′40″, which rounds to 64 for whoever played all of it.
+    // These are the numbers before the display fix as well — it moves no minute.
+    expect(minutesOf(state)).toEqual({
+      hugo: 64,
+      samir: 64,
+      thomas: 64,
+      nico: 64,
+      karim: 64,
+      julien: 64,
+      // Off at half-time after 33′40″; his replacement gets the second half's 30′ and no more.
+      leo: 34,
+      yanis: 30,
+      momo: 0,
+      ali: 0,
+      fabien: 0,
+      gerard: 0,
+    });
+    expect(playerState(state, "hugo")!.playedMs).toBe(63 * MIN + 40_000);
+    expect(playerState(state, "hugo")!.cleanMinutes).toBe(64);
+    expect(state.anomalies).toEqual([]);
+  });
+
+  it("reads the live bar from 30′ while that second half runs", () => {
+    // Two minutes of wall clock after the second-half kick-off.
+    const live = reduceMatch(LATE.slice(0, 7), [], {
+      ...CONFIG,
+      nowMs: T0 + LATE_END_MS + 2 * MIN,
+    });
+    expect(live.clock.periodStartedAtMs).toBe(LATE_END_MS);
+    expect(live.reading).toMatchObject({
+      period: 2,
+      clockMs: LATE_END_MS + 2 * MIN,
+      minute: 32,
+      clock: "32:00",
+      label: "32’",
+      stoppageMs: 0,
+    });
+  });
+
+  it("anchors half-time itself on the first half, which is still showing +4", () => {
+    const atTheBreak = reduceMatch(LATE.slice(0, 5), [], { ...CONFIG, nowMs: T0 + 40 * MIN });
+    expect(atTheBreak.phase).toBe("break");
+    expect(atTheBreak.clock.periodStartedAtMs).toBe(0);
+    expect(atTheBreak.reading.label).toBe("30’+4");
+  });
+
+  it("still starts the second half at 30′ when the first one ended early", () => {
+    // Nothing new — `nextEventStamp` already stamps this kick-off at the nominal 30′ — but the fix
+    // must not take it away: an interrupted first half does not shorten the match.
+    const early = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+      { type: "PERIOD_END", min: 2, sec: 14, period: 1 },
+      { type: "KICKOFF", min: 30, period: 2 },
+      { type: "GOAL_FOR", min: 35, payload: { scorerId: "julien" } },
+    ]);
+    const short = reduceMatch(early, [], { ...CONFIG, nowMs: T0 + 35 * MIN });
+    expect(short.timeline.find((entry) => entry.eventId === "e3")!.minuteLabel).toBe("2’");
+    expect(short.timeline.find((entry) => entry.eventId === "e4")!.minuteLabel).toBe("30’");
+    expect(short.timeline.find((entry) => entry.eventId === "e5")!.minuteLabel).toBe("35’");
+    expect(short.clock.periodStartedAtMs).toBe(30 * MIN);
+    // 2′14″ of first half plus 5′ of second: nobody is credited the break.
+    expect(playerState(short, "hugo")!.playedMs).toBe(2 * MIN + 14_000 + 5 * MIN);
+  });
+
+  it("maps a retro match identically: its periods start where they should", () => {
+    // `lib/retro/log.ts` stamps every kick-off at exactly `periodStartMs`, so there is no overrun to
+    // undo and the display scale is the identity. This pins that the fix did not perturb it.
+    const retro = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+      { type: "GOAL_FOR", min: 24, payload: { scorerId: "julien" } },
+      { type: "PERIOD_END", min: 30, period: 1 },
+      { type: "KICKOFF", min: 30, period: 2 },
+      { type: "GOAL_AGAINST", min: 47 },
+      { type: "PERIOD_END", min: 60, period: 2 },
+      { type: "FINAL_WHISTLE", min: 60, period: 2 },
+    ]);
+    const plain = reduceMatch(retro, [], CONFIG);
+    expect(plain.timeline.map((entry) => entry.minuteLabel)).toEqual([
+      "0’",
+      "0’",
+      "24’",
+      "30’",
+      "30’",
+      "47’",
+      "60’",
+      "60’",
+    ]);
+    expect(plain.timeline.map((entry) => entry.minute)).toEqual([0, 0, 24, 30, 30, 47, 60, 60]);
   });
 });
 

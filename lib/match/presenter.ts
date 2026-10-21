@@ -1251,9 +1251,21 @@ export function phaseLabelFr(state: MatchState): string {
   }
 }
 
-/** « 12’ » and « 30’+2 » for an arbitrary match time, for the prompt and the composer. */
-export function minuteLabelFr(clockMs: number, period: number, periods: PeriodsConfig): string {
-  return formatMinuteLabelFr(clockMs, period, periods);
+/**
+ * « 12’ » and « 30’+2 » for an arbitrary match time, for the prompt and the composer.
+ *
+ * `periodStartedAtMs` is the clock at which `period` actually kicked off — `state.clock
+ * .periodStartedAtMs` for the period in progress — so a second half that started late still reads
+ * from 30′. Omitted, the label is counted from the period's nominal start, which is right for every
+ * caller whose periods start where they should: the retro path stamps its kick-offs exactly there.
+ */
+export function minuteLabelFr(
+  clockMs: number,
+  period: number,
+  periods: PeriodsConfig,
+  periodStartedAtMs?: number | null,
+): string {
+  return formatMinuteLabelFr(clockMs, period, periods, periodStartedAtMs);
 }
 
 /** French label of an event type, for the ACTION sheet. */

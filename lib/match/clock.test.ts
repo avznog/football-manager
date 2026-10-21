@@ -6,8 +6,11 @@ import {
   IDLE_CLOCK_ANCHOR,
   MS_PER_MINUTE,
   type PlayInterval,
+  actualPeriodStarts,
   clockMsToMinute,
   clockMsWithinPeriod,
+  displayClockMs,
+  displayMinute,
   formatClock,
   formatMinuteFr,
   formatMinuteLabelFr,
@@ -116,11 +119,90 @@ describe("converting elapsed milliseconds to a display", () => {
   });
 });
 
+/*
+ * The bug of 2026-10-21, found in a real match: a first half let run to 33′40″ has its second-half
+ * kick-off *stored* at 33′40″ — it must be, or the log sorts wrong and the two halves' played
+ * intervals overlap — and the bar read « 33′ » for the kick-off of a half that starts at 30′.
+ */
+describe("a period that ran past its nominal end", () => {
+  const LATE_END = 33 * MS_PER_MINUTE + 40 * 1_000;
+
+  it("counts the second half from 30′, however late the first one ended", () => {
+    expect(displayClockMs(LATE_END, 2, TWO_THIRTY, LATE_END)).toBe(30 * MS_PER_MINUTE);
+    expect(displayMinute(LATE_END, 2, TWO_THIRTY, LATE_END)).toBe(30);
+    expect(formatMinuteLabelFr(LATE_END, 2, TWO_THIRTY, LATE_END)).toBe("30’");
+    // Eight minutes into that half: 41′40″ of real match time, « 38’ » on the screen.
+    const eightIn = LATE_END + 8 * MS_PER_MINUTE;
+    expect(displayMinute(eightIn, 2, TWO_THIRTY, LATE_END)).toBe(38);
+    expect(formatMinuteLabelFr(eightIn, 2, TWO_THIRTY, LATE_END)).toBe("38’");
+  });
+
+  it("keeps the first half's own overrun in stoppage notation", () => {
+    // The first half started where it should, so its mapping is the identity: 30’+4, never 33’.
+    expect(formatMinuteLabelFr(LATE_END, 1, TWO_THIRTY, 0)).toBe("30’+4");
+    expect(displayMinute(LATE_END, 1, TWO_THIRTY, 0)).toBe(33);
+  });
+
+  it("labels the same stored millisecond differently in each half — which is the whole point", () => {
+    expect(formatMinuteLabelFr(LATE_END, 1, TWO_THIRTY, 0)).toBe("30’+4");
+    expect(formatMinuteLabelFr(LATE_END, 2, TWO_THIRTY, LATE_END)).toBe("30’");
+  });
+
+  it("still ends the overrunning second half in stoppage notation", () => {
+    // 63′40″ stored is 60′ displayed — the half has had its 30 minutes — and 10 seconds later, +1.
+    expect(formatMinuteLabelFr(LATE_END + 30 * MS_PER_MINUTE, 2, TWO_THIRTY, LATE_END)).toBe("60’");
+    expect(
+      formatMinuteLabelFr(LATE_END + 30 * MS_PER_MINUTE + 10_000, 2, TWO_THIRTY, LATE_END),
+    ).toBe("60’+1");
+  });
+
+  it("is the identity when the actual start is not supplied, so every old caller is unmoved", () => {
+    for (const period of [1, 2]) {
+      for (const clockMs of [0, 24 * MS_PER_MINUTE, LATE_END, 62 * MS_PER_MINUTE]) {
+        expect(formatMinuteLabelFr(clockMs, period, TWO_THIRTY)).toBe(
+          formatMinuteLabelFr(clockMs, period, TWO_THIRTY, periodStartMs(period, TWO_THIRTY)),
+        );
+        expect(displayMinute(clockMs, period, TWO_THIRTY)).toBe(
+          displayMinute(clockMs, period, TWO_THIRTY, periodStartMs(period, TWO_THIRTY)),
+        );
+        // And on a clock that is actually inside its own period — the only input a log produces —
+        // that identity is the plain elapsed minute, unchanged from before this fix.
+        if (clockMs >= periodStartMs(period, TWO_THIRTY)) {
+          expect(displayMinute(clockMs, period, TWO_THIRTY)).toBe(clockMsToMinute(clockMs));
+        }
+      }
+    }
+    // And null — the shape the anchor carries before any kick-off — is "not supplied" too.
+    expect(formatMinuteLabelFr(LATE_END, 1, TWO_THIRTY, null)).toBe("30’+4");
+  });
+
+  it("never counts backwards into the previous period", () => {
+    // A period that had not begun at this clock reads as its own start, not as a negative offset.
+    expect(displayClockMs(10 * MS_PER_MINUTE, 2, TWO_THIRTY, LATE_END)).toBe(30 * MS_PER_MINUTE);
+  });
+
+  it("takes each period's real start from the intervals the reducer already builds", () => {
+    const starts = actualPeriodStarts([
+      { period: 1, startMs: 0, endMs: 12 * MS_PER_MINUTE },
+      // A pause inside the first half: a second interval for the same period, not a new start.
+      { period: 1, startMs: 12 * MS_PER_MINUTE, endMs: LATE_END },
+      { period: 2, startMs: LATE_END, endMs: null },
+    ]);
+    expect(starts.get(1)).toBe(0);
+    expect(starts.get(2)).toBe(LATE_END);
+    // A period nobody kicked off has no entry, and the lookup then falls back to the nominal start.
+    expect(starts.get(3)).toBeUndefined();
+    expect(actualPeriodStarts([]).size).toBe(0);
+  });
+});
+
 describe("projecting a running clock", () => {
   const anchor: ClockAnchor = {
     phase: "running",
     period: 2,
     clockMs: 38 * MS_PER_MINUTE,
+    // A first half whistled exactly on time: the second period began where it nominally begins.
+    periodStartedAtMs: 30 * MS_PER_MINUTE,
     anchoredAtMs: 1_000_000,
     running: true,
   };
@@ -171,12 +253,65 @@ describe("projecting a running clock", () => {
       phase: "break",
       period: 2,
       clockMs: 60 * MS_PER_MINUTE,
+      periodStartedAtMs: 30 * MS_PER_MINUTE,
       anchoredAtMs: 1_000_000,
       running: false,
     };
     expect(readClock(atTheEnd, TWO_THIRTY).awaitingFinalWhistle).toBe(true);
     // Half-time of the same match is a break too, but nobody is waiting to whistle.
-    expect(readClock({ ...atTheEnd, period: 1 }, TWO_THIRTY).awaitingFinalWhistle).toBe(false);
+    expect(
+      readClock({ ...atTheEnd, period: 1, periodStartedAtMs: 0 }, TWO_THIRTY).awaitingFinalWhistle,
+    ).toBe(false);
+  });
+
+  it("puts the whole bar back on 30′ when the second half kicked off late", () => {
+    const lateEnd = 33 * MS_PER_MINUTE + 40 * 1_000;
+    const secondHalf: ClockAnchor = {
+      phase: "running",
+      period: 2,
+      clockMs: lateEnd,
+      periodStartedAtMs: lateEnd,
+      anchoredAtMs: 1_000_000,
+      running: true,
+    };
+    // The kick-off itself: the owner's bug read 33:40 here.
+    expect(readClock(secondHalf, TWO_THIRTY)).toMatchObject({
+      clockMs: lateEnd,
+      minute: 30,
+      clock: "30:00",
+      label: "30’",
+      remainingMs: 30 * MS_PER_MINUTE,
+      stoppageMs: 0,
+    });
+    // Two minutes of football later, by the wall clock.
+    expect(readClock(secondHalf, TWO_THIRTY, 1_000_000 + 2 * MS_PER_MINUTE)).toMatchObject({
+      minute: 32,
+      clock: "32:00",
+      label: "32’",
+      stoppageMs: 0,
+    });
+    // And the +N badge only appears once *this* half has had its thirty minutes.
+    const full = readClock(secondHalf, TWO_THIRTY, 1_000_000 + 30 * MS_PER_MINUTE + 30_000);
+    expect(full).toMatchObject({ clock: "60:30", label: "60’+1", remainingMs: 0 });
+    expect(full.stoppageMs).toBe(30_000);
+  });
+
+  it("reads half-time, during the break, as the first half's stoppage time", () => {
+    const lateEnd = 33 * MS_PER_MINUTE + 40 * 1_000;
+    const halfTime: ClockAnchor = {
+      phase: "break",
+      period: 1,
+      clockMs: lateEnd,
+      periodStartedAtMs: 0,
+      anchoredAtMs: 1_000_000,
+      running: false,
+    };
+    // « 30’+4 », not « 30’ »: something that happened here happened after the 30th minute.
+    expect(readClock(halfTime, TWO_THIRTY, 1_000_000 + 600_000)).toMatchObject({
+      label: "30’+4",
+      clock: "33:40",
+      minute: 33,
+    });
   });
 });
 

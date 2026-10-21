@@ -106,7 +106,7 @@ npm run db:seed        # reference data + the demo season (idempotent)
 npm run db:reset       # drop everything, remigrate, reseed — local only
 npm run db:bootstrap   # an empty database: reference data + the one super admin (docs/DEPLOY.md)
 npm test               # Vitest — unit only, and it stays that way
-npm run test:e2e       # Playwright: the season loop, the first run, and the offline queue (~25s)
+npm run test:e2e       # Playwright: the season loop, the first run, and the offline queue (~2 min)
 npm run test:e2e:install   # Chromium, once per machine
 npm run lint           # eslint
 npm run typecheck      # next typegen && tsc --noEmit
@@ -114,7 +114,12 @@ npm run build          # production build
 npm run peer           # what the other sessions changed on origin since last run (COORDINATION.md)
 ```
 
-`npm run test:e2e` reuses a dev server if one is already up, so it is cheap. It drives
+`npm run test:e2e` reuses a dev server if one is already up, which saves the build but **not** the
+run: it is **about two minutes**, measured four times on 2026-10-21 at 1.8–5.2 min. This line said
+« ~25s » and « so it is cheap » until then, which is wrong by a factor of five and was worth
+correcting for a specific reason — a check believed to be free gets run reflexively, and one known to
+cost two minutes gets run when it is the thing that would actually prove the change. `happy-path.spec.ts`
+alone is 1 900 lines driving seven scenarios through a browser. It drives
 **`localhost`, never `127.0.0.1`** — see decision 043: Next treats the latter as a foreign origin,
 the page never hydrates, and the suite silently tests the no-JavaScript fallbacks instead. It owns
 its own fixture team and never touches the demo season (decision 044).

@@ -105,6 +105,8 @@ const STARTING_SEVEN = [
 type Fixture = {
   type: LiveEvent["type"];
   min: number;
+  /** Seconds on top of `min`, for a half the coach let run to 33′40″. */
+  sec?: number;
   period?: number;
   payload?: unknown;
   /** 1-based index of the event this one annuls. */
@@ -118,8 +120,8 @@ function log(fixtures: Fixture[]): LiveEvent[] {
     type: fixture.type,
     period: fixture.period ?? (fixture.min >= 30 ? 2 : 1),
     minute: fixture.min,
-    clockMs: fixture.min * MIN,
-    occurredAt: new Date(T0 + fixture.min * MIN).toISOString(),
+    clockMs: fixture.min * MIN + (fixture.sec ?? 0) * 1_000,
+    occurredAt: new Date(T0 + fixture.min * MIN + (fixture.sec ?? 0) * 1_000).toISOString(),
     payload: fixture.payload ?? {},
     voidsEventId: fixture.voids === undefined ? null : `e${fixture.voids}`,
     seq: index + 1,
@@ -235,6 +237,39 @@ describe("stamping an action on the device", () => {
       minute: 30,
       clockMs: 30 * MIN,
     });
+  });
+
+  it("stores an overrunning half's kick-off at the clock it really happened at", () => {
+    /*
+     * The other arm of the same rule, and the one the display fix must not touch: a first half that
+     * ran to 33′40″ has its second-half kick-off stamped *there*, not at 30′, or the log would sort
+     * it before the period end it follows and the two halves' played intervals would overlap.
+     */
+    const events = log([...KICKED_OFF, { type: "PERIOD_END", min: 33, sec: 40, period: 1 }]);
+    const state = reduceLive(live(events), [], T0 + 45 * MIN);
+
+    expect(nextEventStamp(state, "KICKOFF", T0 + 45 * MIN)).toEqual({
+      period: 2,
+      minute: 33,
+      clockMs: 33 * MIN + 40_000,
+    });
+
+    // And once it is in the log, that stored 33′40″ is displayed as the 30′ it is.
+    const started = reduceLive(
+      live(log([...KICKED_OFF, { type: "PERIOD_END", min: 33, sec: 40, period: 1 }, { type: "KICKOFF", min: 33, sec: 40, period: 2 }])),
+      [],
+      // The instant of the kick-off itself: the clock has not moved since.
+      T0 + 33 * MIN + 40_000,
+    );
+    expect(started.clock.periodStartedAtMs).toBe(33 * MIN + 40_000);
+    expect(started.reading.label).toBe("30’");
+    expect(started.reading.clock).toBe("30:00");
+    // The anchor still carries the real match time: only the reading is on the display's scale.
+    expect(started.clock.clockMs).toBe(33 * MIN + 40_000);
+    // A new action taps in at the real clock, as it always did.
+    expect(nextEventStamp(started, "GOAL_FOR", T0 + 33 * MIN + 40_000).clockMs).toBe(
+      33 * MIN + 40_000,
+    );
   });
 
   it("never invents a period beyond the configured count", () => {
@@ -1311,6 +1346,10 @@ describe("the small strings", () => {
     const periods = periodsOf({ periodsCount: 2, periodMinutes: 30 });
     expect(minuteLabelFr(45 * MIN, 2, periods)).toBe("45’");
     expect(minuteLabelFr(32 * MIN, 1, periods)).toBe("30’+2");
+    // With the period's real start — the game-mode sheets pass the anchor's — a second half that
+    // kicked off at 33′40″ is counted from 30′, and without it nothing moves.
+    expect(minuteLabelFr(41 * MIN + 40_000, 2, periods, 33 * MIN + 40_000)).toBe("38’");
+    expect(minuteLabelFr(41 * MIN + 40_000, 2, periods, null)).toBe("41’");
     expect(wholeMinutes(45 * MIN + 30_000)).toBe(45);
     expect(wholeMinutes(-5)).toBe(0);
   });

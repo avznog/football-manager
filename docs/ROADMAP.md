@@ -2547,3 +2547,50 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       not the same question as « mot de passe oublié », which stays **shut** — that needs a sender, a
       single-use token with an expiry and a rate limit, and a coach can already reset a member's
       password from the team screen
+
+## The second half starts at 30', not at 33' — 2026-10-21
+
+- [x] **The displayed clock is period-relative; the stored clock stays real elapsed** (decision
+      **209**, which **narrows decision 009** and reverts nothing of it). The owner: « when we click
+      on the half time button, and then start the second half, the timing starts back at the first
+      half + additional time time. It should start at 30'. » A 2×30 first half overran to 33:40 —
+      correctly, labelled « 30'+3 » — and the second half then opened at **33'**. One `Math.max` in
+      `nextEventStamp` was doing two jobs and only one of them right: a half ending **early** at 2:14
+      is clamped forward to 30:00, a half ending **late** carries its overrun into the next period.
+      The rule is now **displayed = nominal start of the period + (clockMs − where that period
+      actually began)**, which is what football does: the first half runs 0→30 then « 30+1 », the
+      second **30→60** then « 60+1 ». Minutes stay continuous, now **within a period** — the second
+      half still never reads 0→30
+- [x] **`nextEventStamp` is untouched, and stamping the kick-off at the nominal 30:00 was the wrong
+      fix for three reasons** worth keeping: `compareMatchEvents` sorts by `clock_ms`, so a kick-off
+      at 30:00 after a `PERIOD_END` at 33:40 **sorts before it** and the reducer's
+      `kickoff-while-in-play` branch would **ignore the kick-off** — no second half at all; the
+      periods' intervals would **overlap** (`[0, 33:40]` and `[30:00, …]`), so `playedMsBetween`
+      double-counts 3'40" and **inflates every player's minutes** and every per-60 rate on them; and
+      a goal at 32' becomes ambiguous between first-half stoppage and the second half
+- [x] **`displayClockMs`, `displayMinute` and `actualPeriodStarts` in `lib/match/clock.ts`**, with
+      `formatMinuteLabelFr` gaining an **optional** fourth parameter `periodStartedAtMs` that is the
+      **identity** when omitted — which is what kept every caller without that information working
+      unchanged. The reducer derives the period→start map from the **same `intervals`** minutes are
+      computed over, so the two cannot drift, taking the **first** interval per period (a period's
+      first is opened by its `KICKOFF`, later ones by `RESUME`), and the timeline and
+      composition-snapshot loops pass **each event's own** period start. `game-mode.tsx` was a
+      **fifth** call site, the action sheet's header. `ClockReading.clock` — the `mm:ss` the owner
+      read as « 33' » — moved too, with `remainingMs` and `stoppageMs`, or the « +N » badge appears
+      3'40" early in every overrun second half. **`plannedLineups.due` stays real elapsed on
+      purpose**: « à partir de la 45e » comes due after 45 minutes of football, not after a
+      renumbered 45. **1641** tests, up from 1622; e2e **11 passed in 2.0 min**. **No existing test
+      encoded the old overrun display** — it was untested, which is why the suite stayed green while
+      the bug shipped
+- [ ] **The retro correction sheet's title and field disagree on an overrun match.** The title reads
+      « Corriger — But 38' » while the minute input holds `41`. **Unchanged from before decision
+      209** and left knowingly: `TimelineEntry.minute` and `CompositionSnapshot.minute` stay real
+      elapsed *deliberately*, because `lib/retro/queries.ts` carries `minute` as a number into that
+      input and `lib/retro/amend.ts` turns it back into a clock with `minuteToClockMs` — making the
+      field period-relative would have **moved the event on a re-save**, a silent corruption of an
+      append-only log. Resolving it means teaching the retro stamp about display minutes, in both
+      directions, which is this slice's own work and not a one-liner
+- [ ] **`match-bar.tsx` floors the stoppage badge while the label ceils it**, so the first minute of
+      added time shows « +0 » beside an announced « 5'+1 ». Pre-existing and unrelated to decision
+      209; found while looking at the overrun clock. One of the two has to give — the label's ceil is
+      the one football uses, so the badge is the side to change
