@@ -6949,3 +6949,43 @@ Files: `lib/composition/supporters.ts` (new), `lib/composition/supporters.test.t
 `lib/composition/actions.ts`, `lib/composition/validation.ts`,
 `app/(app)/match/[id]/_components/supporters-card.tsx` (new), `app/(app)/match/[id]/page.tsx`,
 `docs/DECISIONS.md` (211), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+### « Les plus décisifs » on the stats screen
+
+Decision **212**, at the owner's request: goals plus decisive passes, over the minutes played on the
+pitch, per player.
+
+**It needed no arithmetic of its own**, which is the whole report. `minutesPerEventBoard` was already
+generic over a count and a denominator, and decision 203 had already settled what the denominator is
+for a board about what a player *did* — his **outfield** minutes, because time in goal is not time in
+which he could have scored. So the card is `goals + assists` over the figure the two neighbouring
+boards already use, every caveat on `scoringRate` carries over unchanged, and the diff is a board, a
+words constant and a third `<EventRateBoard>`.
+
+Worded « action décisive » because it counts **contributions, not goals**: a goal and the pass before
+it are two actions, so one of the team's goals can add one to each of two players and the card's total
+can legitimately exceed the score. The subtitle spells out « 1 but ou passe décisive » because the sum
+is the whole definition and nothing else on the screen says it.
+
+**A test that proved nothing, caught by reading it rather than by running it.** The case the card
+exists for is the specialist outranking the all-rounder, and the first version gave the winger 4
+assists, the striker 4 goals and the midfielder 2 + 2 — all three come to **four**, so the assertion
+passed while demonstrating the opposite of its own name. Now the midfielder has 1 + 1, the test pins
+his position on all three boards (second, second, last), and it would fail if the sum were ever
+replaced by a max or an average.
+
+**Left raw rather than smoothed, deliberately.** On the demo season Rayan leads with 2 actions in 60′
+ahead of Karim's 9 in 360′. That is decision 177's rule for these cards — the two numbers a reader sees
+are the two the order comes from — and shrinkage on a card with no room to explain it is exactly what
+177 removed. The équipe type is where shrinkage belongs (187, 205), because a model reads the raw
+record beside it and is told to distrust a short one. If the owner wants a floor here it is a threshold
+on this board, not a return to smoothing. **Flagged rather than decided.**
+
+Gates: typecheck clean, eslint clean on the changed files, `npm test` **1657 passed** (1654 → +3).
+Looked at on a **390 px** viewport in light and dark. One cosmetic thing seen and left alone because it
+is the shared component's and predates this card: a departed player's name truncates to « R… » next to
+the « parti » badge.
+
+Files: `lib/stats/aggregate.ts`, `lib/stats/aggregate.test.ts`, `lib/stats/format.ts`,
+`app/(app)/stats/page.tsx`, `docs/DECISIONS.md` (212), `docs/ROADMAP.md`, `docs/SESSIONS.md`,
+`docs/COST.md`.

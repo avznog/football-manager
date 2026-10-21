@@ -366,6 +366,16 @@ export type SeasonStats = {
   scoringRate: MinutesPerEventBoard;
   /** The same for the passes he gave. Never `goalsForWhileOn`, which is the team's. */
   assistRate: MinutesPerEventBoard;
+  /**
+   * « 1 action décisive toutes les X′ » — his goals **and** his assists together, over the same
+   * outfield minutes (decision 212).
+   *
+   * Not a third way of measuring the same thing: a winger who scores little and assists constantly and
+   * a striker who does the reverse both read as ordinary on the two boards above and lead this one. It
+   * is the sum of the two numerators over the one denominator they already share, which is why it
+   * needs no arithmetic of its own.
+   */
+  decisiveRate: MinutesPerEventBoard;
   /** The best at each position by smoothed goal difference per 60 (decision 162, Q7). */
   impact: PositionImpact[];
   /** True when not one match or rating survives the filter. */
@@ -799,6 +809,23 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
       count: player.assists,
     })),
   );
+  /*
+   * The decisive board (decision 212). `goals + assists` over the outfield minutes the two boards
+   * above already use, so every caveat in the comment on `scoringRate` applies here unchanged and is
+   * not restated.
+   *
+   * A goal and the pass before it are two rows in this numerator, so one of the team's goals can add
+   * two actions to two different players. That is the stat the owner asked for and it is the usual
+   * reading of « décisif » — but it means the board does not count goals, it counts contributions, and
+   * `decisiveActionsFr` is the sentence that says so on the card.
+   */
+  const decisiveRate = minutesPerEventBoard(
+    players.map((player) => ({
+      ...memberOf(player),
+      minutes: player.outfieldMinutes,
+      count: player.goals + player.assists,
+    })),
+  );
   const impact = impactByPosition(
     players.map((player) => ({ ...memberOf(player), positions: player.positions })),
   );
@@ -820,6 +847,7 @@ export function aggregateSeason(input: SeasonInput): SeasonStats {
     topOutfieldMinutes,
     scoringRate,
     assistRate,
+    decisiveRate,
     impact,
     isEmpty,
     pendingRatingMatches: input.pendingRatingMatches ?? 0,

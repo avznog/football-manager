@@ -2625,3 +2625,11 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       invisible to `getFieldedMemberIds`. No re-freeze: sheet roles are counted from `match_squad`
       (`aggregate.ts` rule 4). 13 new tests on the pure rules; add, remove and the already-voted
       refusal all exercised in the browser at 390 px in both themes and both roles
+- [x] **« Les plus décisifs » on `/stats`: goals and assists per minute on the pitch** — 2026-10-21.
+      Decision **212**, at the owner's request. No new arithmetic: `minutesPerEventBoard` is already
+      generic, and decision 203 had settled the denominator as the **outfield** minutes, so it is
+      `goals + assists` over the figure the two neighbouring boards use. Worded « action décisive »
+      because it counts contributions, not goals — a goal and the pass before it are two actions, so
+      the card's total can exceed the team's score. **Raw, not smoothed** (decision 177): on the demo
+      season Rayan's 2 in 60′ leads Karim's 9 in 360′. A minimum record would be a threshold on this
+      board, not a return to smoothing

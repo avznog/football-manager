@@ -8606,3 +8606,39 @@ the first version read `team_members.shirt_name` directly for the refusal messag
 « **Cette personne** a déjà donné ses notes » for everybody with no shirt name, which is most of the
 squad. Names come from `getCompositionMembers`, which coalesces onto the display name like every other
 screen. Nothing failed; it just said the wrong thing to the one person reading it.
+
+## 212 — « Les plus décisifs »: goals and assists added up, over the outfield minutes
+
+**2026-10-21.** The owner asked for a ranking of the most decisive players: goals plus decisive
+passes, divided by the minutes played on the pitch, per player.
+
+It needed no arithmetic of its own. `minutesPerEventBoard` is already generic over a count and a
+denominator, and decision 203 had already settled what the denominator is for a board about what a
+player *did*: his **outfield** minutes, because time in goal is not time in which he could have
+scored. So the card is `goals + assists` over the figure the two neighbouring boards already use, and
+every caveat on `scoringRate` carries over unchanged — including the honest one, that
+`match_player_stats` holds `goals` and `assists` but never « a pass given while in goal », so a
+keeper's goal kick turned assist still counts against his outfield minutes.
+
+**Why a third card rather than a column on the other two.** A winger who scores little and assists
+constantly, and a striker who does the reverse, both read as ordinary on the two single boards and
+lead this one; a man who does a little of each is second on both and last here. That reordering is the
+reason it exists, and it is pinned by a test that checks all three positions rather than asserting one
+number.
+
+**It counts contributions, not goals, and the wording has to carry that.** A goal and the pass before
+it are two actions, so one of the team's goals can add one to each of two players and the card's total
+can legitimately exceed the score. Hence « action décisive » — « 1 action déc. toutes les 30′ » — with
+the subtitle spelling out « 1 but ou passe décisive », because the sum is the whole definition and
+nothing else on the screen states it.
+
+**Raw, not smoothed, and the consequence is visible on the demo season.** Rayan leads with 2 actions
+in 60′ ahead of Karim's 9 in 360′. That is decision 177's rule for these cards, kept deliberately
+rather than re-litigated: the two numbers a reader sees are the two numbers the order comes from, and
+a smoothed figure on a card with no room to explain it was what 177 removed. The équipe type is where
+shrinkage belongs (decisions 187, 205), because there a model reads the raw record beside it and is
+told to distrust a short one. If the owner wants a minimum record here, it is a threshold on this
+board and not a return to smoothing.
+
+Placed last of the three frequency cards: a reader who wanted to know who scores has already found it
+above, and this answers the different question « qui pèse ».

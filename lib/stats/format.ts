@@ -321,6 +321,21 @@ export const ASSIST_WORDS_FR: EventWordsFr = {
   none: "aucune passe déc.",
 };
 
+/**
+ * « 1 action déc. toutes les 18′ » · « 5 actions déc. en 90′ » · « aucune action déc. ».
+ *
+ * « action décisive » rather than « but ou passe », because the board counts a *contribution* and not
+ * a goal: a goal and the pass before it are two actions, so one of the team's goals can add one to
+ * each of two players, and the total on this card is legitimately larger than the team's score
+ * (decision 212). Abbreviated for the same reason as the assists — the figure sits in a 110 px column
+ * at 390 px.
+ */
+export const DECISIVE_WORDS_FR: EventWordsFr = {
+  one: "action déc.",
+  many: "actions déc.",
+  none: "aucune action déc.",
+};
+
 /** `1.24` → `+1,2`, `-0.04` → `0,0`: a goal difference per 60, signed, one decimal. */
 export function formatSignedDecimal(value: number): string {
   const rounded = Math.round(value * 10) / 10;
