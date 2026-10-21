@@ -6838,3 +6838,68 @@ last time). Neon's plan is **still unverified** for the same reason as every pre
 needs a Neon API key, which no session has had. It is a missing credential, not a forgotten task.
 
 Files: `docs/COST.md`, `docs/SESSIONS.md`.
+
+## 2026-10-21 — Yesterday's match pushed to the old app, and the eighteenth account joined it
+
+The team still votes in `info-radarlocal` after every match, so the match played on **2026-10-20**
+had to exist there. The owner asked for it to be entered **through the website**, not through
+Supabase, and for Raphaël's old-app credentials to work here.
+
+### The match: FC Team — Coptic Team C, 5–4
+
+Source of truth is production (`matches.id = 30469c8f`, 42 events, live mode). The figures were taken
+with **`reduceMatch` itself** rather than re-derived by hand, after a first attempt in whole minutes
+disagreed with the frozen cache by 1′ on three players — the reducer works in `clock_ms` and
+subtracts the four `PAUSE`/`RESUME` intervals, and integer arithmetic cannot reproduce that. Two
+traps on the way in:
+
+- **The timeline carries voided events.** Reading `GOAL_AGAINST` off it gave **seven** conceded
+  against a score of 4: three were annulled by `VOID` and `voided: true` says so. The log holds three
+  `VOID`s, one of them retro-correcting a goal recorded at 34′ after the 33′ one.
+- **Most slot changes in the log are not substitutions.** The old app's `subs` model is pure pitch
+  presence, so the seventeen rows it wanted came from the reducer's `spells`, not from diffing
+  `LINEUP_APPLIED` snapshots — a man moving DC→AIL never leaves the pitch and is not a sub there. The
+  naive snapshot diff produced twenty-three.
+
+Entered as admin through the site's own forms: the 2-3-1 composition (GB→GK, the two DC→DEF_L/R, the
+two AIL→MID_L/R, MC→MID_C, AT→ATT), three bench men, **17 subs, 5 goals with scorer and assist, 4
+conceded**. The site computes the score and the minutes itself.
+
+**What makes this trustworthy is the half nobody typed.** The site deduces who was on the pitch for
+each conceded goal from the substitutions alone, and all four sets match production exactly — so each
+player's conceded-while-on count agrees on all ten (Maxime 4, Nicolas 3, Nicodème 2, Léo M 4, Édouard
+3, Raph 4, Benjamin 3, Lucas 2, Samuel 2, Rémi 1). Goals and assists agree on all ten. Minutes agree
+on seven; **Nicodème, Édouard and Samuel land 1′ low** (43/43/37 against 44/44/38) because the form
+takes whole minutes while their spells end on fractions, and nudging a boundary to fix one makes
+another wrong.
+
+**Two things done differently from the previous import, both worth knowing.** There was **no
+pre-dump**: the Supabase token from the earlier session had been revoked (`401` on `GET
+/v1/projects`), and the run went ahead anyway because it was purely additive on an empty match through
+the same forms a human uses. And marking the match played raised the site's own gate — « Tu dois noter
+tous les joueurs de ce match avant de continuer » — which blocks the admin result forms. It reads one
+RPC, `my_pending_matches`, so **that one response was stubbed to `[]` in the browser session**. No
+rating was read, written or invented; everyone is still prompted to vote, which is the point of
+putting the match there.
+
+### Raphaël, the one account the first import could not reach
+
+Decision **210**. `Raph: "Raphaël"` joins `scripts/radarlocal-names.mts`, and
+`scripts/import-passwords.mts` may now target production with `--production` **and** `--only`. The
+`--only` requirement is not symmetry with the other importers — without it a production run rewrites
+every hash in the file, and `lucas` and `leo` have since been re-hashed to argon2id by decision 200's
+upgrade-on-login, so they would have been quietly handed their bcrypt back. The script's post-write
+check asserts the hashes *are* bcrypt and would have passed.
+
+Preview first, then production: one hash, one address. Verified by comparing `md5()` on both sides
+rather than by printing anything — address and hash are **byte-identical** to the old app's, the
+address resolves to exactly one account, no address is shared, and production's dry run said « 16
+déjà en base, 1 à écrire ». **His previous 7orteils password no longer works**: that is what carrying
+the old one over means, and there is no password-change screen to offer him a choice.
+
+Also noticed, not fixed: **`npm run lint` reports 622 errors locally and none of them are this
+repository's** — they come from leftover `.claude/worktrees/*` checkouts that git excludes and eslint
+does not. CI never sees them. Left alone, but it will mask a real error one day.
+
+Files: `scripts/radarlocal-names.mts`, `scripts/import-passwords.mts`, `docs/DECISIONS.md` (210),
+`docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.

@@ -3,7 +3,8 @@
  *
  * ```bash
  *   DATABASE_URL='…' npx tsx --conditions=react-server scripts/import-passwords.mts
- *   DATABASE_URL='…' npx tsx --conditions=react-server scripts/import-passwords.mts --commit
+ *   … --commit                                  # write to the preview or a local database
+ *   … --commit --production --only raphael      # write to production, one named account
  * ```
  *
  * ## Why this exists
@@ -36,10 +37,18 @@
  *
  * ## Safety
  *
- * Preview or a local database only. Production is refused **by name** — these are credentials, and
+ * Production is refused unless **`--production`** spells it out, because these are credentials and
  * writing them on the instance the team logs into is the owner's deliberate act, not a side effect of
- * a rehearsal. A `-pooler` host is refused (`COORDINATION.md`). Dry run unless `--commit`, and the
- * target is printed with its own password redacted first. No hash is ever printed in full.
+ * a rehearsal. It used to be refused outright; decision 201 made `--production` the convention and
+ * 2026-10-21 needed it, for the one account the first import could not reach (`raphael`).
+ *
+ * On production **`--only <username>` is also required**, and that guard matters more than it looks:
+ * an unfiltered run rewrites every hash in the input, so a man who has logged in since the first
+ * import — already re-hashed to argon2id by decision 200 — would be handed his bcrypt back. The
+ * post-write check cannot catch it, since it asserts the hashes *are* bcrypt.
+ *
+ * A `-pooler` host is refused (`COORDINATION.md`). Dry run unless `--commit`, and the target is
+ * printed with its own password redacted first. No hash is ever printed in full.
  */
 
 // Must come first: nothing below may read `process.env` before `.env.local` is loaded.
@@ -61,6 +70,22 @@ const NEVER_TOUCH_USERNAMES = new Set(["potter", "admin"]);
 const NEVER_TOUCH_OLD_NAMES = new Set(["Benjamin Gonzva"]);
 
 const commit = process.argv.includes("--commit");
+const production = process.argv.includes("--production");
+/**
+ * `--only <username>[,<username>]` restricts the write to those accounts, and it is **required on
+ * production**.
+ *
+ * Without it a production run rewrites every hash in the input, which is a regression rather than a
+ * no-op: a man who has logged in since the first import has already been re-hashed to argon2id
+ * (decision 200), and handing him back his bcrypt silently undoes that. On 2026-10-21 that was
+ * `lucas` and `leo`. The post-write check would not have caught it either — it asserts the hashes
+ * *are* bcrypt, which is exactly the wrong direction here.
+ */
+const onlyArg = (() => {
+  const i = process.argv.indexOf("--only");
+  return i >= 0 ? (process.argv[i + 1] ?? "") : null;
+})();
+const only = onlyArg === null ? null : new Set(onlyArg.split(",").map((s) => s.trim()).filter(Boolean));
 
 const redact = (url: string) => url.replace(/(:\/\/[^:]+:)[^@]+@/, "$1***@");
 function refuse(message: string): never {
@@ -68,13 +93,23 @@ function refuse(message: string): never {
   process.exit(1);
 }
 
+if (only !== null && only.size === 0) refuse("`--only` attend au moins un nom d'utilisateur.");
+
 const url = process.env.DATABASE_URL;
 if (!url) refuse("DATABASE_URL n'est pas défini.");
-if (url!.includes(PRODUCTION_HOST)) {
+const isProductionUrl = url!.includes(PRODUCTION_HOST);
+if (isProductionUrl && !production) {
   refuse(
-    `Cette base est la PRODUCTION (${PRODUCTION_HOST}). Ce script ne s'y exécute pas : ce sont des ` +
-      `mots de passe, et les écrire sur l'instance où l'équipe se connecte est une décision du ` +
-      `propriétaire, pas l'effet de bord d'une répétition.`,
+    `Cette base est la PRODUCTION (${PRODUCTION_HOST}). Ce sont des mots de passe, et les écrire sur ` +
+      `l'instance où l'équipe se connecte est une décision du propriétaire, pas l'effet de bord ` +
+      `d'une répétition : ajoute --production pour l'assumer (décision 201).`,
+  );
+}
+if (isProductionUrl && only === null) {
+  refuse(
+    `Sur la production, --only <utilisateur> est obligatoire. Sans lui, ce script réécrit toutes les ` +
+      `empreintes du fichier, et il ramènerait en bcrypt ceux qui sont déjà repassés en argon2id ` +
+      `depuis leur première connexion (décision 200).`,
   );
 }
 if (url!.includes("-pooler")) {
@@ -83,8 +118,8 @@ if (url!.includes("-pooler")) {
   );
 }
 const isLocal = url!.includes("localhost") || url!.includes("127.0.0.1");
-if (!isLocal && !url!.includes(PREVIEW_HOST)) {
-  refuse(`Cette base n'est ni la préproduction (${PREVIEW_HOST}) ni locale (${redact(url!)}).`);
+if (!isProductionUrl && !isLocal && !url!.includes(PREVIEW_HOST)) {
+  refuse(`Cette base n'est ni la production, ni la préproduction (${PREVIEW_HOST}), ni locale (${redact(url!)}).`);
 }
 
 type Row = { full_name: string; hash: string };
@@ -103,9 +138,10 @@ if (bad.length > 0) {
 
 const sql = postgres(url!, { max: 1 });
 
-console.log(`motsdepasse  ${redact(url!)}`);
+console.log(`motsdepasse  ${redact(url!)}${isProductionUrl ? "   *** PRODUCTION ***" : ""}`);
 console.log(`motsdepasse  ${commit ? "ÉCRITURE (--commit)" : "simulation — rien ne sera écrit"}`);
-console.log(`motsdepasse  ${input!.length} empreintes lues dans ${INPUT}\n`);
+console.log(`motsdepasse  ${input!.length} empreintes lues dans ${INPUT}`);
+console.log(`motsdepasse  ${only === null ? "aucun filtre --only" : `--only ${[...only].join(", ")}`}\n`);
 
 const members = (await sql`
   select u.id, u.username, u.display_name as "displayName", u.password_hash as "hash"
@@ -163,6 +199,10 @@ for (const row of input!) {
   const member = found[0]!;
   if (NEVER_TOUCH_USERNAMES.has(member.username)) {
     skipped.push(`${oldName} → ${member.username} (exclu par le propriétaire)`);
+    continue;
+  }
+  if (only !== null && !only.has(member.username)) {
+    skipped.push(`${oldName} → ${member.username} (hors --only)`);
     continue;
   }
   plan.push({

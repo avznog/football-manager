@@ -1,7 +1,7 @@
 # COST.md — what this project has cost, and what that number is not
 
-Measured on **2026-10-21**, with `main` at `23863e2` (version `1.1.2`, 215 commits, 210 merged pull
-requests, 105 444 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
+Measured on **2026-10-21** (second pass, after the old-app import), with `main` at `bb3e987`
+(version `1.1.2`, 216 commits, 211 merged pull requests, 105 613 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
 2026-09-22 and its first commit landed on 2026-09-23, so everything below covers **twenty-nine days**.
 
 **The headline, and read the next sentence with it: $2113.87.** That is the cost of the model tokens
@@ -54,9 +54,9 @@ reason); a long-lived session merely under-reports its tail instead.
 Divided by what it bought, which is the only form of this number that is any use when deciding
 whether to spend more:
 
-- **$9.83 per commit** (215) — the Linux machine alone was $7.37
-- **$10.07 per merged pull request** (210) — the first time this project has crossed ten dollars a PR
-- **$0.0200 per line** of committed TypeScript, SQL, CSS and Markdown — two cents exactly, up from 1.84
+- **$9.79 per commit** (216) — the Linux machine alone was $7.33
+- **$10.02 per merged pull request** (211) — just over ten dollars a PR, first crossed earlier today
+- **$0.0200 per line** of committed TypeScript, SQL, CSS and Markdown — two cents, up from 1.84
 - **$72.89 per day** across the twenty-nine days — was $77.20 on 2026-10-16
 
 ### Against the last snapshot, which is the only way to read the trend
@@ -77,6 +77,12 @@ optimise and the per-day one is worth watching.
 
 The rate per line held up better than the rate per commit because the two commits in that window were
 large: the clock fix alone is 833 lines, over half of them tests.
+
+**Re-measured later the same day, after the old-app import: the total did not move at all.**
+`7054d16c` still reads $1297.08, while the denominators gained a commit, a merged pull request and
+169 lines — so the rates eased to $9.79 per commit and $10.02 per PR. This is the lazy-flush
+behaviour described below rather than free work, and that session's tail is the known hole in the
+table: it is the session writing this file.
 
 **Every comparison in this section is the Linux machine against itself**, because that is the only
 machine any of these snapshots was taken on. The macOS figure cannot be split across that date: a `cost-state` record
@@ -124,10 +130,10 @@ printed **$0.00** with every appearance of a measurement.
 
 | | Linux | macOS | both |
 |---|---|---|---|
-| output | 8 558 913 | 3 839 367 | 12 398 280 |
-| cache write | 108 867 494 | 15 627 673 | 124 495 167 |
-| cache read | 1 969 289 958 | 638 846 352 | 2 608 136 310 |
-| input, uncached | 21 010 | 12 432 | 33 442 |
+| output | 8 811 365 | 3 839 367 | 12 650 732 |
+| cache write | 110 130 750 | 15 627 673 | 125 758 423 |
+| cache read | 2 012 772 668 | 638 846 352 | 2 651 619 020 |
+| input, uncached | 21 602 | 12 432 | 34 034 |
 
 The **Linux column is today's run**, all four rows. The **macOS column is the 2026-10-14
 measurement**, carried over and not re-derived, because only the machine the script runs on can be

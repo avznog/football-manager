@@ -2594,3 +2594,24 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       added time shows « +0 » beside an announced « 5'+1 ». Pre-existing and unrelated to decision
       209; found while looking at the overrun clock. One of the two has to give — the label's ceil is
       the one football uses, so the badge is the side to change
+- [x] **Raphaël can log in with the address and password he uses on the old app** — 2026-10-21.
+      Decision **210**. He was the one man decisions 200 and 208 could not reach, because he had no
+      old-app account when they ran; the owner created him there on 2026-10-21. `Raph: "Raphaël"`
+      joins the shared name table and `scripts/import-passwords.mts` gained `--production` plus a
+      **mandatory `--only`** on production — without it the run would have handed `lucas` and `leo`
+      their bcrypt back, undoing the argon2id upgrade they had earned by logging in. Preview first,
+      then one hash and one address on production, both verified byte-identical to the old app's by
+      comparing `md5()` rather than printing them. **His previous 7orteils password stops working**,
+      which is what carrying the old one over means
+- [x] **The 2026-10-20 match is in `info-radarlocal`, so the team can vote on it** — 2026-10-21.
+      Entered through the website as the owner asked, not through Supabase: 2-3-1 compo, 17
+      substitutions, 5 goals with scorer and assist, 4 conceded, **5–4**. The figures came from
+      `reduceMatch` rather than hand arithmetic — whole minutes disagreed with the frozen cache on
+      three players because the reducer subtracts the `PAUSE` intervals in `clock_ms`. The check worth
+      keeping: the site deduces who was on the pitch for each conceded goal from the substitutions
+      alone, and **all four sets match production**, so conceded-while-on agrees on all ten men
+- [ ] **`npm run lint` is unusable locally: 622 errors, none from this repository.** They come from
+      leftover `.claude/worktrees/*` checkouts, which `.git/info/exclude` hides from git and nothing
+      hides from eslint. CI is unaffected — it has no worktrees — so this is a local-only defect, but
+      a run whose output is 9 650 problems long is a run nobody reads, and it will hide a real error.
+      Either ignore the directory in the eslint config or stop leaving worktrees inside the repo

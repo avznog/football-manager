@@ -8505,3 +8505,46 @@ cost two minutes gets run when it is the thing that would actually prove the cha
 change it proves.
 
 ---
+
+## 210 — A credential import on production writes one named account, and the name table finally knows Raphaël
+
+**2026-10-21.** Decision 200 carried `info-radarlocal`'s bcrypt hashes over so the team could keep the
+passwords they knew, and decision 208 made the old app's address a second name for the same account.
+Both left exactly one man out, and the sessions log said why: `raphael` **did not exist in the old app
+at all**, so his hash stayed production's own argon2id and he was the only non-admin account in the
+table with no e-mail. The owner created him over there on 2026-10-21 and asked that the address and
+password he uses on the old app work here too.
+
+So `scripts/radarlocal-names.mts` gains `Raph: "Raphaël"`. That table is a judgement, not a
+computation — it exists because « Leo COACH » and « Léo Montpre » are two different men — and « Raph »
+is safe to add for the reason the two Léos are not: it is a prefix of no other name in it.
+
+**The part that is a decision rather than a line of data: `scripts/import-passwords.mts` may now run
+on production, but only with `--production` *and* `--only <username>`.**
+
+It used to refuse production outright, which was right when it was written and wrong by the time one
+man needed it: decision 201 had since made `--production` the convention for exactly this, and
+`scripts/import-emails.mts` already worked that way. Refusing outright would have meant doing it by
+hand in ad-hoc SQL, which is the thing these scripts exist to avoid.
+
+`--only` is the guard that matters, and it is not symmetry with the other scripts — it is a defect
+this change would otherwise have introduced. **An unfiltered production run rewrites every hash in
+the input file.** By 2026-10-21 `lucas` and `leo` had logged in and been silently re-hashed to
+argon2id, exactly as decision 200 designed; handing them their bcrypt back would have undone that for
+both. It would have worked — same password, re-upgraded on their next login — and it would have been
+a silent regression on two accounts nobody asked about. The script's own post-write check could not
+have caught it either: it asserts the written hashes **are** bcrypt, which here is precisely the wrong
+direction. So production requires naming who is being touched, and the run that followed named one
+man and reported the other sixteen as « hors --only ».
+
+**What was verified rather than assumed.** Both production values are byte-identical to the old app's
+— compared as `md5()` on each side, so no address and no hash was printed to do it. His address
+resolves to exactly one account, and no address in the table is shared. The e-mail import's dry run
+on production listed **sixteen « déjà en base » and one « à écrire »**, which is the convergence
+property doing the work of a diff: a script that would have disturbed anybody else could not have
+printed that.
+
+**The consequence to state plainly: his previous 7orteils password no longer works.** Replacing the
+hash is what « his old-app password works here » means, and there is no password-change screen
+(`docs/ROADMAP.md`, `A1`) to offer him a choice. He has one password across both apps now, which is
+what was asked for, and it becomes argon2id again the first time he uses it.
