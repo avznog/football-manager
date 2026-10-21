@@ -14,9 +14,15 @@
  */
 
 import { Card } from "@/components/ui/card";
-import type { MinutesPerEventBoard } from "@/lib/stats/aggregate";
+import type { DecisiveBoard, MinutesPerEventBoard } from "@/lib/stats/aggregate";
 import type { ConcededRateBoard } from "@/lib/stats/impact";
-import { concededRateFr, eventRateFr, type EventWordsFr } from "@/lib/stats/format";
+import {
+  concededRateFr,
+  DECISIVE_WORDS_FR,
+  decisiveRecordFr,
+  eventRateFr,
+  type EventWordsFr,
+} from "@/lib/stats/format";
 
 import { CardEmpty, RankedRows } from "./parts";
 
@@ -86,6 +92,45 @@ export function EventRateBoard({
         entries={board.entries}
         value={(entry) => eventRateFr(entry.count, entry.minutes, words).rate}
         detail={(entry) => eventRateFr(entry.count, entry.minutes, words).record}
+      />
+    </Card>
+  );
+}
+
+/**
+ * « Les plus décisifs » — his goals *and* his passes over the same outfield minutes (decision 212).
+ *
+ * Its own component rather than an `EventRateBoard` with a flag, because it differs from that board in
+ * both halves of a row. The figure is the same « 1 action déc. toutes les X′ », but the record under it
+ * is a **breakdown** — « 2 buts et 1 passe décisive en 120′ » — and the board carries no zero rows at
+ * all: a man with neither is absent, where the goal and pass boards keep him at the bottom. Two
+ * differences is one too many for a boolean.
+ */
+export function DecisiveRateBoard({
+  title,
+  description,
+  board,
+  emptyMessage,
+}: {
+  title: string;
+  description: string;
+  board: DecisiveBoard;
+  emptyMessage: string;
+}) {
+  if (board.entries.length === 0) {
+    return (
+      <Card title={title} description={description} as="h3">
+        <CardEmpty>{emptyMessage}</CardEmpty>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title={title} description={description} as="h3" flush>
+      <RankedRows
+        entries={board.entries}
+        value={(entry) => eventRateFr(entry.count, entry.minutes, DECISIVE_WORDS_FR).rate}
+        detail={(entry) => decisiveRecordFr(entry.goals, entry.assists, entry.minutes)}
       />
     </Card>
   );

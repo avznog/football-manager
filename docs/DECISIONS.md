@@ -8642,3 +8642,32 @@ board and not a return to smoothing.
 
 Placed last of the three frequency cards: a reader who wanted to know who scores has already found it
 above, and this answers the different question « qui pèse ».
+
+### Amended the same day, at the owner's request
+
+Two changes, both on the row rather than on the arithmetic.
+
+**The record under the rate is the breakdown, not the sum**: « 2 buts et 1 passe décisive en 120′ »
+where it used to read « 3 actions déc. en 120′ ». The sum cannot be unpacked back into the two numbers,
+and the two numbers are what the card is for — it sits under a goal board and a pass board, and the
+question it adds is which of the two a man is made of. Karim reading « 3 buts et 6 passes décisives en
+360′ » says something « 9 actions déc. » does not.
+
+**Both terms are printed even at zero** — « 0 but et 4 passes décisives ». On its own that reads oddly;
+in a column it reads well, because every row parses the same way and the goals and the passes line up
+down the card. French takes the singular after zéro, so this is not `plural()` twice over. It also
+means `minutesPerEventBoard`'s `EventWordsFr.none` is unused here, which is why the board got its own
+component rather than a flag on `EventRateBoard`.
+
+**A man with no decisive action is dropped from the board entirely.** This is the one place the card
+parts company with its two neighbours, and the difference is deliberate on both sides: they keep their
+zero rows because « aucun but marqué » over the minutes it did not happen in is a real record and a man
+who has played five matches without scoring is somewhere rather than nowhere (decision 197). Here the
+row has nothing left to say — the detail line is a breakdown, and the breakdown of nothing is « 0 but
+et 0 passe décisive », which is noise in a list whose whole subject is who contributed. So the empty
+state changes meaning too: « personne n'a encore marqué ni fait marquer », about the team, where the
+neighbours say « personne n'a encore de minutes sur le terrain », about the denominator.
+
+The ordering is still `minutesPerEventBoard`'s, by delegation rather than a second comparator: the
+integer `minutes × other's count` comparison and its tie-breaks are subtle enough that two copies
+would eventually disagree.
