@@ -6903,3 +6903,49 @@ does not. CI never sees them. Left alone, but it will mask a real error one day.
 
 Files: `scripts/radarlocal-names.mts`, `scripts/import-passwords.mts`, `docs/DECISIONS.md` (210),
 `docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.
+
+### Naming a supporter after the final whistle
+
+Decision **211**, and it came out of the old-app work above: the owner asked why Léo C is never asked
+to vote in `info-radarlocal`, and the answer was that its gate joins on his having a row on the match
+sheet, which nobody adds before kick-off. **This app had the same hole from the other end.** The vote
+belongs to whoever the sheet names (decision 159), supporter is the only mark a non-player can carry
+(decision 096) — and the sheet could only be written with the starting composition, by a form that
+refuses a finished match. So the man who turned up and watched could not be named afterwards.
+
+« Supporters » now sits on the match page under the notes, coach-only (`match:selectSquad`, the same
+permission as selecting the squad before kick-off — naming somebody is writing the sheet, not amending
+the log). Add and remove, no confirmation dialog: the form above puts him back, and
+**`match_squad` is not append-only — only `match_events` is**, so deleting the row is the honest undo.
+
+**The trap worth remembering is `playedMatch`.** It has to come from the reducer. The obvious instrument
+is `getFieldedMemberIds`, which reads the slots of *applied* compositions — but most of a live match's
+changes are made on the spot in game mode and carry no `lineup_id` at all. On the 2026-10-20 match that
+was most of the seventeen changes, so a man who came on that way would have been offered as « did not
+play » and could have been marked a supporter of a match he played 37 minutes of.
+
+No re-freeze, which is unusual for a retroactive change here: sheet roles are counted straight from
+`match_squad` and never from the frozen cache (`lib/stats/aggregate.ts` rule 4), so the season table is
+right on the next read and `match_player_stats` is not involved.
+
+The rules are pure in `lib/composition/supporters.ts` with **13 tests**, because what matters is who
+gets refused and an action that touches the database cannot be tested for that. The page and the action
+share `toSupporterCandidates`: they derive « who played » differently — the action reduces the log, the
+page reuses the recap it already reduced — and sharing the mapping is what stops the screen offering a
+name the action rejects.
+
+**Found by looking, not by a test:** the refusal first read `team_members.shirt_name` directly and said
+« Cette personne a déjà donné ses notes » for everybody with no shirt name, which is most of the squad.
+Names now come from `getCompositionMembers`, which coalesces onto the display name like every other
+screen. Nothing failed — it just told the one person reading it the wrong thing.
+
+Gates: typecheck clean, eslint clean on every changed file, `npm test` **1654 passed** (1641 → +13).
+Looked at on a **390 px** viewport in light and dark, as the coach and as a player: the card is absent
+for the player, and add / remove / the already-voted refusal were each exercised in the browser rather
+than inferred. A separate `football_review` database was seeded for it, because the local
+`football_prod` holds a copy of the real team and `db:reset` would have destroyed it.
+
+Files: `lib/composition/supporters.ts` (new), `lib/composition/supporters.test.ts` (new),
+`lib/composition/actions.ts`, `lib/composition/validation.ts`,
+`app/(app)/match/[id]/_components/supporters-card.tsx` (new), `app/(app)/match/[id]/page.tsx`,
+`docs/DECISIONS.md` (211), `docs/ROADMAP.md`, `docs/SESSIONS.md`.

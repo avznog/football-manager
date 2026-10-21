@@ -2615,3 +2615,13 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       hides from eslint. CI is unaffected — it has no worktrees — so this is a local-only defect, but
       a run whose output is 9 650 problems long is a run nobody reads, and it will hide a real error.
       Either ignore the directory in the eslint config or stop leaving worktrees inside the repo
+- [x] **Somebody who did not play can be named supporter after the match, so he can note it** —
+      2026-10-21. Decision **211**. The vote belongs to whoever the sheet names (159) and supporter is
+      the only mark a non-player can carry (096), but the sheet was only writable with the starting
+      composition and `saveLineup` refuses a finished match. « Supporters » now sits on the match page
+      under the notes, coach-only, add and remove. Four refusals: already on the sheet, played,
+      already voted (on removal), match not finished. **`playedMatch` comes from the reducer, not from
+      the planned compositions** — a man who came on in game mode carries no `lineup_id` and is
+      invisible to `getFieldedMemberIds`. No re-freeze: sheet roles are counted from `match_squad`
+      (`aggregate.ts` rule 4). 13 new tests on the pure rules; add, remove and the already-voted
+      refusal all exercised in the browser at 390 px in both themes and both roles
