@@ -1031,6 +1031,71 @@ describe("a first half that ran long", () => {
     expect(state.anomalies).toEqual([]);
   });
 
+  /**
+   * The question period-relative display invites, and the one that would be a real corruption rather
+   * than a wrong label: a goal conceded in the first half's added time reads « 30’+2 », and the second
+   * half also starts at a displayed « 30’ ». Is it charged to the men who were on the pitch for it, or
+   * to the ones who came on afterwards?
+   *
+   * It is charged correctly, and the reason is that **only the labels moved**. `clock_ms` is real
+   * elapsed and strictly increasing, so the stoppage goal sits at 32′00″, the half-time composition
+   * at 33′40″ and the second-half kick-off at 33′40″ — the goal is before both, and `concededWhileOn`
+   * reads the pitch as it was. Léo, who comes off at half-time, is charged; Yanis, who replaces him,
+   * is not.
+   *
+   * `nextEventStamp`'s `Math.max` is what keeps that ordering, and decision 209 left it alone for this
+   * reason — but **not for the reason first written here.** Storing the kick-off at the nominal 30′00″
+   * was measured rather than reasoned about, and it does not move the goal onto the second half's
+   * eleven: the kick-off then sorts before both the 32′ goal and the 33′40″ period end, so the reducer
+   * reports `kickoff-while-in-play` and ignores it, and the second half never starts at all. Léo still
+   * carries the goal. The failure is louder than a misattribution and it is the one decision 209
+   * describes; the attribution itself is protected by the composition change sitting at 33′40″, after
+   * the goal, whatever the kick-off says.
+   */
+  it("charges a goal conceded in added time to the first half's pitch, not the second's", () => {
+    const WITH_CONCEDED = log([
+      { type: "KICKOFF", min: 0, period: 1 },
+      { type: "LINEUP_APPLIED", min: 0, period: 1, payload: lineupPayload(STARTING_ELEVEN) },
+      // « 30’+2 » on screen, 32′00″ in the database, first half.
+      { type: "GOAL_AGAINST", min: 32, period: 1 },
+      { type: "PERIOD_END", min: 33, sec: 40, period: 1 },
+      {
+        type: "LINEUP_APPLIED",
+        min: 33,
+        sec: 40,
+        period: 1,
+        payload: lineupPayload({ ...STARTING_ELEVEN, [SLOT.mc1]: "yanis" }),
+      },
+      { type: "KICKOFF", min: 33, sec: 40, period: 2 },
+      // « 38’ » on screen, 41′40″ stored, second half: this one is Yanis's to carry.
+      { type: "GOAL_AGAINST", min: 41, sec: 40, period: 2 },
+      { type: "PERIOD_END", min: 63, sec: 40, period: 2 },
+      { type: "FINAL_WHISTLE", min: 63, sec: 40, period: 2 },
+    ]);
+    const conceded = reduceMatch(WITH_CONCEDED, [], CONFIG);
+    const concededBy = (memberId: string) => playerState(conceded, memberId)!.concededWhileOn;
+
+    // Léo played only the first half, so the stoppage goal is his and the second-half one is not.
+    expect(concededBy("leo")).toBe(1);
+    // Yanis played only the second half: he carries that goal and none of the added time's.
+    expect(concededBy("yanis")).toBe(1);
+    // Hugo played throughout, so he carries both — which is what makes the two above a partition and
+    // not two readings of the same goal.
+    expect(concededBy("hugo")).toBe(2);
+    expect(conceded.goalsAgainst).toBe(2);
+
+    // The labels are the ambiguous-looking pair, and they are the reason the question gets asked.
+    const labels = conceded.timeline
+      .filter((entry) => entry.type === "GOAL_AGAINST")
+      .map((entry) => entry.minuteLabel);
+    expect(labels).toEqual(["30’+2", "38’"]);
+
+    // The clean-sheet minutes agree, which is the same fact read from the other side: Léo's sheet was
+    // clean for the 32 minutes before the goal, not for the 33′40″ he was on.
+    expect(playerState(conceded, "leo")!.cleanMinutes).toBe(32);
+    expect(conceded.anomalies).toEqual([]);
+  });
+
   it("reads the live bar from 30′ while that second half runs", () => {
     // Two minutes of wall clock after the second-half kick-off.
     const live = reduceMatch(LATE.slice(0, 7), [], {

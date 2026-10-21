@@ -7028,3 +7028,36 @@ of the full squad.
 Files: `lib/stats/aggregate.ts`, `lib/stats/aggregate.test.ts`, `lib/stats/format.ts`,
 `lib/stats/format.test.ts`, `app/(app)/stats/_components/rate-board.tsx`, `app/(app)/stats/page.tsx`,
 `docs/DECISIONS.md` (212, amended), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+### Checking the question decision 209 invites: who is charged for a goal in added time
+
+The owner asked it directly: a goal conceded at « 30’+2 » in the first half, when the second half also
+starts at a displayed « 30’ » — is it charged to the men who were on the pitch for it, or to the ones
+who came on afterwards?
+
+**It is charged correctly, and it always was.** The test is new, the behaviour is not: decision 209
+moved labels only, and `clock_ms` is real elapsed and strictly increasing, so the stoppage goal sits at
+32′00″ and the half-time composition at 33′40″. The goal is before the change, so `concededWhileOn`
+reads the pitch as it was. Pinned now in `lib/match/reducer.test.ts`: Léo, off at half-time, carries
+the added-time goal and not the second half's; Yanis, on at half-time, carries the second half's and
+not the added time's; Hugo played throughout and carries both, which is what makes the two a partition
+rather than two readings of one goal. Clean-sheet minutes agree from the other side — Léo's sheet was
+clean for 32 minutes, not for the 33′40″ he was on.
+
+**The comment on that test was wrong when first written, and the correction is the useful part.** It
+claimed that storing the second-half kick-off at the nominal 30′00″ would have charged the goal to the
+second half's eleven. Measured instead of assumed, that is not what happens: the kick-off then sorts
+before both the goal and the period end, the reducer reports `kickoff-while-in-play` and **ignores
+it**, and the second half never starts. Léo still carries the goal. So the `Math.max` in
+`nextEventStamp` protects against a half that never begins — decision 209's first stated reason — and
+the attribution is protected by something else entirely: the composition change sitting after the goal
+on a monotonic clock, whatever the kick-off says. A plausible claim about a mechanism, written without
+checking it; the kind this file exists to catch.
+
+**The residual, unchanged and worth naming.** A goal typed into the retro sheet as minute 30 on an
+overrun first half lands at 30′00″, which is the first half — so somebody meaning the second half's
+displayed « 30’ » (really 33′40″) would attribute it to the wrong seven. That is the same ambiguity
+already on the roadmap as the retro sheet's title/field mismatch, and it is a property of typing a real
+elapsed minute into a field whose label is a display minute, not of the live path.
+
+Files: `lib/match/reducer.test.ts`, `docs/SESSIONS.md`.
