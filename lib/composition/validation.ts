@@ -121,3 +121,10 @@ export const lineupTargetSchema = z.object({
   matchId: z.uuid(),
   lineupId: z.uuid(),
 });
+
+/** One man on one match's sheet: « nomme-le supporter », « retire-le » (decision 211). */
+export const supporterTargetSchema = z.object({
+  teamId: z.uuid(),
+  matchId: z.uuid(),
+  memberId: z.uuid(),
+});

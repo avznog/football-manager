@@ -8548,3 +8548,61 @@ printed that.
 hash is what « his old-app password works here » means, and there is no password-change screen
 (`docs/ROADMAP.md`, `A1`) to offer him a choice. He has one password across both apps now, which is
 what was asked for, and it becomes argon2id again the first time he uses it.
+
+## 211 — A supporter can be named after the final whistle, and that is the only write a finished sheet takes
+
+**2026-10-21.** The vote belongs to whoever the match sheet names — titulaire, remplaçant or
+**supporter** (decision 159) — and for somebody who did not play, supporter is the *only* thing he can
+be (decision 096: a non-player has no other mark). But the sheet is written with the starting
+composition, at minute 0, by `saveLineup`, and `saveLineup` refuses a finished match. Correctly: a
+composition is a plan for football that has not happened yet, and the refusal exists because the
+« Planifier un changement » button really did once add a plan « à partir de la 30ᵉ minute » to a match
+played the week before.
+
+So the man who turned up, watched, and is asked for his notes afterwards **could not be named
+afterwards.** The owner hit it from the other side first, in the old app: Léo C is never asked to vote
+there either, and for the same reason — `my_pending_matches` joins on his having a row on the sheet,
+and nobody adds him before kick-off.
+
+**A supporter is not a plan, and that is what makes this safe.** He changes no minute, no score, no
+position and no composition. He gains a vote and a line in his own season that reads « 1 fois
+supporter ». So `addSupporter` and `removeSupporter` are the one pair of writes `match_squad` accepts
+on a finished match, and they are deliberately the narrowest possible: one row, one role, one man.
+
+**It needs no re-freeze**, which is worth stating because every other retroactive change in this app
+does. Sheet roles are counted straight from `match_squad` and never from the frozen cache
+(`lib/stats/aggregate.ts` rule 4, because titulaire/remplaçant/supporter is what the coach wrote and
+not something the reducer can know). A row added here is in the season table on the next read, and
+`match_player_stats` is not involved at all.
+
+**Four refusals, and two of them are the interesting ones.**
+
+- *Already on the sheet*, whatever the role. Silently turning a titulaire into a supporter would take
+  minutes he actually played out of his own history.
+- *He played* — the owner's « someone who has not played, obviously ». He already has the vote for
+  having played, so the row would buy him nothing and cost the record its truth. **`playedMatch` has
+  to come from the reducer and not from the planned compositions**: most of a live match's changes are
+  made on the spot in game mode and carry no `lineup_id`, so `getFieldedMemberIds` cannot see the men
+  who came on that way — on the 2026-10-20 match that was most of the seventeen changes.
+- *He has already submitted notes*, on removal. Taking away his place takes away the vote that made
+  them admissible, so the row and the notes would disagree about whether they should exist. Those
+  notes are his judgement of his teammates and are not this control's to destroy.
+- *The match is not finished.* Before the whistle the composition screen is the path, and it names
+  supporters in the same breath as the starting seven. Two ways in would be two screens disagreeing
+  about one row.
+
+Removal is allowed at all because **`match_squad` is not append-only — only `match_events` is**
+(invariant 1). The undo for a mis-tap is deleting the row, not appending a second one that says the
+opposite, and there is no confirmation dialog because the form directly above it puts him back.
+
+The rules live in `lib/composition/supporters.ts` and are **pure**, because the thing worth testing
+here is *who is refused*, and an action that reaches the database cannot be tested for that. The
+screen and the action share `toSupporterCandidates` for the same reason: they derive « who played »
+differently — the action reduces the log, the page reuses the recap it has already reduced — and if
+they also disagreed about the mapping, the screen would offer a name the action rejects.
+
+**One defect found by looking rather than by a test**, and recorded because the class of it recurs:
+the first version read `team_members.shirt_name` directly for the refusal message, and printed
+« **Cette personne** a déjà donné ses notes » for everybody with no shirt name, which is most of the
+squad. Names come from `getCompositionMembers`, which coalesces onto the display name like every other
+screen. Nothing failed; it just said the wrong thing to the one person reading it.

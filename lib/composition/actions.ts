@@ -19,12 +19,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
-import { lineupSlots, lineups, matchSquad, matches } from "@/db/schema";
+import { lineupSlots, lineups, matchSquad, matches, ratings } from "@/db/schema";
 import type { SquadRole } from "@/db/schema";
 import { assertCan } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
 import { getTheFormation } from "@/lib/formation/queries";
+import { loadMatchState } from "@/lib/rating/queries";
 
 import {
   appliedNoticeFr,
@@ -37,10 +38,17 @@ import {
 import { getCompositionMembers, getFieldedMemberIds, getMatchLineups } from "./queries";
 import { isPlaceable, squadFromComposition } from "./squad";
 import {
+  mayAddSupporter,
+  mayRemoveSupporter,
+  toSupporterCandidates,
+  type SupporterCandidate,
+} from "./supporters";
+import {
   lineupTargetSchema,
   readBenchMarks,
   readSlotFields,
   saveLineupSchema,
+  supporterTargetSchema,
 } from "./validation";
 
 function revalidateComposition(matchId: string): void {
@@ -49,6 +57,17 @@ function revalidateComposition(matchId: string): void {
   // Game mode reads the planned compositions to propose them (M4).
   revalidatePath(`/match/${matchId}/jeu`);
   revalidatePath("/calendrier");
+}
+
+/**
+ * The screens a supporter row changes: the match page that offers the control, and the notation
+ * screen, whose « qui doit encore noter » gains or loses a name by it.
+ */
+function revalidateSupporters(matchId: string): void {
+  revalidatePath(`/match/${matchId}`);
+  revalidatePath(`/match/${matchId}/notation`);
+  revalidatePath(`/match/${matchId}/recap`);
+  revalidatePath("/statistiques");
 }
 
 /** The match, but only if it belongs to the team the form claims. */
@@ -318,4 +337,147 @@ export async function deleteLineup(formData: FormData): Promise<void> {
 
   revalidateComposition(parsed.data.matchId);
   redirect(`/match/${parsed.data.matchId}/composition`);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Supporters, after the match                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The two reads the supporter rules need, for one match.
+ *
+ * `playedMatch` comes from the reducer and not from the planned compositions, which is the whole
+ * reason this is a function rather than a join: most of a live match's changes are made on the spot
+ * in game mode and carry no `lineup_id`, so `getFieldedMemberIds` does not see the men who came on
+ * that way. Invariant 2 — the reducer is the only thing that computes who played.
+ */
+async function supporterCandidatesOf(
+  teamId: string,
+  match: Awaited<ReturnType<typeof findMatch>> & object,
+): Promise<SupporterCandidate[]> {
+  const [members, state] = await Promise.all([
+    getCompositionMembers(teamId, match.id),
+    loadMatchState({ ...match, teamId } as Parameters<typeof loadMatchState>[0]),
+  ]);
+  return toSupporterCandidates(
+    members,
+    state.players.filter((player) => player.playedMatch).map((player) => player.memberId),
+  );
+}
+
+/**
+ * Names somebody supporter on a match that is already over (decision 211).
+ *
+ * The sheet decides who has a vote (decision 159) and `saveLineup` cannot write it after the final
+ * whistle, correctly — a composition is a plan for football that has not happened. A supporter is not
+ * a plan: he changes no minute, no score and no position, he gains the vote and a « 1 fois supporter »
+ * in his own season. So this is the one write to `match_squad` that a finished match allows, and it is
+ * deliberately the narrowest possible one.
+ *
+ * `finished` only. Before the final whistle the composition screen is the path, and it says who is
+ * remplaçant and who is supporter in the same breath as the starting eleven; a second way in would be
+ * two screens disagreeing about the same row.
+ */
+export async function addSupporter(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireActor();
+
+  const parsed = supporterTargetSchema.safeParse({
+    teamId: formData.get("teamId"),
+    matchId: formData.get("matchId"),
+    memberId: formData.get("memberId"),
+  });
+  if (!parsed.success) return toFormState(parsed.error);
+  const { teamId, matchId, memberId } = parsed.data;
+
+  assertCan(actor, "match:selectSquad", { teamId });
+
+  const match = await findMatch(teamId, matchId);
+  if (!match) return { error: "Ce match n’existe pas dans cette équipe." };
+  if (match.status !== "finished") {
+    return { error: "Le match n’est pas terminé : nomme-le dans la composition de départ." };
+  }
+
+  const candidates = await supporterCandidatesOf(teamId, match);
+  const candidate = candidates.find((entry) => entry.memberId === memberId);
+  if (!candidate) return { error: "Cette personne n’est pas dans cette équipe." };
+
+  const verdict = mayAddSupporter(candidate);
+  if (verdict !== true) return { error: verdict.errorFr };
+
+  // `onConflictDoNothing` rather than a check: two taps on a slow connection are the ordinary case,
+  // and the unique key on (match, member) is what makes the second one harmless.
+  await db
+    .insert(matchSquad)
+    .values({ matchId, teamMemberId: memberId, role: "supporter" })
+    .onConflictDoNothing();
+
+  // No success message: the list of supporters on the page gains his name, which says it better than
+  // a sentence would and is the same feedback the composition screen gives for the same act.
+  revalidateSupporters(matchId);
+  return undefined;
+}
+
+/**
+ * Takes a supporter back off a finished match's sheet (decision 211).
+ *
+ * `match_squad` is not append-only — only `match_events` is (invariant 1) — so this is a real undo
+ * rather than a second row saying the opposite. It refuses once he has submitted notes: removing his
+ * place removes the vote that made them admissible, and those notes are his judgement of his
+ * teammates, not this control's to destroy.
+ *
+ * The `role` is in the delete predicate as well as in the rule, so there is no window between the
+ * check and the write in which a titulaire could be removed by this button.
+ */
+export async function removeSupporter(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireActor();
+
+  const parsed = supporterTargetSchema.safeParse({
+    teamId: formData.get("teamId"),
+    matchId: formData.get("matchId"),
+    memberId: formData.get("memberId"),
+  });
+  if (!parsed.success) return toFormState(parsed.error);
+  const { teamId, matchId, memberId } = parsed.data;
+
+  assertCan(actor, "match:selectSquad", { teamId });
+
+  const match = await findMatch(teamId, matchId);
+  if (!match) return { error: "Ce match n’existe pas dans cette équipe." };
+  if (match.status !== "finished") {
+    return { error: "Le match n’est pas terminé : modifie-le dans la composition de départ." };
+  }
+
+  // Name and role from `getCompositionMembers`, which is where every other screen gets them: it
+  // coalesces the shirt name onto the display name. Reading `team_members.shirt_name` directly here
+  // printed « Cette personne a déjà donné ses notes » for everybody who has no shirt name, which is
+  // most of the squad.
+  const [members, rated] = await Promise.all([
+    getCompositionMembers(teamId, matchId),
+    db
+      .select({ id: ratings.id })
+      .from(ratings)
+      .where(and(eq(ratings.matchId, matchId), eq(ratings.raterMemberId, memberId)))
+      .limit(1),
+  ]);
+  const member = members.find((entry) => entry.membershipId === memberId);
+  if (!member) return { error: "Cette personne n’est pas dans cette équipe." };
+
+  const verdict = mayRemoveSupporter(
+    { name: member.name, squadRole: member.squadRole },
+    rated.length > 0,
+  );
+  if (verdict !== true) return { error: verdict.errorFr };
+
+  await db
+    .delete(matchSquad)
+    .where(
+      and(
+        eq(matchSquad.matchId, matchId),
+        eq(matchSquad.teamMemberId, memberId),
+        eq(matchSquad.role, "supporter"),
+      ),
+    );
+
+  revalidateSupporters(matchId);
+  return undefined;
 }

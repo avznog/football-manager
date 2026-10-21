@@ -58,12 +58,19 @@ import { getMatch, getMatchScore, hasMatchEvents } from "@/lib/match/queries";
 import { MIN_NOTES_FOR_MEAN } from "@/lib/rating/aggregate";
 import { ratingInvitationFr } from "@/lib/rating/labels";
 import { getMatchRecap, getRatingResults } from "@/lib/rating/queries";
+import { getCompositionMembers } from "@/lib/composition/queries";
+import {
+  addableSupporters,
+  namedSupporters,
+  toSupporterCandidates,
+} from "@/lib/composition/supporters";
 import { CompositionsStrip } from "./_components/compositions-strip";
 import { FinishMatchCard } from "./_components/finish-match-card";
 import { ManOfTheMatchCard } from "./_components/man-of-the-match";
 import { MinutesTable } from "./_components/minutes-table";
 import { RatingsPanel } from "./_components/ratings-panel";
 import { Scoreboard } from "./_components/scoreboard";
+import { SupportersCard } from "./_components/supporters-card";
 import { TimelineList } from "./_components/timeline-list";
 import { CompositionCard } from "./composition/_components/composition-card";
 
@@ -154,6 +161,31 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   // (decision 004). Invariant 4: the permission is `can()`'s answer.
   const mayAmend = can(actor, "match:amend", { teamId: team.id });
   const mayDelete = can(actor, "match:delete", { teamId: team.id });
+  // Naming a supporter is writing the match sheet, so it is the same permission as selecting the
+  // squad before kick-off — not `match:amend`, which is about the log (decision 211).
+  const maySelectSquad = can(actor, "match:selectSquad", { teamId: team.id });
+
+  /**
+   * The supporters card's two lists, for a finished match the coach is looking at.
+   *
+   * The played set comes from the recap this page has already reduced rather than from a third replay
+   * of the log, and `toSupporterCandidates` is shared with the action so the screen cannot offer a
+   * name the action refuses (`lib/composition/supporters.ts`).
+   */
+  const supporterBoard =
+    finished && maySelectSquad && recap !== null
+      ? await (async () => {
+          const members = await getCompositionMembers(team.id, match.id);
+          const candidates = toSupporterCandidates(
+            members,
+            recap.players.filter((player) => player.playedMatch).map((player) => player.memberId),
+          );
+          return {
+            supporters: namedSupporters(candidates),
+            addable: addableSupporters(candidates),
+          };
+        })()
+      : null;
 
   /**
    * Whether the « Terminer le match » card is offered.
@@ -354,16 +386,29 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
             />
           ) : null}
 
-          {/* 3. Le temps de jeu. With an empty log every man on the sheet would be listed « non
+          {/* 3. Les supporters, et c'est le seul écrit que la feuille accepte après le coup de
+                 sifflet final (décision 211). Juste sous les notes, parce que c'est à ça qu'il sert :
+                 c'est la feuille qui donne le droit de noter (décision 159), et quelqu'un qui est
+                 venu regarder ne pouvait pas y être inscrit après coup. */}
+          {maySelectSquad && supporterBoard !== null ? (
+            <SupportersCard
+              teamId={team.id}
+              matchId={match.id}
+              supporters={supporterBoard.supporters}
+              addable={supporterBoard.addable}
+            />
+          ) : null}
+
+          {/* 4. Le temps de jeu. With an empty log every man on the sheet would be listed « non
                  entré » at 0’, which is not « il n'est pas entré » but « on ne sait pas » — the
                  scoreboard has already said so, and the Déroulé below says it again. Nine false lines
                  would be the third telling, and a wrong one. */}
           {recorded ? <MinutesTable players={recap.players} entryMode={match.entryMode} /> : null}
 
-          {/* 4. Le déroulé. */}
+          {/* 5. Le déroulé. */}
           <TimelineList entries={recap.timeline} />
 
-          {/* 5. Les compositions: the Déroulé above says what changed, and this says what the pitch
+          {/* 6. Les compositions: the Déroulé above says what changed, and this says what the pitch
                  looked like after each change (decision 182). Both roles read it — there is no branch
                  here, and that is deliberate: a composition is not privileged. */}
           <CompositionsStrip
@@ -371,14 +416,14 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
             kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
           />
 
-          {/* 6. The coach's own composition card, which after the match is the record of what he
+          {/* 7. The coach's own composition card, which after the match is the record of what he
                  planned — including the plans the afternoon never used. Under the blocks, which are
                  what actually happened. */}
           {isCoach ? <CompositionCard team={team} match={match} /> : null}
         </>
       ) : null}
 
-      {/* 7. « Saisie rétroactive » (`docs/PLAN.md`, screen 8). A match played without the phone is
+      {/* 8. « Saisie rétroactive » (`docs/PLAN.md`, screen 8). A match played without the phone is
              typed up here and becomes an ordinary event log; a match that already has one is
              corrected action by action. */}
       {mayAmend && finished ? (
@@ -412,10 +457,10 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
         </Card>
       ) : null}
 
-      {/* 8. A finished match keeps game mode here: the déroulé is consultation now. */}
+      {/* 9. A finished match keeps game mode here: the déroulé is consultation now. */}
       {finished ? gameModeCard : null}
 
-      {/* 9. And the deletion last, under everything it would destroy (decision 191). A link rather
+      {/* 10. And the deletion last, under everything it would destroy (decision 191). A link rather
              than a button: what it opens is a confirmation that names the déroulé, the notes, the
              sheet and the compositions, one tap from the act itself. */}
       {mayDelete ? (
