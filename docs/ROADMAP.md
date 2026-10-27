@@ -2582,7 +2582,12 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       renumbered 45. **1641** tests, up from 1622; e2e **11 passed in 2.0 min**. **No existing test
       encoded the old overrun display** — it was untested, which is why the suite stayed green while
       the bug shipped
-- [ ] **The retro correction sheet's title and field disagree on an overrun match.** The title reads
+- [x] **The retro correction sheet's title and field disagree on an overrun match** — closed by
+      decision **213** on 2026-10-27, without being worked on: the contradiction existed only because
+      209's display minute differed from the stored one. A label is the elapsed minute again, so the
+      title and the field hold the same number by construction. The item as written below is kept for
+      the reasoning, which is still the right reasoning about why the *field* must stay real elapsed.
+- [ ] ~~**The retro correction sheet's title and field disagree on an overrun match.**~~ The title reads
       « Corriger — But 38' » while the minute input holds `41`. **Unchanged from before decision
       209** and left knowingly: `TimelineEntry.minute` and `CompositionSnapshot.minute` stay real
       elapsed *deliberately*, because `lib/retro/queries.ts` carries `minute` as a number into that
@@ -2590,7 +2595,11 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       field period-relative would have **moved the event on a re-save**, a silent corruption of an
       append-only log. Resolving it means teaching the retro stamp about display minutes, in both
       directions, which is this slice's own work and not a one-liner
-- [ ] **`match-bar.tsx` floors the stoppage badge while the label ceils it**, so the first minute of
+- [x] **`match-bar.tsx` floors the stoppage badge while the label ceils it** — fixed by decision
+      **213**: the ceil happens once, in `readClock`, as `ClockReading.stoppageMinutes`, and the badge
+      reads it. The badge also moved onto the period line, where it is about the half and not the
+      match. Original note:
+- [ ] ~~**`match-bar.tsx` floors the stoppage badge while the label ceils it**~~, so the first minute of
       added time shows « +0 » beside an announced « 5'+1 ». Pre-existing and unrelated to decision
       209; found while looking at the overrun clock. One of the two has to give — the label's ceil is
       the one football uses, so the badge is the side to change
@@ -2638,3 +2647,14 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       board instead of kept at the bottom — the one place this card diverges from decision 197, because
       the breakdown of nothing is « 0 but et 0 passe décisive ». Both terms print at zero so the two
       numbers line up down the column; French takes the singular after zéro
+- [x] **A minute is the football played, counted from the kick-off — and game mode's header carries
+      two clocks** — 2026-10-27. Decision **213**, superseding **209**. The owner's own numbers: 10′
+      is « 10’ », a first half let run to 31′ is « 31’ » and not « 30’+1 », and one minute into a
+      second half whose first ran to 34′ is « 35’ ». A label is now `clockMsToMinute` and nothing
+      else; `displayClockMs`, `displayMinute` and the « +2 » notation are gone. 209's cost was that
+      **two different moments shared a label** — « 30’ » was the end of an overrun first half *and*
+      the kick-off of the second — and the owner could not tell which seven a goal belonged to. The
+      header shows « 45’ · 2e période 13’ », one number read twice, neither advancing through a pause
+      or half-time. Walked in a browser at 390 px in both themes: 31:54 · « 1re période 31’ +2 », then
+      eight minutes of break that moved nothing, then 31:54 · « 2e période 0’ », then 34:54 · « 2e
+      période 3’ » with the list reading « 34’ ». 1666 unit tests, e2e 11 passed

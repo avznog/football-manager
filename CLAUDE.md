@@ -82,8 +82,13 @@ travaillez ».
 - A query returns plain serialisable objects, never Drizzle rows with Date objects crossing the RSC
   boundary unformatted.
 - Dates are stored as `timestamptz` and always handled in `Europe/Paris` for display.
-- Match minutes are **continuous**: with 2×30, the second half runs 30'→60'. Never display a
-  reset clock.
+- **A minute is the football played, counted from the kick-off of the match** (decision 213). Never a
+  reset clock, and never per-period: a first half let run to 33'40" reads « 33' », and one minute into
+  the second half reads « 35' », not « 30'+1 » and not « 31' ». That is `clock_ms`, so a label is
+  `clockMsToMinute` and nothing else. Decision 209 made minutes period-relative with football's
+  « 30'+2 » notation for a fortnight and is superseded: it gave two different moments the same label.
+  The **one** period-relative figure left is the second line of game mode's header, « 2e période 13' »,
+  beside the match's own clock.
 - Tailwind only, with the design tokens in `app/globals.css`. No inline hex colours.
 - **The code is hand-formatted and Prettier is not the formatter.** It is not a dependency and runs in
   no CI job; 106 of 274 source files differ from what it would emit, so `--check` is not a gate and

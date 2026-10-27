@@ -8671,3 +8671,60 @@ neighbours say « personne n'a encore de minutes sur le terrain », about the de
 The ordering is still `minutesPerEventBoard`'s, by delegation rather than a second comparator: the
 integer `minutes × other's count` comparison and its tie-breaks are subtle enough that two copies
 would eventually disagree.
+
+## 213 — A minute is the football played, counted from the kick-off, and the header carries two clocks
+
+**2026-10-27, superseding decision 209.** The owner, after a fortnight of period-relative labels:
+« there is a problem on game mode, the timing is not displaying correctly when putting an action. »
+What he asked for, in his words and his numbers: at 10′ of the first half it is **10**; at 31′ of the
+first half it is **31, not 30+1**; and one minute into a second half whose first half ran to 34′ it is
+**35**.
+
+So a label is the elapsed minute of the match, with the stopped time left out — which is exactly what
+`clock_ms` has always held. `formatMinuteLabelFr` takes one argument now and is
+`formatMinuteFr(clockMsToMinute(clockMs))`; `displayClockMs` and `displayMinute` are gone, and so is
+football's « 30’+2 » notation.
+
+**Why 209 was wrong, which is not what 209 thought it was fixing.** It was right that « 33’ » for the
+kick-off of a second half was confusing, and it mapped each period back onto its nominal start to say
+« 30’ » instead. The cost was that **two different moments got the same label**: « 30’ » was both the
+end of an overrun first half and the kick-off of the second, and « 30’+2 » was both the first half's
+added time and the second's. Reading his own match back, the owner could not tell which seven a goal
+belonged to. Football's notation works on a scoreboard because the viewer has the match in front of
+him; a one-line list in a phone app has no such context, and the one thing it must do is identify a
+moment uniquely. **Real elapsed time does, and it is also the number already in the database** — so
+the label and `TimelineEntry.minute` now agree, where under 209 they deliberately differed. That closes
+the retro sheet's title/field contradiction as a side effect: it was on the roadmap only because of 209.
+
+**The attribution was never in danger under either scheme**, and that is worth repeating because it is
+the thing that would actually be a corruption rather than a bad label. Ordering is by `clock_ms`, which
+is monotonic and untouched, so a goal in added time is sorted before the half-time composition change
+and charged to the men who were on the pitch for it. That is pinned by a test from 2026-10-21 which
+passes unchanged here; only its expected labels moved.
+
+**The header now carries two clocks** (the second half of the request). « 45’ · 2e période 13’ »: the
+whole match's football and the current period's. His own example — « at the 45 mn of the game I get 45’
+of the game and 13’ for the second half, if the first lasted 32 » — is the arithmetic, and the two
+figures are **one number read twice** (`periodClockMs + periodStartedAtMs === clockMs`), computed
+together in `readClock` so a component cannot render 45′ beside a 13′ belonging to a different second.
+Neither advances during a pause or half-time, which `clock_ms` already guaranteed.
+
+`periodElapsedMs` is the **only** period-relative figure left in the app, and the header is its only
+consumer. Nothing that labels an event asks which period it falls in any more — that is the property
+209 lacked.
+
+Two consequences inside `readClock`, both of which were the same thing under 209 and are not now:
+
+- **« Remaining » and « stoppage » are measured against the period's own length**, not the match's
+  nominal end. A second half of a 2×30 that kicks off at 32′ is due to end at 62′ of the match; asking
+  how far past 60′ it is would have announced added time two minutes early.
+- **The `+N` badge is ceiled, once, in `readClock`** as `stoppageMinutes`. `match-bar.tsx` used to
+  floor it while the label ceiled it, so the first minute of added time read « +0 » beside an announced
+  « 30’+1 ». That was on the roadmap; there is one spelling now and the badge sits on the period line,
+  where it is about the half rather than the match.
+
+The stacked layout is deliberate: the bar's width is accounted for to the pixel at 393 px (see
+`match-bar.tsx`), a second figure in the row would not fit, and a line under the big clock costs no
+width at all. It is hidden before the kick-off, when both figures are 0, and shown throughout the first
+period even though it necessarily repeats the clock above — a figure that appears out of nowhere at
+half-time is harder to read than one that has been there all along.

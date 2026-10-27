@@ -448,7 +448,7 @@ async function submitChange(actor: Actor, formData: FormData): Promise<FormState
       candidateIds: changeCandidateIds(live, atClock, state),
       slots: live.slots,
       nameOf: nameIn(live),
-      minuteLabel: minuteLabelFr(stamped.clockMs, stamped.period, atClock.periods),
+      minuteLabel: minuteLabelFr(stamped.clockMs),
     },
   );
   if (problem) return { error: problem };

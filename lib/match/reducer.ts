@@ -1147,12 +1147,7 @@ export function reduceMatch(
               clockMs,
               // Real elapsed, like the timeline's, and for the same reason (see the note there).
               minute: clockMsToMinute(clockMs),
-              minuteLabel: formatMinuteLabelFr(
-                clockMs,
-                event.period,
-                periods,
-                periodStarts.get(event.period),
-              ),
+              minuteLabel: formatMinuteLabelFr(clockMs),
               startingLineup,
               assignments: [...pitch]
                 .map(([memberId, entry]) => ({ memberId, slotId: entry.slotId }))
@@ -1217,17 +1212,13 @@ export function reduceMatch(
        * with it and `amendStamp` turns whatever comes back into `minuteToClockMs(minute)`. Hand it
        * 38 for an event stored at 41′40″ and re-saving the correction moves the event.
        *
-       * The label, in contrast, is read against **its own** period's real start, not the match's
-       * current one: this loop walks both halves, and the first half's own start (0) is what keeps a
-       * 33′40″ `PERIOD_END` reading « 30’+4 » on the same screen as a second half counted from 30′.
+       * The label is now the same number, formatted (decision 213): one minute per moment, counted
+       * from the kick-off of the match. It no longer depends on the period, which is why neither
+       * `event.period` nor the period's real start is passed any more — a second half that kicked off
+       * at 34′ reads « 35’ » one minute in, because that is the 35th minute of football played.
        */
       minute: clockMsToMinute(clockMs),
-      minuteLabel: formatMinuteLabelFr(
-        clockMs,
-        event.period,
-        periods,
-        periodStarts.get(event.period),
-      ),
+      minuteLabel: formatMinuteLabelFr(clockMs),
       labelFr: EVENT_LABELS_FR[event.type],
       voided,
       voidedByEventId: voidedBy.get(event.id) ?? null,

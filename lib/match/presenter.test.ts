@@ -14,7 +14,6 @@ import {
   finalWhistleEvents,
   pendingLineupChangesFr,
   pendingLineupView,
-  periodsOf,
   plannedLineupStepFr,
   plannedLineupViews,
   phaseLabelFr,
@@ -254,7 +253,8 @@ describe("stamping an action on the device", () => {
       clockMs: 33 * MIN + 40_000,
     });
 
-    // And once it is in the log, that stored 33′40″ is displayed as the 30′ it is.
+    // And once it is in the log, that stored 33′40″ is displayed as the 33′ of football it is
+    // (decision 213), with the second line saying the half itself has not started.
     const started = reduceLive(
       live(log([...KICKED_OFF, { type: "PERIOD_END", min: 33, sec: 40, period: 1 }, { type: "KICKOFF", min: 33, sec: 40, period: 2 }])),
       [],
@@ -262,9 +262,11 @@ describe("stamping an action on the device", () => {
       T0 + 33 * MIN + 40_000,
     );
     expect(started.clock.periodStartedAtMs).toBe(33 * MIN + 40_000);
-    expect(started.reading.label).toBe("30’");
-    expect(started.reading.clock).toBe("30:00");
-    // The anchor still carries the real match time: only the reading is on the display's scale.
+    expect(started.reading.label).toBe("33’");
+    expect(started.reading.clock).toBe("33:40");
+    expect(started.reading.periodLabel).toBe("0’");
+    expect(started.reading.periodClock).toBe("00:00");
+    // The anchor carries the real match time, and so now does the reading.
     expect(started.clock.clockMs).toBe(33 * MIN + 40_000);
     // A new action taps in at the real clock, as it always did.
     expect(nextEventStamp(started, "GOAL_FOR", T0 + 33 * MIN + 40_000).clockMs).toBe(
@@ -1342,14 +1344,12 @@ describe("the small strings", () => {
     expect(eventLabel("PENALTY_MISSED")).toBe("Penalty manqué");
   });
 
-  it("keeps the minutes continuous and marks added time", () => {
-    const periods = periodsOf({ periodsCount: 2, periodMinutes: 30 });
-    expect(minuteLabelFr(45 * MIN, 2, periods)).toBe("45’");
-    expect(minuteLabelFr(32 * MIN, 1, periods)).toBe("30’+2");
-    // With the period's real start — the game-mode sheets pass the anchor's — a second half that
-    // kicked off at 33′40″ is counted from 30′, and without it nothing moves.
-    expect(minuteLabelFr(41 * MIN + 40_000, 2, periods, 33 * MIN + 40_000)).toBe("38’");
-    expect(minuteLabelFr(41 * MIN + 40_000, 2, periods, null)).toBe("41’");
+  it("labels a minute by the football played, whichever half it falls in", () => {
+    // One argument since decision 213: the label does not depend on the period, so the sheets, the
+    // timeline and the composer can never disagree about the same instant.
+    expect(minuteLabelFr(45 * MIN)).toBe("45’");
+    expect(minuteLabelFr(32 * MIN)).toBe("32’");
+    expect(minuteLabelFr(41 * MIN + 40_000)).toBe("41’");
     expect(wholeMinutes(45 * MIN + 30_000)).toBe(45);
     expect(wholeMinutes(-5)).toBe(0);
   });

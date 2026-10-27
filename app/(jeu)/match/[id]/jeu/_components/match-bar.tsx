@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { SCORE_SEPARATOR_FR } from "@/lib/calendar/labels";
+import { ordinalPeriodFr } from "@/lib/match/presenter";
 import type { ClockReading } from "@/lib/match/clock";
 
 export type MatchBarProps = {
@@ -113,26 +114,48 @@ export function MatchBar({
           <span className="sr-only">Retour au match contre {opponentName}</span>
         </Link>
 
-        <p className="flex shrink-0 items-baseline gap-1">
-          {reading.running ? (
+        {/* The match's clock, and under it the current period's (decision 213). Stacked rather than
+            side by side because the row's width is already accounted for to the pixel above: a second
+            figure in the row would not fit, and a line under the big one costs no width at all — it is
+            narrower than the « MM:SS » it sits beneath. */}
+        <div className="flex shrink-0 flex-col gap-0.5">
+          <p className="flex items-baseline gap-1">
+            {reading.running ? (
+              <span
+                className="mb-1 size-2 shrink-0 self-center rounded-full bg-danger"
+                aria-hidden="true"
+              />
+            ) : null}
             <span
-              className="mb-1 size-2 shrink-0 self-center rounded-full bg-danger"
-              aria-hidden="true"
-            />
-          ) : null}
-          <span
-            role="img"
-            className="font-mono text-3xl leading-none font-bold text-ink tabular-nums"
-            aria-label={`Chrono ${reading.label}${reading.running ? ", en cours" : ""}`}
-          >
-            {reading.clock}
-          </span>
-          {reading.stoppageMs > 0 ? (
-            <span className="text-sm font-semibold text-warning" aria-hidden="true">
-              +{Math.floor(reading.stoppageMs / 60_000)}
+              role="img"
+              className="font-mono text-3xl leading-none font-bold text-ink tabular-nums"
+              aria-label={`Chrono ${reading.label}${reading.running ? ", en cours" : ""}`}
+            >
+              {reading.clock}
             </span>
+          </p>
+
+          {/* Hidden until the kick-off, when both figures are 0 and the line would say nothing. In the
+              first period it necessarily repeats the clock above — they are the same number until
+              half-time — and it is shown anyway, because a figure that appears out of nowhere at
+              half-time is harder to read than one that has been there all along. */}
+          {reading.phase !== "before-kickoff" ? (
+            <p
+              role="img"
+              className="flex items-baseline gap-1 text-xs leading-none text-ink-muted"
+              aria-label={`${ordinalPeriodFr(reading.period)} ${reading.periodLabel}`}
+            >
+              <span className="tabular-nums">
+                {ordinalPeriodFr(reading.period)} {reading.periodLabel}
+              </span>
+              {/* The added time of *this* period, ceiled in `readClock` so the badge and the figure
+                  it sits beside can no longer disagree about the first minute of it. */}
+              {reading.stoppageMinutes > 0 ? (
+                <span className="font-semibold text-warning">+{reading.stoppageMinutes}</span>
+              ) : null}
+            </p>
           ) : null}
-        </p>
+        </div>
 
         <p
           role="img"
