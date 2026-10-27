@@ -1,12 +1,12 @@
 # COST.md — what this project has cost, and what that number is not
 
-Measured on **2026-10-21** (third pass, after the supporters and decisives slices), with `main` at
-`96f7db5` (version `1.1.2`, 218 commits, 213 merged pull requests, 106 498 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
-2026-09-22 and its first commit landed on 2026-09-23, so everything below covers the **thirty days**
-the script counts.
+Measured on **2026-10-27**, with `main` at `255618e` (version `1.2.0`, 224 commits, 218 merged pull
+requests, 107 169 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
+2026-09-22 and its first commit landed on 2026-09-23, so everything below covers the **thirty-six
+days** the script counts.
 
-**The headline, and read the next sentence with it: $2113.87.** That is the cost of the model tokens
-this project consumed, **at API list prices, on both machines** — $1583.94 on the Linux one
+**The headline, and read the next sentence with it: $2214.17.** That is the cost of the model tokens
+this project consumed, **at API list prices, on both machines** — $1684.24 on the Linux one
 (`/home/bgonzva`) and $529.93 on the macOS one (`/Users/benjamingonzva`), each measured by running
 `node scripts/cost.mjs` there. It is not an invoice, nobody necessarily paid it, it is still a floor
 (one macOS session reports $0, see below), and the sections after the table are not footnotes — they
@@ -22,7 +22,7 @@ rots.
 
 | session | machine | where it ran | cost (USD) |
 |---|---|---|---|
-| `7054d16c` | Linux | the main checkout | 1297.08 |
+| `7054d16c` | Linux | the main checkout | 1397.39 |
 | `e0c60542` | macOS | the main checkout, 2026-09-22 → 2026-10-06 | 529.93 |
 | `62dacd8d` | Linux | worktree `binary-spinning-hickey` | 152.34 |
 | `efba1c3d` | Linux | worktree `ux-analyser` | 96.63 |
@@ -31,9 +31,9 @@ rots.
 | `a677bdb5` | Linux | a `.claude/worktrees/*` agent, 2026-10-16 | 2.88 |
 | `81055d9b` | Linux | `tmp/football-manager` | 0.01 |
 | `1a3e8cd8` | macOS | the main checkout, 2026-10-09 → 2026-10-13 | 0.00 — **reported, not real** |
-| **total** | | **9 sessions** | **2113.87** |
+| **total** | | **9 sessions** | **2214.17** |
 
-The Linux machine is **$1583.94 (75 %)** and the macOS machine **$529.93 (25 %)**. The macOS rows are
+The Linux machine is **$1684.24 (76 %)** and the macOS machine **$529.93 (24 %)**. The macOS rows are
 the 2026-10-14 run there and are carried unchanged: this refresh ran on the Linux machine, which can
 only ever measure its own.
 
@@ -55,10 +55,10 @@ reason); a long-lived session merely under-reports its tail instead.
 Divided by what it bought, which is the only form of this number that is any use when deciding
 whether to spend more:
 
-- **$9.70 per commit** (218) — the Linux machine alone was $7.27
-- **$9.92 per merged pull request** (213) — back under ten dollars a PR, which it crossed earlier today
-- **$0.0198 per line** of committed TypeScript, SQL, CSS and Markdown — just under two cents
-- **$70.46 per day** across the thirty days — was $77.20 on 2026-10-16
+- **$9.89 per commit** (224) — the Linux machine alone was $7.52
+- **$10.16 per merged pull request** (218)
+- **$0.0207 per line** of committed TypeScript, SQL, CSS and Markdown — two cents
+- **$61.50 per day** across the thirty-six days — was $70.46 on 2026-10-21 and $77.20 on 2026-10-16
 
 ### Against the last snapshot, which is the only way to read the trend
 
@@ -109,6 +109,22 @@ cahier-des-charges rework, the owner's third and fourth backlogs, the first thre
 his paper sheets, the 342 real ratings recovered from the old app, `v1.0.0` and `v1.0.1` shipped,
 production becoming the team's real season, and the eighteen championship fixtures imported from the
 FSGT.
+
+### 2026-10-27: the total moved again, and the per-day rate keeps falling
+
+**$2113.87 → $2214.17**, the Linux machine adding **$100.30** over the six days since 2026-10-21. In
+that window `main` gained **six commits and five merged pull requests**, so the per-unit rates drifted
+up a little — $9.70 → **$9.89** per commit — while **per day fell to $61.50** from $70.46, and from
+$77.20 on 2026-10-16.
+
+That per-day fall is the only line in this file that has moved in one direction every time it has been
+measured, and it is worth more than the total: the denominator is calendar days, which keep arriving
+whether or not anybody works, so a falling figure means the project is being *finished* rather than
+abandoned — the work per day is getting cheaper against a season that is now thirty-six days long.
+
+The last three snapshots on this machine, as a sanity check on everything above: **$1583.94 → $1583.94
+→ $1684.24**. The middle one is the lazy flush described below, measured three times on one afternoon
+and never moving; it caught up in this reading, which is what that note predicted it would do.
 
 ### How to re-derive it rather than trusting this file
 
@@ -180,24 +196,24 @@ records exist only on that machine, and the script can only ever print **its own
 Both known machines are now in the table — the macOS one was added on 2026-10-14 by running the
 script there. **A refresh from one machine must keep the other machine's last figure** and say how
 old it is, rather than drop it: replacing the whole table with one machine's output would quietly
-take $529.93 or $1583.94 off the headline. If a third machine ever works here, it is absent until it
+take $529.93 or $1684.24 off the headline. If a third machine ever works here, it is absent until it
 runs the script.
 
 ### 2. A subscription is not a bill
 
 `totalCostUSD` is computed from token counts at **API list prices**. If the work was done under a
 Claude subscription rather than API billing, that money was never charged — the real outlay was the
-subscription fee for the period, and $2113.87 is then better read as *what this project would have
+subscription fee for the period, and $2214.17 is then better read as *what this project would have
 cost at list prices*, which is a useful number for a different question (is this worth automating,
 what would it cost someone else) and the wrong one for « what did I spend ».
 
 **This file cannot tell which case applies**, because the transcript records the computed cost either
-way. Check the billing mode, and if it is a subscription, the honest total for the thirty days is
+way. Check the billing mode, and if it is a subscription, the honest total for the thirty-six days is
 the pro-rated fee.
 
 ### 3. Time
 
-Nobody's hours are in here, on either side. Thirty days of review, phone testing and decisions is
+Nobody's hours are in here, on either side. Thirty-six days of review, phone testing and decisions is
 the largest uncosted input to the project and the one this file is least able to measure.
 
 ---
@@ -244,5 +260,5 @@ the same way. Three rules, and the first is now in `CLAUDE.md`'s definition of d
    script's output or arithmetic on one, which is why the script is in the repository rather than in
    somebody's shell history.
 3. **Date the measurement, name the commit it was taken at, and keep the previous snapshot's
-   figures.** A cost without a denominator — 218 commits, thirty days — says nothing at all, and a
+   figures.** A cost without a denominator — 224 commits, thirty-six days — says nothing at all, and a
    cost without its predecessor says nothing about where it is going.

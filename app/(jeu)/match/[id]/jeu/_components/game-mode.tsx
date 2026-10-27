@@ -37,7 +37,6 @@ import {
   onPitchOptions,
   pendingCountLabelFr,
   pendingLineupView,
-  periodsOf,
   phaseLabelFr,
   plannedLineupViews,
   pitchView,
@@ -363,7 +362,6 @@ export function GameMode({ live, canOperate }: GameModeProps) {
 
   const state = useMemo(() => reduceLive(live, local, nowMs), [live, local, nowMs]);
   const players = useMemo(() => playerIndex(live.players), [live.players]);
-  const periods = useMemo(() => periodsOf(live.match), [live.match]);
 
   const queuedIds = useMemo(
     () => queue.pending.map((record) => record.clientEventId),
@@ -469,9 +467,9 @@ export function GameMode({ live, canOperate }: GameModeProps) {
   // `FOUL` stands in for "an action that takes the clock as it reads" — every type but `KICKOFF`
   // is stamped the same way, and this is only here to print the minute on the sheets.
   const stamp = nextEventStamp(state, "FOUL", tappedAtMs ?? nowMs ?? 0);
-  // `stamp.period` is the period in progress for every type but `KICKOFF`, so the anchor's own
-  // start is the right offset: the sheets read 30′ in a second half that kicked off late, like the bar.
-  const stampLabel = `${minuteLabelFr(stamp.clockMs, stamp.period, periods, state.clock.periodStartedAtMs)} · ${phaseLabelFr(state)}`;
+  // The minute of the match, counted from its kick-off (decision 213): the sheets say « 35’ » one
+  // minute into a second half that kicked off at 34′, which is what the log will record.
+  const stampLabel = `${minuteLabelFr(stamp.clockMs)} · ${phaseLabelFr(state)}`;
 
   const canAct = canOperate && state.started && !state.finished;
   /**

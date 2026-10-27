@@ -7083,3 +7083,69 @@ hidden until the coach publishes them.
 - Cosmetic: the script's closing line still says « sur les 4 matchs ».
 
 Files: `docs/SESSIONS.md`.
+
+## 2026-10-27 — A minute is the football played, and the header carries two clocks
+
+Decision **213**, superseding **209** after a fortnight. The owner: « there is a problem on game mode,
+the timing is not displaying correctly when putting an action. » His numbers, which are the spec: 10′
+of the first half is **10**; 31′ of the first half is **31, not 30+1**; one minute into a second half
+whose first ran to 34′ is **35**.
+
+**Two questions asked before writing anything, because his header example did not add up.** « At the 45
+mn of the game, on top I get 49’ of the game and 13’ for the second half (if the first lasted 32) » —
+32 + 13 = 45, not 49. He confirmed 45: the match timer is played time only, and the 49 was a slip. The
+second question was scope, and he chose **everywhere** rather than game mode alone — which was the right
+call, because the match page timeline and the live list would otherwise have printed different numbers
+for the same goal.
+
+**209's actual defect, which is not the one it set out to fix.** It was right that « 33’ » for a
+second-half kick-off was confusing. Its remedy — map each period onto its nominal start — made **two
+different moments share a label**: « 30’ » was both the end of an overrun first half and the kick-off of
+the second, « 30’+2 » was both halves' added time. Football gets away with that because the viewer has
+the match in front of him; a one-line list on a phone has no such context, and identifying a moment
+uniquely is the only thing it has to do. Real elapsed time does that, and it is **already the number in
+the database**, so the label and `TimelineEntry.minute` now agree where 209 deliberately differed.
+
+**That closes two roadmap items without working on either.** The retro sheet's title/field
+contradiction existed *only* because 209's display minute differed from the stored one. And the
+stoppage badge's floor-versus-ceil disagreement is gone because the ceil now happens once, in
+`readClock`, as `stoppageMinutes`.
+
+**What the header does.** « 45’ · 2e période 13’ », stacked, because the bar's width is accounted for
+to the pixel at 393 px and a second figure in the row would not fit while a line under the big clock
+costs nothing. The two are **one number read twice** — `periodClockMs + periodStartedAtMs === clockMs`,
+asserted — and computed together in `readClock` so no component can show 45′ beside a 13′ from a
+different second. `periodElapsedMs` is now the only period-relative figure in the app and the header is
+its only consumer.
+
+Two things inside `readClock` that were the same under 209 and are not now: « remaining » and
+« stoppage » are measured against **the period's own length**, not the match's nominal end — a second
+half kicking off at 32′ of a 2×30 is due at 62′, and asking how far past 60′ it is would announce added
+time two minutes early.
+
+**Walked in a browser rather than reasoned about**, at 390 px in light and dark, with Playwright's fake
+clock so no real time was spent waiting:
+
+```
+kick-off                      00:00  ·  1re période 0’
+first half overrunning        31:54  ·  1re période 31’  +2
+half-time, then 8 min of break 31:54 ·  1re période 31’  +2    ← the break moves nothing
+second-half kick-off          31:54  ·  2e période 0’
+3 min into the second half     34:54 ·  2e période 3’
+list: 34’ But · 31’ Coup d’envoi · 31’ Fin de période · 31’ But · 0’ Coup d’envoi
+```
+
+Gates: typecheck clean, eslint clean, `npm test` **1666 passed**, `npm run test:e2e` **11 passed**.
+The e2e suite needed one real change — `offline.spec.ts` pinned « 30’+11 » for a 41:00 first half, now
+« 41’ ». The happy path's two clock assertions survived untouched, because it whistles half-time at
+exactly 30:00 and so has no overrun to disagree about.
+
+**The attribution of an added-time goal was never in danger under either scheme**, and the test from
+2026-10-21 that pins it passes here unchanged — only its expected labels moved. Ordering is by
+`clock_ms`, which is monotonic and which neither decision touched.
+
+Files: `lib/match/clock.ts`, `lib/match/clock.test.ts`, `lib/match/reducer.ts`,
+`lib/match/reducer.test.ts`, `lib/match/presenter.ts`, `lib/match/presenter.test.ts`,
+`lib/retro/actions.ts`, `app/(jeu)/match/[id]/jeu/_components/match-bar.tsx`,
+`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `e2e/offline.spec.ts`, `CLAUDE.md`,
+`docs/DECISIONS.md` (213), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
