@@ -7379,3 +7379,49 @@ Files: `lib/match/clock.ts`, `lib/match/clock.test.ts`, `lib/match/reducer.ts`,
 `app/(app)/match/[id]/_components/compositions-strip.tsx`,
 `app/(jeu)/match/[id]/jeu/_components/event-timeline.tsx`, `docs/DECISIONS.md` (217, 218),
 `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+### The old app's schema, checked rather than inferred
+
+The owner supplied a working Supabase token, so everything decision 216 shipped as « inferred from the
+deployed client » is now **read from the live project**. It runs as `postgres`, not the read-only user a
+Management token gave on 2026-10-21, so the whole schema was readable.
+
+Confirmed, and none of it was wrong: `substitutions(match_id, minute, player_off, player_on)`; every
+column the push script omits has a default, so its inserts are valid as written; `lineup_role` is
+`player | supporter`, `formation_type` is `2-3-1 | 3-2-1`, `match_status` is `upcoming | played`, and
+every value sent is in range.
+
+Three things are now facts rather than guesses, and all three are load-bearing:
+
+- **`matches.goals_for` and `goals_against` are maintained by `gf_sync_score` and `gc_sync_score`.**
+  The script must not set them and does not.
+- **`recompute_minutes` matches the script's own derivation exactly** — a starter is `slot is not
+  null`, substitutions are walked in `(minute, created_at)` order, and whoever is still on at the end
+  is paid to `matches.duration`. That is why `duration` is sent, and why the dry run's two minute
+  columns agree.
+- **`recompute_goals_conceded_lineup` compares `substitutions.minute <= goals_conceded.minute`**, so
+  the conceded minutes and the substitution minutes must share a scale. With `duration` in the same
+  arithmetic, real elapsed football is the only scale all three agree on — which settles what the
+  script sends and is now written in its docblock.
+
+**The fork's RLS finding is confirmed verbatim.** `ratings_insert_if_in_lineup` checks
+`exists (select 1 from lineups where match_id = ratings.match_id and player_id = auth.uid())` with **no
+role restriction**: a `supporter` row is enough, and a man with no row cannot insert a rating at all.
+Pushing only the players with minutes really would have refused the vote to the supporters of decision
+211 and to every unused substitute.
+
+**A dry run was then taken against production and the live old app**, end to end: the 2026-10-27 match,
+**4 – 4**, 63′, all seven 2-3-1 slots filled, 20 substitutions, 4 goals with scorers and assists, 4
+conceded, and the target fixture matched by day and opponent (« FC Copains du Dimanche », still
+`upcoming` over there). Eight of the ten minute figures agree exactly; Lucien is one short and Lucas
+one long, which is the whole-minute rounding the docblock already described.
+
+**One consequence found by running it, now documented rather than discovered later.** After a period
+that did not end on time the two apps **name the same goal differently**: that match's first half ran
+to 33′, so a goal at 62′ of football reads « 59’ » in this app (the television minute, decision 214)
+and will read « 62’ » over there. Sending the television minute instead would make the old app
+internally inconsistent — a goal at 59 among substitutions at real minutes — and would move who is
+credited with a conceded goal, because of the comparison above. The dry run prints both numbers for
+every goal where they differ.
+
+Files: `scripts/push-match-to-old-app.mts` (docblock), `docs/SESSIONS.md`.
