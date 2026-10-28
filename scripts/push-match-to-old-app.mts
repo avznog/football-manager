@@ -23,9 +23,26 @@
  * Driving the site needs the owner's own password as a secret and broke twice in one afternoon on a
  * dropdown and a button name. It also stubs the app's own « rate everyone first » gate to reach the
  * admin forms, which is fine for a person at a keyboard and not for an unattended job. So this writes
- * rows, with a `service_role` key, and the shapes below are taken from the live client
- * (`old-app/index.html`) rather than from `old-app/schema.sql`, which is **out of date** — it has no
- * `substitutions` table at all, and the deployed app reads one.
+ * rows, with a `service_role` key.
+ *
+ * ## The shapes below are read from that database, not inferred (2026-10-28)
+ *
+ * They were taken from the deployed client (`old-app/index.html`) first, because `old-app/schema.sql`
+ * is **out of date** — it has no `substitutions` table at all and the app reads one. The owner then
+ * supplied a token and every one of them was checked against the live project. What that confirmed,
+ * so the next session need not re-check it:
+ *
+ * - `substitutions(match_id, minute, player_off, player_on)`, and the four columns this omits on every
+ *   table (`id`, `created_at`, `minutes_played`, `goals`, `assists`) all have defaults, so the inserts
+ *   are valid as written.
+ * - `lineup_role` is `player | supporter`, `formation_type` is `2-3-1 | 3-2-1`, `match_status` is
+ *   `upcoming | played`. Every value this sends is in range.
+ * - **`matches.goals_for` and `goals_against` are maintained by `gf_sync_score` and `gc_sync_score`**,
+ *   so this must not set them, and does not.
+ * - `recompute_minutes` matches this script's own derivation exactly: a starter is `slot is not null`,
+ *   substitutions are walked in `(minute, created_at)` order, and whoever is still on at the end is
+ *   paid to `matches.duration`. That is why `duration` is sent and why the dry run's two minute
+ *   columns agree.
  *
  * ## Everybody on the sheet gets a `lineups` row, and that is the point
  *
@@ -65,7 +82,22 @@
  * stamped on the same scale. The dry run prints our own notation beside each goal so a human can check
  * the one against the other.
  *
- * ## Minutes are whole, and three players will be a minute short
+ * ## Everything is sent on the real-elapsed scale, and the two apps will label a goal differently
+ *
+ * `recompute_goals_conceded_lineup` decides who was on the pitch for a conceded goal with
+ * `substitutions.minute <= goals_conceded.minute`, so **the conceded minutes and the substitution
+ * minutes have to be the same scale** — and `recompute_minutes` pays to `duration`, so that is the
+ * same scale again. Real elapsed football is the only scale all three agree on, so that is what this
+ * sends throughout.
+ *
+ * The consequence, which is visible and is not a bug: after a period that did not end on time the two
+ * apps **name the same goal differently**. This app shows the television minute (decision 214) and the
+ * old app shows real elapsed, so a goal at 62′ of football in a match whose first half ran to 33′ reads
+ * « 59’ » here and « 62’ » there. The dry run prints both for every goal where they differ. Sending
+ * the television minute instead would make the old app internally inconsistent — a goal at 59 among
+ * substitutions at real minutes — and would move whoever is credited with a conceded goal.
+ *
+ * ## Minutes are whole, and some players will be a minute short
  *
  * Its forms take integers while the reducer works in milliseconds and subtracts the pauses, so a man
  * whose spell ends at 43.87′ is rounded. On 2026-10-20 that cost three men one minute each, and
