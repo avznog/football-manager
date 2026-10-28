@@ -72,9 +72,11 @@
  *
  * ## Safety
  *
- * Refuses a `-pooler` host (`COORDINATION.md`: a pooled connection can carry an empty `search_path`
- * left by a `pg_restore`, and the whole app then 500s). **Production needs `--production` on the
- * command line**, because decision 201 made it the only copy of the season. Dry run unless
+ * **Warns** on a `-pooler` host rather than refusing it (decision 219). It refused until the CI job
+ * hit it: the `DATABASE_URL` secret is the pooled string, by `release.yml`'s own instruction, and
+ * production migrations run through it. The hazard `COORDINATION.md` names — a pooled session carrying
+ * an empty `search_path` after a `pg_restore` — fails loudly on the first query rather than reading or
+ * writing the wrong thing. **Production needs `--production` on the command line**, because decision 201 made it the only copy of the season. Dry run unless
  * `--commit`, and the target is printed with its password redacted first.
  */
 
@@ -106,7 +108,30 @@ if (!url) refuse("DATABASE_URL n'est pas défini.");
 const token = process.env.SUPABASE_ACCESS_TOKEN;
 if (!token) refuse("SUPABASE_ACCESS_TOKEN n'est pas défini : c'est la source des notes.");
 if (url!.includes("-pooler")) {
-  refuse("Cette URL passe par le pooler Neon. Utilise le point d'entrée direct (COORDINATION.md).");
+  /*
+   * A warning and not a refusal, since 2026-10-28 (decision 219).
+   *
+   * `COORDINATION.md` says « direct endpoint only, never -pooler », and this script refused on that
+   * basis until the CI job it exists for hit it on its first run: the `DATABASE_URL` secret is the
+   * **pooled** string, deliberately and by `release.yml`'s own instruction — « Set it to the pooled
+   * Neon string — docs/DEPLOY.md §4 » — and production migrations have been running through it for
+   * every release so far.
+   *
+   * The hazard that rule protects against is real but it is **loud**: a pooled session that inherited
+   * `search_path = ''` from a `pg_restore` answers every query with « relation does not exist », so it
+   * aborts rather than reading or writing the wrong thing. Nothing here can produce a *wrong* figure
+   * over the pooler; it can only fail. That is worth a line of output, not a refusal that stops the
+   * job the owner asked for.
+   *
+   * The dump-and-restore rule in `COORDINATION.md` is untouched: that is about `pg_dump`,
+   * `pg_restore` and a hand-run migration after one, where the pooled connection really can leave a
+   * schema nobody notices.
+   */
+  console.log(
+    "ATTENTION : cette URL passe par le pooler Neon. C'est ce que le secret CI contient et ce que " +
+      "release.yml demande ; si une requête échoue sur « relation … does not exist », c'est le " +
+      "search_path du pooler (COORDINATION.md) et il faut le point d'entrée direct.",
+  );
 }
 const isProductionUrl = url!.includes(PRODUCTION_HOST);
 if (isProductionUrl && !production) {
