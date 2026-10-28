@@ -961,43 +961,39 @@ describe("a first half that ran long", () => {
   const labelOf = (eventId: string) =>
     state.timeline.find((entry) => entry.eventId === eventId)!.minuteLabel;
 
-  it("labels every line by the football played, in either half (decision 213)", () => {
-    // e7 is the second-half kick-off, stamped at 33′40″ like the period end it follows, and read as
-    // the 33rd minute of football — which it is. Decision 209 wrote « 30’ » here.
-    expect(labelOf("e7")).toBe("33’");
-    // Eight minutes into that half: 41′40″ stored, « 41’ » on the screen.
-    expect(labelOf("e8")).toBe("41’");
+  it("starts the second half at 30′, not at the first half's final reading", () => {
+    // e7 is the second-half kick-off, stamped at 33′40″ like the period end it follows.
+    expect(labelOf("e7")).toBe("30’");
+    // And eight minutes into that half — 41′40″ stored — the screen says 38′.
+    expect(labelOf("e8")).toBe("38’");
     /*
-     * And the label now *agrees* with the entry's `minute`, which has always been the real elapsed
-     * minute because the correction sheet pre-fills its minute field with it. Under 209 the two
-     * differed, which is what made the sheet's title and its field contradict each other.
+     * The entry's `minute` is *not* that 38: it stays the real elapsed minute, because the
+     * correction sheet pre-fills its minute field with it and sends it back through
+     * `minuteToClockMs`. A display minute there would move the event on a re-save.
      */
     expect(state.timeline.find((entry) => entry.eventId === "e7")!.minute).toBe(33);
     expect(state.timeline.find((entry) => entry.eventId === "e8")!.minute).toBe(41);
-    for (const entry of state.timeline) {
-      expect(entry.minuteLabel).toBe(`${entry.minute}’`);
-    }
   });
 
-  it("reads the first half's added time as the minutes it was, not as stoppage notation", () => {
+  it("keeps the first half's added time in stoppage notation, on the same timeline", () => {
+    // Each line is read against its own period's real start: both halves, in one pass.
     expect(labelOf("e3")).toBe("11’");
-    // 32′ and 33′40″ of football. Decision 209 wrote « 30’+2 » and « 30’+4 ».
-    expect(labelOf("e4")).toBe("32’");
-    expect(labelOf("e5")).toBe("33’");
-    // The second half's own end: thirty minutes after a kick-off at 33′40″, so 63′40″ of football.
-    expect(labelOf("e9")).toBe("63’");
+    expect(labelOf("e4")).toBe("30’+2");
+    expect(labelOf("e5")).toBe("30’+4");
+    // The second half's own end: thirty minutes of football after a kick-off at 33′40″.
+    expect(labelOf("e9")).toBe("60’");
   });
 
-  it("labels an event during the break by the clock it was recorded at", () => {
-    // The half-time composition is stamped at 33′40″, the clock the break froze on, and reads « 33’ ».
-    // Decision 209 gave it « 30’+4 » to keep it off the second half's « 30’ »; under 213 the two
-    // instants are different numbers to begin with, so nothing has to be kept apart.
-    expect(labelOf("e6")).toBe("33’");
+  it("puts an event during the break in the half that had just ended", () => {
+    // The half-time composition carries period 1, so it reads « 30’+4 » — not « 30’ », which would
+    // claim something that happened after the 30th minute happened on it.
+    expect(labelOf("e6")).toBe("30’+4");
     const composition = state.compositions.find((entry) => entry.eventId === "e6")!;
-    expect(composition.minuteLabel).toBe("33’");
-    // Real elapsed, and the label now says the same: 33′40″ floored.
+    expect(composition.minuteLabel).toBe("30’+4");
+    // Real elapsed, like the timeline's: 33′40″ floored.
     expect(composition.minute).toBe(33);
-    expect(state.compositions.map((entry) => entry.minuteLabel)).toEqual(["0’", "33’"]);
+    // The starting composition, and the rest of the strip, are unmoved.
+    expect(state.compositions.map((entry) => entry.minuteLabel)).toEqual(["0’", "30’+4"]);
   });
 
   it("stores the real elapsed time and changes nothing about it", () => {
@@ -1088,16 +1084,11 @@ describe("a first half that ran long", () => {
     expect(concededBy("hugo")).toBe(2);
     expect(conceded.goalsAgainst).toBe(2);
 
-    /*
-     * And since decision 213 the labels are no longer the ambiguous-looking pair that prompted this
-     * test: « 32’ » and « 41’ » are plainly two different minutes of the same afternoon. The
-     * attribution was already right under 209's labels — this test passed the day it was written —
-     * but a reader can now see that it is, which was the owner's complaint about 209.
-     */
+    // The labels are the ambiguous-looking pair, and they are the reason the question gets asked.
     const labels = conceded.timeline
       .filter((entry) => entry.type === "GOAL_AGAINST")
       .map((entry) => entry.minuteLabel);
-    expect(labels).toEqual(["32’", "41’"]);
+    expect(labels).toEqual(["30’+2", "38’"]);
 
     // The clean-sheet minutes agree, which is the same fact read from the other side: Léo's sheet was
     // clean for the 32 minutes before the goal, not for the 33′40″ he was on.
@@ -1105,9 +1096,8 @@ describe("a first half that ran long", () => {
     expect(conceded.anomalies).toEqual([]);
   });
 
-  it("reads the live bar as the match's clock and the half's, side by side", () => {
-    // Two minutes of wall clock after a second-half kick-off at 33′40″: the 35th minute of football,
-    // and the 2nd of this half. That pair is the header the owner asked for (decision 213).
+  it("reads the live bar from 30′ while that second half runs", () => {
+    // Two minutes of wall clock after the second-half kick-off.
     const live = reduceMatch(LATE.slice(0, 7), [], {
       ...CONFIG,
       nowMs: T0 + LATE_END_MS + 2 * MIN,
@@ -1116,27 +1106,18 @@ describe("a first half that ran long", () => {
     expect(live.reading).toMatchObject({
       period: 2,
       clockMs: LATE_END_MS + 2 * MIN,
-      minute: 35,
-      clock: "35:40",
-      label: "35’",
-      periodMinute: 2,
-      periodClock: "02:00",
-      periodLabel: "2’",
+      minute: 32,
+      clock: "32:00",
+      label: "32’",
       stoppageMs: 0,
     });
-    // The two are one number read twice, so they cannot drift: 33′40″ + 2′ = 35′40″.
-    expect(live.reading.periodClockMs + LATE_END_MS).toBe(live.reading.clockMs);
   });
 
-  it("freezes half-time on the football the first half was given, and says it ran 4 over", () => {
+  it("anchors half-time itself on the first half, which is still showing +4", () => {
     const atTheBreak = reduceMatch(LATE.slice(0, 5), [], { ...CONFIG, nowMs: T0 + 40 * MIN });
     expect(atTheBreak.phase).toBe("break");
     expect(atTheBreak.clock.periodStartedAtMs).toBe(0);
-    // The match clock says 33′ — the break does not advance it — and the overrun is now the period
-    // line's « +4 » rather than a « 30’+4 » label on the match itself.
-    expect(atTheBreak.reading.label).toBe("33’");
-    expect(atTheBreak.reading.periodLabel).toBe("33’");
-    expect(atTheBreak.reading.stoppageMinutes).toBe(4);
+    expect(atTheBreak.reading.label).toBe("30’+4");
   });
 
   it("still starts the second half at 30′ when the first one ended early", () => {

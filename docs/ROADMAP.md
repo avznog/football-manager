@@ -2658,3 +2658,17 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       or half-time. Walked in a browser at 390 px in both themes: 31:54 · « 1re période 31’ +2 », then
       eight minutes of break that moved nothing, then 31:54 · « 2e période 0’ », then 34:54 · « 2e
       période 3’ » with the list reading « 34’ ». 1666 unit tests, e2e 11 passed
+- [x] **The television's clock on screen, the football played beside it, and a correction sheet that
+      takes the minute you can see** — 2026-10-28. Decision **214**, superseding **213** and restoring
+      **209**'s display after one day. Of a 2×30 whose first half ran 32: « 30’+1 » for a goal at 31,
+      « 30’+2 » for the whistle, « 30’ » for the second kick-off, « 50’ » for a goal twenty minutes in —
+      and 52 minutes played. Walked in a browser at 390 px in both themes and it reads exactly that.
+      The reversal is on me: 213 was built from « if it is 31 in second half (but the first half lasted
+      34), it will be 35 », the opposite rule, and the worked example that settles it should have come
+      before 213 rather than after
+- [ ] **A minute in added time cannot be typed into the correction sheet.** « 30’+2 » is not an
+      integer, so a correction into the first half's stoppage can only be typed as 30 and lands on
+      30′00″ exactly. The field pre-fills the display minute (decision 214), so **re-saving an
+      added-time event without touching the field moves it to the period boundary** and loses the
+      seconds — a small, real corruption on a path a coach can walk. Fixing it means the field
+      accepting « 30+2 », parsed into a period and an overrun, which is a slice of its own

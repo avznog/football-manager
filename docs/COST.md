@@ -1,7 +1,7 @@
 # COST.md — what this project has cost, and what that number is not
 
-Measured on **2026-10-27**, with `main` at `255618e` (version `1.2.0`, 224 commits, 218 merged pull
-requests, 107 169 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
+Measured on **2026-10-28**, with `main` at `302a31f` (version `1.2.0`, 225 commits, 219 merged pull
+requests, 107 562 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
 2026-09-22 and its first commit landed on 2026-09-23, so everything below covers the **thirty-six
 days** the script counts.
 
@@ -55,8 +55,8 @@ reason); a long-lived session merely under-reports its tail instead.
 Divided by what it bought, which is the only form of this number that is any use when deciding
 whether to spend more:
 
-- **$9.89 per commit** (224) — the Linux machine alone was $7.52
-- **$10.16 per merged pull request** (218)
+- **$9.84 per commit** (225) — the Linux machine alone was $7.49
+- **$10.11 per merged pull request** (219)
 - **$0.0207 per line** of committed TypeScript, SQL, CSS and Markdown — two cents
 - **$61.50 per day** across the thirty-six days — was $70.46 on 2026-10-21 and $77.20 on 2026-10-16
 
@@ -125,6 +125,12 @@ abandoned — the work per day is getting cheaper against a season that is now t
 The last three snapshots on this machine, as a sanity check on everything above: **$1583.94 → $1583.94
 → $1684.24**. The middle one is the lazy flush described below, measured three times on one afternoon
 and never moving; it caught up in this reading, which is what that note predicted it would do.
+
+**Re-measured 2026-10-28: the total held at $2214.17** while `main` gained a commit and a merged pull
+request, so the rates eased a hair ($9.89 → $9.84 per commit). The lazy flush again — `7054d16c` has
+read $1397.39 since yesterday — and the same caveat as every same-session reading: the session being
+measured is the one running the script, so its tail is missing and on a long day the tail is most of
+the work.
 
 ### How to re-derive it rather than trusting this file
 
@@ -260,5 +266,5 @@ the same way. Three rules, and the first is now in `CLAUDE.md`'s definition of d
    script's output or arithmetic on one, which is why the script is in the repository rather than in
    somebody's shell history.
 3. **Date the measurement, name the commit it was taken at, and keep the previous snapshot's
-   figures.** A cost without a denominator — 224 commits, thirty-six days — says nothing at all, and a
+   figures.** A cost without a denominator — 225 commits, thirty-six days — says nothing at all, and a
    cost without its predecessor says nothing about where it is going.

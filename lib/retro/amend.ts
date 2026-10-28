@@ -28,7 +28,7 @@ import {
   type PeriodsConfig,
   MS_PER_MINUTE,
   clockMsToMinute,
-  minuteToClockMs,
+  clockMsForDisplayMinute,
   periodOfClockMs,
   periodsConfig,
   regulationMs,
@@ -111,6 +111,18 @@ export type AmendInput = {
   target: AmendTarget | null;
   /** The event to append. Null when something is simply being annulled. */
   fact: AmendFact | null;
+  /**
+   * Where each period actually kicked off, from `actualPeriodStarts(state.playIntervals)`.
+   *
+   * The minute the coach types is the one he can **see** (decision 214), so it is on the display's
+   * scale and has to be mapped back. Without this the sheet asks for a figure nobody on the screen
+   * has: the owner corrected a goal to the « 56’ » he was looking at by typing **59**, having worked
+   * out the three minutes of first-half overrun himself.
+   *
+   * Absent or empty, every period is taken to have started where it nominally does, which is the
+   * identity — right for a retro log, whose kick-offs are stamped exactly there.
+   */
+  periodStarts?: ReadonlyMap<number, number> | null;
 };
 
 export type Amendment = {
@@ -137,10 +149,18 @@ export function buildChangeAmendment(input: {
   kickoffAtMs: number;
   finalWhistleMs: number;
   change: AmendChange;
+  /** See `AmendInput.periodStarts`: the typed minute is the displayed one (decision 214). */
+  periodStarts?: ReadonlyMap<number, number> | null;
 }): Amendment {
   const periods = periodsConfig(input.periods);
   const ceilingMs = input.finalWhistleMs > 0 ? input.finalWhistleMs : regulationMs(periods);
-  const clockMs = Math.max(0, Math.min(minuteToClockMs(input.change.minute), ceilingMs));
+  const clockMs = Math.max(
+    0,
+    Math.min(
+      clockMsForDisplayMinute(input.change.minute, periods, input.periodStarts).clockMs,
+      ceilingMs,
+    ),
+  );
   return {
     events: [
       {
@@ -196,7 +216,13 @@ export function buildAmendment(input: AmendInput): Amendment {
   }
 
   if (input.fact) {
-    const stamp = amendStamp(input.fact.minute, input.target, periods, ceilingMs);
+    const stamp = amendStamp(
+      input.fact.minute,
+      input.target,
+      periods,
+      ceilingMs,
+      input.periodStarts,
+    );
     drafts.push({
       type: input.fact.type,
       period: stamp.period,
@@ -225,10 +251,18 @@ function amendStamp(
   target: AmendTarget | null,
   periods: PeriodsConfig,
   ceilingMs: number,
+  periodStarts?: ReadonlyMap<number, number> | null,
 ): { clockMs: number; period: number } {
   if (minute !== null) {
-    const clockMs = Math.min(minuteToClockMs(minute), ceilingMs);
-    return { clockMs, period: periodOfClockMs(clockMs, periods) };
+    /*
+     * The typed minute is the displayed one (decision 214), so it is mapped back onto the real clock
+     * before anything is stored. `period` comes from the mapping rather than from `periodOfClockMs`
+     * of the result: after an overrun first half the real clock of a second-half minute can land
+     * inside the first half's nominal span, and recomputing there would file it in the wrong half.
+     */
+    const stamped = clockMsForDisplayMinute(minute, periods, periodStarts);
+    const clockMs = Math.min(stamped.clockMs, ceilingMs);
+    return { clockMs, period: clockMs === stamped.clockMs ? stamped.period : periodOfClockMs(clockMs, periods) };
   }
   // The period is copied, not recomputed: at exactly 30′ of a 2×30 only the log knows whether that
   // was the end of the first half or the start of the second (`formatMinuteLabelFr`).

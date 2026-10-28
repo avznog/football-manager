@@ -8728,3 +8728,57 @@ The stacked layout is deliberate: the bar's width is accounted for to the pixel 
 width at all. It is hidden before the kick-off, when both figures are 0, and shown throughout the first
 period even though it necessarily repeats the clock above — a figure that appears out of nowhere at
 half-time is harder to read than one that has been there all along.
+
+## 214 — The television's clock, the football played beside it, and a sheet that takes the minute you can see
+
+**2026-10-28, superseding 213 and restoring 209's display.** The owner, asked for examples and given
+them: « I want the real stuff like in the real games at the TV. » Concretely, on a 2×30 whose first
+half ran to 32 —
+
+- a goal 20 minutes into the second half reads **50’**, because the second half's clock begins again
+  at 30;
+- a goal at 31 minutes of the first half reads **30’+1**, and the whistle at 32 reads **30’+2**;
+- a player on from the start has **52 minutes** played, which is 32 + 20 and is not what any clock says.
+
+That is decision **209**, which **213 removed the day before on his instruction**, and the reversal is
+the honest record: 213 was built from « if it is 31 in second half (but the first half lasted 34), it
+will be 35 », which is the opposite rule. Both messages were clear; they contradicted each other, and
+the questions that settled it should have been asked before 213 rather than after. The lesson is not
+« ask more » in general — it is that **a rule about how a number is displayed is worth one worked
+example before it is built**, because the two candidate rules differ only on a match that overran, and
+neither of us had one in front of us.
+
+**What 213 got right and is kept.** 209's real defect was never the convention; it was that the
+correction sheet's **title** said « 56’ » while its **field** held **59**, because the title was the
+display minute and the field the stored one. The owner hit exactly that: he moved a goal to the 56th
+minute by typing 59, having worked out the three minutes of first-half overrun himself. 213 closed it
+by making the two the same number; 214 closes it the other way — **the field is the minute you can
+see**, and `clockMsForDisplayMinute` maps it back. `TimelineEntry.displayMinute` is the integer that
+the label is, and it exists for that one field.
+
+So `clock_ms` is still real elapsed football, nothing stored moved under 209, 213 or 214, and minutes
+played have never depended on any of it.
+
+**The header is new and is not 209's.** Decision 213 put two clocks in it; this keeps two, but the
+second one changes meaning. The big figure is the **television's** — so it agrees with the feed, which
+is non-negotiable — and under it sits **the football actually played**: « 50:00 » over « 51’ jouées ».
+The owner chose that over the current period's own time, and the reason it is the better of the two is
+that the period's time is a restatement of the big figure minus 30, while the played figure is the
+number every minutes-played column in the app is built from and the only one no other screen shows.
+
+Two things carried over from 213 because they were improvements rather than part of the convention:
+
+- **`stoppageMinutes` is ceiled once, in `readClock`.** `match-bar.tsx` floored the badge while
+  `formatMinuteLabelFr` ceiled the label, so the first ten seconds of added time printed « +0 » beside
+  an announced « 30’+1 ». One spelling, and the badge sits on the second line because the big figure
+  is *already* « 30’+1 » and saying +1 twice in one row reads as two different things.
+- **Stoppage is measured against the period's own length**, not the match's nominal end. A second half
+  kicking off at 32′ of a 2×30 has had its thirty minutes at 62′ of football; measuring against 60′
+  put the board up two minutes early, while the half was still inside its time.
+
+**The one thing this convention cannot express, named rather than hidden:** a minute in added time has
+no integer. « 30’+2 » is not a number the sheet's field can hold, so a correction into the first half's
+stoppage can only be typed as 30, which lands on 30′00″ exactly. The pre-fill is the display minute, so
+re-saving an added-time event without touching the field moves it to the period boundary and loses the
+seconds. It is on `docs/ROADMAP.md`; fixing it means the field accepting « 30+2 », which is a different
+slice.

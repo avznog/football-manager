@@ -3,7 +3,6 @@
 import Link from "next/link";
 
 import { SCORE_SEPARATOR_FR } from "@/lib/calendar/labels";
-import { ordinalPeriodFr } from "@/lib/match/presenter";
 import type { ClockReading } from "@/lib/match/clock";
 
 export type MatchBarProps = {
@@ -135,21 +134,29 @@ export function MatchBar({
             </span>
           </p>
 
-          {/* Hidden until the kick-off, when both figures are 0 and the line would say nothing. In the
-              first period it necessarily repeats the clock above — they are the same number until
-              half-time — and it is shown anyway, because a figure that appears out of nowhere at
-              half-time is harder to read than one that has been there all along. */}
+          {/*
+            The football actually played, under the clock that is on the television (decision 214).
+            After an overrun period the two differ, and the difference is the point: the big figure is
+            the minute every screen in the app calls this moment, and this one is the number every
+            player's minutes are built from. « 43:00 » over « 45’ jouées » is a first half that ran to
+            32 and a second that has had 13.
+
+            Hidden until the kick-off, when both are 0 and the line says nothing. Through the first
+            period it necessarily repeats the clock above — before any overrun they *are* the same
+            number — and it is shown anyway, because a figure that appears out of nowhere at half-time
+            is harder to read than one that has been there all along.
+          */}
           {reading.phase !== "before-kickoff" ? (
             <p
               role="img"
               className="flex items-baseline gap-1 text-xs leading-none text-ink-muted"
-              aria-label={`${ordinalPeriodFr(reading.period)} ${reading.periodLabel}`}
+              aria-label={`${reading.playedLabel} jouées`}
             >
-              <span className="tabular-nums">
-                {ordinalPeriodFr(reading.period)} {reading.periodLabel}
-              </span>
-              {/* The added time of *this* period, ceiled in `readClock` so the badge and the figure
-                  it sits beside can no longer disagree about the first minute of it. */}
+              <span className="tabular-nums">{reading.playedLabel} jouées</span>
+              {/* The added time of the period in progress, ceiled once in `readClock` so the badge and
+                  the « 30’+1 » the clock above announces can no longer disagree about its first
+                  minute. It sits here rather than beside the big figure because the big figure is
+                  already « 30’+1 »: saying +1 twice in one row reads as two different things. */}
               {reading.stoppageMinutes > 0 ? (
                 <span className="font-semibold text-warning">+{reading.stoppageMinutes}</span>
               ) : null}

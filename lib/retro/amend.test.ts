@@ -5,6 +5,13 @@ import type { SlotInfo } from "@/lib/match/lineup";
 import { playerState, reduceMatch } from "@/lib/match/reducer";
 
 import { type RetroEntry, buildRetroLog, retroEventRecords } from "./log";
+import {
+  actualPeriodStarts,
+  clockMsForDisplayMinute,
+  displayMinute,
+  periodsConfig,
+} from "@/lib/match/clock";
+
 import { buildAmendment, isAmendableEventType } from "./amend";
 
 /* -------------------------------------------------------------------------- */
@@ -322,5 +329,109 @@ describe("isAmendableEventType", () => {
     ] as const) {
       expect(isAmendableEventType(type), type).toBe(false);
     }
+  });
+});
+
+/*
+ * The owner's own bug, 2026-10-27, and the arithmetic he did by hand to get round it.
+ *
+ * A first half let run to 33′ puts the second half's kick-off at 33′ of real match time while the
+ * screen counts it from 30′. So a goal the feed calls « 56’ » is stored at 59′ — and the correction
+ * sheet's title said 56 while its field held 59. He wanted the goal at 56, saw 53 in the field, and
+ * typed **59** to make the screen read 56. It worked. Nothing told him he was converting for the app.
+ */
+describe("a minute typed into the correction sheet is the one the sheet shows (decision 214)", () => {
+  const LATE_END = 33 * MINUTE;
+
+  /** A 2×30 whose first half ran to 33′, so every second-half display minute is 3′ behind the clock. */
+  const overrunMatch = () => {
+    const base: RetroEntry = {
+      ...BASE,
+      kickoffAtMs: KICKOFF_AT_MS,
+    };
+    const stored = storedMatch(base);
+    // The log the fixture builds stamps its periods nominally; re-stamp the second half as a coach
+    // who let the first one run would have, which is what `nextEventStamp` does live.
+    return stored.map((event) => {
+      if (event.period === 2) return { ...event, clockMs: event.clockMs + 3 * MINUTE };
+      if (event.type === "PERIOD_END" && event.period === 1) return { ...event, clockMs: LATE_END };
+      return event;
+    });
+  };
+
+  it("maps a typed display minute back onto the clock, so the feed reads what he typed", () => {
+    const stored = overrunMatch();
+    const starts = actualPeriodStarts(reduce(stored).playIntervals);
+
+    const amendment = buildAmendment({
+      submissionId: SUBMISSION,
+      periods: PERIODS,
+      kickoffAtMs: KICKOFF_AT_MS,
+      finalWhistleMs: 63 * MINUTE,
+      target: null,
+      // He types 56, the minute he can see. Under the old sheet this landed at 56′ of the clock and
+      // showed « 53’ », which is the mismatch he worked around.
+      fact: { type: "GOAL_FOR", memberId: P.mcl, assistId: null, minute: 56 },
+      periodStarts: starts,
+    });
+
+    const appended = amendment.events.at(-1)!;
+    // Stored at 59′ — the real football — and filed in the second half.
+    expect(appended.clockMs).toBe(59 * MINUTE);
+    expect(appended.minute).toBe(59);
+    expect(appended.period).toBe(2);
+
+    // And the feed, which is the only thing he was looking at, says 56.
+    const state = reduce([
+      ...stored,
+      ...amendment.events.map((event, index) => ({
+        ...event,
+        id: uuid("fff", index + 1),
+        seq: stored.length + index + 1,
+      })),
+    ]);
+    const goal = state.timeline.find((line) => line.eventId === uuid("fff", 1))!;
+    expect(goal.minuteLabel).toBe("56’");
+    expect(goal.displayMinute).toBe(56);
+    // The stored minute is still the real one, because every minute played is built from it.
+    expect(goal.minute).toBe(59);
+  });
+
+  it("round-trips: the sheet pre-fills what it would store back unchanged", () => {
+    const stored = overrunMatch();
+    const starts = actualPeriodStarts(reduce(stored).playIntervals);
+    for (const typed of [0, 10, 29, 31, 45, 56, 60]) {
+      const { clockMs, period } = clockMsForDisplayMinute(typed, periodsConfig(PERIODS), starts);
+      // Whatever he types comes back as the same number on the screen, which is the whole contract.
+      expect(displayMinute(clockMs, period, periodsConfig(PERIODS), starts.get(period))).toBe(typed);
+    }
+  });
+
+  it("is the identity when the periods started where they should", () => {
+    // A retro log stamps its kick-offs exactly at the nominal start, so nothing moves for it.
+    for (const typed of [0, 17, 30, 44, 60]) {
+      expect(clockMsForDisplayMinute(typed, periodsConfig(PERIODS)).clockMs).toBe(typed * MINUTE);
+      expect(clockMsForDisplayMinute(typed, periodsConfig(PERIODS), new Map()).clockMs).toBe(
+        typed * MINUTE,
+      );
+    }
+  });
+
+  it("files a second-half minute in the second half, even though its clock lands in the first's span", () => {
+    // 31 displayed is 34′ of football here. `periodOfClockMs(34′)` would say period 2 as well, but at
+    // 30 displayed → 33′ the two disagree, and the mapping's answer is the one that must win.
+    const starts = new Map([
+      [1, 0],
+      [2, LATE_END],
+    ]);
+    expect(clockMsForDisplayMinute(31, periodsConfig(PERIODS), starts)).toEqual({
+      clockMs: 34 * MINUTE,
+      period: 2,
+    });
+    // And the first half's own minutes are untouched by the second's overrun.
+    expect(clockMsForDisplayMinute(12, periodsConfig(PERIODS), starts)).toEqual({
+      clockMs: 12 * MINUTE,
+      period: 1,
+    });
   });
 });

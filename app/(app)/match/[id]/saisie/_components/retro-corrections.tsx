@@ -338,7 +338,13 @@ function AmendFields({
   const [assistId, setAssistId] = useState(
     line.actors.find((actor) => actor.role === "assist")?.memberId ?? "",
   );
-  const [minute, setMinute] = useState(String(line.minute));
+  /*
+   * The displayed minute, not the stored one (decision 214). The sheet's own title reads
+   * « Corriger — But 56’ », so a field pre-filled with the 59 that moment is stored at asks the coach
+   * to reconcile two numbers the app knows how to reconcile itself — and the one time that happened
+   * for real, he typed 59 by hand to get 56 on screen.
+   */
+  const [minute, setMinute] = useState(String(line.displayMinute));
 
   // A substitution or a change is not editable field by field — the players and the minute are one
   // fact. The honest correction is to annul it and add the right one, which is what the sheet offers.
