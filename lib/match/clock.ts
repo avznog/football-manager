@@ -250,6 +250,33 @@ export function formatMinuteFieldFr(
   return `${clockMsToMinute(nominalEnd)}+${extra}`;
 }
 
+/**
+ * The minutes a period ends on: `[30, 60]` of a 2×30, `[20, 40, 60]` of a 3×20.
+ *
+ * The only minutes the stoppage notation can name (`30+2`, `60+1`), which is why the added-time field
+ * offers them and nothing else.
+ */
+export function periodEndMinutes(config: PeriodsConfig): number[] {
+  return Array.from({ length: config.periodsCount }, (_, index) =>
+    clockMsToMinute(periodEndMs(index + 1, config)),
+  );
+}
+
+/**
+ * Which period end a minute belongs to, for the moment the coach fills the added-time box
+ * (decision 218).
+ *
+ * He is looking at a goal the screen calls « 36’ » and realises it was in added time. 36 of a 2×30 is
+ * in the second half, so the added time he means is the second half's and the minute becomes **60**.
+ * A goal at 12′ would become 30. The first end at or after the minute, and the last one if it is
+ * past them all — an empty field counts as the start of the match, which gives the first period.
+ */
+export function snapToPeriodEnd(minute: number | null, config: PeriodsConfig): number {
+  const ends = periodEndMinutes(config);
+  const from = typeof minute === "number" && Number.isFinite(minute) ? minute : 0;
+  return ends.find((end) => from <= end) ?? ends[ends.length - 1]!;
+}
+
 /** The shape the field accepts, for a message and for a client-side check. */
 export const MINUTE_FIELD_PATTERN = /^(\d{1,3})(?:\+(\d{1,2}))?$/;
 

@@ -8911,3 +8911,58 @@ client's behaviour and from one hand-run, and it says so in the script.
 both jobs; keeping them apart means the job that only reads cannot write, and the job that writes the old
 app holds no account-level access. `SUPABASE_SERVICE_ROLE_KEY` for `push-match`,
 `SUPABASE_ACCESS_TOKEN` for `sync-ratings`, and the existing `DATABASE_URL` for both.
+
+## 217 — Every feed prints the football played under the minute
+
+**2026-10-28.** The owner: « in all the feed, put smaller the real time. For example, in the feed, I
+get two 36 times. under it, I need the exact timing, maybe 36:44 or 42:32 (if there has been extra time
+on the first half) ».
+
+Under the television convention (214) a minute label **repeats**, and that is not a defect of the
+convention — it is what a television minute is. Two actions forty seconds apart both read « 36’ ». So
+every feed now carries `mm:ss` of real football played, small, under the label: `36’` over `42:32`.
+`TimelineEntry.clock` and `CompositionSnapshot.clock` are built in the reducer beside `minuteLabel`,
+one spelling, and threaded to the four places that print a minute — the match page's déroulé, game
+mode's own feed, the correction screen's déroulé and the compositions strip.
+
+**The correction screen is the one that needed it most.** Choosing which of two lines reading « 36’ »
+to correct is the whole job there, and the label could not tell them apart.
+
+**What it does not do, which is worth knowing before relying on it.** It separates two actions that
+happened at different instants, which is the live case and the owner's. It cannot separate two events
+stamped at the *same* instant — a `PERIOD_END` and the `KICKOFF` that follows it both read « 30:00 »,
+and only their names differ. And on a **retro-entered** match every event is stamped on a whole minute,
+so the second line is always `:00` and adds nothing: that log never had seconds to lose.
+
+## 218 — The « + » is not typed: added time is a second box
+
+**2026-10-28.** Decision 215 let the minute field hold `30+2`, and the owner found the hole in it from
+a phone the same day: « I feel that on the phone there is no possibility to add "+1", as the keyboard
+is only numbers. »
+
+He is right, and it is a defect 215 introduced. `inputMode="numeric"` is what makes a phone open the
+digits keypad, and **that keypad has no `+`**. Switching to a text keyboard would offer the `+` and
+also every letter, for a field that wants three digits — worse.
+
+So the `+` stops being something to type. **Two numeric boxes**, and his description of the behaviour
+is the specification: « add another field for additional time, that, if filled up with a minute, changes
+the first field to either 30 or 60 ».
+
+**The snap is the whole interaction.** Added time only exists at the end of a period, so filling the
+second box means the first must be a period's end — and *which* end is not a guess: it is the end of the
+period the minute is already in. A goal the screen calls « 36’ » is in the second half, so it becomes
+`60+n`; one at 12′ becomes `30+n`. `snapToPeriodEnd` is pure and knows nothing about halves, so a 3×20
+snaps to 20, 40 or 60.
+
+Two smaller decisions inside it:
+
+- **Emptying the added-time box leaves the snapped minute alone** rather than restoring what was there
+  before. Undoing a snap by guessing what he meant two keystrokes ago is how a minute changes without
+  anybody asking; 60 is a true minute, and he can edit it.
+- **`+0` is not added time**, it is no added time: the suffix is dropped and the minute kept, because
+  « 30+0 » is a thing the parser would have to refuse and a reader would have to interpret.
+
+The parent component still holds **one string** — `30+2`, the value the form posts and the server
+validates — and never sees the two halves. `MinuteField` is the only place that splits it, which is
+what stops the boxes and the wire drifting apart. Both sheets that take a minute on a finished match use
+it: the correction sheet and « Ajouter un changement ».

@@ -60,6 +60,8 @@ export type RetroTimelineLine = {
   /** The minute as the sheet's field holds it: `56`, or `30+2` in added time (decision 215). */
   minuteField: string;
   minuteLabel: string;
+  /** `42:32` — real football played, under the label in the déroulé (decision 217). */
+  clock: string;
   labelFr: string;
   voided: boolean;
   actors: TimelineEntry["actors"];
@@ -190,6 +192,7 @@ function toTimelineLine(entry: TimelineEntry): RetroTimelineLine {
     displayMinute: entry.displayMinute,
     minuteField: entry.minuteField,
     minuteLabel: entry.minuteLabel,
+    clock: entry.clock,
     // « Changement », « Changement de poste », « Composition de départ » — the same words game mode
     // and the recap use (`pitchEventFr`, decision 152), rather than « Composition appliquée ».
     labelFr: pitchEventFr(entry, () => "")?.title ?? entry.labelFr,

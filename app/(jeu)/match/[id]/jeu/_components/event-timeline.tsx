@@ -30,8 +30,11 @@ export function EventTimeline({ lines, onVoid }: EventTimelineProps) {
         <ol className="divide-y divide-border/60">
           {lines.map((line) => (
             <li key={line.eventId} className="flex items-start gap-3 px-4 py-3">
-              <span className="w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold text-ink-muted tabular-nums">
-                {line.minuteLabel}
+              {/* Same pair as the recap's déroulé (decision 217): the minute a screen calls this
+                  moment, and under it the football played, which no two actions share. */}
+              <span className="flex w-14 shrink-0 flex-col pt-0.5 font-mono tabular-nums">
+                <span className="text-sm font-semibold text-ink-muted">{line.minuteLabel}</span>
+                <span className="text-[10px] leading-tight text-ink-subtle">{line.clock}</span>
               </span>
 
               <span className="min-w-0 flex-1">

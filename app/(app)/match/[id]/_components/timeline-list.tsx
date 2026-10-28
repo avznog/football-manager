@@ -35,8 +35,12 @@ export function TimelineList({ entries }: { entries: readonly RecapTimelineEntry
       <ol className="divide-y divide-border/60 border-t border-border/60">
         {entries.map((entry) => (
           <li key={entry.eventId} className="flex items-baseline gap-3 px-4 py-2.5">
-            <span className="w-11 shrink-0 font-mono text-sm text-ink-subtle tabular-nums">
-              {entry.minuteLabel}
+            {/* The television minute, and under it the football actually played (decision 217). A
+                label repeats — the same minute of two halves, or two actions that round to it — and
+                the `mm:ss` is the one figure that is different for every instant of the match. */}
+            <span className="flex w-14 shrink-0 flex-col font-mono tabular-nums">
+              <span className="text-sm text-ink-subtle">{entry.minuteLabel}</span>
+              <span className="text-[10px] leading-tight text-ink-subtle/70">{entry.clock}</span>
             </span>
 
             <span

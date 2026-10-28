@@ -20,7 +20,6 @@ import { startTransition, useMemo, useState } from "react";
 
 import { MultiPlayerPicker, TerrainSheet } from "@/components/action-sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
 import {
   availableOptions,
@@ -36,6 +35,8 @@ import {
   periodsConfig,
 } from "@/lib/match/clock";
 import { changeArrangement, terrainPayload, type SlotAssignment } from "@/lib/match/terrain";
+
+import { MinuteField } from "./minute-field";
 import { changeCandidateIds, stateAtClock } from "@/lib/retro/change";
 import type { RetroView } from "@/lib/retro/queries";
 
@@ -185,7 +186,7 @@ export function AddChange({
         open
         onClose={close}
         title="Ajouter un changement"
-        description={`À quelle minute ? Entre 0 et ${maxMinute}, ou 30+2 pour le temps additionnel : les listes suivantes montrent le terrain à cette minute-là.`}
+        description={`À quelle minute ? Entre 0 et ${maxMinute}, ou la deuxième case pour le temps additionnel : les listes suivantes montrent le terrain à cette minute-là.`}
         footer={
           <Button
             fullWidth
@@ -206,20 +207,16 @@ export function AddChange({
           </Button>
         }
       >
-        <div className="flex items-center gap-2">
-          <Input
-            aria-label="Minute du changement"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]{1,3}([+][0-9]{1,2})?"
-            maxLength={6}
-            value={minuteText}
-            invalid={minuteText !== "" && !minuteOk}
-            onChange={(event) => setMinuteText(event.target.value)}
-            className="w-24 min-h-11 text-center"
-          />
-          <span className="text-sm text-ink-muted">ᵉ minute</span>
-        </div>
+        {/* The same two boxes as the correction sheet (decision 218): the « + » is not typed, it is
+            the second box, because a phone's numeric keyboard has no key for it. No `name`, because
+            this flow builds its own FormData at the last step. */}
+        <MinuteField
+          label="Minute du changement"
+          value={minuteText}
+          onChange={setMinuteText}
+          periods={periods}
+          invalid={minuteText !== "" && !minuteOk}
+        />
       </Sheet>
     );
   }

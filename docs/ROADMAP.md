@@ -2704,3 +2704,15 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       log is a pitch snapshot and theirs is a list of exchanges, so something is lost in every group
       change. It costs nothing today because their only consumer of `substitutions` is the minutes
       recompute, which cares about presence and not about who swapped with whom
+- [x] **The football played, under the minute, in every feed** — 2026-10-28. Decision **217**. Under the
+      television convention a label repeats — « I get two 36 times » — so each line now carries `mm:ss`
+      of real play beneath it: `36’` over `42:32`. Built once in the reducer, printed in the match
+      page's déroulé, game mode's feed, the correction screen and the compositions strip. It separates
+      two actions at different instants, which is the live case; it cannot separate two events stamped
+      at the same instant, and on a retro match it is always `:00`
+- [x] **Added time is a second box, because a phone's keypad has no « + »** — 2026-10-28. Decision
+      **218**, closing a defect decision 215 shipped the same day. Two numeric inputs; filling the
+      second snaps the first to the end of the period it is in, so 36 becomes 60 and 12 becomes 30, and
+      a 3×20 snaps to 20, 40 or 60. The parent still holds one string (`60+2`) and `MinuteField` is the
+      only thing that splits it. Verified in a browser at 390 px: typing 2 in the second box moved the
+      first from 52 to 60 and posted `60+2`
