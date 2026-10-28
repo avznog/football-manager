@@ -88,6 +88,7 @@ import {
   actualPeriodStarts,
   clockMsToMinute,
   displayMinute,
+  formatMinuteFieldFr,
   formatMinuteLabelFr,
   msToWholeMinutes,
   periodsConfig,
@@ -326,6 +327,12 @@ export type TimelineEntry = {
    * it. The field holds this now, and `lib/retro/amend.ts` maps it back.
    */
   displayMinute: number;
+  /**
+   * The same moment in the **minute field's** own notation: `56`, or `30+2` for added time
+   * (decision 215). Plain ASCII, so the correction sheet can pre-fill it and a coach can type it —
+   * which `displayMinute` alone cannot express, there being no integer for the first half's stoppage.
+   */
+  minuteField: string;
   /** French name of the event kind. Player names are the UI's job — the reducer knows none. */
   labelFr: string;
   /** True when a `VOID` points at this event: show it, struck through. */
@@ -1241,6 +1248,7 @@ export function reduceMatch(
         periodStarts.get(event.period),
       ),
       displayMinute: displayMinute(clockMs, event.period, periods, periodStarts.get(event.period)),
+      minuteField: formatMinuteFieldFr(clockMs, event.period, periods, periodStarts.get(event.period)),
       labelFr: EVENT_LABELS_FR[event.type],
       voided,
       voidedByEventId: voidedBy.get(event.id) ?? null,

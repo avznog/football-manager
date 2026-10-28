@@ -229,6 +229,88 @@ export function formatMinuteLabelFr(
 }
 
 /**
+ * The minute field's own notation: `56`, or `30+2` for added time (decision 215).
+ *
+ * The plain ASCII twin of `formatMinuteLabelFr`, which writes « 30’+2 » with a typographic prime that
+ * nobody can type. It exists because the correction sheet's field must be able to **hold what the
+ * label says**: the field used to take an integer only, so a goal scored in the first half's added
+ * time had no minute a coach could enter — typing 32 of a 2×30 means two minutes into the *second*
+ * half, which is a different seven and a different afternoon.
+ */
+export function formatMinuteFieldFr(
+  clockMs: number,
+  period: number,
+  config: PeriodsConfig,
+  periodStartedAtMs?: number | null,
+): string {
+  const displayMs = displayClockMs(clockMs, period, config, periodStartedAtMs);
+  const nominalEnd = periodEndMs(period, config);
+  if (displayMs <= nominalEnd) return String(clockMsToMinute(displayMs));
+  const extra = Math.ceil((displayMs - nominalEnd) / MS_PER_MINUTE);
+  return `${clockMsToMinute(nominalEnd)}+${extra}`;
+}
+
+/** The shape the field accepts, for a message and for a client-side check. */
+export const MINUTE_FIELD_PATTERN = /^(\d{1,3})(?:\+(\d{1,2}))?$/;
+
+/**
+ * A typed minute, on the display's scale, as a position in the match.
+ *
+ * `period` cannot be derived from `displayMs` and that is the whole subtlety: `30+2` of a 2×30 is
+ * 32 minutes on the display's scale, and 32 read as a plain minute falls in the **second** half. The
+ * stoppage form names its period by that period's nominal **end**, so `30+2` is the first half and
+ * `60+1` the second, and the period comes from matching that end rather than from the millisecond.
+ *
+ * `null` when the text is not a minute at all, or when the `A` of `A+n` is no period's nominal end —
+ * `25+2` of a 2×30 names nothing, and guessing which half it meant is exactly the kind of guess that
+ * puts a goal on the wrong seven.
+ */
+export function parseMinuteFieldFr(
+  value: string,
+  config: PeriodsConfig,
+): { displayMs: number; period: number } | null {
+  const match = MINUTE_FIELD_PATTERN.exec(value.trim());
+  if (!match) return null;
+  const minute = Number(match[1]);
+  if (!Number.isFinite(minute)) return null;
+
+  if (match[2] === undefined) {
+    const displayMs = minuteToClockMs(minute);
+    return { displayMs, period: periodOfClockMs(displayMs, config) };
+  }
+
+  const extra = Number(match[2]);
+  if (!Number.isFinite(extra) || extra <= 0) return null;
+  // Which period ends on that minute. Exhaustive rather than arithmetic, because `periodMinutes` is
+  // the team's own setting and a match of 3×20 ends its periods on 20, 40 and 60.
+  for (let period = 1; period <= config.periodsCount; period += 1) {
+    if (clockMsToMinute(periodEndMs(period, config)) === minute) {
+      return { displayMs: periodEndMs(period, config) + extra * MS_PER_MINUTE, period };
+    }
+  }
+  return null;
+}
+
+/**
+ * Where a typed minute lands on the real clock: `parseMinuteFieldFr`, then the inverse of the display
+ * mapping. `null` for anything the field should refuse.
+ */
+export function clockMsForMinuteField(
+  value: string,
+  config: PeriodsConfig,
+  periodStarts?: ReadonlyMap<number, number> | null,
+): { clockMs: number; period: number } | null {
+  const parsed = parseMinuteFieldFr(value, config);
+  if (!parsed) return null;
+  const nominalStart = periodStartMs(parsed.period, config);
+  const actualStart = periodStarts?.get(parsed.period) ?? nominalStart;
+  return {
+    clockMs: Math.max(0, actualStart + (parsed.displayMs - nominalStart)),
+    period: parsed.period,
+  };
+}
+
+/**
  * The **inverse** of `displayClockMs`: the real match clock for a minute the coach typed on the
  * display's scale (decision 214).
  *

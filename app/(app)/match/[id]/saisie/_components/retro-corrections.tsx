@@ -27,9 +27,9 @@ import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Sheet } from "@/components/ui/sheet";
+import { regulationMinutes } from "@/lib/match/clock";
 import { cn } from "@/components/ui/cn";
 import { EVENT_LABELS_FR } from "@/lib/match/events";
-import { regulationMinutes } from "@/lib/match/clock";
 import { submitAmendment } from "@/lib/retro/actions";
 import {
   RETRO_FACT_TYPES,
@@ -78,6 +78,8 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
   const nameOf = (memberId: string) =>
     view.players.find((player) => player.memberId === memberId)?.displayName ?? "Joueur retiré";
 
+  // Only « Ajouter un changement » still needs it, for the last minute a change can be made at: the
+  // correction sheet's own minute field stopped being a number with decision 215.
   const regulation = regulationMinutes({
     periodsCount: view.match.periodsCount,
     periodMinutes: view.match.periodMinutes,
@@ -183,7 +185,6 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
         teamId={teamId}
         view={view}
         line={openLine}
-        regulation={regulation}
         pending={pending}
         action={dispatch("line")}
         onClose={() => setOpenLine(null)}
@@ -193,7 +194,6 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
         teamId={teamId}
         view={view}
         open={adding}
-        regulation={regulation}
         pending={pending}
         action={dispatch("line")}
         onClose={() => setAdding(false)}
@@ -219,7 +219,6 @@ function AddSheet({
   teamId,
   view,
   open,
-  regulation,
   pending,
   action,
   onClose,
@@ -227,7 +226,6 @@ function AddSheet({
   teamId: string;
   view: RetroView;
   open: boolean;
-  regulation: number;
   pending: boolean;
   action: (payload: FormData) => void;
   onClose: () => void;
@@ -255,7 +253,6 @@ function AddSheet({
           assistId={assistId}
           minute={minute}
           players={view.players}
-          regulation={regulation}
           onType={setType}
           onMember={setMemberId}
           onAssist={setAssistId}
@@ -280,7 +277,6 @@ function AmendSheet({
   teamId,
   view,
   line,
-  regulation,
   pending,
   action,
   onClose,
@@ -288,7 +284,6 @@ function AmendSheet({
   teamId: string;
   view: RetroView;
   line: RetroTimelineLine | null;
-  regulation: number;
   pending: boolean;
   action: (payload: FormData) => void;
   onClose: () => void;
@@ -306,7 +301,6 @@ function AmendSheet({
           teamId={teamId}
           view={view}
           line={line}
-          regulation={regulation}
           pending={pending}
           action={action}
         />
@@ -319,14 +313,12 @@ function AmendFields({
   teamId,
   view,
   line,
-  regulation,
   pending,
   action,
 }: {
   teamId: string;
   view: RetroView;
   line: RetroTimelineLine;
-  regulation: number;
   pending: boolean;
   action: (payload: FormData) => void;
 }) {
@@ -344,7 +336,7 @@ function AmendFields({
    * to reconcile two numbers the app knows how to reconcile itself — and the one time that happened
    * for real, he typed 59 by hand to get 56 on screen.
    */
-  const [minute, setMinute] = useState(String(line.displayMinute));
+  const [minute, setMinute] = useState(line.minuteField);
 
   // A substitution or a change is not editable field by field — the players and the minute are one
   // fact. The honest correction is to annul it and add the right one, which is what the sheet offers.
@@ -375,7 +367,6 @@ function AmendFields({
             assistId={assistId}
             minute={minute}
             players={view.players}
-            regulation={regulation}
             onType={setType}
             onMember={setMemberId}
             onAssist={setAssistId}
@@ -413,7 +404,6 @@ function FactFields({
   assistId,
   minute,
   players,
-  regulation,
   onType,
   onMember,
   onAssist,
@@ -424,7 +414,6 @@ function FactFields({
   assistId: string;
   minute: string;
   players: RetroView["players"];
-  regulation: number;
   onType: (value: RetroFactType) => void;
   onMember: (value: string) => void;
   onAssist: (value: string) => void;
@@ -481,21 +470,31 @@ function FactFields({
       ) : null}
 
       <div className="flex items-center gap-2">
+        {/*
+          `text`, not `number`, since decision 215: added time is « 30+2 », which a numeric input
+          refuses to hold. `inputMode="numeric"` still brings up the digits keyboard on a phone, and
+          the `+` is on it. The pattern is the same one the server validates with, so the browser
+          refuses the same strings. `[+]` rather than `\+` because a JSX attribute is literal text and
+          not a JS string, so a backslash here would reach the DOM as a backslash.
+        */}
         <Input
           aria-label="Minute de l’action"
           name="fact-minute"
-          type="number"
+          type="text"
           inputMode="numeric"
-          min={0}
-          max={regulation}
-          step={1}
+          pattern="[0-9]{1,3}([+][0-9]{1,2})?"
+          maxLength={6}
           placeholder="?"
           value={minute}
           onChange={(event) => onMinute(event.target.value)}
-          className="w-20 min-h-11 text-center"
+          className="w-24 min-h-11 text-center"
         />
         <span className="text-sm text-ink-muted">
-          {minute === "" ? "minute inconnue" : "ᵉ minute"}
+          {minute === ""
+            ? "minute inconnue"
+            : minute.includes("+")
+              ? "temps additionnel"
+              : "ᵉ minute"}
         </span>
       </div>
     </>

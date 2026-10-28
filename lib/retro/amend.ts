@@ -28,7 +28,7 @@ import {
   type PeriodsConfig,
   MS_PER_MINUTE,
   clockMsToMinute,
-  clockMsForDisplayMinute,
+  clockMsForMinuteField,
   periodOfClockMs,
   periodsConfig,
   regulationMs,
@@ -92,8 +92,11 @@ export type AmendFact = {
   type: RetroFactType;
   memberId: string | null;
   assistId: string | null;
-  /** Null keeps the annulled event's minute, or the middle of the match for a pure addition. */
-  minute: number | null;
+  /**
+   * The minute **as the sheet showed it**, text so that `30+2` survives (decisions 214, 215). Null
+   * keeps the annulled event's minute, or the middle of the match for a pure addition.
+   */
+  minute: string | null;
 };
 
 export type AmendInput = {
@@ -131,7 +134,8 @@ export type Amendment = {
 
 /** A change added after the match: the whole pitch after it, at a minute (decision 147). */
 export type AmendChange = {
-  minute: number;
+  /** As typed: `20`, or `30+2` for a change made in added time (decision 215). */
+  minute: string;
   slots: readonly { slotId: string; memberId: string }[];
 };
 
@@ -154,13 +158,12 @@ export function buildChangeAmendment(input: {
 }): Amendment {
   const periods = periodsConfig(input.periods);
   const ceilingMs = input.finalWhistleMs > 0 ? input.finalWhistleMs : regulationMs(periods);
-  const clockMs = Math.max(
-    0,
-    Math.min(
-      clockMsForDisplayMinute(input.change.minute, periods, input.periodStarts).clockMs,
-      ceilingMs,
-    ),
-  );
+  const placed = clockMsForMinuteField(input.change.minute, periods, input.periodStarts);
+  // `null` is a minute the field's shape allowed and this match has no place for — « 25+2 » of a 2×30.
+  // The action checks for it before calling and says so; falling back to 0 here would silently put a
+  // change at the kick-off, which is the worst of the available wrong answers.
+  if (!placed) throw new Error(`Minute hors du match : ${input.change.minute}`);
+  const clockMs = Math.max(0, Math.min(placed.clockMs, ceilingMs));
   return {
     events: [
       {
@@ -247,7 +250,7 @@ export function buildAmendment(input: AmendInput): Amendment {
 }
 
 function amendStamp(
-  minute: number | null,
+  minute: string | null,
   target: AmendTarget | null,
   periods: PeriodsConfig,
   ceilingMs: number,
@@ -260,9 +263,16 @@ function amendStamp(
      * of the result: after an overrun first half the real clock of a second-half minute can land
      * inside the first half's nominal span, and recomputing there would file it in the wrong half.
      */
-    const stamped = clockMsForDisplayMinute(minute, periods, periodStarts);
-    const clockMs = Math.min(stamped.clockMs, ceilingMs);
-    return { clockMs, period: clockMs === stamped.clockMs ? stamped.period : periodOfClockMs(clockMs, periods) };
+    const stamped = clockMsForMinuteField(minute, periods, periodStarts);
+    if (stamped) {
+      const clockMs = Math.min(stamped.clockMs, ceilingMs);
+      return {
+        clockMs,
+        period: clockMs === stamped.clockMs ? stamped.period : periodOfClockMs(clockMs, periods),
+      };
+    }
+    // Unplaceable: fall through to the target's own stamp, so a correction that only meant to change
+    // the scorer is not moved to the kick-off by a minute the action should already have refused.
   }
   // The period is copied, not recomputed: at exactly 30′ of a 2×30 only the log knows whether that
   // was the end of the first half or the start of the second (`formatMinuteLabelFr`).

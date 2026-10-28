@@ -7213,3 +7213,52 @@ Files: `lib/match/clock.ts`, `lib/match/clock.test.ts`, `lib/match/reducer.ts`, 
 `app/(jeu)/match/[id]/jeu/_components/match-bar.tsx`,
 `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `e2e/offline.spec.ts`, `CLAUDE.md`,
 `docs/DECISIONS.md` (214), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.
+
+### A correction in added time, the same day the hole was named
+
+Decision **215**. The owner read 214's roadmap note and answered it in one line: « I want to be able to
+add corrections in additional time of first or second half !! »
+
+The field took an integer, and under the television convention the first half's stoppage has none —
+« 30’+2 » looks like 32, and **32 as a plain minute is two minutes into the second half**, a different
+seven. So `30+2` is a minute the field accepts now, and the thing that makes it work is that **the
+period comes from the parse and never from the millisecond**: the stoppage form names its period by
+that period's nominal end, so `30+2` is the first half and `60+1` the second. A stoppage on a minute no
+period ends on (« 25+2 » of a 2×30) is refused rather than guessed, because guessing the half is how a
+goal lands on the wrong seven. The period search is a loop, so a 3×20 works too.
+
+`formatMinuteFieldFr` is `formatMinuteLabelFr` without the typographic prime, and the field **pre-fills
+from it** — which is what makes re-saving an added-time correction leave the event alone. 214 could not:
+its field held the display integer, so a re-save jumped the event to the period boundary and lost the
+seconds. A test round-trips every minute of a match that overran, added time included.
+
+Three places moved together, because the notation is not a number. `AmendFact.minute` and
+`AmendChange.minute` are text — but **the entry form's rows keep their integer on purpose**: that sheet
+types up a match with no log at all, whose periods begin where they nominally do, so it has no overrun
+to name. « Ajouter un changement » now carries `{ minuteText, clockMs, period }` through its flow
+instead of a minute, because every step after the first asks about the clock. And the inputs are
+`type="text"` with `inputMode="numeric"` so a phone still offers digits and the `+`.
+
+Two small things worth the next session's attention:
+
+- **`pattern="[0-9]{1,3}([+][0-9]{1,2})?"` uses `[+]` and not `\+`** — a JSX attribute is literal text,
+  not a JS string, so a backslash reaches the DOM as a backslash and the browser's own check breaks.
+  Written wrong first, caught by reading the rendered attribute.
+- **An unplaceable minute is a sentence, not a fallback.** The action checks
+  `clockMsForMinuteField` before building and says « La minute « 25+2 » n'existe pas dans ce match ».
+  `buildChangeAmendment` throws if reached with one anyway, which is right for something already
+  refused: falling back to 0 would stamp a change at the kick-off.
+
+Also deleted: the `regulation` prop threaded through four components in `retro-corrections.tsx`, whose
+only consumer was the vanished numeric input's `max`.
+
+Gates: typecheck clean, eslint clean, `npm test` **1680 passed**, `npm run test:e2e` **11 passed**.
+Looked at at 390 px in both themes: « Corriger — But 30’+1 » over a field holding `30+1`, hint « temps
+additionnel » — the title and the field saying the same thing for the first time.
+
+Files: `lib/match/clock.ts`, `lib/match/clock.test.ts`, `lib/match/reducer.ts`, `lib/retro/amend.ts`,
+`lib/retro/amend.test.ts`, `lib/retro/actions.ts`, `lib/retro/change.ts`, `lib/retro/change.test.ts`,
+`lib/retro/queries.ts`, `lib/retro/validation.ts`,
+`app/(app)/match/[id]/saisie/_components/retro-corrections.tsx`,
+`app/(app)/match/[id]/saisie/_components/add-change.tsx`, `docs/DECISIONS.md` (215),
+`docs/ROADMAP.md`, `docs/SESSIONS.md`.

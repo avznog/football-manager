@@ -173,7 +173,8 @@ export function changeProblemFr(
  * The idempotency seed of a change (invariant 6): the same change, posted twice, is one change. The
  * slots are sorted so the order the discs were dragged in does not make two changes of one.
  */
-export function changeSeed(matchId: string, minute: number, slots: readonly SlotAssignment[]): string[] {
+/** `minute` is the field's own text since decision 215, so `30+2` seeds differently from `32`. */
+export function changeSeed(matchId: string, minute: string, slots: readonly SlotAssignment[]): string[] {
   return [
     matchId,
     "change",

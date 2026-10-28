@@ -8782,3 +8782,51 @@ stoppage can only be typed as 30, which lands on 30′00″ exactly. The pre-fil
 re-saving an added-time event without touching the field moves it to the period boundary and loses the
 seconds. It is on `docs/ROADMAP.md`; fixing it means the field accepting « 30+2 », which is a different
 slice.
+
+## 215 — A correction in added time: the minute field holds « 30+2 »
+
+**2026-10-28.** The owner, in one line: « I want to be able to add corrections in additional time of
+first or second half !! » Decision 214 shipped with this hole and named it on the roadmap the same day;
+this closes it.
+
+The field took an **integer**, and under the television convention (214) the first half's stoppage has
+no integer: it reads « 30’+2 », and the 32 it looks like is *two minutes into the second half* — a
+different seven and a different afternoon. So a goal scored in added time could not be corrected at
+all, and `30+2` is now a minute the field accepts.
+
+**The period comes from the parse, never from the millisecond**, and that is the whole subtlety.
+`30+2` is 32 minutes on the display's scale, and 32 as a plain minute falls in the second half. The
+stoppage form names its period by that period's nominal **end** — `30+2` is the first half, `60+1` the
+second — so `parseMinuteFieldFr` matches the end and returns the period with it. A stoppage on a minute
+no period ends on (« 25+2 » of a 2×30) is **refused** rather than guessed at, because guessing which
+half it meant is exactly how a goal lands on the wrong seven. The search is a loop over the periods
+rather than arithmetic, so a 3×20 ends on 20, 40 and 60 and all three work.
+
+`formatMinuteFieldFr` is the same function as `formatMinuteLabelFr` without the typographic prime: the
+label is « 30’+2 » and the field is `30+2`, and the field **pre-fills from it**. That is what makes
+re-saving an added-time correction leave the event where it was, which 214 could not do — its field
+held the display integer, so a re-save moved the event to the period boundary and lost the seconds.
+There is a test for the round trip over every minute of a match that overran, added time included.
+
+**Three places had to move together**, and the reason is that the notation is not a number:
+
+- `AmendFact.minute` and `AmendChange.minute` are **text**. The entry form's rows keep their integer
+  deliberately: that sheet types up a match with **no log at all**, whose periods begin exactly where
+  they nominally do, so it has no overrun to name and `30+2` would mean the same as 32.
+- « Ajouter un changement » carries `{ minuteText, clockMs, period }` through its flow instead of a
+  minute, because everything after the first step — who was on the pitch, the stamp on the event — is
+  a question about the clock, and after an overrun the clock and the minute differ. A change in added
+  time is a real thing: a substitution made while the first half runs over.
+- The inputs are `type="text"` with `inputMode="numeric"`, so a phone still shows digits and the `+`
+  is on that keyboard. The HTML `pattern` is `[0-9]{1,3}([+][0-9]{1,2})?` — `[+]` and not `\+`,
+  because a JSX attribute is literal text and a backslash would reach the DOM as a backslash.
+
+**An unplaceable minute is a sentence, not a fallback.** `clockMsForMinuteField` returns null, and
+`lib/retro/actions.ts` checks for it *before* building the amendment and says « La minute « 25+2 »
+n'existe pas dans ce match ». `buildChangeAmendment` throws if it is reached with one anyway, which is
+the right shape for a thing the action has already refused: falling back to 0 would put a change at the
+kick-off, the worst of the available wrong answers.
+
+Also removed: the `regulation` prop threaded through four components in `retro-corrections.tsx`, whose
+only consumer was the `max` of the numeric input that no longer exists. « Ajouter un changement » still
+needs it, so it is computed for that one caller.
