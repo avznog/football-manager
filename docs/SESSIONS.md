@@ -7262,3 +7262,67 @@ Files: `lib/match/clock.ts`, `lib/match/clock.test.ts`, `lib/match/reducer.ts`, 
 `app/(app)/match/[id]/saisie/_components/retro-corrections.tsx`,
 `app/(app)/match/[id]/saisie/_components/add-change.tsx`, `docs/DECISIONS.md` (215),
 `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+### The two `info-radarlocal` jobs, moved into CI
+
+Decision **216**. The owner: « I want to add to the info-radarlocal the data of the previous match
+played. But for that, I want to do it through CI, so I do not have to do it with claude anymore […] I
+want also to create a CI job to synchronise the notes of the latest match from info-radaralocal to our
+production DB. »
+
+`.github/workflows/old-app.yml`, two `workflow_dispatch` jobs and no other trigger, **dry run unless
+the `commit` box is ticked**. `push-match` is new (`scripts/push-match-to-old-app.mts`);
+`sync-ratings` just wraps `scripts/import-ratings-from-old-app.mts`, which already existed and had been
+run by hand on 2026-10-21.
+
+**The finding that changed the design, and the reason to read their schema rather than guess.** The old
+app's RLS is `ratings_insert_if_in_lineup`: `exists (select 1 from lineups where match_id =
+ratings.match_id and player_id = auth.uid())`. So a man with **no `lineups` row cannot rate the match at
+all** — the insert is refused, he is not merely unprompted. The first draft pushed only the men who got
+minutes, which would have silently disenfranchised the supporters of decision 211 — who exist precisely
+so that somebody who did not play can vote — and every unused substitute. It now pushes the **whole
+match sheet**, with the old app's own `supporter` role where ours says so.
+
+**Why the API and not the website, which reverses an instruction.** On 2026-10-21 the owner said « not
+with supabase, but with the website ». That was a one-off by hand and should not bind an unattended job:
+driving the site needs his own password as a secret, stubs the app's « rate everyone first » gate, and
+broke twice in one afternoon on a dropdown and a button name. He was asked and chose the API.
+
+**Three things verified rather than assumed, because each would have failed quietly:**
+
+- **The conditional `postgres.js` fragment.** `where status = 'finished' ${arg ? sql\`and …\` : sql\`\`}`
+  composes correctly and an empty fragment is a valid no-op — tested against a real database for all
+  three cases (no arg, a real day, a day with no match). A fragment that dropped the filter would have
+  pushed the wrong match.
+- **The `&&` guards in the workflow under `bash -e`.** `[ "$X" = "true" ] && args+=(…)` does *not* abort
+  the step when the test fails — POSIX ignores `-e` for a non-final command of an AND-OR list. Checked,
+  because if it had aborted, every dry run would have failed.
+- **The derivation, against a real local log** with the old app's REST calls stubbed: 3–2, all seven
+  2-3-1 slots filled, 17 substitutions, three goals with scorers and assists, two conceded, both
+  supporters picked up, and every minute column agreeing.
+
+**Bugs found reading it, all fixed.** `tableByKey.get(key) ?? profile.full_name` turned the name table's
+explicit `null` — « this person has no counterpart », i.e. « Alexis CHARRIER » — into « matches on his
+own name », and made the `if (ours !== null)` guard below it dead code. `squad as never` was lying about
+`SquadEntry`. `--kickoff` with nothing after it, or followed by another flag, silently became « the
+latest match » and would have reported a date the owner never typed. `profileFor` aborts, and it was
+being called inside a `filter` in the post-write read-back. And the workflow interpolated
+`${{ inputs.kickoff }}` straight into the shell, which is a script-injection pattern worth not
+publishing in a public repository — the inputs now travel through `env:` and are read as quoted shell
+variables, with the arguments built as a bash array.
+
+**`old-app/schema.sql` is stale and was not trusted.** It has no `substitutions` table and the deployed
+client reads one, so every shape came from `old-app/index.html`. The RLS policy above is the one part of
+that file corroborated by observed behaviour.
+
+**What is still unverified, and it is the important part: no call has reached Supabase.** Every token
+this session held was revoked (401), and `SUPABASE_SERVICE_ROLE_KEY` does not exist as a secret yet. The
+insert ordering — `duration` → `lineups` → `substitutions` → `goals_for` → **`goals_conceded` last**, so
+the trigger that fills `goals_conceded_lineup` can see who was on the pitch — is **inferred from the
+client's behaviour and from one hand-run, not read from the trigger bodies**, and the script's docblock
+says so. Run `push-match` as a dry run first and read it.
+
+Gates: typecheck clean, eslint clean, `npm test` **1680 passed**. No e2e: nothing here touches a screen.
+
+Files: `scripts/push-match-to-old-app.mts` (new), `.github/workflows/old-app.yml` (new),
+`docs/DECISIONS.md` (216), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.

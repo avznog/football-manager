@@ -1,0 +1,155 @@
+# The two jobs that talk to `info-radarlocal`, the app the team still votes in.
+#
+# **Both are `workflow_dispatch` only.** Nothing here fires on a push, a tag or a schedule: they move
+# real football between two live databases, and the owner asked for a button rather than a cron —
+# « this job must be triggerable manually, at any time ».
+#
+# **Both are a dry run unless you tick `commit`.** That is the scripts' own convention (`--commit`)
+# and it is the convention here for the same reason: a mis-click then costs a log and not a database.
+# Read the dry run's output before ticking the box — `push-match` prints the whole composition, every
+# substitution, every goal and the minutes the old app will recompute, and `sync-ratings` prints the
+# notes it would insert.
+#
+# ## This is the second workflow that touches production, and that is deliberate
+#
+# Decision 119 says `release.yml` is the only one. `sync-ratings` makes that two, and the difference
+# that makes it acceptable is in what it may do: `release.yml` runs `db:migrate`, which can change the
+# shape of production, while this one runs an importer that **only ever inserts** rows into `ratings`
+# and leaves anything already there alone (see the script's own docblock). It cannot move a goal, a
+# minute or a password. Decision 216 records the narrowing; if a future job here wants to update or
+# delete in production, that is a new decision and not an extension of this one.
+#
+# ## Direction, because the names are easy to confuse
+#
+#   push-match    this app  →  info-radarlocal     (a played match, so the team can vote on it)
+#   sync-ratings  info-radarlocal  →  this app     (the notes they voted)
+#
+# ## Secrets
+#
+# `DATABASE_URL` — production, already here for `release.yml`.
+# `SUPABASE_SERVICE_ROLE_KEY` — writes the old app. Only `push-match` uses it.
+# `SUPABASE_ACCESS_TOKEN` — reads the old app over the Management API. Only `sync-ratings` uses it.
+#
+# The two Supabase secrets are **not** one secret used twice, though a Management API token can fetch
+# the service-role key and so could have served both. Keeping them apart means the job that only reads
+# cannot write, and the job that writes the old app has no account-level access at all.
+name: info-radarlocal
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which direction"
+        required: true
+        type: choice
+        default: push-match
+        options:
+          - push-match
+          - sync-ratings
+      commit:
+        description: "Write for real (unticked = dry run)"
+        required: false
+        type: boolean
+        default: false
+      kickoff:
+        description: "push-match only: the match's day, YYYY-MM-DD. Empty = the latest finished one."
+        required: false
+        type: string
+      replace:
+        description: "push-match only: overwrite a match that already has a result over there"
+        required: false
+        type: boolean
+        default: false
+
+# Two runs writing the same match would race on the delete-then-insert.
+concurrency:
+  group: old-app
+  cancel-in-progress: false
+
+jobs:
+  push-match:
+    if: inputs.job == 'push-match'
+    name: A played match → info-radarlocal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Refuse early if a secret is missing
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::The DATABASE_URL repository secret is not set." && exit 1
+          fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::The SUPABASE_SERVICE_ROLE_KEY repository secret is not set. Supabase" \
+                 "dashboard → Project Settings → API → service_role." && exit 1
+          fi
+
+      # `--env-file` is not used here because the values arrive as environment variables already. The
+      # trap that rule exists for is the opposite one: sourcing a file mis-parses the `&` in a Neon
+      # URL and falls back to the local database (docs/SESSIONS.md, 2026-10-21).
+      #
+      # **The inputs go through `env:` and are read as shell variables**, never interpolated into the
+      # script with `${{ }}`. GitHub substitutes those before bash ever sees the text, so a `kickoff`
+      # of `x; curl …` would be a second command rather than a bad date. Only the owner can dispatch
+      # this, which makes it a footgun rather than a hole — and this repository is public, so the
+      # pattern is worth not publishing. The array keeps an empty argument from becoming a stray word.
+      - name: Push the match
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          INPUT_COMMIT: ${{ inputs.commit }}
+          INPUT_REPLACE: ${{ inputs.replace }}
+          INPUT_KICKOFF: ${{ inputs.kickoff }}
+        run: |
+          args=()
+          if [ "$INPUT_COMMIT" = "true" ]; then args+=(--commit); fi
+          if [ "$INPUT_REPLACE" = "true" ]; then args+=(--replace); fi
+          if [ -n "$INPUT_KICKOFF" ]; then args+=(--kickoff "$INPUT_KICKOFF"); fi
+          echo "::notice::scripts/push-match-to-old-app.mts ${args[*]}"
+          npx tsx --conditions=react-server scripts/push-match-to-old-app.mts "${args[@]}"
+
+  sync-ratings:
+    if: inputs.job == 'sync-ratings'
+    name: info-radarlocal's notes → production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Refuse early if a secret is missing
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::The DATABASE_URL repository secret is not set." && exit 1
+          fi
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::The SUPABASE_ACCESS_TOKEN repository secret is not set. Supabase" \
+                 "dashboard → account → Access Tokens → Generate new token." && exit 1
+          fi
+
+      # `--production` is passed unconditionally: this secret *is* production, and the script refuses
+      # that host without the flag (decision 201). `--commit` is what the box controls.
+      - name: Bring the notes over
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          INPUT_COMMIT: ${{ inputs.commit }}
+        run: |
+          args=(--production)
+          if [ "$INPUT_COMMIT" = "true" ]; then args+=(--commit); fi
+          echo "::notice::scripts/import-ratings-from-old-app.mts ${args[*]}"
+          npx tsx --conditions=react-server scripts/import-ratings-from-old-app.mts "${args[@]}"

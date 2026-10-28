@@ -1,8 +1,8 @@
 # COST.md — what this project has cost, and what that number is not
 
-Measured on **2026-10-28**, with `main` at `302a31f` (version `1.2.0`, 225 commits, 219 merged pull
-requests, 107 562 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
-2026-09-22 and its first commit landed on 2026-09-23, so everything below covers the **thirty-six
+Measured on **2026-10-28**, with `main` at `509186a` (version `1.2.0`, 227 commits, 221 merged pull
+requests, 108 230 lines across `.ts`/`.tsx`/`.sql`/`.css`/`.md`). The repository was created on
+2026-09-22 and its first commit landed on 2026-09-23, so everything below covers the **thirty-seven
 days** the script counts.
 
 **The headline, and read the next sentence with it: $2214.17.** That is the cost of the model tokens
@@ -55,10 +55,10 @@ reason); a long-lived session merely under-reports its tail instead.
 Divided by what it bought, which is the only form of this number that is any use when deciding
 whether to spend more:
 
-- **$9.84 per commit** (225) — the Linux machine alone was $7.49
-- **$10.11 per merged pull request** (219)
-- **$0.0207 per line** of committed TypeScript, SQL, CSS and Markdown — two cents
-- **$61.50 per day** across the thirty-six days — was $70.46 on 2026-10-21 and $77.20 on 2026-10-16
+- **$9.75 per commit** (227) — the Linux machine alone was $7.42
+- **$10.02 per merged pull request** (221)
+- **$0.0205 per line** of committed TypeScript, SQL, CSS and Markdown — two cents
+- **$59.84 per day** across the thirty-seven days — was $70.46 on 2026-10-21 and $77.20 on 2026-10-16
 
 ### Against the last snapshot, which is the only way to read the trend
 
@@ -132,6 +132,23 @@ read $1397.39 since yesterday — and the same caveat as every same-session read
 measured is the one running the script, so its tail is missing and on a long day the tail is most of
 the work.
 
+### 2026-10-28, second pass: the total held, the per-day rate fell again
+
+**$2214.17 still**, the Linux machine unmoved at $1684.24 while `main` gained two commits, two merged
+pull requests and 668 lines. So the rates eased once more — **$9.84 → $9.75 per commit**, and **$61.50
+→ $59.84 per day** as the thirty-seventh day arrived. The lazy flush described below is why the total
+does not budge within a session; the tail of this one is, as always, missing from it.
+
+**Per day has now fallen at every single reading**: $77.20 → $70.46 → $61.50 → $59.84. It is the one
+figure in this file whose denominator arrives whether or not anybody works, which is exactly what makes
+it the honest one: a project being finished gets cheaper per day, and a project being abandoned gets
+cheaper faster. The per-commit figure cannot tell those apart.
+
+**GitHub Actions is also worth a glance this pass: 516 runs, ~1 772 minutes**, up from ~1 607 six days
+ago. Still free because the repository is public, and still the number that becomes the bill the day it
+is not — now **88 %** of a 2 000-minute monthly allowance rather than 80 %. Two new `workflow_dispatch`
+jobs (decision 216) add to this only when somebody presses the button.
+
 ### How to re-derive it rather than trusting this file
 
 ```bash
@@ -158,10 +175,10 @@ printed **$0.00** with every appearance of a measurement.
 
 | | Linux | macOS | both |
 |---|---|---|---|
-| output | 8 941 511 | 3 839 367 | 12 780 878 |
-| cache write | 111 604 246 | 15 627 673 | 127 231 919 |
-| cache read | 2 069 047 709 | 638 846 352 | 2 707 894 061 |
-| input, uncached | 21 996 | 12 432 | 34 428 |
+| output | 9 400 677 | 3 839 367 | 13 240 044 |
+| cache write | 122 400 604 | 15 627 673 | 138 028 277 |
+| cache read | 2 291 131 026 | 638 846 352 | 2 929 977 378 |
+| input, uncached | 22 902 | 12 432 | 35 334 |
 
 The **Linux column is today's run**, all four rows. The **macOS column is the 2026-10-14
 measurement**, carried over and not re-derived, because only the machine the script runs on can be
@@ -214,12 +231,12 @@ cost at list prices*, which is a useful number for a different question (is this
 what would it cost someone else) and the wrong one for « what did I spend ».
 
 **This file cannot tell which case applies**, because the transcript records the computed cost either
-way. Check the billing mode, and if it is a subscription, the honest total for the thirty-six days is
+way. Check the billing mode, and if it is a subscription, the honest total for the thirty-seven days is
 the pro-rated fee.
 
 ### 3. Time
 
-Nobody's hours are in here, on either side. Thirty-six days of review, phone testing and decisions is
+Nobody's hours are in here, on either side. Thirty-seven days of review, phone testing and decisions is
 the largest uncosted input to the project and the one this file is least able to measure.
 
 ---
@@ -237,10 +254,11 @@ on the free tier » is exactly the kind of claim that is true until a usage thre
   `deploymentId` buys here (`docs/SESSIONS.md`).
 - **GitHub Actions: $0.** `avznog/football-manager` is **public** (`gh repo view --json visibility`),
   and standard runners are free for public repositories with no minute cap. The usage keeps growing:
-  **492 workflow runs** (462 five days ago), averaging 196 s of wall clock over a sample of 100
-  completed runs, so roughly **1 607 minutes** (was ~1 494). Worth writing down because the number is
-  the bill the day the repository is made private — about 1 607 minutes against a 2 000-minute monthly
-  allowance, i.e. still nothing, but no longer with much room, and ~$0.008/minute beyond it.
+  **516 workflow runs** (492 a day ago, 462 six days ago), averaging 206 s of wall clock over a sample
+  of 100 completed runs, so roughly **1 772 minutes** (was ~1 607). Worth writing down because the
+  number is the bill the day the repository is made private — about 1 772 minutes against a
+  2 000-minute monthly allowance, which is **88 %** of it, and ~$0.008/minute beyond. The two
+  `workflow_dispatch` jobs of decision 216 only add to this when somebody presses the button.
 - **Neon: still unverified, and the reason is the same one as last time.** Two databases are in play
   (preview and production) and the free tier plausibly covers both, but **this file will not assert
   it**. This session holds the *database* connection strings and **no Neon API key**, and a Postgres
@@ -266,5 +284,5 @@ the same way. Three rules, and the first is now in `CLAUDE.md`'s definition of d
    script's output or arithmetic on one, which is why the script is in the repository rather than in
    somebody's shell history.
 3. **Date the measurement, name the commit it was taken at, and keep the previous snapshot's
-   figures.** A cost without a denominator — 225 commits, thirty-six days — says nothing at all, and a
+   figures.** A cost without a denominator — 227 commits, thirty-seven days — says nothing at all, and a
    cost without its predecessor says nothing about where it is going.

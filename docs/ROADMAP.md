@@ -2682,3 +2682,25 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       the event to the period boundary. The period comes from the parse and never from the
       millisecond; « 25+2 » of a 2×30 is refused rather than guessed. Looked at at 390 px in both
       themes: « Corriger — But 30’+1 » over a field holding `30+1` and the hint « temps additionnel »
+- [x] **The two `info-radarlocal` jobs, as buttons in CI** — 2026-10-28. Decision **216**, at the
+      owner's request: « I want to do it through CI, so I do not have to do it with claude anymore. »
+      `.github/workflows/old-app.yml`, `workflow_dispatch` only, **dry run unless you tick `commit`**.
+      `push-match` sends a played match to the old app so the team can vote on it; `sync-ratings`
+      brings their notes back into production. The finding that shaped it: the old app's
+      `ratings_insert_if_in_lineup` policy means a man with **no `lineups` row cannot rate at all**, so
+      the whole match sheet is pushed — supporters (decision 211) and unused substitutes included —
+      and not only the seven who started. Shapes taken from `old-app/index.html`, the deployed client,
+      because `old-app/schema.sql` is stale and has no `substitutions` table
+- [ ] **Nothing has run either `info-radarlocal` job against the real project yet.** The derivation was
+      exercised against a real local log with the old app's REST calls stubbed — 3–2, seven slots
+      filled, 17 substitutions, both supporters picked up — but **no call has reached Supabase**: every
+      token this session held was revoked, and `SUPABASE_SERVICE_ROLE_KEY` does not exist as a secret
+      yet. The trigger ordering and the exact column names are therefore **inferred from the deployed
+      client, not verified against the database**. Add the two secrets, run `push-match` as a dry run,
+      and read the output before ticking `commit` the first time
+- [ ] **`push-match` describes a substitution as one man for one man, and a group change is not that.**
+      When a minute takes three off and brings three on, the pairing is by first position and then
+      arbitrary; when the counts differ, the surplus is dropped and the run says so on stderr. Our own
+      log is a pitch snapshot and theirs is a list of exchanges, so something is lost in every group
+      change. It costs nothing today because their only consumer of `substitutions` is the minutes
+      recompute, which cares about presence and not about who swapped with whom
