@@ -1220,8 +1220,7 @@ function periodEndLabelFr(state: MatchState): string {
     : `Fin de la ${ordinalPeriodFr(state.clock.period)}`;
 }
 
-/** « 1re période », « 2e période » — the one spelling, shared with game mode's header. */
-export function ordinalPeriodFr(period: number): string {
+function ordinalPeriodFr(period: number): string {
   switch (period) {
     case 1:
       return "1re période";
@@ -1253,14 +1252,20 @@ export function phaseLabelFr(state: MatchState): string {
 }
 
 /**
- * « 12’ » for an arbitrary match time, for the prompt and the composer.
+ * « 12’ » and « 30’+2 » for an arbitrary match time, for the prompt and the composer.
  *
- * One argument since decision 213: a minute is counted from the kick-off of the match, so the label
- * does not depend on which period the moment falls in. It kept a `period` and the period's real start
- * while decision 209 mapped each half back onto its nominal one; both are gone, and so is « 30’+2 ».
+ * `periodStartedAtMs` is the clock at which `period` actually kicked off — `state.clock
+ * .periodStartedAtMs` for the period in progress — so a second half that started late still reads
+ * from 30′. Omitted, the label is counted from the period's nominal start, which is right for every
+ * caller whose periods start where they should: the retro path stamps its kick-offs exactly there.
  */
-export function minuteLabelFr(clockMs: number): string {
-  return formatMinuteLabelFr(clockMs);
+export function minuteLabelFr(
+  clockMs: number,
+  period: number,
+  periods: PeriodsConfig,
+  periodStartedAtMs?: number | null,
+): string {
+  return formatMinuteLabelFr(clockMs, period, periods, periodStartedAtMs);
 }
 
 /** French label of an event type, for the ACTION sheet. */

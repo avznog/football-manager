@@ -16,7 +16,7 @@
  * wall clock did in between — a referee who takes twelve minutes for half-time does not give
  * anybody twelve extra minutes played.
  *
- * ## An overrun period, and why the screen shows real elapsed time
+ * ## The one place the two numbers come apart: an overrun period
  *
  * That last sentence holds for the *wall* clock, not for a half the coach let run long. A first half
  * whistled at 33′40″ of a 2×30 leaves real elapsed match time at 33′40″, and the second-half
@@ -24,25 +24,22 @@
  * stamped before the period end it follows would replay in the wrong order, and because the played
  * intervals of the two halves would otherwise overlap and pay everybody for the same 3′40″ twice.
  *
- * **So the second half genuinely starts at 33′40″ of football, and that is what every screen shows.**
- * An action taken one minute into it reads « 35’ », not « 31’ » and not « 30’+1 ». Decision 213: one
- * minute per moment, counted from the kick-off, with the stopped time left out — which is exactly
- * `clock_ms`, so a label is now `clockMsToMinute` and nothing else.
+ * So the second half genuinely starts at 33′40″ of match time, and showing that as « 33′ » is the
+ * bug this file now fixes: real football shows 45+3 and then kicks the second half off at 45.
+ * **Displayed minutes are therefore relative to their own period**, offset by that period's
+ * *nominal* start:
  *
- * Decision 209 did the opposite for a fortnight — it mapped each period back onto its *nominal* start
- * so the second half read 30′→60′ and added time read « 30’+2 ». It is superseded, and the reason is
- * worth keeping: that scheme made two different moments share a label. « 30’ » was both the end of an
- * overrun first half and the kick-off of the second, and the owner, reading his own match back, could
- * not tell which seven a goal belonged to. Football's own notation solves that with a separate
- * scoreboard the viewer already understands; a one-line list in a phone app has no such context.
+ *     displayed = nominalStart(period) + (clockMs − the clock at which that period actually began)
  *
- * **What a period-relative figure is still needed for is the header**, and only there: game mode shows
- * the whole match's clock *and* the current half's, so « 45’ · 2e période 13’ » says both how far the
- * afternoon has got and how long this half has run. That is what `periodElapsedMs` is for, and it is
- * the only consumer — nothing that labels an *event* asks which period it belongs to any more.
+ * This narrows decision 009 rather than reversing it: minutes are still continuous across the
+ * match, 0→30 then 30→60, but they are continuous *within a period with stoppage notation* rather
+ * than continuous across an overrun. Nothing stored moves — `clock_ms` and `match_events.minute`
+ * stay real elapsed match time, and minutes played are computed from the intervals, untouched.
  *
- * Nothing stored ever moved, under either decision: `clock_ms` and `match_events.minute` are real
- * elapsed match time and minutes played are computed from the intervals.
+ * Every display function below therefore takes the period's **actual** start as an optional
+ * argument. Omitted, it falls back to the nominal start, which is the identity: that is what keeps
+ * a caller with no such knowledge — and every retro match, whose kick-offs are stamped exactly at
+ * `periodStartMs` — behaving as before.
  *
  * ## Both directions
  *
@@ -165,39 +162,103 @@ export function formatMinuteFr(minute: number): string {
 }
 
 /**
- * How long the current period has been going: real elapsed match time minus the clock at which that
- * period actually kicked off.
+ * Real elapsed match time, moved onto the display's scale: the period's nominal start plus however
+ * long the period has actually been going. See the header — this is the whole of the overrun fix,
+ * and every other display function here goes through it.
  *
- * The **only** period-relative figure left in the app (decision 213), and it exists for the game-mode
- * header, which shows the match's clock beside the current half's. Nothing that labels an event uses
- * it: an event's minute is counted from the kick-off of the match, full stop.
+ * `periodStartedAtMs` is the `clock_ms` at which this period actually kicked off. Omitted, null, or
+ * not a finite number, it falls back to the nominal start and the mapping is the identity.
  *
- * `periodStartedAtMs` null, absent or not finite — before any kick-off, or a caller that does not know
- * — gives back the whole elapsed clock, which is right for the first period and the safest answer for
- * anything else. Never negative: a period recorded as starting after the clock it is read at reads 0
- * rather than counting backwards.
+ * Never returns less than the period's nominal start: an event carrying a period that had not begun
+ * yet (a hand-written row, a retro minute clamped oddly) reads as the start of it rather than as a
+ * negative offset into the previous one.
  */
-export function periodElapsedMs(clockMs: number, periodStartedAtMs?: number | null): number {
-  const start =
+export function displayClockMs(
+  clockMs: number,
+  period: number,
+  config: PeriodsConfig,
+  periodStartedAtMs?: number | null,
+): number {
+  const nominalStart = periodStartMs(period, config);
+  const actualStart =
     typeof periodStartedAtMs === "number" && Number.isFinite(periodStartedAtMs)
       ? periodStartedAtMs
-      : 0;
-  return Math.max(0, Math.max(0, clockMs) - start);
+      : nominalStart;
+  return Math.max(nominalStart, nominalStart + (Math.max(0, clockMs) - actualStart));
 }
 
 /**
- * How a timeline line is labelled: the elapsed minute of the match, and nothing else (decision 213).
- *
- * « 10’ » ten minutes in. « 31’ » for a first half the coach let run past 30. « 35’ » one minute into
- * a second half that kicked off at 34′, because that moment really is the 35th minute of football
- * played. No stoppage notation, no per-period reset, and no `period` argument — the label does not
- * depend on which half it falls in, which is the property decision 209 lacked and the owner missed.
- *
- * It is `formatMinuteFr(clockMsToMinute(clockMs))`, kept as its own name because every screen in the
- * app calls it and one of them one day will want to change how a minute reads.
+ * The minute to display for an event: `clockMsToMinute`, but on the display's scale, so it always
+ * agrees with the label `formatMinuteLabelFr` writes for the same arguments. A second-half kick-off
+ * stored at 33′40″ is minute 30, not 33.
  */
-export function formatMinuteLabelFr(clockMs: number): string {
-  return formatMinuteFr(clockMsToMinute(clockMs));
+export function displayMinute(
+  clockMs: number,
+  period: number,
+  config: PeriodsConfig,
+  periodStartedAtMs?: number | null,
+): number {
+  return clockMsToMinute(displayClockMs(clockMs, period, config, periodStartedAtMs));
+}
+
+/**
+ * How a timeline line is labelled. Inside the period it is just the minute; beyond the period's
+ * nominal end it becomes football's stoppage notation, `30’+2`, so a goal scored in added time at
+ * the end of the first half does not read as if it happened in the second.
+ *
+ * The period is passed in rather than derived: at exactly 30′00″ of a 2×30, the log alone knows
+ * whether that was the end of the first half or the kick-off of the second. With `periodStartedAtMs`
+ * those two cases now also *read* differently, which is the point: a `PERIOD_END` at 33′40″ of the
+ * first half is « 30’+4 », and the second-half kick-off stamped at the very same 33′40″ is « 30’ ».
+ *
+ * That also settles **an event during the break**, half-time's applied composition above all: it
+ * carries the period that just ended, so it keeps that period's stoppage notation — « 30’+4 », not
+ * « 30’ », which would claim something that happened after the 30th minute happened on it.
+ */
+export function formatMinuteLabelFr(
+  clockMs: number,
+  period: number,
+  config: PeriodsConfig,
+  periodStartedAtMs?: number | null,
+): string {
+  const displayMs = displayClockMs(clockMs, period, config, periodStartedAtMs);
+  const nominalEnd = periodEndMs(period, config);
+  if (displayMs <= nominalEnd) return formatMinuteFr(clockMsToMinute(displayMs));
+  const extraMinutes = Math.ceil((displayMs - nominalEnd) / MS_PER_MINUTE);
+  return `${clockMsToMinute(nominalEnd)}’+${extraMinutes}`;
+}
+
+/**
+ * The **inverse** of `displayClockMs`: the real match clock for a minute the coach typed on the
+ * display's scale (decision 214).
+ *
+ * This is what the correction sheet needs, and the reason it exists is a bug the owner hit by hand.
+ * The sheet's field held real elapsed time while its title showed the display minute, so to move a
+ * goal to the « 56’ » he could see, he had to work out and type **59**. He did, and it worked, and
+ * nothing in the app told him he was doing the app's arithmetic for it.
+ *
+ *     clockMs = actualStart(period) + (minuteToClockMs(minute) − nominalStart(period))
+ *
+ * The period is derived from the **typed** minute, not from a real clock, because display minutes map
+ * onto the nominal periods one for one: of a 2×30, 0–29 is the first half and 31–60 the second. At
+ * exactly 30 it is the first half's end, which is the same choice `periodOfClockMs` already makes and
+ * the same one the old code made.
+ *
+ * **A minute in added time cannot be typed**, and that is a property of the notation rather than of
+ * this function: the first half's stoppage reads « 30’+2 », so there is no integer for it. Typing 30
+ * lands on 30′00″ exactly, which is the end of the first half. Worth knowing before correcting a goal
+ * scored in added time; `docs/ROADMAP.md` carries it.
+ */
+export function clockMsForDisplayMinute(
+  minute: number,
+  config: PeriodsConfig,
+  periodStarts?: ReadonlyMap<number, number> | null,
+): { clockMs: number; period: number } {
+  const displayMs = minuteToClockMs(Math.max(0, minute));
+  const period = periodOfClockMs(displayMs, config);
+  const nominalStart = periodStartMs(period, config);
+  const actualStart = periodStarts?.get(period) ?? nominalStart;
+  return { clockMs: Math.max(0, actualStart + (displayMs - nominalStart)), period };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -268,42 +329,40 @@ export function projectClockMs(anchor: ClockAnchor, nowMs?: number | null): numb
 export type ClockReading = {
   phase: ClockPhase;
   period: number;
-  /**
-   * Real elapsed match time — the truth, the thing events are stamped with, and since decision 213
-   * also the thing every screen shows. Stopped time is already out of it.
-   */
+  /** Real elapsed match time — the truth, the thing events are stamped with. */
   clockMs: number;
-  /** The elapsed minute of the match. Always agrees with `label` and with `clock`. */
+  /**
+   * Continuous displayed minute (decision 009), **relative to its own period**: after a first half
+   * that ran to 33′40″, the second half's minute 0 is 30, not 33. See the header for why this
+   * narrows 009 rather than contradicting it. Always agrees with `label` and with `clock`.
+   */
   minute: number;
-  /** `mm:ss` of the whole match: the big figure in game mode's header. */
+  /** `mm:ss`, on the same display scale as `minute` and `label`. */
   clock: string;
-  /** `45’`. No stoppage notation since decision 213. */
+  /** `12’`, or `30’+2` in stoppage time. */
   label: string;
   /**
-   * The same four, for the **current period alone** — the second figure in the header, « 2e période
-   * 13’ ». After a first half of 32′, a match clock of 45′ is a period clock of 13′.
+   * The football actually played, which after an overrun period is **more** than `minute`: a second
+   * half that kicked off at 32′ and has run 13 shows « 43’ » and has had 45 minutes of football.
    *
-   * These are the only period-relative numbers left in the app, and they are here rather than derived
-   * in the component so that the two figures in one header can never be computed from two different
-   * `now`s and disagree by a second.
+   * It is `clockMs` as a minute, and it is here rather than left to the component because game mode's
+   * header prints the two side by side (decision 214) and they must come from one `clockMs`. It is
+   * also the number every minute played is built from, which is why the header says « jouées ».
    */
-  periodClockMs: number;
-  periodMinute: number;
-  periodClock: string;
-  periodLabel: string;
+  playedMinute: number;
+  /** `45’` — `playedMinute`, formatted. */
+  playedLabel: string;
   running: boolean;
-  /**
-   * Time left in the current period, 0 once it is over — measured against that period's own length,
-   * so a first half that overran does not eat into the second's.
-   */
+  /** Time left in the current period, 0 once it is over. */
   remainingMs: number;
-  /** Time this period has run beyond its length, 0 inside it. */
+  /** Time played beyond the period's nominal end, 0 inside it. */
   stoppageMs: number;
   /**
    * `stoppageMs` as the whole minutes a scoreboard would announce — **ceiled**, because the fourth
-   * official's board goes up the moment added time begins, not a minute later. The badge in
-   * `match-bar.tsx` used to floor it while the label ceiled it, so the first minute of added time
-   * read « +0 » beside an announced « 30’+1 »; there is one spelling now and this is it.
+   * official's board goes up the moment added time begins, not a minute later, and because that is
+   * what `formatMinuteLabelFr` does for « 30’+1 ». The badge in `match-bar.tsx` floored it while the
+   * label ceiled it, so the first minute of added time read « +0 » beside an announced « 30’+1 ».
+   * One spelling now, and this is it.
    */
   stoppageMinutes: number;
   /** True when the last period has ended but no final whistle has been recorded. */
@@ -317,34 +376,26 @@ export function readClock(
 ): ClockReading {
   const clockMs = projectClockMs(anchor, nowMs);
   const period = Math.min(Math.max(1, anchor.period), config.periodsCount);
+  const nominalEnd = periodEndMs(period, config);
   /*
-   * Two figures off one `clockMs`, which is the whole reason they are computed here: the header shows
-   * both at once, and a component reading the match clock and the period clock from two calls could
-   * show 45′ beside a 13′ that belonged to a different second.
-   *
-   * The period's length, not its nominal end, is what « remaining » and « stoppage » are measured
-   * against now. After an overrun first half those were the same thing under decision 209 and are not
-   * under 213: the second half of a 2×30 that kicks off at 34′ is due to end at 64′ of the match, and
-   * asking how far past 60′ it is would announce added time four minutes early.
+   * Everything the bar renders is read off this one number, so the big `mm:ss`, the minute, the
+   * label and the `+N` stoppage badge can never disagree: a second half that kicked off at 33′40″
+   * reads 30:00 and « 30’ », and it is 3′40″ later than real match time that it starts showing +1.
    */
-  const periodMs = periodElapsedMs(clockMs, anchor.periodStartedAtMs);
-  const periodLengthMs = config.periodMinutes * MS_PER_MINUTE;
-  const stoppageMs = Math.max(0, periodMs - periodLengthMs);
+  const displayMs = displayClockMs(clockMs, period, config, anchor.periodStartedAtMs);
   return {
     phase: anchor.phase,
     period,
     clockMs,
-    minute: clockMsToMinute(clockMs),
-    clock: formatClock(clockMs),
-    label: formatMinuteLabelFr(clockMs),
-    periodClockMs: periodMs,
-    periodMinute: clockMsToMinute(periodMs),
-    periodClock: formatClock(periodMs),
-    periodLabel: formatMinuteLabelFr(periodMs),
+    minute: clockMsToMinute(displayMs),
+    clock: formatClock(displayMs),
+    label: formatMinuteLabelFr(clockMs, period, config, anchor.periodStartedAtMs),
+    playedMinute: clockMsToMinute(clockMs),
+    playedLabel: formatMinuteFr(clockMsToMinute(clockMs)),
     running: anchor.running,
-    remainingMs: Math.max(0, periodLengthMs - periodMs),
-    stoppageMs,
-    stoppageMinutes: Math.ceil(stoppageMs / MS_PER_MINUTE),
+    remainingMs: Math.max(0, nominalEnd - displayMs),
+    stoppageMs: Math.max(0, displayMs - nominalEnd),
+    stoppageMinutes: Math.ceil(Math.max(0, displayMs - nominalEnd) / MS_PER_MINUTE),
     awaitingFinalWhistle: anchor.phase === "break" && period >= config.periodsCount,
   };
 }

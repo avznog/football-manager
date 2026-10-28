@@ -7149,3 +7149,67 @@ Files: `lib/match/clock.ts`, `lib/match/clock.test.ts`, `lib/match/reducer.ts`,
 `lib/retro/actions.ts`, `app/(jeu)/match/[id]/jeu/_components/match-bar.tsx`,
 `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `e2e/offline.spec.ts`, `CLAUDE.md`,
 `docs/DECISIONS.md` (213), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-10-28 — The television's clock, and the sheet that takes the minute you can see
+
+Decision **214**, superseding **213** one day after it merged and restoring **209**'s display. The
+owner: « I want the real stuff like in the real games at the TV », with his own numbers — a goal twenty
+minutes into a second half whose first ran 32 reads **50’**, a goal at 31 of the first half reads
+**30’+1**, and a starter has **52** minutes played.
+
+**The reversal is mine to own.** 213 was built from his previous message — « if it is 31 in second half
+(but the first half lasted 34), it will be 35 » — which is the opposite rule. Both messages were clear;
+they contradicted each other. The worked example that settles it costs one question and should have
+come **before** 213, not after: the two candidate rules differ only on a match that overran, and
+neither of us had one in front of us when 213 was specified. That is the transferable lesson, not
+« ask more questions » — *a rule about how a number is displayed is worth one concrete example before
+it is built.*
+
+**What 213 got right, and is kept.** 209's actual defect was never the convention. It was that the
+correction sheet's **title** read « 56’ » while its **field** held **59** — title on the display scale,
+field on the stored one. The owner hit precisely that and moved a goal to the 56th minute by **typing
+59**, having worked out the three minutes of first-half overrun himself. 213 closed it by making the two
+numbers identical; 214 closes it the other way round, which is the better way: `clockMsForDisplayMinute`
+is the inverse of `displayClockMs`, `TimelineEntry.displayMinute` is the integer the label *is*, and the
+field holds that. There is a round-trip test — type 56, store 59, read back « 56’ » — plus one that
+asserts the identity for every typed minute, so the field and the title cannot drift again.
+
+Also carried over from 213 because they were improvements rather than convention: `stoppageMinutes` is
+**ceiled once** in `readClock` (the badge floored while the label ceiled, printing « +0 » beside an
+announced « 30’+1 »), and stoppage is measured against **the period's own length** — a second half
+kicking off at 32′ has had its thirty minutes at 62′ of football, and measuring against the match's
+nominal 60′ put the board up two minutes early.
+
+**The header is new and is not 209's.** Two figures: the big one is the television's, so it agrees with
+the feed, and under it the football actually played — « 50:00 » over « 51’ jouées ». The owner picked
+that over the current period's own time, and it is the better of the two because the period's time is
+just the big figure minus 30, while the played figure is what every minutes-played column is built from
+and the only number no other screen shows.
+
+Walked in a browser at **390 px**, light and dark, with a fake clock:
+
+```
+kick-off                 00:00  ·  0’ jouées            feed: 0’ Coup d’envoi
+31′ of the first half    30:53  ·  30’ jouées  +1        feed: 30’+1 But
+whistle at 32′           31:53  ·  31’ jouées  +2        feed: 30’+2 Fin de période
+8 min of break           31:53  ·  31’ jouées  +2        ← nothing moves
+second-half kick-off     30:00  ·  31’ jouées            feed: 30’ Coup d’envoi
+20 min into the second   50:00  ·  51’ jouées            feed: 50’ But
+```
+
+Gates: typecheck clean, eslint clean, `npm test` **1671 passed**, `npm run test:e2e` **11 passed**.
+The e2e suite needed **no** change this time — restoring 209's labels restored what it already
+asserted, including the « 30’+11 » the offline spec pins.
+
+**Named rather than hidden:** a minute in added time has no integer, so a correction into first-half
+stoppage can only be typed as 30 and lands on 30′00″. Since the field pre-fills the display minute,
+re-saving an added-time event without touching the field moves it to the period boundary and loses the
+seconds. On the roadmap; the fix is a field that accepts « 30+2 ».
+
+Files: `lib/match/clock.ts`, `lib/match/clock.test.ts`, `lib/match/reducer.ts`, `lib/match/presenter.ts`,
+`lib/match/presenter.test.ts`, `lib/match/reducer.test.ts`, `lib/retro/amend.ts`,
+`lib/retro/amend.test.ts`, `lib/retro/actions.ts`, `lib/retro/queries.ts`,
+`app/(app)/match/[id]/saisie/_components/retro-corrections.tsx`,
+`app/(jeu)/match/[id]/jeu/_components/match-bar.tsx`,
+`app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `e2e/offline.spec.ts`, `CLAUDE.md`,
+`docs/DECISIONS.md` (214), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.

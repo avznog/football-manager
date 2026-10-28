@@ -50,7 +50,13 @@ export type RetroTimelineLine = {
   type: TimelineEntry["type"];
   period: number;
   clockMs: number;
+  /** Real elapsed match time, floored. The truth, and what minutes played are built from. */
   minute: number;
+  /**
+   * The same moment on the display's scale, which is what the correction sheet's field edits
+   * (decision 214): its title says `minuteLabel`, so its field must hold the number that label is.
+   */
+  displayMinute: number;
   minuteLabel: string;
   labelFr: string;
   voided: boolean;
@@ -179,6 +185,7 @@ function toTimelineLine(entry: TimelineEntry): RetroTimelineLine {
     period: entry.period,
     clockMs: entry.clockMs,
     minute: entry.minute,
+    displayMinute: entry.displayMinute,
     minuteLabel: entry.minuteLabel,
     // « Changement », « Changement de poste », « Composition de départ » — the same words game mode
     // and the recap use (`pitchEventFr`, decision 152), rather than « Composition appliquée ».

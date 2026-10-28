@@ -82,13 +82,15 @@ travaillez ».
 - A query returns plain serialisable objects, never Drizzle rows with Date objects crossing the RSC
   boundary unformatted.
 - Dates are stored as `timestamptz` and always handled in `Europe/Paris` for display.
-- **A minute is the football played, counted from the kick-off of the match** (decision 213). Never a
-  reset clock, and never per-period: a first half let run to 33'40" reads « 33' », and one minute into
-  the second half reads « 35' », not « 30'+1 » and not « 31' ». That is `clock_ms`, so a label is
-  `clockMsToMinute` and nothing else. Decision 209 made minutes period-relative with football's
-  « 30'+2 » notation for a fortnight and is superseded: it gave two different moments the same label.
-  The **one** period-relative figure left is the second line of game mode's header, « 2e période 13' »,
-  beside the match's own clock.
+- **Minutes on screen are the television's; minutes played are the football** (decision 214). Of a
+  2×30 whose first half ran to 32: the whistle reads « 30'+2 », the second half kicks off again at
+  « 30' », a goal twenty minutes into it reads « 50' » — and a player on from the start has **52**
+  minutes. `clock_ms` is always real elapsed football and nothing stored ever moves; the display is a
+  mapping over it (`displayClockMs`), and `clockMsForDisplayMinute` is the inverse, which the
+  correction sheet needs because **its field holds the minute you can see**. Decision 209 is this
+  convention and 213 briefly replaced it with real elapsed everywhere; 214 restores it and keeps 213's
+  two fixes — the sheet's field, and one ceiled spelling of the added-time badge. Game mode's header
+  shows both: « 50:00 » over « 51' jouées ».
 - Tailwind only, with the design tokens in `app/globals.css`. No inline hex colours.
 - **The code is hand-formatted and Prettier is not the formatter.** It is not a dependency and runs in
   no CI job; 106 of 274 source files differ from what it would emit, so `--check` is not a gate and

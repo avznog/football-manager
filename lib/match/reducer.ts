@@ -87,6 +87,7 @@ import {
   type PlayInterval,
   actualPeriodStarts,
   clockMsToMinute,
+  displayMinute,
   formatMinuteLabelFr,
   msToWholeMinutes,
   periodsConfig,
@@ -314,6 +315,17 @@ export type TimelineEntry = {
   minute: number;
   /** `58’`, or `30’+2` in stoppage time, counted from its own period's start. What a screen shows. */
   minuteLabel: string;
+  /**
+   * `minuteLabel` as an integer: the minute on the display's scale, which after an overrun period is
+   * **not** `minute`. A second half that kicked off at 33′40″ gives an event stored at 59′ a `minute`
+   * of 59 and a `displayMinute` of 55.
+   *
+   * It exists for one caller and one reason (decision 214): the correction sheet's minute field. Its
+   * title reads `minuteLabel` and its field held `minute`, so the two disagreed by the overrun, and
+   * the owner moved a goal to the « 56’ » he could see by typing 59 — doing the app's arithmetic for
+   * it. The field holds this now, and `lib/retro/amend.ts` maps it back.
+   */
+  displayMinute: number;
   /** French name of the event kind. Player names are the UI's job — the reducer knows none. */
   labelFr: string;
   /** True when a `VOID` points at this event: show it, struck through. */
@@ -1147,7 +1159,12 @@ export function reduceMatch(
               clockMs,
               // Real elapsed, like the timeline's, and for the same reason (see the note there).
               minute: clockMsToMinute(clockMs),
-              minuteLabel: formatMinuteLabelFr(clockMs),
+              minuteLabel: formatMinuteLabelFr(
+                clockMs,
+                event.period,
+                periods,
+                periodStarts.get(event.period),
+              ),
               startingLineup,
               assignments: [...pitch]
                 .map(([memberId, entry]) => ({ memberId, slotId: entry.slotId }))
@@ -1212,13 +1229,18 @@ export function reduceMatch(
        * with it and `amendStamp` turns whatever comes back into `minuteToClockMs(minute)`. Hand it
        * 38 for an event stored at 41′40″ and re-saving the correction moves the event.
        *
-       * The label is now the same number, formatted (decision 213): one minute per moment, counted
-       * from the kick-off of the match. It no longer depends on the period, which is why neither
-       * `event.period` nor the period's real start is passed any more — a second half that kicked off
-       * at 34′ reads « 35’ » one minute in, because that is the 35th minute of football played.
+       * The label, in contrast, is read against **its own** period's real start, not the match's
+       * current one: this loop walks both halves, and the first half's own start (0) is what keeps a
+       * 33′40″ `PERIOD_END` reading « 30’+4 » on the same screen as a second half counted from 30′.
        */
       minute: clockMsToMinute(clockMs),
-      minuteLabel: formatMinuteLabelFr(clockMs),
+      minuteLabel: formatMinuteLabelFr(
+        clockMs,
+        event.period,
+        periods,
+        periodStarts.get(event.period),
+      ),
+      displayMinute: displayMinute(clockMs, event.period, periods, periodStarts.get(event.period)),
       labelFr: EVENT_LABELS_FR[event.type],
       voided,
       voidedByEventId: voidedBy.get(event.id) ?? null,

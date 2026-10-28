@@ -194,10 +194,9 @@ test("le hors-ligne : les actions tapées sans réseau arrivent une fois chacune
     await page.reload();
     await expect(score).toHaveText("0 – 4");
     await expect(timeline).toHaveCount(5);
-    // 41:00 of a 2×30 first half is « 41’ »: the football played, counted from the kick-off
-    // (decision 213). Decision 209 wrote « 30’+11 » here for a fortnight. What matters to *this*
-    // test either way is that the minute is the one of the **tap**, kept through a 503 and a retry
-    // the coach never saw.
-    await expect(timeline.nth(0)).toContainText("41’");
+    // 41:00 of a 2×30 is « 30’+11 »: added time on the first half, which is the notation decision 009
+    // asks for. What matters here is that it is the minute of the **tap**, kept through a 503 and a
+    // retry the coach never saw.
+    await expect(timeline.nth(0)).toContainText("30’+11");
   });
 });

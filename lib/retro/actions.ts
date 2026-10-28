@@ -24,6 +24,7 @@ import { assertCan } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
 import { amendMatchEvents } from "@/lib/match/append";
+import { actualPeriodStarts } from "@/lib/match/clock";
 import { getLiveMatch } from "@/lib/match/live";
 import { type LiveMatch, type PendingEvent, minuteLabelFr, reduceLive } from "@/lib/match/presenter";
 import type { MatchState } from "@/lib/match/reducer";
@@ -326,6 +327,9 @@ export async function submitAmendment(_prev: FormState, formData: FormData): Pro
     kickoffAtMs,
     finalWhistleMs:
       state.timeline.find((line) => line.type === "FINAL_WHISTLE" && !line.voided)?.clockMs ?? 0,
+    // The minute the coach typed is the one the sheet showed him (decision 214), so the real starts
+    // of the periods are what maps it back onto the clock.
+    periodStarts: actualPeriodStarts(state.playIntervals),
     target: target
       ? {
           eventId: target.eventId,
@@ -434,6 +438,7 @@ async function submitChange(actor: Actor, formData: FormData): Promise<FormState
     kickoffAtMs,
     finalWhistleMs,
     change: { minute, slots },
+    periodStarts: actualPeriodStarts(state.playIntervals),
   });
   const stamped = amendment.events[0];
   if (finalWhistleMs > 0 && stamped.clockMs >= finalWhistleMs) {
@@ -448,7 +453,7 @@ async function submitChange(actor: Actor, formData: FormData): Promise<FormState
       candidateIds: changeCandidateIds(live, atClock, state),
       slots: live.slots,
       nameOf: nameIn(live),
-      minuteLabel: minuteLabelFr(stamped.clockMs),
+      minuteLabel: minuteLabelFr(stamped.clockMs, stamped.period, atClock.periods),
     },
   );
   if (problem) return { error: problem };
