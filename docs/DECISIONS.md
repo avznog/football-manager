@@ -8830,3 +8830,84 @@ kick-off, the worst of the available wrong answers.
 Also removed: the `regulation` prop threaded through four components in `retro-corrections.tsx`, whose
 only consumer was the `max` of the numeric input that no longer exists. « Ajouter un changement » still
 needs it, so it is computed for that one caller.
+
+## 216 — The two `info-radarlocal` jobs are buttons in CI, dry by default, and they write its API
+
+**2026-10-28.** The owner: « I want to add to the info-radarlocal the data of the previous match
+played. But for that, I want to do it through CI, so I do not have to do it with claude anymore. This
+job must be triggerable manually, at any time. I want also to create a CI job to synchronise the notes
+of the latest match from info-radaralocal to our production DB. »
+
+Two jobs in `.github/workflows/old-app.yml`, both `workflow_dispatch` and nothing else:
+
+```
+push-match    this app  →  info-radarlocal     a played match, so the team can vote on it
+sync-ratings  info-radarlocal  →  this app     the notes they voted
+```
+
+**Why a job rather than a session.** Filling the old app was done twice by hand, through its website,
+with a browser driven for an afternoon each time. That is a fortnightly chore with a person in the
+loop for no reason: the inputs are entirely derivable from this app's own log, and the only judgement
+in it was the name mapping, which has lived in `scripts/radarlocal-names.mts` since decision 188.
+
+**Why the API and not the website, which reverses an instruction.** On 2026-10-21 the owner said « I do
+not want you to do it with supabase, but with the info-radaralocal.fr website ». That was about a
+one-off done by hand, and it should not bind an unattended job: driving the site needs *his own
+password* as a repository secret, it stubs the app's « rate everyone first » gate to reach the admin
+forms, and it broke twice in one afternoon on a dropdown and a button name. So `push-match` writes rows
+with a `service_role` key. He was asked and chose this explicitly.
+
+**Dry run by default, both jobs.** The `commit` input is unticked unless you tick it, which matches the
+scripts' own `--commit` convention and means a mis-click costs a log and not a database. `push-match`'s
+dry run prints the composition in formation order, every substitution, every goal, and both minute
+columns; `sync-ratings`'s prints the notes it would insert.
+
+**This is the second workflow to touch production, and that narrows decision 119 rather than
+contradicting it.** 119 made `release.yml` the only one, and the thing it was protecting is that
+production's *shape* changes in exactly one place: `release.yml` runs `db:migrate`. `sync-ratings` runs
+an importer that **only ever inserts** into `ratings` and leaves anything already there alone — it
+cannot move a goal, a minute, a password or a column. If a future job here wants to update or delete in
+production, that is a new decision and not an extension of this one.
+
+**Everybody on the match sheet is pushed, not only the men who played**, and this is the finding that
+changed the design. The old app's own policy is
+`ratings_insert_if_in_lineup`: `exists (select 1 from lineups where match_id = ratings.match_id and
+player_id = auth.uid())`. A man with no `lineups` row therefore **cannot rate the match at all** — RLS
+refuses the insert, he is not merely left unprompted. So the supporters of decision 211, who exist
+precisely so somebody who did not play can still vote, and the substitutes who never came on, all get a
+row. Pushing only the seven who started would have silently disenfranchised exactly the people 211 was
+written for — the same hole that stops Léo C being asked over there.
+
+**The minutes sent are real elapsed, not what our screens show.** Ours display the television's clock
+(decision 214), so a goal can read « 30’+1 » here; the old app has no notion of added time and its
+minute is a plain integer against `duration`. Every minute pushed — goals, concessions, substitutions —
+is real elapsed football, which keeps the push self-consistent, because their trigger decides who was
+on the pitch at minute *n* from substitutions stamped on the same scale. The dry run prints our own
+notation beside a goal **only when it differs**, so « 31' (chez nous 30+2) » is worth reading and
+« 5' (5) » never appears.
+
+**Whole minutes cost somebody a minute, and the dry run says so.** Their forms take integers while the
+reducer works in milliseconds and subtracts the pauses. On 2026-10-20 three men were a minute short, and
+nudging a boundary to fix one makes another wrong. Both columns are printed side by side so the gap is
+read rather than discovered, and the post-write read-back warns if their trigger disagrees with us by
+more than a minute.
+
+**`old-app/schema.sql` is stale and was not trusted.** It has no `substitutions` table at all, and the
+deployed client reads one. Every shape here — `substitutions(match_id, minute, player_off, player_on)`,
+`goals_for(match_id, minute, scorer_id, assist_id)`, `goals_conceded(match_id, minute)`,
+`lineups(match_id, player_id, slot, role)`, `matches(status, duration, formation)` — was taken from
+`old-app/index.html`, which **is** the deployed app. The RLS policy above is from `schema.sql` and is
+the one part of that file corroborated by observed behaviour (decision 211's note on Léo C).
+
+**The insert order is load-bearing and is inferred, not read.** `matches.duration` →
+`lineups` → `substitutions` → `goals_for` → **`goals_conceded` last**, because the trigger that fills
+`goals_conceded_lineup` works out who was on the pitch from the first two; inserted before them it would
+record an empty pitch for every goal conceded and nothing would complain. `goals_conceded_lineup` is
+never deleted directly — it has no `match_id` to filter on and cascades from `goals_conceded`. This
+session held no credential that could list the trigger bodies, so that ordering is deduced from the
+client's behaviour and from one hand-run, and it says so in the script.
+
+**Two secrets, not one.** A Management API token can fetch the service-role key and so could have served
+both jobs; keeping them apart means the job that only reads cannot write, and the job that writes the old
+app holds no account-level access. `SUPABASE_SERVICE_ROLE_KEY` for `push-match`,
+`SUPABASE_ACCESS_TOKEN` for `sync-ratings`, and the existing `DATABASE_URL` for both.
