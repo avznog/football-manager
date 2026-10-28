@@ -8966,3 +8966,35 @@ The parent component still holds **one string** — `30+2`, the value the form p
 validates — and never sees the two halves. `MinuteField` is the only place that splits it, which is
 what stops the boxes and the wire drifting apart. Both sheets that take a minute on a finished match use
 it: the correction sheet and « Ajouter un changement ».
+
+## 219 — A pooled connection string is a warning, not a refusal
+
+**2026-10-28.** The first run of decision 216's `push-match` job failed on its own guard:
+
+```
+ABANDON : Cette URL passe par le pooler Neon. Utilise le point d'entrée direct (COORDINATION.md).
+```
+
+The guard was wrong, and the reason is worth keeping: **the `DATABASE_URL` secret is the pooled string
+deliberately**, by `release.yml`'s own instruction — « Set it to the pooled Neon string — docs/DEPLOY.md
+§4 » — and every production migration this project has run has gone through it. So the script was
+refusing the one string CI has, on the authority of a rule that `release.yml` already does not follow.
+
+`COORDINATION.md`'s « direct endpoint only, never `-pooler` » is still right **for what it is about**:
+`pg_dump`, `pg_restore`, and a migration run by hand after one, where a pooled session can inherit
+`search_path = ''` and leave a schema nobody notices. That rule is untouched.
+
+What makes it the wrong rule for these two importers is that the hazard is **loud**. A session carrying
+an empty `search_path` answers every query with « relation … does not exist », so the script aborts
+before reading or writing anything. Over the pooler these scripts can **fail**; they cannot produce a
+wrong figure. That is worth a line of output and not a refusal that stops the job the owner asked for.
+
+So both `scripts/push-match-to-old-app.mts` and `scripts/import-ratings-from-old-app.mts` print a
+warning naming the symptom to expect — « si une requête échoue sur « relation … does not exist » » —
+and carry on. Verified against the actual pooled production string: the warning prints and the whole
+derivation runs, 4 – 4, identical to the same run over the direct endpoint.
+
+The contradiction between `COORDINATION.md` and `release.yml` about which endpoint production
+migrations should use is **left standing and not resolved here**, because `release.yml` has shipped
+every release through the pooler and nothing about this job is evidence either way. Noted so the next
+session does not mistake one document's silence for agreement.

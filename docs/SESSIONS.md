@@ -7425,3 +7425,29 @@ credited with a conceded goal, because of the comparison above. The dry run prin
 every goal where they differ.
 
 Files: `scripts/push-match-to-old-app.mts` (docblock), `docs/SESSIONS.md`.
+
+### The CI job's first run failed on its own guard
+
+Decision **219**. The owner added the secrets, triggered `push-match`, and it aborted:
+« Cette URL passe par le pooler Neon. »
+
+**The guard was wrong, not the secret.** `DATABASE_URL` is the pooled string on purpose —
+`release.yml` says so in its own error message, « Set it to the pooled Neon string — docs/DEPLOY.md
+§4 » — and every production migration has run through it. The script was refusing the only string CI
+has, citing a rule `release.yml` already does not follow.
+
+`COORDINATION.md`'s « never `-pooler` » stays right for what it is about: `pg_dump`, `pg_restore`, and a
+hand-run migration after one. What makes it the wrong rule for an importer is that the hazard is
+**loud** — a session with an empty `search_path` answers every query with « relation … does not exist »,
+so the script aborts before reading or writing anything. Over the pooler these scripts can fail; they
+cannot produce a wrong figure. Both now warn, naming the symptom to expect, and carry on.
+
+Checked against the real pooled production string rather than assumed: the warning prints, the whole
+derivation runs, and the output is identical to the direct-endpoint run — 4 – 4, 63′, 20 substitutions.
+
+**Left standing:** `COORDINATION.md` and `release.yml` disagree about which endpoint production
+migrations should use. `release.yml` has shipped every release through the pooler, and nothing about
+this job is evidence either way, so it is recorded rather than resolved.
+
+Files: `scripts/push-match-to-old-app.mts`, `scripts/import-ratings-from-old-app.mts`,
+`docs/DECISIONS.md` (219), `docs/SESSIONS.md`.
