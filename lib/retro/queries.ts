@@ -57,6 +57,8 @@ export type RetroTimelineLine = {
    * (decision 214): its title says `minuteLabel`, so its field must hold the number that label is.
    */
   displayMinute: number;
+  /** The minute as the sheet's field holds it: `56`, or `30+2` in added time (decision 215). */
+  minuteField: string;
   minuteLabel: string;
   labelFr: string;
   voided: boolean;
@@ -186,6 +188,7 @@ function toTimelineLine(entry: TimelineEntry): RetroTimelineLine {
     clockMs: entry.clockMs,
     minute: entry.minute,
     displayMinute: entry.displayMinute,
+    minuteField: entry.minuteField,
     minuteLabel: entry.minuteLabel,
     // « Changement », « Changement de poste », « Composition de départ » — the same words game mode
     // and the recap use (`pitchEventFr`, decision 152), rather than « Composition appliquée ».

@@ -7,8 +7,9 @@ import { playerState, reduceMatch } from "@/lib/match/reducer";
 import { type RetroEntry, buildRetroLog, retroEventRecords } from "./log";
 import {
   actualPeriodStarts,
-  clockMsForDisplayMinute,
+  clockMsForMinuteField,
   displayMinute,
+  formatMinuteFieldFr,
   periodsConfig,
 } from "@/lib/match/clock";
 
@@ -154,7 +155,7 @@ describe("buildAmendment", () => {
       kickoffAtMs: KICKOFF_AT_MS,
       finalWhistleMs: FINAL_WHISTLE_MS,
       target: { eventId: goal.id, type: goal.type, period: goal.period, clockMs: goal.clockMs },
-      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 52 },
+      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: "52" },
     });
 
     expect(amendment.events[0].minute).toBe(27); // the VOID stays beside its target
@@ -173,7 +174,7 @@ describe("buildAmendment", () => {
       // This match ran three minutes over: the whistle in the log is what counts, not regulation.
       finalWhistleMs: 63 * MINUTE,
       target: { eventId: goal.id, type: goal.type, period: goal.period, clockMs: goal.clockMs },
-      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 90 },
+      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: "90" },
     });
 
     expect(amendment.events[1].minute).toBe(63);
@@ -214,7 +215,7 @@ describe("buildAmendment", () => {
       kickoffAtMs: KICKOFF_AT_MS,
       finalWhistleMs: FINAL_WHISTLE_MS,
       target: null,
-      fact: { type: "GOAL_AGAINST", memberId: null, assistId: null, minute: 41 },
+      fact: { type: "GOAL_AGAINST", memberId: null, assistId: null, minute: "41" },
     });
 
     expect(amendment.events.map((event) => event.type)).toEqual(["GOAL_AGAINST"]);
@@ -275,7 +276,7 @@ describe("buildAmendment", () => {
       kickoffAtMs: KICKOFF_AT_MS,
       finalWhistleMs: 0,
       target: null,
-      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: 200 },
+      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: "200" },
     });
 
     expect(amendment.events[0].minute).toBe(60);
@@ -371,7 +372,7 @@ describe("a minute typed into the correction sheet is the one the sheet shows (d
       target: null,
       // He types 56, the minute he can see. Under the old sheet this landed at 56′ of the clock and
       // showed « 53’ », which is the mismatch he worked around.
-      fact: { type: "GOAL_FOR", memberId: P.mcl, assistId: null, minute: 56 },
+      fact: { type: "GOAL_FOR", memberId: P.mcl, assistId: null, minute: "56" },
       periodStarts: starts,
     });
 
@@ -401,7 +402,7 @@ describe("a minute typed into the correction sheet is the one the sheet shows (d
     const stored = overrunMatch();
     const starts = actualPeriodStarts(reduce(stored).playIntervals);
     for (const typed of [0, 10, 29, 31, 45, 56, 60]) {
-      const { clockMs, period } = clockMsForDisplayMinute(typed, periodsConfig(PERIODS), starts);
+      const { clockMs, period } = clockMsForMinuteField(String(typed), periodsConfig(PERIODS), starts)!;
       // Whatever he types comes back as the same number on the screen, which is the whole contract.
       expect(displayMinute(clockMs, period, periodsConfig(PERIODS), starts.get(period))).toBe(typed);
     }
@@ -410,8 +411,8 @@ describe("a minute typed into the correction sheet is the one the sheet shows (d
   it("is the identity when the periods started where they should", () => {
     // A retro log stamps its kick-offs exactly at the nominal start, so nothing moves for it.
     for (const typed of [0, 17, 30, 44, 60]) {
-      expect(clockMsForDisplayMinute(typed, periodsConfig(PERIODS)).clockMs).toBe(typed * MINUTE);
-      expect(clockMsForDisplayMinute(typed, periodsConfig(PERIODS), new Map()).clockMs).toBe(
+      expect(clockMsForMinuteField(String(typed), periodsConfig(PERIODS))!.clockMs).toBe(typed * MINUTE);
+      expect(clockMsForMinuteField(String(typed), periodsConfig(PERIODS), new Map())!.clockMs).toBe(
         typed * MINUTE,
       );
     }
@@ -424,14 +425,105 @@ describe("a minute typed into the correction sheet is the one the sheet shows (d
       [1, 0],
       [2, LATE_END],
     ]);
-    expect(clockMsForDisplayMinute(31, periodsConfig(PERIODS), starts)).toEqual({
+    expect(clockMsForMinuteField("31", periodsConfig(PERIODS), starts)).toEqual({
       clockMs: 34 * MINUTE,
       period: 2,
     });
     // And the first half's own minutes are untouched by the second's overrun.
-    expect(clockMsForDisplayMinute(12, periodsConfig(PERIODS), starts)).toEqual({
+    expect(clockMsForMinuteField("12", periodsConfig(PERIODS), starts)).toEqual({
       clockMs: 12 * MINUTE,
       period: 1,
     });
+  });
+});
+
+/*
+ * Decision 215, and the thing the owner asked for in one line: « I want to be able to add corrections
+ * in additional time of first or second half !! » Before this, the field took an integer, so the first
+ * half's stoppage had no minute at all — 32 of a 2×30 means two minutes into the second half.
+ */
+describe("a correction in added time", () => {
+  const LATE_END = 33 * MINUTE;
+  const overrunMatch = () => {
+    const stored = storedMatch();
+    return stored.map((event) => {
+      if (event.period === 2) return { ...event, clockMs: event.clockMs + 3 * MINUTE };
+      if (event.type === "PERIOD_END" && event.period === 1) return { ...event, clockMs: LATE_END };
+      return event;
+    });
+  };
+
+  it("puts a goal in the first half's stoppage, where « 32 » would have put it in the second", () => {
+    const stored = overrunMatch();
+    const starts = actualPeriodStarts(reduce(stored).playIntervals);
+
+    const amendment = buildAmendment({
+      submissionId: SUBMISSION,
+      periods: PERIODS,
+      kickoffAtMs: KICKOFF_AT_MS,
+      finalWhistleMs: 63 * MINUTE,
+      target: null,
+      fact: { type: "GOAL_FOR", memberId: P.mcl, assistId: null, minute: "30+2" },
+      periodStarts: starts,
+    });
+
+    const appended = amendment.events.at(-1)!;
+    expect(appended.clockMs).toBe(32 * MINUTE);
+    // The first half, which is the whole point: the same 32 minutes typed as « 32 » is period 2.
+    expect(appended.period).toBe(1);
+
+    const state = reduce([
+      ...stored,
+      ...amendment.events.map((event, index) => ({
+        ...event,
+        id: uuid("ggg", index + 1),
+        seq: stored.length + index + 1,
+      })),
+    ]);
+    const goal = state.timeline.find((line) => line.eventId === uuid("ggg", 1))!;
+    expect(goal.minuteLabel).toBe("30’+2");
+    expect(goal.minuteField).toBe("30+2");
+  });
+
+  it("puts one in the second half's stoppage, counted from that half's own end", () => {
+    const stored = overrunMatch();
+    const starts = actualPeriodStarts(reduce(stored).playIntervals);
+    const amendment = buildAmendment({
+      submissionId: SUBMISSION,
+      periods: PERIODS,
+      kickoffAtMs: KICKOFF_AT_MS,
+      finalWhistleMs: 66 * MINUTE,
+      target: null,
+      fact: { type: "GOAL_FOR", memberId: P.mcl, assistId: null, minute: "60+1" },
+      periodStarts: starts,
+    });
+    const appended = amendment.events.at(-1)!;
+    // 61 displayed, and the half kicked off at 33′, so 64′ of football.
+    expect(appended.clockMs).toBe(64 * MINUTE);
+    expect(appended.period).toBe(2);
+  });
+
+  /**
+   * The pre-fill is the field's own notation now, so re-saving an added-time correction without
+   * touching the minute leaves it exactly where it was. That was the hole decision 214 shipped with:
+   * the field held the display *integer*, so an added-time event re-saved jumped to the boundary.
+   */
+  it("re-saves an added-time event without moving it", () => {
+    const stored = overrunMatch();
+    const starts = actualPeriodStarts(reduce(stored).playIntervals);
+    const original = 32 * MINUTE;
+    const field = formatMinuteFieldFr(original, 1, periodsConfig(PERIODS), starts.get(1));
+    expect(field).toBe("30+2");
+
+    const again = buildAmendment({
+      submissionId: SUBMISSION,
+      periods: PERIODS,
+      kickoffAtMs: KICKOFF_AT_MS,
+      finalWhistleMs: 63 * MINUTE,
+      target: null,
+      fact: { type: "GOAL_FOR", memberId: P.mcl, assistId: null, minute: field },
+      periodStarts: starts,
+    });
+    expect(again.events.at(-1)!.clockMs).toBe(original);
   });
 });

@@ -24,7 +24,7 @@ import { assertCan } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
 import { amendMatchEvents } from "@/lib/match/append";
-import { actualPeriodStarts } from "@/lib/match/clock";
+import { actualPeriodStarts, clockMsForMinuteField, periodsConfig } from "@/lib/match/clock";
 import { getLiveMatch } from "@/lib/match/live";
 import { type LiveMatch, type PendingEvent, minuteLabelFr, reduceLive } from "@/lib/match/presenter";
 import type { MatchState } from "@/lib/match/reducer";
@@ -243,7 +243,7 @@ export async function submitAmendment(_prev: FormState, formData: FormData): Pro
             type: factType,
             memberId: emptyToNull(formData.get("fact-member")),
             assistId: emptyToNull(formData.get("fact-assist")),
-            minute: optionalMinute(formData.get("fact-minute")),
+            minute: optionalMinuteField(formData.get("fact-minute")),
           }
         : undefined,
   });
@@ -317,6 +317,17 @@ export async function submitAmendment(_prev: FormState, formData: FormData): Pro
   }
 
   if (target?.voided) return { error: "Cette action est déjà annulée." };
+
+  // A minute the field's shape allowed but this match has no place for — « 25+2 » of a 2×30. Checked
+  // here so it is a sentence rather than a silent fallback to the target's own stamp (decision 215).
+  if (
+    fact?.minute != null &&
+    !clockMsForMinuteField(fact.minute, periodsConfig(live.match), actualPeriodStarts(state.playIntervals))
+  ) {
+    return {
+      error: `La minute « ${fact.minute} » n’existe pas dans ce match : le temps additionnel s’écrit avec la fin de la période, par exemple 30+2.`,
+    };
+  }
 
   const amendment = buildAmendment({
     submissionId,
@@ -402,7 +413,7 @@ async function submitChange(actor: Actor, formData: FormData): Promise<FormState
     teamId: formData.get("teamId"),
     matchId: formData.get("matchId"),
     intent: formData.get("intent"),
-    minute: minuteRaw === "" ? undefined : Number(minuteRaw),
+    minute: minuteRaw,
     outIds: formData.getAll("change-out").map(String),
     inIds: formData.getAll("change-in").map(String),
     slots: formData
@@ -430,6 +441,12 @@ async function submitChange(actor: Actor, formData: FormData): Promise<FormState
   const submissionId = retroSubmissionId(changeSeed(matchId, minute, slots));
   if (live.events.some((event) => event.clientEventId === retroEventId(submissionId, 0))) {
     redirect(`/match/${matchId}/saisie?corrige=1`);
+  }
+
+  if (!clockMsForMinuteField(minute, periodsConfig(live.match), actualPeriodStarts(state.playIntervals))) {
+    return {
+      error: `La minute « ${minute} » n’existe pas dans ce match : le temps additionnel s’écrit avec la fin de la période, par exemple 30+2.`,
+    };
   }
 
   const amendment = buildChangeAmendment({
@@ -479,8 +496,11 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
   return raw === "" ? null : raw;
 }
 
-/** An empty minute field is « je ne sais plus », which the stamp rule handles. */
-function optionalMinute(value: FormDataEntryValue | null): number | null {
+/**
+ * An empty minute field is « je ne sais plus », which the stamp rule handles. Text rather than a
+ * number since decision 215: `30+2` is a minute of this match and not a number.
+ */
+function optionalMinuteField(value: FormDataEntryValue | null): string | null {
   const raw = typeof value === "string" ? value.trim() : "";
-  return raw === "" ? null : Number(raw);
+  return raw === "" ? null : raw;
 }

@@ -131,7 +131,7 @@ const onAt = (live: LiveMatch, minute: number) =>
     .onPitch.map((entry) => entry.memberId)
     .sort();
 
-function change(live: LiveMatch, minute: number, slots: { slotId: string; memberId: string }[]) {
+function change(live: LiveMatch, minute: string, slots: { slotId: string; memberId: string }[]) {
   const submissionId = retroSubmissionId(changeSeed(live.match.id, minute, slots));
   return buildChangeAmendment({
     submissionId,
@@ -328,7 +328,7 @@ describe("buildChangeAmendment", () => {
   const slots = swapAt(live, 20, P.ail2, P.sub);
 
   it("appends one LINEUP_APPLIED on the minute, nobody's planned composition", () => {
-    const { events } = change(live, 20, slots);
+    const { events } = change(live, "20", slots);
     expect(events).toHaveLength(1);
     const [event] = events;
     expect(event.type).toBe("LINEUP_APPLIED");
@@ -341,11 +341,11 @@ describe("buildChangeAmendment", () => {
   });
 
   it("is keyed on the change, so a double tap is one change (invariant 6)", () => {
-    const first = change(live, 20, slots).events[0].clientEventId;
-    const reordered = change(live, 20, [...slots].reverse()).events[0].clientEventId;
+    const first = change(live, "20", slots).events[0].clientEventId;
+    const reordered = change(live, "20", [...slots].reverse()).events[0].clientEventId;
     expect(reordered).toBe(first);
-    expect(first).toBe(retroEventId(retroSubmissionId(changeSeed("m1", 20, slots)), 0));
-    expect(change(live, 21, slots).events[0].clientEventId).not.toBe(first);
+    expect(first).toBe(retroEventId(retroSubmissionId(changeSeed("m1", "20", slots)), 0));
+    expect(change(live, "21", slots).events[0].clientEventId).not.toBe(first);
   });
 
   it("is clamped to the final whistle", () => {
@@ -354,7 +354,7 @@ describe("buildChangeAmendment", () => {
       periods: { periodsCount: 2, periodMinutes: 30 },
       kickoffAtMs: KICKOFF_AT_MS,
       finalWhistleMs: 60 * MINUTE,
-      change: { minute: 90, slots },
+      change: { minute: "90", slots },
     });
     expect(events[0].clockMs).toBe(60 * MINUTE);
   });
@@ -394,13 +394,13 @@ describe("realism", () => {
   const before = reduceLive(live, [], null);
 
   it("accepts a change that strands nothing", () => {
-    const amendment = change(live, 20, swapAt(live, 20, P.ail2, P.sub2));
+    const amendment = change(live, "20", swapAt(live, 20, P.ail2, P.sub2));
     const after = reduceLive(live, pending(amendment), null);
     expect(introducedAnomalies(before.anomalies, after.anomalies)).toEqual([]);
   });
 
   it("refuses bringing on at 20’ the man the log brings on at 30’ — that later change strands", () => {
-    const amendment = change(live, 20, swapAt(live, 20, P.ail2, P.sub));
+    const amendment = change(live, "20", swapAt(live, 20, P.ail2, P.sub));
     const after = reduceLive(live, pending(amendment), null);
     const introduced = introducedAnomalies(before.anomalies, after.anomalies);
     expect(introduced.map((anomaly) => anomaly.code)).toEqual(["substitute-in-already-on"]);
@@ -411,7 +411,7 @@ describe("realism", () => {
 
   it("refuses a change that takes off the man who scores later, naming him and the goal's minute", () => {
     // Samuel scores at 41’; a change at 20’ that takes him off leaves that goal scored by nobody on.
-    const amendment = change(live, 20, swapAt(live, 20, P.at, P.sub2));
+    const amendment = change(live, "20", swapAt(live, 20, P.at, P.sub2));
     const after = reduceLive(live, pending(amendment), null);
     const introduced = introducedAnomalies(before.anomalies, after.anomalies);
     expect(introduced.map((anomaly) => anomaly.code)).toEqual(["scorer-off-pitch"]);
@@ -441,7 +441,7 @@ describe("realism", () => {
   });
 
   it("tutoies and never says « vous »", () => {
-    const amendment = change(live, 20, swapAt(live, 20, P.at, P.sub2));
+    const amendment = change(live, "20", swapAt(live, 20, P.at, P.sub2));
     const after = reduceLive(live, pending(amendment), null);
     const sentence = realismRefusalFr(introducedAnomalies(before.anomalies, after.anomalies), after, nameOf);
     expect(sentence).not.toMatch(/\bvous\b|\bvotre\b/i);

@@ -28,16 +28,29 @@ import {
   playerIndex,
   reduceLive,
 } from "@/lib/match/presenter";
-import { MS_PER_MINUTE } from "@/lib/match/clock";
+import {
+  MS_PER_MINUTE,
+  actualPeriodStarts,
+  clockMsForMinuteField,
+  formatMinuteLabelFr,
+  periodsConfig,
+} from "@/lib/match/clock";
 import { changeArrangement, terrainPayload, type SlotAssignment } from "@/lib/match/terrain";
 import { changeCandidateIds, stateAtClock } from "@/lib/retro/change";
 import type { RetroView } from "@/lib/retro/queries";
 
+/**
+ * The minute is carried as **what he typed** and as the clock it resolves to (decision 215): `30+2`
+ * is a minute of this match and not a number, and everything downstream — who was on the pitch, the
+ * stamp on the event — needs the clock rather than the text.
+ */
+type Placed = { minuteText: string; clockMs: number; period: number };
+
 type Step =
   | { step: "minute" }
-  | { step: "out"; minute: number; outIds: string[] }
-  | { step: "in"; minute: number; outIds: string[]; inIds: string[] }
-  | { step: "terrain"; minute: number; outIds: string[]; inIds: string[]; initial: SlotAssignment[] };
+  | ({ step: "out"; outIds: string[] } & Placed)
+  | ({ step: "in"; outIds: string[]; inIds: string[] } & Placed)
+  | ({ step: "terrain"; outIds: string[]; inIds: string[]; initial: SlotAssignment[] } & Placed);
 
 /** The last minute a change can be stamped at: strictly before the final whistle. */
 export function lastChangeMinute(finalWhistleMs: number, regulation: number): number {
@@ -67,11 +80,18 @@ export function AddChange({
   const maxMinute = lastChangeMinute(view.finalWhistleMs, regulation);
   const players = useMemo(() => playerIndex(live.players), [live.players]);
   const wholeMatch = useMemo(() => reduceLive(live, [], null), [live]);
+  // Where each period really kicked off, so `30+2` lands on the clock it means and the stamp reads
+  // back as « 30’+2 » (decision 215).
+  const periods = useMemo(() => periodsConfig(view.match), [view.match]);
+  const periodStarts = useMemo(
+    () => actualPeriodStarts(wholeMatch.playIntervals),
+    [wholeMatch.playIntervals],
+  );
 
-  const minute = flow.step === "minute" ? null : flow.minute;
+  const placedClockMs = flow.step === "minute" ? null : flow.clockMs;
   const atClock = useMemo(
-    () => (minute === null ? null : stateAtClock(live, minute * MS_PER_MINUTE)),
-    [live, minute],
+    () => (placedClockMs === null ? null : stateAtClock(live, placedClockMs)),
+    [live, placedClockMs],
   );
 
   const base = useMemo<SlotAssignment[]>(
@@ -114,14 +134,28 @@ export function AddChange({
     onClose();
   };
 
-  const stamp = minute === null ? "" : `${minute}’`;
+  const stamp =
+    flow.step === "minute"
+      ? ""
+      : formatMinuteLabelFr(flow.clockMs, flow.period, periods, periodStarts.get(flow.period));
   const toggled = (ids: readonly string[], memberId: string) =>
     ids.includes(memberId) ? ids.filter((id) => id !== memberId) : [...ids, memberId];
   const count = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
 
-  const parsedMinute = minuteText.trim() === "" ? null : Number(minuteText);
-  const minuteOk =
-    parsedMinute !== null && Number.isInteger(parsedMinute) && parsedMinute >= 0 && parsedMinute <= maxMinute;
+  /*
+   * `30+2` as well as `20` (decision 215), resolved to the real clock here so the lists below show the
+   * pitch as it actually was. A change must land strictly before the final whistle, which is a
+   * question about the clock and not about the minute: after an overrun first half the two differ.
+   */
+  const placed = useMemo(
+    () =>
+      minuteText.trim() === ""
+        ? null
+        : clockMsForMinuteField(minuteText, periods, periodStarts),
+    [minuteText, periods, periodStarts],
+  );
+  const ceilingMs = view.finalWhistleMs > 0 ? view.finalWhistleMs - 1 : regulation * MS_PER_MINUTE;
+  const minuteOk = placed !== null && placed.clockMs >= 0 && placed.clockMs <= ceilingMs;
 
   function submit(assignments: SlotAssignment[]) {
     if (flow.step !== "terrain") return;
@@ -130,7 +164,7 @@ export function AddChange({
     form.set("teamId", teamId);
     form.set("matchId", view.match.id);
     form.set("intent", "change");
-    form.set("change-minute", String(flow.minute));
+    form.set("change-minute", flow.minuteText);
     // Who went out and who came in, read off the pitch he confirmed rather than off his two answers:
     // the sheet lets him bench an arrival or bring on one more, and the server checks the lists
     // against the slots, so they must describe the same change.
@@ -151,12 +185,22 @@ export function AddChange({
         open
         onClose={close}
         title="Ajouter un changement"
-        description={`À quelle minute ? Entre 0 et ${maxMinute} : les listes suivantes montrent le terrain à cette minute-là.`}
+        description={`À quelle minute ? Entre 0 et ${maxMinute}, ou 30+2 pour le temps additionnel : les listes suivantes montrent le terrain à cette minute-là.`}
         footer={
           <Button
             fullWidth
             disabled={!minuteOk}
-            onClick={() => minuteOk && setFlow({ step: "out", minute: parsedMinute, outIds: [] })}
+            onClick={() =>
+              minuteOk &&
+              placed &&
+              setFlow({
+                step: "out",
+                minuteText: minuteText.trim(),
+                clockMs: placed.clockMs,
+                period: placed.period,
+                outIds: [],
+              })
+            }
           >
             Suivant
           </Button>
@@ -165,11 +209,10 @@ export function AddChange({
         <div className="flex items-center gap-2">
           <Input
             aria-label="Minute du changement"
-            type="number"
+            type="text"
             inputMode="numeric"
-            min={0}
-            max={maxMinute}
-            step={1}
+            pattern="[0-9]{1,3}([+][0-9]{1,2})?"
+            maxLength={6}
             value={minuteText}
             invalid={minuteText !== "" && !minuteOk}
             onChange={(event) => setMinuteText(event.target.value)}

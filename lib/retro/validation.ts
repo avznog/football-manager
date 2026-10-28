@@ -17,7 +17,12 @@ import { z } from "zod";
 
 import { FORMATION_SLOT_COUNT } from "@/db/reference";
 import { MAX_MINUTE } from "@/lib/match/events";
-import { type PeriodsConfig, periodsConfig, regulationMinutes } from "@/lib/match/clock";
+import {
+  MINUTE_FIELD_PATTERN,
+  type PeriodsConfig,
+  periodsConfig,
+  regulationMinutes,
+} from "@/lib/match/clock";
 import type { MatchEventInput } from "@/lib/match/events";
 import type { SlotInfo } from "@/lib/match/lineup";
 import { type MatchAnomalyCode, reduceMatch } from "@/lib/match/reducer";
@@ -162,6 +167,20 @@ const minuteSchema = z
   .max(MAX_MINUTE, "Cette minute est impossible.")
   .nullable();
 
+/**
+ * `12`, or `30+2` for added time (decision 215). The shape only — **which** period ends on that
+ * minute is a question about this match's configuration, so `clockMsForMinuteField` answers it and
+ * `lib/retro/actions.ts` turns its `null` into a sentence.
+ *
+ * The entry form's rows keep `minuteSchema` and its integer: that sheet types up a match with no log,
+ * whose periods begin exactly where they nominally do, so it has no overrun to name.
+ */
+const minuteFieldSchema = z
+  .string()
+  .trim()
+  .regex(MINUTE_FIELD_PATTERN, "Une minute s’écrit 12, ou 30+2 pour le temps additionnel.")
+  .nullable();
+
 const idSchema = z.uuid("Ce joueur n’est pas valide.");
 
 const rowKeySchema = z.string().min(1).max(64);
@@ -243,7 +262,9 @@ export const amendSubmitSchema = z
     matchId: z.uuid(),
     intent: z.enum(["correct", "void"]),
     targetEventId: z.uuid().nullish(),
-    fact: retroFactSchema.omit({ key: true }).nullish(),
+    // The amend arm's minute is text where the entry form's is an integer (decision 215): only a
+    // match that already has a log has an overrun to name, and only this sheet corrects one.
+    fact: retroFactSchema.omit({ key: true }).extend({ minute: minuteFieldSchema }).nullish(),
   })
   .refine((value) => value.intent !== "void" || !!value.targetEventId, {
     path: ["targetEventId"],
@@ -263,11 +284,12 @@ export const amendChangeSchema = z.object({
   teamId: z.uuid(),
   matchId: z.uuid(),
   intent: z.literal("change"),
+  // Text, like the correction sheet's: a change can be made in added time too (decision 215).
   minute: z
-    .number({ message: "Indique la minute du changement." })
-    .int("Une minute s’écrit en nombre entier.")
-    .min(0, "La minute ne peut pas être négative.")
-    .max(MAX_MINUTE, "Cette minute est impossible."),
+    .string({ message: "Indique la minute du changement." })
+    .trim()
+    .min(1, "Indique la minute du changement.")
+    .regex(MINUTE_FIELD_PATTERN, "Une minute s’écrit 12, ou 30+2 pour le temps additionnel."),
   outIds: z.array(idSchema).max(FORMATION_SLOT_COUNT, "Trop de joueurs sortent."),
   inIds: z.array(idSchema).max(FORMATION_SLOT_COUNT * 2, "Trop de joueurs entrent."),
   slots: z

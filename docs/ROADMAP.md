@@ -2666,9 +2666,19 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       The reversal is on me: 213 was built from « if it is 31 in second half (but the first half lasted
       34), it will be 35 », the opposite rule, and the worked example that settles it should have come
       before 213 rather than after
-- [ ] **A minute in added time cannot be typed into the correction sheet.** « 30’+2 » is not an
+- [x] ~~**A minute in added time cannot be typed into the correction sheet.**~~ Closed by decision
+      **215** on 2026-10-28, hours after it was written. Original note:
+- [ ] ~~**A minute in added time cannot be typed into the correction sheet.**~~ « 30’+2 » is not an
       integer, so a correction into the first half's stoppage can only be typed as 30 and lands on
       30′00″ exactly. The field pre-fills the display minute (decision 214), so **re-saving an
       added-time event without touching the field moves it to the period boundary** and loses the
       seconds — a small, real corruption on a path a coach can walk. Fixing it means the field
       accepting « 30+2 », parsed into a period and an overrun, which is a slice of its own
+- [x] **A correction in added time, « 30+2 »** — 2026-10-28. Decision **215**, closing the hole
+      decision 214 shipped with the same day. The field took an integer, and under the television
+      convention the first half's stoppage has none: « 30’+2 » looks like 32, and 32 is two minutes
+      into the *second* half. Now `30+2` is a minute the field accepts, in the correction sheet and in
+      « Ajouter un changement » alike, and it **pre-fills from the label** so re-saving no longer moves
+      the event to the period boundary. The period comes from the parse and never from the
+      millisecond; « 25+2 » of a 2×30 is refused rather than guessed. Looked at at 390 px in both
+      themes: « Corriger — But 30’+1 » over a field holding `30+1` and the hint « temps additionnel »

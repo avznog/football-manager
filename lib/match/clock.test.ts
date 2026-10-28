@@ -13,12 +13,15 @@ import {
   displayMinute,
   formatClock,
   formatMinuteFr,
+  formatMinuteFieldFr,
   formatMinuteLabelFr,
   minuteToClockMs,
   msToWholeMinutes,
   periodEndMs,
   periodOfClockMs,
+  clockMsForMinuteField,
   periodStartMs,
+  parseMinuteFieldFr,
   periodsConfig,
   playedMsBetween,
   projectClockMs,
@@ -388,6 +391,87 @@ describe("the two figures in game mode's header", () => {
     expect(over.label).toBe("60’+1");
     expect(over.stoppageMinutes).toBe(1);
     expect(over.playedLabel).toBe("62’");
+  });
+});
+
+/*
+ * Decision 215: a correction in added time. « 30’+2 » is the label, so `30+2` has to be a minute the
+ * field can hold — and the integer it looks like (32) means two minutes into the *second* half, which
+ * is a different seven and a different afternoon.
+ */
+describe("the minute field's own notation", () => {
+  const LATE_END = 33 * MS_PER_MINUTE;
+  const STARTS = new Map([
+    [1, 0],
+    [2, LATE_END],
+  ]);
+
+  it("writes added time the way the label does, in characters a coach can type", () => {
+    // Same arguments as `formatMinuteLabelFr`, same answer without the typographic prime.
+    expect(formatMinuteFieldFr(32 * MS_PER_MINUTE, 1, TWO_THIRTY, 0)).toBe("30+2");
+    expect(formatMinuteLabelFr(32 * MS_PER_MINUTE, 1, TWO_THIRTY, 0)).toBe("30’+2");
+    // Inside the period it is a bare minute, as before.
+    expect(formatMinuteFieldFr(11 * MS_PER_MINUTE, 1, TWO_THIRTY, 0)).toBe("11");
+    // And a second half that kicked off late: 59′ of football is « 56 ».
+    expect(formatMinuteFieldFr(59 * MS_PER_MINUTE, 2, TWO_THIRTY, LATE_END)).toBe("56");
+  });
+
+  it("names the period by the minute its period ends on, not by the millisecond", () => {
+    // `30+2` is 32 minutes on the display's scale, and 32 as a plain minute is the second half. The
+    // stoppage form must not be read that way, which is the whole reason `period` comes from the parse.
+    expect(parseMinuteFieldFr("30+2", TWO_THIRTY)).toEqual({
+      displayMs: 32 * MS_PER_MINUTE,
+      period: 1,
+    });
+    expect(parseMinuteFieldFr("32", TWO_THIRTY)).toEqual({
+      displayMs: 32 * MS_PER_MINUTE,
+      period: 2,
+    });
+    expect(parseMinuteFieldFr("60+1", TWO_THIRTY)).toEqual({
+      displayMs: 61 * MS_PER_MINUTE,
+      period: 2,
+    });
+  });
+
+  it("refuses a stoppage on a minute no period ends on, rather than guessing a half", () => {
+    expect(parseMinuteFieldFr("25+2", TWO_THIRTY)).toBeNull();
+    expect(parseMinuteFieldFr("0+1", TWO_THIRTY)).toBeNull();
+    // And refuses what is not a minute at all.
+    for (const bad of ["", "abc", "30+", "+2", "30++2", "30+0", "-4", "12.5"]) {
+      expect(parseMinuteFieldFr(bad, TWO_THIRTY)).toBeNull();
+    }
+  });
+
+  it("places added time on the real clock, through an overrun second half too", () => {
+    // The first half's own stoppage: it began at 0, so the display is the clock.
+    expect(clockMsForMinuteField("30+2", TWO_THIRTY, STARTS)).toEqual({
+      clockMs: 32 * MS_PER_MINUTE,
+      period: 1,
+    });
+    // The second half's, after a first that ran to 33′: « 60+1 » is 61 displayed, 64′ of football.
+    expect(clockMsForMinuteField("60+1", TWO_THIRTY, STARTS)).toEqual({
+      clockMs: 64 * MS_PER_MINUTE,
+      period: 2,
+    });
+    expect(clockMsForMinuteField("25+2", TWO_THIRTY, STARTS)).toBeNull();
+  });
+
+  it("round-trips every minute of a match that overran, added time included", () => {
+    for (const typed of ["0", "11", "29", "30", "30+1", "30+2", "31", "45", "56", "60", "60+1", "60+3"]) {
+      const placed = clockMsForMinuteField(typed, TWO_THIRTY, STARTS)!;
+      expect(placed).not.toBeNull();
+      // What he types is what the sheet shows him back, which is the contract the field owes him.
+      expect(formatMinuteFieldFr(placed.clockMs, placed.period, TWO_THIRTY, STARTS.get(placed.period))).toBe(
+        typed,
+      );
+    }
+  });
+
+  it("is the identity on a retro log, whose periods begin where they should", () => {
+    for (const typed of ["0", "17", "30", "30+2", "44", "60", "60+1"]) {
+      const withStarts = clockMsForMinuteField(typed, TWO_THIRTY, new Map([[1, 0], [2, 30 * MS_PER_MINUTE]]));
+      expect(clockMsForMinuteField(typed, TWO_THIRTY)).toEqual(withStarts);
+    }
   });
 });
 
