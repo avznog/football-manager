@@ -7326,3 +7326,56 @@ Gates: typecheck clean, eslint clean, `npm test` **1680 passed**. No e2e: nothin
 
 Files: `scripts/push-match-to-old-app.mts` (new), `.github/workflows/old-app.yml` (new),
 `docs/DECISIONS.md` (216), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.
+
+### The real time under every minute, and a « + » nobody can type
+
+Two things the owner found by using the app on his phone, both answered the same afternoon.
+
+**Decision 217 — « in the feed, I get two 36 times ».** Under the television convention a minute label
+*repeats*, which is not a defect of the convention but what a television minute is: two actions forty
+seconds apart both read « 36’ ». Every feed now prints `mm:ss` of real football under the label — `36’`
+over `42:32`. `TimelineEntry.clock` and `CompositionSnapshot.clock` are built in the reducer beside
+`minuteLabel`, so there is one spelling, and threaded to the four screens that print a minute. The
+correction screen needed it most: choosing which of two « 36’ » lines to correct is the whole job there.
+
+**What it cannot do**, stated because the next session will otherwise assume it: it separates two
+actions at different instants — the live case, and his — but not two events stamped at the *same*
+instant (a `PERIOD_END` and the `KICKOFF` after it both read « 30:00 »; only their names differ), and
+on a **retro-entered** match every event sits on a whole minute, so the line is always `:00` and adds
+nothing.
+
+**Decision 218 — the « + » is not typed.** « I feel that on the phone there is no possibility to add
+"+1", as the keyboard is only numbers. » He is right, and it is a defect decision 215 introduced hours
+earlier: `inputMode="numeric"` is what opens the digits keypad, and that keypad has no `+`. A text
+keyboard would offer the `+` and also every letter, for a field that wants three digits.
+
+So: **two numeric boxes**, and his own sentence is the spec — « add another field for additional time,
+that, if filled up with a minute, changes the first field to either 30 or 60 ». The snap is the
+interaction: added time only exists at a period's end, and *which* end is not a guess but the end of
+the period the minute is already in. 36 → `60+n`, 12 → `30+n`. `snapToPeriodEnd` is pure and knows
+nothing about halves, so a 3×20 snaps to 20, 40 or 60.
+
+Two smaller calls inside it. **Emptying the added-time box leaves the snapped minute alone** rather than
+restoring the previous value — undoing a snap by guessing what he meant two keystrokes ago is how a
+minute changes without anybody asking, and 60 is a true minute he can edit. And **`+0` is not added
+time**: the suffix is dropped and the minute kept, rather than composing a « 30+0 » the parser would
+refuse.
+
+The parent keeps **one string** (`60+2`, the value the form posts and the server validates) and never
+sees the halves; `MinuteField` is the only thing that splits it, which is what stops the boxes and the
+wire drifting apart. Both sheets that take a minute on a finished match use it.
+
+Gates: typecheck clean, eslint clean, `npm test` **1687 passed**, `npm run test:e2e` **11 passed** —
+run because the happy path walks both feeds. Verified in a browser at 390 px in light and dark: the
+déroulé reads « 9’ » over « 09:00 », and in the sheet typing 2 into the second box moved the first from
+52 to **60** and posted `60+2`.
+
+Files: `lib/match/clock.ts`, `lib/match/clock.test.ts`, `lib/match/reducer.ts`,
+`lib/match/presenter.ts`, `lib/rating/recap.ts`, `lib/retro/queries.ts`,
+`app/(app)/match/[id]/saisie/_components/minute-field.tsx` (new),
+`app/(app)/match/[id]/saisie/_components/retro-corrections.tsx`,
+`app/(app)/match/[id]/saisie/_components/add-change.tsx`,
+`app/(app)/match/[id]/_components/timeline-list.tsx`,
+`app/(app)/match/[id]/_components/compositions-strip.tsx`,
+`app/(jeu)/match/[id]/jeu/_components/event-timeline.tsx`, `docs/DECISIONS.md` (217, 218),
+`docs/ROADMAP.md`, `docs/SESSIONS.md`.

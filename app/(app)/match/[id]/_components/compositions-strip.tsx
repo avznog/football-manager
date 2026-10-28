@@ -54,6 +54,9 @@ export function CompositionsStrip({ compositions, kit }: CompositionsStripProps)
             <div className="flex items-baseline justify-between gap-2">
               <p className="min-w-0 truncate">
                 <span className="text-lg font-bold text-ink">{composition.minuteLabel}</span>{" "}
+                <span className="font-mono text-[10px] text-ink-subtle tabular-nums">
+                  {composition.clock}
+                </span>{" "}
                 <span className="text-sm text-ink-muted">{composition.kindLabel}</span>
               </p>
               {/* Not decoration: it is how a reader knows whether the flick that moved the strip

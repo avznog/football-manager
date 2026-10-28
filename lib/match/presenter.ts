@@ -560,6 +560,8 @@ export type TimelineLine = {
   clientEventId: string | null;
   /** `58’`, or `30’+2`. */
   minuteLabel: string;
+  /** `42:32` — the real football played, under the label, because a label can repeat. */
+  clock: string;
   /** « But », « Changement »… */
   title: string;
   /** « Julien (passe de Karim) », « Léo → Yanis » — empty when the event is about nobody. */
@@ -605,6 +607,7 @@ export function timelineLines(
         eventId: entry.eventId,
         clientEventId: entry.clientEventId,
         minuteLabel: entry.minuteLabel,
+        clock: entry.clock,
         title: pitchEventFr(entry, players.nameOf)?.title ?? entry.labelFr,
         detail: detailFr(entry, players),
         scoreLabel: entry.scoreAfter

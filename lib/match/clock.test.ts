@@ -22,7 +22,9 @@ import {
   clockMsForMinuteField,
   periodStartMs,
   parseMinuteFieldFr,
+  periodEndMinutes,
   periodsConfig,
+  snapToPeriodEnd,
   playedMsBetween,
   projectClockMs,
   readClock,
@@ -399,6 +401,63 @@ describe("the two figures in game mode's header", () => {
  * field can hold — and the integer it looks like (32) means two minutes into the *second* half, which
  * is a different seven and a different afternoon.
  */
+/*
+ * Decision 218: the « + » is not typed. A phone's numeric keyboard has no key for it, so the field is
+ * two boxes, and filling the second snaps the first to a period's end — « add another field for
+ * additional time, that, if filled up with a minute, changes the first field to either 30 or 60 ».
+ */
+describe("snapping a minute onto a period's end", () => {
+  const THREE_TWENTY = periodsConfig({ periodsCount: 3, periodMinutes: 20 });
+
+  it("knows the minutes a period can end on", () => {
+    expect(periodEndMinutes(TWO_THIRTY)).toEqual([30, 60]);
+    expect(periodEndMinutes(THREE_TWENTY)).toEqual([20, 40, 60]);
+  });
+
+  it("snaps to the end of the period the minute is in", () => {
+    // The owner's case: a goal the screen calls 36’ is in the second half, so its added time is the
+    // second half's and the minute becomes 60.
+    expect(snapToPeriodEnd(36, TWO_THIRTY)).toBe(60);
+    // And one at 12’ is the first half's.
+    expect(snapToPeriodEnd(12, TWO_THIRTY)).toBe(30);
+  });
+
+  it("keeps a minute that is already a period's end", () => {
+    expect(snapToPeriodEnd(30, TWO_THIRTY)).toBe(30);
+    expect(snapToPeriodEnd(60, TWO_THIRTY)).toBe(60);
+  });
+
+  it("treats an empty box as the start of the match", () => {
+    // He opened the sheet on an action with no minute and went straight for the added time.
+    expect(snapToPeriodEnd(null, TWO_THIRTY)).toBe(30);
+    expect(snapToPeriodEnd(0, TWO_THIRTY)).toBe(30);
+  });
+
+  it("falls back to the last period rather than off the end", () => {
+    // A minute past every period — a match that overran a long way, or a stale field.
+    expect(snapToPeriodEnd(99, TWO_THIRTY)).toBe(60);
+    expect(snapToPeriodEnd(Number.NaN, TWO_THIRTY)).toBe(30);
+  });
+
+  it("works for a match that is not two halves", () => {
+    expect(snapToPeriodEnd(5, THREE_TWENTY)).toBe(20);
+    expect(snapToPeriodEnd(25, THREE_TWENTY)).toBe(40);
+    expect(snapToPeriodEnd(55, THREE_TWENTY)).toBe(60);
+  });
+
+  /** The pair the two boxes compose, read straight back by the parser they post to. */
+  it("composes a minute the parser accepts, for every period", () => {
+    for (const [minute, extra] of [[36, 3], [12, 1], [55, 2]] as const) {
+      const composed = `${snapToPeriodEnd(minute, TWO_THIRTY)}+${extra}`;
+      expect(parseMinuteFieldFr(composed, TWO_THIRTY)).not.toBeNull();
+    }
+    for (const minute of [5, 25, 55]) {
+      const composed = `${snapToPeriodEnd(minute, THREE_TWENTY)}+1`;
+      expect(parseMinuteFieldFr(composed, THREE_TWENTY)).not.toBeNull();
+    }
+  });
+});
+
 describe("the minute field's own notation", () => {
   const LATE_END = 33 * MS_PER_MINUTE;
   const STARTS = new Map([

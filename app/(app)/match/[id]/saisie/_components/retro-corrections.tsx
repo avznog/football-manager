@@ -24,10 +24,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FieldError } from "@/components/ui/field-error";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Sheet } from "@/components/ui/sheet";
-import { regulationMinutes } from "@/lib/match/clock";
+import { MinuteField } from "./minute-field";
+import { periodsConfig, regulationMinutes, type PeriodsConfig } from "@/lib/match/clock";
 import { cn } from "@/components/ui/cn";
 import { EVENT_LABELS_FR } from "@/lib/match/events";
 import { submitAmendment } from "@/lib/retro/actions";
@@ -103,8 +103,12 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
         <ul className="divide-y divide-border/60">
           {view.timeline.map((line) => (
             <li key={line.eventId} className="flex items-center gap-3 px-4 py-3">
-              <span className="w-12 shrink-0 font-mono text-sm text-ink-muted tabular-nums">
-                {line.minuteLabel}
+              {/* The minute, and under it the football played (decision 217). On this screen above
+                  all: two lines that both read « 36’ » are two different actions, and choosing which
+                  one to correct is the whole job. */}
+              <span className="flex w-14 shrink-0 flex-col font-mono tabular-nums">
+                <span className="text-sm text-ink-muted">{line.minuteLabel}</span>
+                <span className="text-[10px] leading-tight text-ink-subtle">{line.clock}</span>
               </span>
 
               <div className="min-w-0 flex-1">
@@ -234,6 +238,8 @@ function AddSheet({
   const [memberId, setMemberId] = useState("");
   const [assistId, setAssistId] = useState("");
   const [minute, setMinute] = useState("");
+  // The added-time box snaps the minute to a period's end, so it needs to know where they are.
+  const periods = periodsConfig(view.match);
 
   return (
     <Sheet
@@ -249,6 +255,7 @@ function AddSheet({
 
         <FactFields
           type={type}
+          periods={periods}
           memberId={memberId}
           assistId={assistId}
           minute={minute}
@@ -337,6 +344,7 @@ function AmendFields({
    * for real, he typed 59 by hand to get 56 on screen.
    */
   const [minute, setMinute] = useState(line.minuteField);
+  const periods = periodsConfig(view.match);
 
   // A substitution or a change is not editable field by field — the players and the minute are one
   // fact. The honest correction is to annul it and add the right one, which is what the sheet offers.
@@ -363,6 +371,7 @@ function AmendFields({
 
           <FactFields
             type={type}
+            periods={periods}
             memberId={memberId}
             assistId={assistId}
             minute={minute}
@@ -403,6 +412,7 @@ function FactFields({
   memberId,
   assistId,
   minute,
+  periods,
   players,
   onType,
   onMember,
@@ -413,6 +423,7 @@ function FactFields({
   memberId: string;
   assistId: string;
   minute: string;
+  periods: PeriodsConfig;
   players: RetroView["players"];
   onType: (value: RetroFactType) => void;
   onMember: (value: string) => void;
@@ -469,34 +480,14 @@ function FactFields({
         </Select>
       ) : null}
 
-      <div className="flex items-center gap-2">
-        {/*
-          `text`, not `number`, since decision 215: added time is « 30+2 », which a numeric input
-          refuses to hold. `inputMode="numeric"` still brings up the digits keyboard on a phone, and
-          the `+` is on it. The pattern is the same one the server validates with, so the browser
-          refuses the same strings. `[+]` rather than `\+` because a JSX attribute is literal text and
-          not a JS string, so a backslash here would reach the DOM as a backslash.
-        */}
-        <Input
-          aria-label="Minute de l’action"
-          name="fact-minute"
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]{1,3}([+][0-9]{1,2})?"
-          maxLength={6}
-          placeholder="?"
-          value={minute}
-          onChange={(event) => onMinute(event.target.value)}
-          className="w-24 min-h-11 text-center"
-        />
-        <span className="text-sm text-ink-muted">
-          {minute === ""
-            ? "minute inconnue"
-            : minute.includes("+")
-              ? "temps additionnel"
-              : "ᵉ minute"}
-        </span>
-      </div>
+      {/* Two boxes, because a phone's numeric keyboard has no « + » (decision 218). */}
+      <MinuteField
+        name="fact-minute"
+        label="Minute de l’action"
+        value={minute}
+        onChange={onMinute}
+        periods={periods}
+      />
     </>
   );
 }

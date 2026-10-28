@@ -88,6 +88,7 @@ import {
   actualPeriodStarts,
   clockMsToMinute,
   displayMinute,
+  formatClock,
   formatMinuteFieldFr,
   formatMinuteLabelFr,
   msToWholeMinutes,
@@ -317,6 +318,15 @@ export type TimelineEntry = {
   /** `58’`, or `30’+2` in stoppage time, counted from its own period's start. What a screen shows. */
   minuteLabel: string;
   /**
+   * `42:32` — the real football played when this happened, `mm:ss`.
+   *
+   * Every feed prints it small under `minuteLabel`, and the reason is the owner's: « in the feed, I
+   * get two 36 times ». Two actions can share a television minute — the same minute of two different
+   * halves, or two things a minute apart that both round to 36 — and the label alone cannot tell
+   * them apart. This can: it is the one number that is different for every instant of the match.
+   */
+  clock: string;
+  /**
    * `minuteLabel` as an integer: the minute on the display's scale, which after an overrun period is
    * **not** `minute`. A second half that kicked off at 33′40″ gives an event stored at 59′ a `minute`
    * of 59 and a `displayMinute` of 55.
@@ -440,6 +450,8 @@ export type CompositionSnapshot = {
   minute: number;
   /** `34’`, `30’+2` — the same label the timeline stamps on the event. */
   minuteLabel: string;
+  /** `42:32` — real football played, `mm:ss`, as the timeline carries it and for the same reason. */
+  clock: string;
   /** This one filled an empty pitch: the composition rather than a change. */
   startingLineup: boolean;
   /** Slot → member, ordered like a team sheet. `slotId` is null for a slot nobody can place. */
@@ -1172,6 +1184,7 @@ export function reduceMatch(
                 periods,
                 periodStarts.get(event.period),
               ),
+              clock: formatClock(clockMs),
               startingLineup,
               assignments: [...pitch]
                 .map(([memberId, entry]) => ({ memberId, slotId: entry.slotId }))
@@ -1247,6 +1260,7 @@ export function reduceMatch(
         periods,
         periodStarts.get(event.period),
       ),
+      clock: formatClock(clockMs),
       displayMinute: displayMinute(clockMs, event.period, periods, periodStarts.get(event.period)),
       minuteField: formatMinuteFieldFr(clockMs, event.period, periods, periodStarts.get(event.period)),
       labelFr: EVENT_LABELS_FR[event.type],

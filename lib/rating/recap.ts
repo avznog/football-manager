@@ -68,6 +68,8 @@ export type RecapTimelineEntry = {
   eventId: string;
   /** « 27’ », « 45’+2 » — continuous minutes, as `formatMinuteLabelFr` writes them. */
   minuteLabel: string;
+  /** `42:32` — real football played, printed small under the label (decision 217). */
+  clock: string;
   /** « But », « Changement »… plus « — annulé » when the event was voided. */
   label: string;
   /** « Julien Marchal, passe de Karim Benali » — null when there is nobody to name. */
@@ -184,6 +186,8 @@ export type RecapComposition = {
   minute: number;
   /** `34’` — the same label the Déroulé stamps on the change that produced this block. */
   minuteLabel: string;
+  /** `42:32` — the football played, beside the label, as in the Déroulé (decision 217). */
+  clock: string;
   /**
    * « Composition de départ » or « Changement ».
    *
@@ -371,6 +375,7 @@ export function buildTimeline(
         return {
           eventId: entry.eventId,
           minuteLabel: entry.minuteLabel,
+          clock: entry.clock,
           label: entry.voided ? `${label} — ${VOIDED_SUFFIX_FR}` : label,
           detail: pitchEvent ? pitchEvent.detail : detailOf(entry),
           voided: entry.voided,
@@ -521,6 +526,7 @@ export function buildCompositions(
       eventId: snapshot.eventId,
       minute: snapshot.minute,
       minuteLabel: snapshot.minuteLabel,
+      clock: snapshot.clock,
       kindLabel: snapshot.startingLineup ? "Composition de départ" : "Changement",
       startingLineup: snapshot.startingLineup,
       slots: drawn,
