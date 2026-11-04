@@ -61,7 +61,7 @@ on:
         type: boolean
         default: false
       ref:
-        description: "Code to run: a tag such as v1.3.0, or main. Empty = the latest release tag."
+        description: "Code to run: a tag such as v1.3.0, or main. Empty = the tag picked above, or the latest release if main is picked."
         required: false
         type: string
 
@@ -103,6 +103,11 @@ jobs:
               echo "::error::No tag $INPUT_REF in this repository." && exit 1
             fi
             ref="$INPUT_REF"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            # A tag picked in « Use workflow from » is a choice and is honoured. GitHub always opens that
+            # dropdown on the default branch and offers no setting to change it, so `main` there means
+            # « no choice made » and falls through to the latest release below (decision 221).
+            ref="$GITHUB_REF_NAME"
           else
             # Sorted as versions, not by date: a tag cut late on an older commit must not win.
             ref=$(git tag --list 'v*' --sort=-version:refname | head -n 1)

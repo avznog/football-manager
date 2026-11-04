@@ -7473,3 +7473,11 @@ Boys AS)**, no double votes. Nothing was written.
 
 Files: `.github/workflows/old-app.yml`, `scripts/import-ratings-from-old-app.mts`,
 `docs/DECISIONS.md` (220), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.
+
+### « Use workflow from » cannot open on a tag
+
+Decision **221**. The owner wanted the dropdown to default to the latest tag. GitHub does not allow
+that: it always opens on the default branch, with no setting to change it. So `main` there now means
+« the latest release », a tag picked there is honoured (decision 220 had ignored it and still ran the
+latest tag), and the `ref` field wins over both. Files: `.github/workflows/old-app.yml`,
+`docs/DECISIONS.md` (221), `docs/SESSIONS.md`.
