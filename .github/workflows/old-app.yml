@@ -60,6 +60,10 @@ on:
         required: false
         type: boolean
         default: false
+      ref:
+        description: "Code to run: a tag such as v1.3.0, or main. Empty = the latest release tag."
+        required: false
+        type: string
 
 # Two runs writing the same match would race on the delete-then-insert.
 concurrency:
@@ -67,12 +71,57 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Which code the two jobs below run (decision 220). **The latest release tag by default**, so these
+  # jobs read and write production with the code production is running — not with whatever `main`
+  # holds today, which may be a scheme production has never seen. The owner: « it should always take
+  # the code of the last tag created (meaning the last production code) by default. »
+  #
+  # Note what this does and does not select. The *scripts* come from the resolved ref; **this YAML
+  # comes from the branch picked in « Use workflow from »**, as it does for every `workflow_dispatch`.
+  # So a change to the job's own steps reaches it from `main` straight away, and a change to a script
+  # only once it is tagged — which is the split wanted: the plumbing can be fixed without a release,
+  # the logic that touches the data cannot.
+  resolve:
+    name: Which code to run
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pick
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          if [ -n "$INPUT_REF" ]; then
+            # Passed through env and checked by shape, never interpolated: this is a public repo.
+            if ! printf '%s' "$INPUT_REF" | grep -Eq '^(v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?|main)$'; then
+              echo "::error::« $INPUT_REF » is neither a release tag (v1.3.0) nor main." && exit 1
+            fi
+            if ! git rev-parse --verify --quiet "refs/tags/$INPUT_REF" >/dev/null && [ "$INPUT_REF" != "main" ]; then
+              echo "::error::No tag $INPUT_REF in this repository." && exit 1
+            fi
+            ref="$INPUT_REF"
+          else
+            # Sorted as versions, not by date: a tag cut late on an older commit must not win.
+            ref=$(git tag --list 'v*' --sort=-version:refname | head -n 1)
+            if [ -z "$ref" ]; then
+              echo "::error::No release tag exists yet, so there is no production code to run." && exit 1
+            fi
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "::notice::Running the scripts at $ref ($(git rev-parse --short "$ref^{commit}" 2>/dev/null || echo main))"
+
   push-match:
+    needs: resolve
     if: inputs.job == 'push-match'
     name: A played match → info-radarlocal
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -117,11 +166,14 @@ jobs:
           npx tsx --conditions=react-server scripts/push-match-to-old-app.mts "${args[@]}"
 
   sync-ratings:
+    needs: resolve
     if: inputs.job == 'sync-ratings'
     name: info-radarlocal's notes → production
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22

@@ -2716,3 +2716,9 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       a 3×20 snaps to 20, 40 or 60. The parent still holds one string (`60+2`) and `MinuteField` is the
       only thing that splits it. Verified in a browser at 390 px: typing 2 in the second box moved the
       first from 52 to 60 and posted `60+2`
+- [x] **The info-radarlocal jobs run the released code, and report a double vote** — 2026-11-04.
+      Decision **220**. A `resolve` job picks the highest `v*` tag (by version, not date) and both jobs
+      check it out; a `ref` input can name another tag or `main`. A note rated in both apps keeps the
+      7orteils one, and is now counted apart from a re-run — who, how many, how many differ, never the
+      scores. Also fixed: the importer's refusal messages printed individual scores, and its logs are
+      now public CI logs
