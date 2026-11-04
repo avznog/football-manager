@@ -7451,3 +7451,25 @@ this job is evidence either way, so it is recorded rather than resolved.
 
 Files: `scripts/push-match-to-old-app.mts`, `scripts/import-ratings-from-old-app.mts`,
 `docs/DECISIONS.md` (219), `docs/SESSIONS.md`.
+
+## 2026-11-04 — The info-radarlocal jobs run the released code
+
+Decision **220**. The owner asked for the jobs to run « the code of the last tag created » by default:
+a `resolve` job now picks the highest `v*` tag by version sort and both jobs check it out, with a `ref`
+input to override (a tag or `main`, shape-checked, passed through `env`). Tested locally: `v1.3.0`
+resolved, `main` and `v1.0.0-beta.9` accepted, `main; rm -rf /` and `feat/x` refused by shape, `v9.9.9`
+refused as a missing tag. The scripts come from the resolved ref, the YAML from the dispatch branch.
+
+He also asked what a sync does to people who already rated in 7orteils. **The 7orteils note wins** —
+the importer never updates — and that was already true; what was missing was being able to see it,
+because a double vote was counted with plain re-runs under « déjà là ». It is counted apart now, by
+rater, with how many notes differ and never the scores.
+
+**Found while writing that: a leak.** The refusal messages printed `rater→rated note X`. On a laptop
+that was fine; in CI on a public repository the log is public. They name the rater only now.
+
+Dry run against production: 734 notes read, 663 already present, **71 to write for 2026-11-03 (Paris
+Boys AS)**, no double votes. Nothing was written.
+
+Files: `.github/workflows/old-app.yml`, `scripts/import-ratings-from-old-app.mts`,
+`docs/DECISIONS.md` (220), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.

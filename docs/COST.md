@@ -149,6 +149,10 @@ ago. Still free because the repository is public, and still the number that beco
 is not — now **88 %** of a 2 000-minute monthly allowance rather than 80 %. Two new `workflow_dispatch`
 jobs (decision 216) add to this only when somebody presses the button.
 
+**Re-measured 2026-11-04 on this machine: $1801.28 for Linux**, up from $1684.24 a week earlier, so
+**$2331.21 combined** with the macOS $529.93 still carried from 2026-10-14. 232 commits, 225 merged pull
+requests, 108 749 lines, 44 days — $40.94 a day for this machine, still falling every reading.
+
 ### How to re-derive it rather than trusting this file
 
 ```bash

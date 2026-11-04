@@ -8998,3 +8998,36 @@ The contradiction between `COORDINATION.md` and `release.yml` about which endpoi
 migrations should use is **left standing and not resolved here**, because `release.yml` has shipped
 every release through the pooler and nothing about this job is evidence either way. Noted so the next
 session does not mistake one document's silence for agreement.
+
+## 220 — The info-radarlocal jobs run the released code, and a double vote keeps 7orteils' note
+
+**2026-11-04.** Two things the owner asked about the jobs of decision 216.
+
+**« It should always take the code of the last tag created (meaning the last production code) by
+default. »** A new `resolve` job picks the highest `v*` tag — sorted as a version, not by date, so a
+tag cut late on an older commit cannot win — and both jobs check that ref out. A `ref` input overrides
+it with another tag or `main`, validated by shape and passed through `env`, never interpolated, because
+this is a public repository. The point is that a job reading and writing **production** runs the code
+production runs, not whatever `main` holds today. One distinction worth knowing: the *scripts* come from
+the resolved ref, but **the workflow YAML itself comes from the branch chosen in « Use workflow from »**,
+as for every `workflow_dispatch`. So a fix to the job's plumbing applies at once from `main`, and a
+change to the logic that touches the data only once it is released — which is the split wanted.
+
+**« What happens if I sync the ratings from info-radarlocal, but people already rated on 7orteils? »**
+The answer was already safe and is now visible. The import never updates and never deletes, so for any
+`(rater, rated)` pair that already has a note in 7orteils, **the 7orteils note is kept and the old
+app's is dropped**; pairs he rated only in the old app are imported beside the ones he rated here, so a
+man's set can come from both apps and end up complete. `ratings_unique` is the backstop either way.
+
+What changed is that this used to vanish into « déjà là » together with plain re-runs. They are
+different events — a re-run offers the same old-app note id, a double vote is a second note on the
+same pair — so the second is now counted apart: who voted in both apps, how many players, and **how
+many of those notes differ**. Never the scores themselves.
+
+That last rule found a real leak while being written: the importer's refusal messages printed
+`rater→rated note 7.5` for a note out of range. Harmless on a laptop, but this script now runs in CI,
+and **the Actions logs of a public repository are public**. A peer's mark is the one figure in this app
+given in confidence, which is why the équipe-type model never sees one either (`lib/stats/seven-prompt.ts`). The messages now name the rater and nothing else.
+
+Checked by a dry run against production: no double votes today, and 71 notes waiting for the
+2026-11-03 match against Paris Boys AS.

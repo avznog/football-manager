@@ -289,6 +289,8 @@ type Insert = { id: string; matchId: string; rater: string; rated: string; score
 const toInsert: Insert[] = [];
 const problems: string[] = [];
 let alreadyThere = 0;
+/** Per rater: how many players he rated in both apps, and on how many the two notes differ. */
+const doubleVotes = new Map<string, { name: string; pairs: number; differing: number }>();
 
 console.log("date         adversaire                   notes  à écrire  déjà là  publié");
 console.log("-----------  ---------------------------  -----  --------  -------  ------");
@@ -306,11 +308,13 @@ for (const plan of plans) {
   const withMinutes = new Set(played.filter((p) => p.minutes > 0).map((p) => p.teamMemberId));
 
   const existing = (await sql`
-    select id, rater_member_id as "raterMemberId", rated_member_id as "ratedMemberId"
+    select id, rater_member_id as "raterMemberId", rated_member_id as "ratedMemberId", score
     from ratings where match_id = ${plan.matchId}
-  `) as unknown as { id: string; raterMemberId: string; ratedMemberId: string }[];
+  `) as unknown as { id: string; raterMemberId: string; ratedMemberId: string; score: string }[];
   const existingIds = new Set(existing.map((r) => r.id));
-  const existingPairs = new Set(existing.map((r) => `${r.raterMemberId}|${r.ratedMemberId}`));
+  const existingByPair = new Map(
+    existing.map((r) => [`${r.raterMemberId}|${r.ratedMemberId}`, r]),
+  );
 
   let planned = 0;
   let skipped = 0;
@@ -320,11 +324,17 @@ for (const plan of plans) {
     const score = Number(row.rating);
 
     if (rater === rated) problems.push(`${plan.day} : ${row.rater} se note lui-même`);
+    /*
+     * No score and no « X→Y » pair in these messages (decision 220). This script now runs in CI, and
+     * the Actions logs of a public repository are readable by anybody: a peer's mark is the one figure
+     * in this app given in confidence, and a log line is the kind of thing that leaks once and for
+     * ever. The rater's name is enough to go and look.
+     */
     if (!Number.isFinite(score) || score < 0 || score > 10) {
-      problems.push(`${plan.day} : ${row.rater}→${row.rated} note ${row.rating} hors de 0–10`);
+      problems.push(`${plan.day} : une note de ${row.rater} est hors de 0–10`);
     }
     if (Math.round(score * 10) !== score * 10) {
-      problems.push(`${plan.day} : ${row.rater}→${row.rated} note ${row.rating} a plus d'une décimale`);
+      problems.push(`${plan.day} : une note de ${row.rater} a plus d'une décimale`);
     }
     if (!withMinutes.has(rated)) {
       problems.push(`${plan.day} : ${row.rated} est noté sans avoir joué (décision 137)`);
@@ -333,8 +343,24 @@ for (const plan of plans) {
       problems.push(`${plan.day} : ${row.rater} note sans être sur la feuille (décision 159)`);
     }
 
-    if (existingIds.has(row.id) || existingPairs.has(`${rater}|${rated}`)) {
+    // The same old-app note, offered again: a re-run, and nothing to say about it.
+    if (existingIds.has(row.id)) {
       skipped += 1;
+      continue;
+    }
+    /*
+     * Somebody who rated this player **in both apps** (decision 220). The note already here wins and
+     * the old app's is dropped — this script never updates — but it is counted apart from a re-run
+     * now, because it is a different event: he voted twice, and possibly differently. It used to
+     * vanish into « déjà là » with the re-runs, so nobody could tell that it had happened.
+     */
+    const here = existingByPair.get(`${rater}|${rated}`);
+    if (here) {
+      skipped += 1;
+      const tally = doubleVotes.get(rater) ?? { name: row.rater, pairs: 0, differing: 0 };
+      tally.pairs += 1;
+      if (Number(here.score) !== score) tally.differing += 1;
+      doubleVotes.set(rater, tally);
       continue;
     }
     planned += 1;
@@ -358,6 +384,21 @@ console.log(
   `\nnotes      ${toInsert.length} à écrire, ${alreadyThere} déjà en base · ` +
     `aucune suppression, aucune mise à jour`,
 );
+if (doubleVotes.size > 0) {
+  // Counts and names only, never a score (see above).
+  const differing = [...doubleVotes.values()].reduce((n, t) => n + t.differing, 0);
+  console.log(
+    `notes      ${doubleVotes.size} personne(s) ont noté dans les deux applications : la note de ` +
+      `7orteils est gardée, celle de l'ancienne ignorée` +
+      (differing > 0 ? ` — ${differing} note(s) différaient` : " — toutes identiques"),
+  );
+  for (const tally of doubleVotes.values()) {
+    console.log(
+      `             ${tally.name} : ${tally.pairs} joueur(s) noté(s) deux fois` +
+        (tally.differing > 0 ? `, ${tally.differing} différemment` : ""),
+    );
+  }
+}
 console.log(
   "notes      les deux règles vérifiées : noté = a joué (137), notant = sur la feuille (159).",
 );
