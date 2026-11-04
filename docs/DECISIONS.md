@@ -9031,3 +9031,22 @@ given in confidence, which is why the équipe-type model never sees one either (
 
 Checked by a dry run against production: no double votes today, and 71 notes waiting for the
 2026-11-03 match against Paris Boys AS.
+
+## 221 — « Use workflow from » cannot default to a tag, so `main` there means the latest release
+
+**2026-11-04.** The owner wanted the « Use workflow from » dropdown of the info-radarlocal jobs to open
+on the latest tag. **GitHub does not allow it**: that dropdown always opens on the repository's default
+branch, and no workflow setting changes it. Making a tag the default branch would break pull requests,
+CI and the preview deployment, so that is not an option.
+
+So the dropdown's default is made to mean the right thing instead. The `resolve` job of decision 220
+reads it now:
+
+- **`main` picked (the default)** → the scripts of the **latest release tag** run;
+- **a tag picked** → that tag's scripts run. Decision 220 ignored this choice and still ran the latest
+  tag, which was the one way the screen could say something untrue;
+- **the `ref` field filled** → wins over both.
+
+Picking a tag older than `v1.3.0` runs that tag's own copy of this workflow, which may not have the
+`resolve` job or the scripts at all; the dropdown can offer it, and it will fail rather than do the
+wrong thing.
