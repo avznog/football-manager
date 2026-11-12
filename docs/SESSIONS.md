@@ -7506,3 +7506,35 @@ whistles at 0:02 and 30:02) is skipped and the rest syncs. Dry runs against prod
 the match the owner meant: **pull 0 to write (all 101 old-app notes already here), push 20 to copy**,
 and **Pierre rated 10 players in both apps, 8 differently** — both kept where they are, as decision 222
 says. Files: `scripts/import-ratings-from-old-app.mts`, `docs/DECISIONS.md` (225), `docs/SESSIONS.md`.
+
+## 2026-11-12 — Correcting the starting composition after the match
+
+Decision **223**, slice A of two run in parallel (the other extends a whistle that a late correction
+passes). The owner's Tuesday match had a real seven different from the one in the app, and he chose,
+when asked, **« change the start only »**: later lines stay as recorded, and an impossible one is
+refused rather than fixed for him.
+
+**Decision 150 narrowed rather than reversed.** A `VOID` on the start alone is still refused. A batch
+that annuls the start *and* carries the corrected seven is allowed: `voidsStartingLineup` replays it and
+lets it through when one of its own events comes out as the starting composition **at the start's clock
+or earlier** — a seven posted at 20′ would refill the pitch too, after twenty empty minutes, and a test
+pins that it is still refused.
+
+**Two things found by looking rather than by reasoning.** The replacement replays after the kick-off it
+shares 0′00″ with, which looked like an edge and is not: the seeded live logs already store their start
+*after* the kick-off at the same reading. And against a log whose changes are whole-pitch snapshots
+(decision 147) « start only » refuses almost nothing — a later snapshot is re-read by diff and simply
+describes a different movement. What gets refused is what names a person: a `SUBSTITUTION` bringing on
+a man who now started, taking off one who now did not, a goal by somebody now benched.
+
+Walked in a browser on an isolated database (`football_slicea`, port 3100): the start's « Corriger »
+opens game mode's TERRAIN sheet on the seven; benching Julien was refused with « Julien n’était pas sur
+le terrain à la 9’ : il ne peut pas y avoir marqué. »; swapping Fabien in for Samir landed as `VOID` +
+`LINEUP_APPLIED` at 0′, Fabien `starter` with 60′ in the frozen stats, Samir `substitute` with 0′. A
+player gets a 404 on the correction screen. Light and dark at 390 px.
+
+Files: `lib/retro/start.ts` (new), `lib/retro/start.test.ts` (new), `lib/match/ingest.ts`,
+`lib/retro/actions.ts` (one dispatch line and an appended `submitStart`), `lib/retro/queries.ts`,
+`app/(app)/match/[id]/saisie/_components/correct-start.tsx` (new),
+`app/(app)/match/[id]/saisie/_components/retro-corrections.tsx`, `docs/DECISIONS.md` (223),
+`docs/ROADMAP.md`, `docs/SESSIONS.md`.

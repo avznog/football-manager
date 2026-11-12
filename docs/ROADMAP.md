@@ -2727,3 +2727,13 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       note id, so the next pull sees it as a re-run rather than a double vote. Old-app rules applied by
       hand (rater on the sheet there, rated with minutes there); failures are counted and skipped. Dry
       run: 20 notes for 2026-11-03 to copy, every earlier match already in step
+
+- [x] **The starting composition of a finished match can be corrected** — 2026-11-12. Decision **223**,
+      narrowing **150**. « Corriger » on the « Composition de départ » line opens game mode's TERRAIN
+      sheet on the start; confirming appends a `VOID` and the corrected seven at the start's clock, in
+      one batch, which `voidsStartingLineup` now allows when the batch itself refills the pitch at that
+      clock. **The start only**, as the owner chose: later lines stay as recorded, and one the new seven
+      makes impossible is refused by the realism check, naming who and when. Squad roles follow. Walked
+      at 390 px in both themes; a player gets a 404 on the correction screen. Not looked at: the
+      shared TERRAIN sheet says « Le terrain est identique à ce qu'il y a en jeu » before any move,
+      which reads oddly after the match — the sheet's own copy, left alone

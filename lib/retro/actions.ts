@@ -24,6 +24,7 @@ import { assertCan } from "@/lib/auth/can";
 import { requireActor } from "@/lib/auth/dal";
 import { toFormState, type FormState } from "@/lib/auth/validation";
 import { amendMatchEvents } from "@/lib/match/append";
+import { finalizeMatchById } from "@/lib/match/finalize";
 import { actualPeriodStarts, clockMsForMinuteField, periodsConfig } from "@/lib/match/clock";
 import { getLiveMatch } from "@/lib/match/live";
 import { type LiveMatch, type PendingEvent, minuteLabelFr, reduceLive } from "@/lib/match/presenter";
@@ -33,6 +34,13 @@ import type { Actor } from "@/lib/auth/can";
 import { type Amendment, buildAmendment, buildChangeAmendment, isAmendableEntry } from "./amend";
 import { changeCandidateIds, changeProblemFr, changeSeed, stateAtClock } from "./change";
 import { introducedAnomalies, realismRefusalFr } from "./realism";
+import {
+  amendStartSchema,
+  buildStartAmendment,
+  squadAfterStart,
+  startProblemFr,
+  startSignature,
+} from "./start";
 import {
   buildRetroLog,
   retroEntrySeed,
@@ -230,6 +238,8 @@ export async function submitAmendment(_prev: FormState, formData: FormData): Pro
 
   // « Ajouter un changement » (decision 169): a shape of its own, the same path afterwards.
   if (formData.get("intent") === "change") return submitChange(actor, formData);
+  // « Corriger la composition de départ » (decision 223).
+  if (formData.get("intent") === "start") return submitStart(actor, formData);
 
   const factType = formData.get("fact-type");
   const parsed = amendSubmitSchema.safeParse({
@@ -503,4 +513,113 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
 function optionalMinuteField(value: FormDataEntryValue | null): string | null {
   const raw = typeof value === "string" ? value.trim() : "";
   return raw === "" ? null : raw;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Correcting the starting composition (decision 223)                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * « Corriger la composition de départ » on a finished match.
+ *
+ * The start only, as the owner chose: a `VOID` on the current start and the corrected seven at the
+ * same clock, in one batch (`lib/retro/start.ts` says why that is not what decision 150 forbids).
+ * Every later change stays as recorded. If the corrected seven makes a later line impossible — a
+ * substitution bringing on somebody who now starts, a goal by somebody now on the bench — the
+ * reducer finds it and the same realism check every correction uses refuses it, naming who and when.
+ *
+ * Then the squad sheet follows: who now starts is a `starter`, who no longer does a `substitute`.
+ * After the events, not before, so a refused batch leaves the sheet as it was; and the stats are
+ * re-frozen once more afterwards, because `match_player_stats.squad_role` is read off the sheet.
+ */
+async function submitStart(actor: Actor, formData: FormData): Promise<FormState> {
+  const parsed = amendStartSchema.safeParse({
+    teamId: formData.get("teamId"),
+    matchId: formData.get("matchId"),
+    intent: formData.get("intent"),
+    slots: formData
+      .getAll("start-slot")
+      .map(String)
+      .map((value) => {
+        const [slotId, memberId] = value.split(":");
+        return { slotId: slotId ?? "", memberId: memberId ?? "" };
+      }),
+  });
+  if (!parsed.success) return toFormState(parsed.error);
+  const { teamId, matchId, slots } = parsed.data;
+
+  assertCan(actor, "match:amend", { teamId });
+
+  const live = await getLiveMatch(teamId, matchId);
+  if (!live) return { error: "Ce match n’existe pas dans cette équipe." };
+  if (live.match.status !== "finished") {
+    return { error: "Le match n’est pas terminé : la composition de départ se règle avant ou pendant le match." };
+  }
+  const kickoffAtMs = new Date(live.match.kickoffAt).getTime();
+  if (Number.isNaN(kickoffAtMs)) return { error: "Ce match n’a pas de date exploitable." };
+
+  const state = reduceLive(live, [], null);
+  const start = state.timeline.find(
+    (line) => line.type === "LINEUP_APPLIED" && line.startingLineup && !line.voided,
+  );
+  const current = state.compositions.find((composition) => composition.eventId === start?.eventId);
+  if (!start || !current) {
+    return { error: "Ce match n’a pas de composition de départ à corriger." };
+  }
+  const before = current.assignments
+    .filter((assignment): assignment is { memberId: string; slotId: string } => assignment.slotId !== null)
+    .map((assignment) => ({ slotId: assignment.slotId, memberId: assignment.memberId }));
+
+  const problem = startProblemFr({
+    current: before,
+    proposed: slots,
+    knownSlotIds: new Set(live.slots.map((slot) => slot.id)),
+    candidates: live.players.map((player) => ({
+      memberId: player.memberId,
+      displayName: player.displayName,
+      isPlayer: player.isPlayer,
+      squadRole: player.squadRole,
+    })),
+  });
+  if (problem) return { error: problem };
+
+  const submissionId = retroSubmissionId([matchId, "start", start.eventId, ...startSignature(slots)]);
+  if (live.events.some((event) => event.clientEventId === retroEventId(submissionId, 0))) {
+    redirect(`/match/${matchId}/saisie?corrige=1`);
+  }
+
+  const amendment = buildStartAmendment({
+    submissionId,
+    kickoffAtMs,
+    start: { eventId: start.eventId, period: start.period, clockMs: start.clockMs },
+    slots,
+  });
+
+  const refusal = realismOf(live, state, amendment);
+  if (refusal) return { error: refusal };
+
+  const result = await amendMatchEvents(actor, { matchId, events: amendment.events });
+  if (!result.ok) return { error: result.body.error };
+
+  const roles = squadAfterStart({
+    hasSquadSheet: live.hasSquadSheet,
+    before,
+    after: slots,
+    roles: new Map(live.players.map((player) => [player.memberId, player.squadRole])),
+  });
+  if (roles.length > 0) {
+    for (const change of roles) {
+      await db
+        .insert(matchSquad)
+        .values({ matchId, teamMemberId: change.memberId, role: change.role })
+        .onConflictDoUpdate({
+          target: [matchSquad.matchId, matchSquad.teamMemberId],
+          set: { role: change.role },
+        });
+    }
+    // `amendMatchEvents` froze the stats before the sheet moved; `squad_role` is read off the sheet.
+    await finalizeMatchById(teamId, matchId);
+  }
+
+  redirect(`/match/${matchId}/saisie?corrige=1`);
 }
