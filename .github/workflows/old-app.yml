@@ -22,7 +22,7 @@
 # ## Direction, because the names are easy to confuse
 #
 #   push-match    this app  →  info-radarlocal     (a played match, so the team can vote on it)
-#   sync-ratings  info-radarlocal  →  this app     (the notes they voted)
+#   sync-ratings  info-radarlocal  ⇄  this app     (the notes, both ways, insert-only — decision 222)
 #
 # ## Secrets
 #
@@ -173,7 +173,7 @@ jobs:
   sync-ratings:
     needs: resolve
     if: inputs.job == 'sync-ratings'
-    name: info-radarlocal's notes → production
+    name: Notes, both ways between info-radarlocal and production
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -189,9 +189,13 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           if [ -z "$DATABASE_URL" ]; then
             echo "::error::The DATABASE_URL repository secret is not set." && exit 1
+          fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::The SUPABASE_SERVICE_ROLE_KEY repository secret is not set." && exit 1
           fi
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
             echo "::error::The SUPABASE_ACCESS_TOKEN repository secret is not set. Supabase" \
@@ -210,3 +214,25 @@ jobs:
           if [ "$INPUT_COMMIT" = "true" ]; then args+=(--commit); fi
           echo "::notice::scripts/import-ratings-from-old-app.mts ${args[*]}"
           npx tsx --conditions=react-server scripts/import-ratings-from-old-app.mts "${args[@]}"
+
+      # The other half (decision 222): notes given in 7orteils and missing from info-radarlocal are
+      # copied there. Insert-only, like the pull above — a pair that has a note in both apps is left
+      # alone in both. After the pull on purpose, so a dry run reads the same state both steps would.
+      #
+      # The script only exists from the release that introduced it. Run on an older tag it is absent,
+      # and the step says so rather than failing the half of the job that did its work.
+      - name: Copy 7orteils' notes to info-radarlocal
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          INPUT_COMMIT: ${{ inputs.commit }}
+        run: |
+          if [ ! -f scripts/push-ratings-to-old-app.mts ]; then
+            echo "::warning::This release has no scripts/push-ratings-to-old-app.mts: only the pull ran." \
+                 "Pick main, or a release that contains it, to copy notes the other way."
+            exit 0
+          fi
+          args=()
+          if [ "$INPUT_COMMIT" = "true" ]; then args+=(--commit); fi
+          echo "::notice::scripts/push-ratings-to-old-app.mts ${args[*]}"
+          npx tsx --conditions=react-server scripts/push-ratings-to-old-app.mts "${args[@]}"

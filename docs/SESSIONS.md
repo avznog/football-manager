@@ -7481,3 +7481,19 @@ that: it always opens on the default branch, with no setting to change it. So `m
 « the latest release », a tag picked there is honoured (decision 220 had ignored it and still ran the
 latest tag), and the `ref` field wins over both. Files: `.github/workflows/old-app.yml`,
 `docs/DECISIONS.md` (221), `docs/SESSIONS.md`.
+
+## 2026-11-12 — Notes go both ways
+
+Decision **222**: `scripts/push-ratings-to-old-app.mts`, run by `sync-ratings` after the pull. Insert
+only, like the pull; a pair with a note in both apps is left alone in both. The pushed copy keeps this
+app's `ratings.id`, which is what keeps the two halves from reporting each other's work as double votes.
+The old app's RLS is bypassed by the service-role key, so its two rules are applied by hand and a note
+failing one is skipped and counted. Checked the old app's unique key `(match_id, rater_id,
+rated_player_id)` exists before relying on it for `on_conflict`.
+
+Dry run against production and the live old app: the six earlier matches fully in step (642 notes, 0 to
+copy, 0 skipped), **20 to copy for 2026-11-03**. Nothing written. The step needs a release that contains
+the script; on `v1.3.1` it warns and the pull still runs. No version bump — that is the owner's.
+
+Files: `scripts/push-ratings-to-old-app.mts` (new), `.github/workflows/old-app.yml`,
+`docs/DECISIONS.md` (222), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.
