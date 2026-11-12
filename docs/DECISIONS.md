@@ -9214,3 +9214,89 @@ still has its first half ending at 0′02″ until a first-half action is added 
 corrections at 6′–29′ do not move it on their own. And a correction typed with an absurd minute — a
 three-digit typo — extends the match to it, as typed: there is no upper bound, because the owner's rule
 has none and any number chosen here would be one he did not choose.
+
+## 226 — After a match, somebody can be brought onto it from outside the sheet, or taken off it entirely
+
+**2026-11-12.** Two requests from the owner, built as one slice because each is the other's undo.
+
+> « I must be able to add people to the match, if I did not. Example: if Rémi was not player, sub or
+> supporter, I want to be able to, post match, add him to a composition, substitution, etc. But make it
+> clear that you are adding him to the game, as people not on the "feuille de match" should not be
+> there, as it is today. »
+
+> « Lucien has been on the pitch from 0′ but never showed up, so I remove him from the match, as he
+> should not even be a supporter. »
+
+### Bringing somebody on
+
+The default lists of « Ajouter un changement » and of the start correction stay exactly what decision
+169 made them — after the match the sheet is what happened. The team's **players** the sheet does not
+name, and the **supporters** of the match, are offered **apart**, under a muted heading « Pas sur la
+feuille de match », in « Qui entre ? » and on the pitch sheet's bench. Picking one changes nothing
+silently: the pitch sheet says, above « Valider », one sentence per person —
+« Rémi sera ajouté à la feuille de match comme remplaçant. », « … comme titulaire. » for the start, or
+« Léo C passe de supporter à remplaçant. ». Non-players stay excluded (decision 096) and so does anybody
+who has left the team (`LivePlayer.hasLeft`, set on the departed sheet members `getLiveMatch` loads).
+
+**The supporter refusal of decision 223 is gone.** It said « retire-le des supporters avant de le
+faire démarrer », to stop a coach's choice being undone quietly. The promotion is now said out loud
+instead, which was the point of the refusal, without the round trip through the supporters card.
+
+On the server the same list is recomputed from the roster the action loaded — this team's active
+members plus whoever the sheet names — so the client's list is never believed. The sheet row is written
+**after** the events, in the same action, and the stats re-freeze once more because
+`match_player_stats.squad_role` is read off the sheet. A match with no sheet at all has nothing to add
+to: everybody is offered already, as before.
+
+### Taking somebody off
+
+« Sur la feuille de match » on the correction screen lists everybody the match names, each with
+« Retirer du match ». If he played, one question: **who really was in his place** — somebody from the
+sheet, somebody from « Pas sur la feuille de match », or « Personne, on a joué à 6 » (the owner's
+answer). Then a confirmation that says exactly what will happen, computed by the same pure function the
+server runs (`planRemoval`): « Lucien sera retiré du match. Rémi prend sa place en DC de 0’ à 40’. »
+or « Personne ne le remplace : l’équipe joue à 6 de 0’ à 40’. »
+
+Every whole-pitch `LINEUP_APPLIED` he is in — the start included — is annulled and re-appended with his
+slot given to the replacement, or emptied: append-only, one batch, one submission id. The start's
+replacement is accepted by decision 223's ingest guard for the reason 223 gave, the batch carries the
+start at the start's own clock. Then his `match_squad` row goes, whatever its role, and the
+replacement's role follows (`starter` if he took a place in the start).
+
+Refused rather than guessed, each with a French sentence naming the line:
+- an action that **names** him — a goal, an assist, a foul, a `SUBSTITUTION`: « Lucien est nommé dans
+  « Changement » à la 20’ : corrige ou annule cette action d’abord. »;
+- a replacement already on the pitch in one of those snapshots;
+- nobody in his place when he was in goal.
+
+Whatever else it makes impossible is found by the realism check every correction goes through.
+
+### His notes: kept, and counted only while he is on the match
+
+The owner's answer: never deleted, appear nowhere while he is off the match, come back if he is added
+again. So no row of `ratings` is touched, and **which notes count is decided in one place**,
+`lib/rating/eligibility.ts`: a note counts when the rated player has minutes in the match (decision 137)
+and the rater is on the sheet in any role or has minutes (decision 159, `eligibleRaterIds`). It is
+applied where ratings are read:
+
+- `getRatingResults` — the match's means, the man of the match, the coach's per-note list;
+- `getSeasonStats` — the season averages and leaderboards, and through it the player profile card and
+  the « notes » équipe type, which read nothing else;
+- the notation progress and the coach's tally already counted only eligible people (`ratingTargetsFor`,
+  `tallyOf`), and are unchanged.
+
+Not filtered, deliberately: `submitRatings` reading the rater's own rows to upsert them, and
+`getRatedMatchIds`, which only answers « does this match hold any note » for the pending count — a match
+whose only notes are hidden is counted as rated there.
+
+### The ratings sync
+
+`scripts/import-ratings-from-old-app.mts` now skips **one note** whose rater or rated is not on the
+match here, counted as « ignorée : la personne n’est plus sur ce match », instead of skipping the whole
+match (decision 225) — a removed player is an ordinary state, not a corruption. A self-rating or a score
+out of range still skips the match. `scripts/push-ratings-to-old-app.mts` copies only the notes that
+count here, through the same shared rule, so a removal is not undone over there. No score is printed.
+
+Walked on an isolated database: a published match's coach view went from 34 notes to 22 when the player
+was removed (his 4 received and 8 given), the rows stayed, and it went back to 34 when he was put back
+through the start correction.

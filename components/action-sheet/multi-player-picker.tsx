@@ -18,6 +18,11 @@ export type MultiPlayerPickerProps = {
   confirmLabel: string;
   onConfirm: () => void;
   emptyLabel?: string;
+  /**
+   * A second group under the first, with its own heading — « Pas sur la feuille de match » after a
+   * match (decision 226). Apart rather than merged, so picking from it is visibly a different act.
+   */
+  secondary?: { heading: string; options: readonly PlayerOption[] };
 };
 
 /**
@@ -39,8 +44,22 @@ export function MultiPlayerPicker({
   confirmLabel,
   onConfirm,
   emptyLabel = "Personne à proposer.",
+  secondary,
 }: MultiPlayerPickerProps) {
   const chosen = new Set(selected);
+  const row = (option: PlayerOption) => (
+    <li key={option.memberId}>
+      <OptionRow
+        label={option.name}
+        subtitle={option.subtitle}
+        warn={option.warn}
+        leading={option.jerseyNumber ?? undefined}
+        selected={chosen.has(option.memberId)}
+        onClick={() => onToggle(option.memberId)}
+      />
+    </li>
+  );
+  const hasSecondary = secondary !== undefined && secondary.options.length > 0;
   return (
     <Sheet
       open={open}
@@ -53,24 +72,21 @@ export function MultiPlayerPicker({
         </Button>
       }
     >
-      {options.length === 0 ? (
-        <EmptyState title={emptyLabel} />
-      ) : (
-        <ul className="space-y-2">
-          {options.map((option) => (
-            <li key={option.memberId}>
-              <OptionRow
-                label={option.name}
-                subtitle={option.subtitle}
-                warn={option.warn}
-                leading={option.jerseyNumber ?? undefined}
-                selected={chosen.has(option.memberId)}
-                onClick={() => onToggle(option.memberId)}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="space-y-4">
+        {options.length === 0 ? (
+          <EmptyState title={emptyLabel} />
+        ) : (
+          <ul className="space-y-2">{options.map(row)}</ul>
+        )}
+        {hasSecondary ? (
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
+              {secondary.heading}
+            </h3>
+            <ul className="space-y-2">{secondary.options.map(row)}</ul>
+          </section>
+        ) : null}
+      </div>
     </Sheet>
   );
 }

@@ -9,8 +9,9 @@
  *
  * Who may be placed is what « Ajouter un changement » offers at the kick-off: the starters, plus the
  * players the sheet names as starter or substitute or who played at some point (`changeCandidateIds`).
- * Not the supporters, and not somebody who does not play — the server refuses both anyway
- * (`startProblemFr`), this is only the list not offering them.
+ * Plus, under « Pas sur la feuille de match », the players the sheet does not have and the
+ * supporters (decision 226): starting one adds him to the sheet as a starter, and the sheet's footer
+ * says so before « Valider ». Never somebody who does not play — the server refuses that anyway.
  *
  * The start only, as the owner chose. Every later change stays as recorded; if the new seven makes a
  * later line impossible, the server says which and the coach corrects that line himself.
@@ -27,6 +28,12 @@ import {
 } from "@/lib/match/presenter";
 import { terrainPayload, type SlotAssignment } from "@/lib/match/terrain";
 import { changeCandidateIds, stateAtClock } from "@/lib/retro/change";
+import {
+  OFF_SHEET_HEADING_FR,
+  offSheetCandidateIds,
+  sheetAdditionFr,
+  sheetAdditions,
+} from "@/lib/retro/sheet";
 import type { RetroView } from "@/lib/retro/queries";
 
 export function CorrectStart({
@@ -64,14 +71,26 @@ export function CorrectStart({
         .map((entry) => ({ slotId: entry.slotId, memberId: entry.memberId })),
     [startEntry],
   );
+  // The players the sheet does not have, and the supporters, offered apart (decision 226).
+  const offSheetIds = useMemo(
+    () => (atStart ? offSheetCandidateIds(live, atStart, wholeMatch) : []),
+    [atStart, live, wholeMatch],
+  );
   const candidates = useMemo(() => {
     if (!atStart) return [];
-    const allowed = new Set(changeCandidateIds(live, atStart, wholeMatch));
+    const allowed = new Set([...changeCandidateIds(live, atStart, wholeMatch), ...offSheetIds]);
     return [
       ...onPitchOptions(atStart, live.slots, players),
       ...availableOptions(atStart, live.players).filter((option) => allowed.has(option.memberId)),
     ];
-  }, [atStart, live, players, wholeMatch]);
+  }, [atStart, live, players, wholeMatch, offSheetIds]);
+  /** « Rémi sera ajouté à la feuille de match comme titulaire. », for whoever now starts. */
+  const noticesFor = (assignments: readonly SlotAssignment[]) =>
+    sheetAdditions(
+      live,
+      assignments.map((assignment) => assignment.memberId),
+      "starter",
+    ).map(sheetAdditionFr);
 
   const formationId = useMemo(() => {
     for (const entry of base) {
@@ -107,6 +126,8 @@ export function CorrectStart({
       base={base}
       initialAssignments={base}
       candidates={candidates}
+      offSheet={{ heading: OFF_SHEET_HEADING_FR, memberIds: offSheetIds }}
+      noticesFor={noticesFor}
       onConfirm={submit}
     />
   );

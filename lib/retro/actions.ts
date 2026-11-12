@@ -41,6 +41,8 @@ import { type Amendment, buildAmendment, buildChangeAmendment, isAmendableEntry 
 import { changeCandidateIds, changeProblemFr, changeSeed, stateAtClock } from "./change";
 import { MAX_AMENDMENT_EVENTS, withFrameMove } from "./frame";
 import { introducedAnomalies, realismRefusalFr } from "./realism";
+import { offSheetCandidateIds, sheetAdditions } from "./sheet";
+import { NOBODY, amendRemoveSchema, planRemoval } from "./remove";
 import {
   amendStartSchema,
   buildStartAmendment,
@@ -247,6 +249,8 @@ export async function submitAmendment(_prev: FormState, formData: FormData): Pro
   if (formData.get("intent") === "change") return submitChange(actor, formData);
   // « Corriger la composition de départ » (decision 223).
   if (formData.get("intent") === "start") return submitStart(actor, formData);
+  // « Retirer du match » (decision 226).
+  if (formData.get("intent") === "remove") return submitRemove(actor, formData);
 
   const factType = formData.get("fact-type");
   const parsed = amendSubmitSchema.safeParse({
@@ -517,11 +521,21 @@ async function submitChange(actor: Actor, formData: FormData): Promise<FormState
     moved.length === 0 ? live : { ...live, events: mergeEvents(live.events, moved.map(toPending)) };
 
   const atClock = stateAtClock(liveMoved, stamped.clockMs);
+  /*
+   * Who may come on: the sheet's own, and — said as such on the screen before confirming — the
+   * players it does not have (decision 226). Recomputed here from the roster this action loaded, never
+   * taken from the form: `live.players` holds only this team's active members plus whoever this
+   * match's sheet names, so a member of another team, a departed one or a non-player cannot be posted.
+   */
+  const candidateIds = [
+    ...changeCandidateIds(live, atClock, state),
+    ...offSheetCandidateIds(live, atClock, state),
+  ];
   const problem = changeProblemFr(
     { outIds, inIds, slots },
     {
       atClock,
-      candidateIds: changeCandidateIds(live, atClock, state),
+      candidateIds,
       slots: live.slots,
       nameOf: nameIn(live),
       minuteLabel: minuteLabelFr(stamped.clockMs, stamped.period, atClock.periods),
@@ -542,7 +556,35 @@ async function submitChange(actor: Actor, formData: FormData): Promise<FormState
   const result = await amendMatchEvents(actor, { matchId, events: framed.events });
   if (!result.ok) return { error: result.body.error };
 
+  // Whoever came on from outside the sheet is on it now, as a substitute (decision 226). After the
+  // events, so a refused batch leaves the sheet alone; then the stats once more, because
+  // `match_player_stats.squad_role` is read off the sheet and `amendMatchEvents` froze them before.
+  const added = sheetAdditions(live, inIds, "substitute");
+  if (added.length > 0) {
+    await writeSquadRoles(
+      matchId,
+      added.map((entry) => ({ memberId: entry.memberId, role: entry.to })),
+    );
+    await finalizeMatchById(teamId, matchId);
+  }
+
   redirect(`/match/${matchId}/saisie?corrige=1`);
+}
+
+/** Set these members' role on this match's sheet, creating the row where there was none. */
+async function writeSquadRoles(
+  matchId: string,
+  roles: readonly { memberId: string; role: "starter" | "substitute" }[],
+): Promise<void> {
+  for (const change of roles) {
+    await db
+      .insert(matchSquad)
+      .values({ matchId, teamMemberId: change.memberId, role: change.role })
+      .onConflictDoUpdate({
+        target: [matchSquad.matchId, matchSquad.teamMemberId],
+        set: { role: change.role },
+      });
+  }
 }
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
@@ -623,6 +665,7 @@ async function submitStart(actor: Actor, formData: FormData): Promise<FormState>
       displayName: player.displayName,
       isPlayer: player.isPlayer,
       squadRole: player.squadRole,
+      hasLeft: player.hasLeft,
     })),
   });
   if (problem) return { error: problem };
@@ -652,18 +695,91 @@ async function submitStart(actor: Actor, formData: FormData): Promise<FormState>
     roles: new Map(live.players.map((player) => [player.memberId, player.squadRole])),
   });
   if (roles.length > 0) {
-    for (const change of roles) {
-      await db
-        .insert(matchSquad)
-        .values({ matchId, teamMemberId: change.memberId, role: change.role })
-        .onConflictDoUpdate({
-          target: [matchSquad.matchId, matchSquad.teamMemberId],
-          set: { role: change.role },
-        });
-    }
+    // Includes a player brought in from outside the sheet, or a supporter promoted (decision 226).
+    await writeSquadRoles(matchId, roles);
     // `amendMatchEvents` froze the stats before the sheet moved; `squad_role` is read off the sheet.
     await finalizeMatchById(teamId, matchId);
   }
+
+  redirect(`/match/${matchId}/saisie?corrige=1`);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Taking somebody off the match (decision 226)                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * « Retirer du match »: he never was there, so he leaves the sheet, and every whole-pitch snapshot he
+ * is in gives his slot to whoever really played there — or to nobody, « on a joué à 6 ».
+ *
+ * `planRemoval` decides everything and the screen ran the same function to show the sentence; this
+ * re-runs it on the log as the server has it, never on what the form claims. Then the same realism
+ * check as every correction, the same `amendMatchEvents`, and only afterwards the sheet: his row goes
+ * (any role, supporter included), the replacement's role follows. **His notes are not touched** —
+ * they stop counting because he is no longer on the match (`lib/rating/eligibility.ts`), and come back
+ * if he is added again.
+ */
+async function submitRemove(actor: Actor, formData: FormData): Promise<FormState> {
+  const parsed = amendRemoveSchema.safeParse({
+    teamId: formData.get("teamId"),
+    matchId: formData.get("matchId"),
+    intent: formData.get("intent"),
+    memberId: formData.get("memberId"),
+    replacement: formData.get("replacement"),
+  });
+  if (!parsed.success) return toFormState(parsed.error);
+  const { teamId, matchId, memberId, replacement } = parsed.data;
+
+  assertCan(actor, "match:amend", { teamId });
+
+  const live = await getLiveMatch(teamId, matchId);
+  if (!live) return { error: "Ce match n’existe pas dans cette équipe." };
+  if (live.match.status !== "finished") {
+    return { error: "Le match n’est pas terminé : la feuille se règle dans la composition." };
+  }
+  const kickoffAtMs = new Date(live.match.kickoffAt).getTime();
+  if (Number.isNaN(kickoffAtMs)) return { error: "Ce match n’a pas de date exploitable." };
+
+  const state = reduceLive(live, [], null);
+  const onTheMatch =
+    live.players.some((player) => player.memberId === memberId && player.squadRole !== null) ||
+    state.players.some((player) => player.memberId === memberId && player.playedMatch);
+  if (!onTheMatch) return { error: "Cette personne n’est pas sur ce match." };
+
+  const replacementId = replacement === NOBODY ? null : replacement;
+  const submissionId = retroSubmissionId([matchId, "remove", memberId, replacement]);
+  if (live.events.some((event) => event.clientEventId === retroEventId(submissionId, 0))) {
+    redirect(`/match/${matchId}/saisie?corrige=1`);
+  }
+
+  const plan = planRemoval({
+    live,
+    state,
+    periods: periodsConfig(live.match),
+    periodStarts: actualPeriodStarts(state.playIntervals),
+    memberId,
+    replacementId,
+    submissionId,
+    kickoffAtMs,
+  });
+  if (!plan.ok) return { error: plan.problemFr };
+
+  if (plan.amendment.events.length > 0) {
+    if (plan.amendment.events.length > MAX_AMENDMENT_EVENTS) return { error: FRAME_TOO_LONG_FR };
+    const refusal = realismOf(live, state, plan.amendment, plan.copies);
+    if (refusal) return { error: refusal };
+    const result = await amendMatchEvents(actor, { matchId, events: plan.amendment.events });
+    if (!result.ok) return { error: result.body.error };
+  }
+
+  // The sheet last, so a refused batch leaves it as it was.
+  await db
+    .delete(matchSquad)
+    .where(and(eq(matchSquad.matchId, matchId), eq(matchSquad.teamMemberId, memberId)));
+  if (plan.replacementRole) await writeSquadRoles(matchId, [plan.replacementRole]);
+  // `amendMatchEvents` froze the stats before the sheet moved, or did not run at all for somebody who
+  // never played; `squad_role` and the minutes are read again here either way.
+  await finalizeMatchById(teamId, matchId);
 
   redirect(`/match/${matchId}/saisie?corrige=1`);
 }

@@ -7584,3 +7584,57 @@ Files: `lib/retro/frame.ts` (new), `lib/retro/frame.test.ts` (new), `lib/retro/a
 `lib/retro/amend.test.ts`, `lib/retro/change.test.ts`, `lib/retro/actions.ts`,
 `app/(app)/match/[id]/saisie/_components/add-change.tsx`, `docs/DECISIONS.md` (224),
 `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-11-12 — Adding somebody to a finished match, and taking somebody off it
+
+Decision **226**, two owner requests in one slice because each undoes the other: bring onto the match
+somebody the sheet forgot (« if Rémi was not player, sub or supporter… make it clear that you are adding
+him to the game ») and take off it somebody who never came (« Lucien … never showed up, so I remove him
+from the match »).
+
+**Adding.** The two post-match pitch flows keep their lists and gain a separate group, « Pas sur la
+feuille de match »: the team's players with no sheet row, and the match's supporters. The pitch sheet
+says what the sheet becomes before « Valider ». The server recomputes the group from the roster it
+loaded and writes the row after the events, then re-freezes. Decision 223's supporter refusal became an
+announced promotion. Pure part in `lib/retro/sheet.ts`.
+
+**Removing.** `lib/retro/remove.ts` plans it — refuses an action that names him, a replacement already
+on the pitch, nobody in goal — and gives his slot to the replacement (or empties it) in every pitch
+snapshot, start included, as VOID + copy in one batch. The screen runs the same planner for its
+confirmation. His sheet row is deleted afterwards and the stats re-freeze.
+
+**Ratings.** Not touched. `lib/rating/eligibility.ts` decides which notes count — rated has minutes,
+rater on the sheet or has minutes — and `getRatingResults` and `getSeasonStats` both apply it, which
+covers the match's means, man of the match, the coach's note list, season averages, leaderboards, the
+profile card and the « notes » équipe type. The progress line and the tally already counted only
+eligible people. The import script skips such a note individually (« ignorée : la personne n’est plus
+sur ce match ») instead of skipping the match; the push script never copies a hidden one.
+
+**Walked**, on an isolated database at 390 px, light and dark, coach and player:
+- a change at 40′ bringing on Mehdi from the off-sheet group: « Mehdi sera ajouté à la feuille de match
+  comme remplaçant. », written as `substitute` with 20′;
+- removing Léo was refused because a `SUBSTITUTION` at 20′ names him — the seeded log uses that type;
+- removing Thomas with Julien in his place: « Julien prend sa place en DC de 0’ à 60’. Julien sera
+  ajouté à la feuille de match comme titulaire. »; Thomas left the sheet, Julien `starter`, 60′;
+- on a published match, removing Samir took the coach's view from **34 notes to 22** (his 4 received
+  and 8 given) with all 34 rows still stored, and putting him back through the start correction
+  returned it to **34**;
+- the player gets a 404 on `/saisie` and sees no « Retirer du match ».
+
+Gates: typecheck clean, eslint clean on the changed files, `npm test` **1736 passed** (+20),
+`npm run test:e2e` **11 passed** on its own port and database. The two `.mts` scripts typechecked
+through a temporary config, since `tsconfig.json` does not include `.mts`.
+
+**Not verified:** neither sync script was run against the live old app — it needs the service-role key,
+and a run would read production. The rule they use is the unit-tested one.
+
+Files: `lib/retro/sheet.ts` (new), `lib/retro/remove.ts` (new), `lib/rating/eligibility.ts` (new),
+`lib/retro/sheet.test.ts` (new), `lib/rating/eligibility.test.ts` (new), `lib/retro/actions.ts`,
+`lib/retro/start.ts`, `lib/retro/start.test.ts`, `lib/rating/queries.ts`, `lib/stats/queries.ts`,
+`lib/match/presenter.ts`, `lib/match/live.ts`, `components/action-sheet/multi-player-picker.tsx`,
+`components/action-sheet/terrain-sheet.tsx`, `app/(app)/match/[id]/saisie/_components/add-change.tsx`,
+`app/(app)/match/[id]/saisie/_components/correct-start.tsx`,
+`app/(app)/match/[id]/saisie/_components/remove-from-match.tsx` (new),
+`app/(app)/match/[id]/saisie/_components/retro-corrections.tsx`,
+`scripts/import-ratings-from-old-app.mts`, `scripts/push-ratings-to-old-app.mts`,
+`docs/DECISIONS.md` (226), `docs/ROADMAP.md`, `docs/SESSIONS.md`.

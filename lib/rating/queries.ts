@@ -63,6 +63,7 @@ import {
   type ManOfTheMatch,
   type RatingRecord,
 } from "./aggregate";
+import { eligibleRatings } from "./eligibility";
 import {
   eligibleRaterIds,
   hasPlayed,
@@ -529,7 +530,7 @@ export async function getRatingResults(input: {
     return { ...common, readable: false, published: false };
   }
 
-  const rows = await db
+  const stored = await db
     .select({
       raterMemberId: ratings.raterMemberId,
       ratedMemberId: ratings.ratedMemberId,
@@ -537,6 +538,10 @@ export async function getRatingResults(input: {
     })
     .from(ratings)
     .where(eq(ratings.matchId, match.id));
+  // Only the notes of people still on the match count (decision 226): the means, the man of the match
+  // and the coach's per-note list all read `rows`, so a removed player's notes vanish from all three
+  // at once, and come back if he is added again.
+  const rows = eligibleRatings(stored, { sheet, played });
 
   const aggregate = aggregateRatings(rows as RatingRecord[], { members: ratedIds });
 

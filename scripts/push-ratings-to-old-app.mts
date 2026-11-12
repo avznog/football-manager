@@ -57,6 +57,11 @@ import "../db/load-env";
 
 import postgres from "postgres";
 
+import {
+  eligibleRatingsByMatch,
+  type RatingEligibilityContext,
+} from "../lib/rating/eligibility.js";
+import type { SquadEntry } from "../lib/rating/progress.js";
 import { OLD_TO_TARGET_DISPLAY_NAME } from "./radarlocal-names.mjs";
 
 const PROJECT_REF = "foqqovzyvstancdtxnyn";
@@ -142,8 +147,9 @@ type OurNote = {
   rated: string;
   score: string;
 };
-const ours = (await sql`
+const allNotes = (await sql`
   select r.id, r.match_id as "matchId",
+         r.rater_member_id as "raterMemberId", r.rated_member_id as "ratedMemberId",
          to_char(m.kickoff_at at time zone 'Europe/Paris', 'YYYY-MM-DD') as day,
          m.opponent_name as opponent,
          coalesce(ur.display_name, ur.username) as rater,
@@ -156,8 +162,40 @@ const ours = (await sql`
   join team_members td on td.id = r.rated_member_id
   left join users ud on ud.id = td.user_id
   order by m.kickoff_at
-`) as unknown as OurNote[];
+`) as unknown as (OurNote & { raterMemberId: string; ratedMemberId: string })[];
+
+/*
+ * A note that does not count here is not copied there (decision 226). When the coach removes somebody
+ * from a finished match his notes are kept but hidden, and copying them to the old app would put back
+ * over there exactly what he took off here. Judged with the same shared rule every screen uses
+ * (`lib/rating/eligibility.ts`), against each match's sheet and frozen minutes.
+ */
+const matchIds = [...new Set(allNotes.map((note) => note.matchId))];
+const sheetRows = (matchIds.length === 0
+  ? []
+  : await sql`
+      select match_id as "matchId", team_member_id as "teamMemberId", role::text as role
+      from match_squad where match_id in ${sql(matchIds)}
+    `) as unknown as { matchId: string; teamMemberId: string; role: SquadEntry["role"] }[];
+const playedRows = (matchIds.length === 0
+  ? []
+  : await sql`
+      select match_id as "matchId", team_member_id as "teamMemberId", minutes
+      from match_player_stats where match_id in ${sql(matchIds)}
+    `) as unknown as { matchId: string; teamMemberId: string; minutes: number }[];
 await sql.end();
+
+const contexts = new Map<string, RatingEligibilityContext>(
+  matchIds.map((matchId) => [
+    matchId,
+    {
+      sheet: sheetRows.filter((row) => row.matchId === matchId),
+      played: playedRows.filter((row) => row.matchId === matchId),
+    },
+  ]),
+);
+const ours = eligibleRatingsByMatch(allNotes, contexts);
+const hiddenHere = allNotes.length - ours.length;
 
 /* -------------------------------------------------------------------------- */
 /* The old app                                                                */
@@ -294,6 +332,11 @@ for (const t of tallies.values()) {
   );
 }
 console.log(`\nnotes      ${toWrite.length} à copier vers l'ancienne application · aucune mise à jour`);
+if (hiddenHere > 0) {
+  console.log(
+    `notes      ${hiddenHere} note(s) non copiée(s) : la personne n’est plus sur ce match ici (décision 226)`,
+  );
+}
 if (noMatchThere.size > 0) {
   console.log(`notes      match absent là-bas (pousse-le d'abord) : ${[...noMatchThere].join(", ")}`);
 }

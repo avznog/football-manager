@@ -38,6 +38,10 @@ import {
 } from "@/db/schema";
 import type { SquadRole } from "@/db/schema";
 import type { SlotInfo } from "@/lib/match/lineup";
+import {
+  eligibleRatingsByMatch,
+  type RatingEligibilityContext,
+} from "@/lib/rating/eligibility";
 import { getMatchScores } from "@/lib/match/queries";
 import type { MatchEventRecord } from "@/lib/match/reducer";
 import {
@@ -283,11 +287,14 @@ async function getRatedMatchIds(matchIds: readonly string[]): Promise<string[]> 
 /** The scores themselves, for the matches whose means are out — and for no others. */
 async function getVisibleRatingScores(
   publishedMatchIds: readonly string[],
-): Promise<VisibleRatingRow[]> {
+): Promise<(VisibleRatingRow & { raterMemberId: string })[]> {
   if (publishedMatchIds.length === 0) return [];
+  // The rater is selected so `eligibleRatingsByMatch` can tell whether he is still on the match
+  // (decision 226); the aggregate below never sees who gave which note.
   return db
     .select({
       matchId: ratings.matchId,
+      raterMemberId: ratings.raterMemberId,
       ratedMemberId: ratings.ratedMemberId,
       score: ratings.score,
     })
@@ -417,7 +424,35 @@ export const getSeasonStats = cache(
       logs,
     });
 
-    const visibleRatingRows = await visibleRatings;
+    /*
+     * Only the notes of people still on their match count (decision 226) — the season average, the
+     * leaderboards, the profile card and the « notes » équipe type all read `ratings` below, so this
+     * one filter is all of them. Each match is judged against its own sheet and its own minutes, which
+     * are already here: `squad` from the sheet, `lines` from the cache or the replayed log.
+     */
+    const sheets = new Map<string, RatingEligibilityContext["sheet"][number][]>();
+    const played = new Map<string, RatingEligibilityContext["played"][number][]>();
+    for (const matchId of matchIds) {
+      sheets.set(matchId, []);
+      played.set(matchId, []);
+    }
+    for (const row of squad) {
+      sheets.get(row.matchId)?.push({ teamMemberId: row.teamMemberId, role: row.role });
+    }
+    for (const line of lines) {
+      played.get(line.matchId)?.push({ teamMemberId: line.teamMemberId, minutes: line.minutes });
+    }
+    const contexts = new Map<string, RatingEligibilityContext>(
+      matchIds.map((matchId) => [
+        matchId,
+        { sheet: sheets.get(matchId) ?? [], played: played.get(matchId) ?? [] },
+      ]),
+    );
+    // Who gave a note is dropped again once eligibility is decided: the aggregate needs none of it.
+    const visibleRatingRows: VisibleRatingRow[] = eligibleRatingsByMatch(
+      await visibleRatings,
+      contexts,
+    ).map((row) => ({ matchId: row.matchId, ratedMemberId: row.ratedMemberId, score: row.score }));
 
     const statsMatches: StatsMatch[] = matchRows.map((match) => ({
       id: match.id,

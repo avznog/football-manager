@@ -38,6 +38,12 @@ import { changeArrangement, terrainPayload, type SlotAssignment } from "@/lib/ma
 
 import { MinuteField } from "./minute-field";
 import { changeCandidateIds, stateAtClock } from "@/lib/retro/change";
+import {
+  OFF_SHEET_HEADING_FR,
+  offSheetCandidateIds,
+  sheetAdditionFr,
+  sheetAdditions,
+} from "@/lib/retro/sheet";
 import { frameMoveFor } from "@/lib/retro/frame";
 import type { RetroView } from "@/lib/retro/queries";
 
@@ -151,6 +157,28 @@ export function AddChange({
     const allowed = new Set(changeCandidateIds(live, atClock, wholeMatch));
     return availableOptions(atClock, live.players).filter((option) => allowed.has(option.memberId));
   }, [atClock, live, wholeMatch]);
+  /*
+   * The players the sheet does not have, offered apart (decision 226): bringing one on adds him to
+   * the match, and the confirm step says so. The server computes the same list and refuses anyone
+   * else.
+   */
+  const offSheetIds = useMemo(
+    () => (atClock ? offSheetCandidateIds(live, atClock, wholeMatch) : []),
+    [atClock, live, wholeMatch],
+  );
+  const comingOffSheet = useMemo(() => {
+    if (!atClock) return [];
+    const allowed = new Set(offSheetIds);
+    return availableOptions(atClock, live.players).filter((option) => allowed.has(option.memberId));
+  }, [atClock, live.players, offSheetIds]);
+  /** « Rémi sera ajouté à la feuille de match comme remplaçant. », for whoever the pitch brings on. */
+  const noticesFor = (assignments: readonly SlotAssignment[]) => {
+    const before = new Set(base.map((entry) => entry.memberId));
+    const arriving = assignments
+      .map((assignment) => assignment.memberId)
+      .filter((memberId) => !before.has(memberId));
+    return sheetAdditions(live, arriving, "substitute").map(sheetAdditionFr);
+  };
 
   /** The formation the pitch stood in at that minute: the one its players' slots belong to. */
   const formationId = useMemo(() => {
@@ -305,6 +333,7 @@ export function AddChange({
         title="Qui entre ?"
         description={`${count(flow.outIds.length, "sort", "sortent")}, ${count(flow.inIds.length, "entre", "entrent")} · ${stamp}`}
         options={coming}
+        secondary={{ heading: OFF_SHEET_HEADING_FR, options: comingOffSheet }}
         selected={flow.inIds}
         onToggle={(memberId) => setFlow({ ...flow, inIds: toggled(flow.inIds, memberId) })}
         confirmLabel="Placer sur le terrain"
@@ -337,7 +366,9 @@ export function AddChange({
       formationId={formationId}
       base={base}
       initialAssignments={flow.initial}
-      candidates={[...onPitch, ...coming]}
+      candidates={[...onPitch, ...coming, ...comingOffSheet]}
+      offSheet={{ heading: OFF_SHEET_HEADING_FR, memberIds: offSheetIds }}
+      noticesFor={noticesFor}
       leftPitchMemberIds={leftPitchMemberIds}
       onConfirm={submit}
     />
