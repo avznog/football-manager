@@ -9084,3 +9084,16 @@ only the pull ran and exits cleanly, rather than failing the half of the job tha
 Checked by a dry run against production and the live old app: every note of the six earlier matches
 already present on both sides (0 to copy, 0 skipped — the name and match mapping holding over 642
 notes), and **20 notes given in 7orteils for the 2026-11-03 match** missing over there.
+
+## 225 — One bad match skips that match, not the whole ratings sync
+
+**2026-11-12.** The pull of `sync-ratings` refused **everything** as soon as one note anywhere was one
+the app would refuse. The 2026-11-10 match, closed by tapping through game mode in eight seconds so
+that nobody has a minute, made all six of its old-app notes « noté sans avoir joué » — and with them
+held back the 2026-11-03 match the owner actually wanted synced. For a job meant to run unattended, one
+broken match blocking every other is the wrong failure.
+
+Now a match with a refused note is **skipped whole** — none of its notes is written, which is the old
+rule applied at the right scale — reported with a GitHub `::warning::` annotation so it shows on the
+run's summary page, and the other matches sync normally. The double-vote report also names the match
+now, since a rater can vote twice on one match and not on another.

@@ -288,8 +288,10 @@ if (plans.length === 0) refuse("Aucun match de l'ancienne application ne corresp
 type Insert = { id: string; matchId: string; rater: string; rated: string; score: string };
 const toInsert: Insert[] = [];
 const problems: string[] = [];
+/** Matches left out because at least one of their notes is one the app would refuse. */
+const skippedMatches: string[] = [];
 let alreadyThere = 0;
-/** Per rater: how many players he rated in both apps, and on how many the two notes differ. */
+/** Per match and rater: how many players he rated in both apps, and on how many the notes differ. */
 const doubleVotes = new Map<string, { name: string; pairs: number; differing: number }>();
 
 console.log("date         adversaire                   notes  à écrire  déjà là  publié");
@@ -318,6 +320,8 @@ for (const plan of plans) {
 
   let planned = 0;
   let skipped = 0;
+  const problemsBefore = problems.length;
+  const insertsBefore = toInsert.length;
   for (const row of plan.rows) {
     const rater = memberIdFor(row.rater);
     const rated = memberIdFor(row.rated);
@@ -357,27 +361,49 @@ for (const plan of plans) {
     const here = existingByPair.get(`${rater}|${rated}`);
     if (here) {
       skipped += 1;
-      const tally = doubleVotes.get(rater) ?? { name: row.rater, pairs: 0, differing: 0 };
+      const tally = doubleVotes.get(`${plan.matchId}|${rater}`) ?? {
+        name: `${row.rater} (${plan.day})`,
+        pairs: 0,
+        differing: 0,
+      };
       tally.pairs += 1;
       if (Number(here.score) !== score) tally.differing += 1;
-      doubleVotes.set(rater, tally);
+      doubleVotes.set(`${plan.matchId}|${rater}`, tally);
       continue;
     }
     planned += 1;
     toInsert.push({ id: row.id, matchId: plan.matchId, rater, rated, score: score.toFixed(1) });
   }
+  /*
+   * One bad match skips **that match**, not the whole sync (decision 225). It used to abort
+   * everything, so a single unrecorded match — the 2026-11-10 one, closed by tapping through game mode
+   * in eight seconds, where nobody has a minute — held back every other match's notes indefinitely.
+   * The rule itself is unchanged: none of that match's notes is written, because the app would refuse
+   * every one of them.
+   */
+  if (problems.length > problemsBefore) {
+    toInsert.length = insertsBefore;
+    skippedMatches.push(`${plan.day} ${plan.opponent}`);
+    planned = 0;
+  }
   alreadyThere += skipped;
   console.log(
     `${plan.day}   ${plan.opponent.padEnd(27)}  ${String(plan.rows.length).padStart(5)}  ` +
-      `${String(planned).padStart(8)}  ${String(skipped).padStart(7)}  ${plan.published ? "oui" : "non"}`,
+      `${String(planned).padStart(8)}  ${String(skipped).padStart(7)}  ${plan.published ? "oui" : "non"}` +
+      (problems.length > problemsBefore ? "   ← ignoré" : ""),
   );
 }
 
 if (problems.length > 0) {
-  console.error(`\nABANDON : ${problems.length} note(s) que l'application elle-même refuserait :`);
-  for (const line of [...new Set(problems)].slice(0, 20)) console.error(`    ${line}`);
-  await sql.end();
-  process.exit(1);
+  // `::warning::` is a GitHub Actions annotation: it surfaces on the run's summary page, so a skipped
+  // match is seen without reading the log. On a terminal it is just a line.
+  console.log(
+    `\n::warning::${skippedMatches.length} match(s) ignoré(s), aucune de leurs notes n'est écrite : ` +
+      skippedMatches.join(", "),
+  );
+  console.log(`notes      ${problems.length} note(s) que l'application elle-même refuserait :`);
+  for (const line of [...new Set(problems)].slice(0, 20)) console.log(`    ${line}`);
+  console.log("notes      les autres matchs sont synchronisés normalement.");
 }
 
 console.log(
