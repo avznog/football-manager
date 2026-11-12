@@ -9097,3 +9097,59 @@ Now a match with a refused note is **skipped whole** — none of its notes is wr
 rule applied at the right scale — reported with a GitHub `::warning::` annotation so it shows on the
 run's summary page, and the other matches sync normally. The double-vote report also names the match
 now, since a rater can vote twice on one match and not on another.
+
+## 223 — The starting composition of a finished match can be corrected, by replacing it in one batch
+
+**2026-11-12, narrowing decision 150.** The owner: « the game I did Tuesday had a starting composition
+different than the one that I noted on the app. I need to be able to edit the starting composition,
+post match. » Asked what the correction should do to the rest of the match, he chose **« change the
+start only »**: the starting seven changes and nothing else does; every later line stays exactly as
+recorded, and if the new seven makes one of them impossible the correction is refused, naming it, and
+he fixes that line himself with the tools that already exist.
+
+**Decision 150 is narrowed, not reversed.** It forbade annulling the start because a `VOID` on it leaves
+the pitch empty and nothing in the log can refill it. That is still refused. What is now allowed is the
+batch that annuls the start **and carries the corrected seven**: `voidsStartingLineup`
+(`lib/match/ingest.ts`) replays the batch over the log and lets the annulment through only when one of
+the batch's own events comes out of the reducer as the new starting composition **at the start's own
+clock or before**. That last clause matters: a seven posted at 20′ would also fill an empty pitch, and
+leave it empty from the kick-off to 20′ — exactly the hole 150 is about. The rule is asked of the
+reducer, as 150 asked it which event the start is, rather than of « the batch has a `LINEUP_APPLIED` ».
+
+**The two events.** A `VOID` on the current start and the corrected `LINEUP_APPLIED`, both at the start's
+clock and period, built by `buildStartAmendment` (`lib/retro/start.ts`). Being appended, the
+replacement replays **after** the `KICKOFF` it shares 0′00″ with; that turned out to be the ordinary
+case and not an edge — the seeded live logs already store their start after the kick-off at the same
+reading. The pitch is empty for no time, minutes are paid from 0′00″, and the reducer marks the
+replacement `startingLineup` because it is the event that filled an empty pitch. Pinned by tests.
+
+**What « start only » means against a log of whole-pitch changes.** Since decision 147 a change is a
+snapshot of the whole seven. A later snapshot does not say « Rémi comes on », it says « from 14′ the
+pitch is these seven »; correct the start and that snapshot stays as recorded while what it *means* is
+re-derived by diff — the 14′ change can now read as Lucas coming on instead. Nothing is rewritten and
+nothing becomes impossible. **What can become impossible** is everything that names a person relative
+to the pitch: a `SUBSTITUTION` (older logs and the retro sheet still write them) bringing on somebody
+who now started, taking off somebody who now did not, or a goal by somebody now on the bench. The
+reducer finds those and `realismRefusalFr` refuses them — the same check every correction goes through,
+so the sentences are the ones the coach already knows:
+
+- « Clément était déjà sur le terrain à la 30’. »
+- « Pierre n’était pas sur le terrain à la 30’ : il ne peut pas en sortir. »
+- « Julien n’était pas sur le terrain à la 9’ : il ne peut pas y avoir marqué. »
+
+And the seven itself is refused before the reducer is asked (`startProblemFr`): « C’est déjà la
+composition de départ de ce match. », a non-player (« … ne joue pas : il peut être supporter, pas sur
+le terrain. », decision 096), a supporter (« … est supporter de ce match : retire-le des supporters
+avant de le faire démarrer. », decision 211), a man or a post twice, an unknown post or player, an
+empty pitch.
+
+**The squad sheet follows**: whoever now starts becomes `starter`, whoever no longer does `substitute`;
+supporters are untouched, and a match with no sheet gets none (writing seven rows would switch every
+screen from « no sheet, anybody may be offered » to the sheet's narrower rules on the strength of rows
+nobody chose). The sheet is written **after** the events, so a refused batch leaves it alone, and the
+stats are re-frozen once more afterwards because `match_player_stats.squad_role` is read off it.
+
+The UI is game mode's own TERRAIN sheet, opened on the starting seven from a « Corriger » on the
+« Composition de départ » line of the correction screen — no new pitch. `isAmendableEntry` is left
+alone: the start is still not amendable through the fact/void path, it has its own door. The planned
+composition (`lineups`) is not touched: it is the record of what was intended.

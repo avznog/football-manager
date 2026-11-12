@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { FieldError } from "@/components/ui/field-error";
 import { Select } from "@/components/ui/select";
 import { Sheet } from "@/components/ui/sheet";
+import { CorrectStart } from "./correct-start";
 import { MinuteField } from "./minute-field";
 import { periodsConfig, regulationMinutes, type PeriodsConfig } from "@/lib/match/clock";
 import { cn } from "@/components/ui/cn";
@@ -64,6 +65,7 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
   const [openLine, setOpenLine] = useState<RetroTimelineLine | null>(null);
   const [adding, setAdding] = useState(false);
   const [addingChange, setAddingChange] = useState(false);
+  const [correctingStart, setCorrectingStart] = useState(false);
   /**
    * Which card the last submission came from, so its refusal is printed **there**. A change refused
    * at the bottom of the page with its sentence at the top is a refusal the coach never reads: the
@@ -148,6 +150,18 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
                 >
                   Corriger
                 </Button>
+              ) : line.startingLineup ? (
+                // The start is never annulled on its own (decision 150), so it does not open the
+                // correction sheet; it opens the pitch and is replaced in one batch (decision 223).
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCorrectingStart(true)}
+                  disabled={pending}
+                >
+                  Corriger
+                </Button>
               ) : null}
             </li>
           ))}
@@ -201,6 +215,14 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
         pending={pending}
         action={dispatch("line")}
         onClose={() => setAdding(false)}
+      />
+
+      <CorrectStart
+        teamId={teamId}
+        view={view}
+        open={correctingStart}
+        onClose={() => setCorrectingStart(false)}
+        action={dispatch("line")}
       />
 
       <AddChange

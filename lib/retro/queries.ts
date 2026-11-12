@@ -67,6 +67,11 @@ export type RetroTimelineLine = {
   actors: TimelineEntry["actors"];
   /** True when this line may be corrected from this screen: a fact, a substitution, a change. */
   amendable: boolean;
+  /**
+   * The starting composition. Not `amendable` — it is never annulled on its own (decision 150) — but
+   * it has its own « Corriger », which replaces it in one batch (decision 223).
+   */
+  startingLineup: boolean;
   /** The fact type to pre-select in the correction sheet, when it is one. */
   factType: RetroFactType | null;
 };
@@ -202,6 +207,7 @@ function toTimelineLine(entry: TimelineEntry): RetroTimelineLine {
     // which is which (a change is, the starting composition is not), and `lib/retro/actions.ts` asks
     // it the same question of a posted target.
     amendable: !entry.voided && isAmendableEntry(entry),
+    startingLineup: entry.startingLineup && !entry.voided,
     factType,
   };
 }

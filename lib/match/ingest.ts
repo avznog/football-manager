@@ -186,7 +186,7 @@ export const INGEST_ERRORS = {
 } as const;
 
 /**
- * Does this batch annul the starting composition? Decision 150.
+ * Does this batch annul the starting composition **and leave the pitch empty**? Decisions 150, 223.
  *
  * The `LINEUP_APPLIED` that put the seven on an empty pitch is the one event whose `VOID` the
  * timeline cannot undo: the reducer skips it, nobody is on the pitch, game mode has no pitch to
@@ -209,9 +209,40 @@ export function voidsStartingLineup(
       .map((event) => event.voidsEventId as string),
   );
   if (targets.size === 0) return false;
-  return reduceMatch(log).timeline.some(
+  const hit = reduceMatch(log).timeline.find(
     (entry) => entry.startingLineup && targets.has(entry.eventId),
   );
+  if (!hit) return false;
+
+  /*
+   * Decision 223 narrows 150 rather than reversing it: what 150 forbids is a pitch left **empty**, and
+   * a batch that annuls the start *and* carries the corrected seven does not leave it empty. So the
+   * batch is replayed over the log, and the annulment is allowed exactly when one of its own events
+   * comes out of the reducer as the new starting composition. Asked of the reducer rather than of
+   * « the batch contains a `LINEUP_APPLIED` », for the same reason 150 asks the reducer which event
+   * the start is: a composition at 20′ in the same batch would not fill the pitch at the kick-off.
+   */
+  const lastSeq = log.reduce((max, event) => Math.max(max, event.seq ?? 0), 0);
+  const replayed = reduceMatch([
+    ...log,
+    ...incoming.map((event, index) => ({
+      ...event,
+      id: `incoming:${index}`,
+      clientEventId: event.clientEventId,
+      voidsEventId: event.voidsEventId ?? null,
+      seq: lastSeq + 1 + index,
+    })),
+  ]);
+  // At the start's own clock or before: a seven posted at 20′ would also fill an empty pitch, and
+  // leave it empty from the kick-off to 20′ — exactly the hole 150 is about.
+  const replaced = replayed.timeline.some(
+    (entry) =>
+      entry.startingLineup &&
+      !entry.voided &&
+      entry.eventId.startsWith("incoming:") &&
+      entry.clockMs <= hit.clockMs,
+  );
+  return !replaced;
 }
 
 /**
