@@ -9050,3 +9050,37 @@ reads it now:
 Picking a tag older than `v1.3.0` runs that tag's own copy of this workflow, which may not have the
 `resolve` job or the scripts at all; the dropdown can offer it, and it will fail rather than do the
 wrong thing.
+
+## 222 — `sync-ratings` goes both ways, and inserts only in both directions
+
+**2026-11-12.** The owner: « if someone put a rating on 7orteils and not on info radar, it is also
+updated in info radar ». The team votes in both apps, and until now notes only travelled one way.
+
+`scripts/push-ratings-to-old-app.mts` is the other half, and `sync-ratings` runs it after the pull. The
+rule is **the same in both directions: a note that exists in only one app is copied to the other; a
+(match, rater, rated) that has a note in both is touched in neither**, whatever the two scores are.
+Nothing tells which of two different votes he meant, and an update either way would rewrite somebody's
+vote without telling him. The pull counts those pairs (decision 220); the push leaves them alone.
+
+**The copy keeps 7orteils' `ratings.id` over there**, and that is what stops the two halves fighting.
+The pull keys on the old app's note id, so on the next run it finds that id already here and treats it
+as a re-run. With a fresh id, every pushed note would come back as a « double vote » with itself.
+
+The `service_role` key bypasses the old app's RLS, so its rules are applied by hand: the rater must have
+a `lineups` row for the match there (`ratings_insert_if_in_lineup`) and the rated player
+`minutes_played > 0` (what its own rating screen offers). A note failing either is **counted and
+skipped, not fatal** — a match never pushed, a supporter named here after the push, a teammate with no
+account there are all ordinary states — and the run says which, with the remedy for the commonest one:
+re-run `push-match` with « overwrite » to put a late supporter on the sheet. `on_conflict … 
+ignore-duplicates` on the old app's unique key is the backstop for a vote cast between read and write.
+
+`sync-ratings` now needs `SUPABASE_SERVICE_ROLE_KEY` as well, which undoes the separation decision 216
+argued for — the job that reads the old app can now write it. That is the cost of a two-way sync and it
+is accepted: the key reaches the old app's tables, not its account.
+
+**It runs only from a release that contains it** (decision 220): on an older tag the step warns that
+only the pull ran and exits cleanly, rather than failing the half of the job that worked.
+
+Checked by a dry run against production and the live old app: every note of the six earlier matches
+already present on both sides (0 to copy, 0 skipped — the name and match mapping holding over 642
+notes), and **20 notes given in 7orteils for the 2026-11-03 match** missing over there.

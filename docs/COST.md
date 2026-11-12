@@ -153,6 +153,9 @@ jobs (decision 216) add to this only when somebody presses the button.
 **$2331.21 combined** with the macOS $529.93 still carried from 2026-10-14. 232 commits, 225 merged pull
 requests, 108 749 lines, 44 days — $40.94 a day for this machine, still falling every reading.
 
+**Re-measured 2026-11-12: $1810.31 for Linux**, so **$2340.24 combined** with the macOS $529.93 carried
+from 2026-10-14. 235 commits, 51 days — $35.50 a day for this machine, falling again.
+
 ### How to re-derive it rather than trusting this file
 
 ```bash

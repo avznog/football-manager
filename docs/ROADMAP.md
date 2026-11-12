@@ -2722,3 +2722,8 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       7orteils one, and is now counted apart from a re-run — who, how many, how many differ, never the
       scores. Also fixed: the importer's refusal messages printed individual scores, and its logs are
       now public CI logs
+- [x] **`sync-ratings` copies 7orteils' notes to info-radarlocal too** — 2026-11-12. Decision **222**.
+      Insert-only both ways: a pair rated in both apps is touched in neither. The copy keeps this app's
+      note id, so the next pull sees it as a re-run rather than a double vote. Old-app rules applied by
+      hand (rater on the sheet there, rated with minutes there); failures are counted and skipped. Dry
+      run: 20 notes for 2026-11-03 to copy, every earlier match already in step
