@@ -348,15 +348,33 @@ describe("buildChangeAmendment", () => {
     expect(change(live, "21", slots).events[0].clientEventId).not.toBe(first);
   });
 
-  it("is clamped to the final whistle", () => {
+  /*
+   * It used to be clamped to the final whistle, and « Ajouter un changement » refused anything after
+   * it — so on the owner's match whistled at 30′02″ the field was red above 30. Decision 224: the change
+   * is stamped as typed and the whistle moves (`lib/retro/frame.ts`).
+   */
+  it("is stamped as typed after the final whistle, in the period the field names", () => {
+    const { events } = buildChangeAmendment({
+      submissionId: "s",
+      periods: { periodsCount: 2, periodMinutes: 30 },
+      kickoffAtMs: KICKOFF_AT_MS,
+      finalWhistleMs: 30 * MINUTE + 2_473,
+      change: { minute: "50", slots },
+    });
+    expect(events[0].clockMs).toBe(50 * MINUTE);
+    expect(events[0].period).toBe(2);
+  });
+
+  it("files « 30+2 » in the first half, though 32′ is the second half's span", () => {
     const { events } = buildChangeAmendment({
       submissionId: "s",
       periods: { periodsCount: 2, periodMinutes: 30 },
       kickoffAtMs: KICKOFF_AT_MS,
       finalWhistleMs: 60 * MINUTE,
-      change: { minute: "90", slots },
+      change: { minute: "30+2", slots },
     });
-    expect(events[0].clockMs).toBe(60 * MINUTE);
+    expect(events[0].clockMs).toBe(32 * MINUTE);
+    expect(events[0].period).toBe(1);
   });
 });
 

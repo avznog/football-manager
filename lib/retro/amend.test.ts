@@ -163,7 +163,13 @@ describe("buildAmendment", () => {
     expect(amendment.events[1].period).toBe(2); // continuous minutes, decision 009
   });
 
-  it("clamps a minute past the final whistle instead of producing an anomaly", () => {
+  /*
+   * Decision 224 reverses what this test used to pin. A minute past the final whistle was clamped to
+   * it, so the owner's goal typed at 50′ on a match whistled at 30′02″ was stored at 30′ without a
+   * word. The minute is now kept as typed, and `lib/retro/frame.ts` moves the whistle to cover it —
+   * tested there, because it needs the log and this function only sees the stamp.
+   */
+  it("keeps a minute past the final whistle as typed, rather than clamping it", () => {
     const stored = storedMatch();
     const goal = stored.find((event) => event.type === "GOAL_FOR")!;
 
@@ -171,13 +177,13 @@ describe("buildAmendment", () => {
       submissionId: SUBMISSION,
       periods: PERIODS,
       kickoffAtMs: KICKOFF_AT_MS,
-      // This match ran three minutes over: the whistle in the log is what counts, not regulation.
       finalWhistleMs: 63 * MINUTE,
       target: { eventId: goal.id, type: goal.type, period: goal.period, clockMs: goal.clockMs },
-      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: "90" },
+      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: "60+3" },
     });
 
     expect(amendment.events[1].minute).toBe(63);
+    expect(amendment.events[1].period).toBe(2);
   });
 
   it("annuls without replacing when the goal simply never happened", () => {
@@ -269,17 +275,31 @@ describe("buildAmendment", () => {
     );
   });
 
-  it("falls back to regulation when the log has no whistle yet", () => {
+  it("stamps a typed minute as typed when the log has no whistle yet", () => {
+    // No ceiling of any kind since decision 224: a match with no whistle has nothing to move either.
     const amendment = buildAmendment({
       submissionId: SUBMISSION,
       periods: PERIODS,
       kickoffAtMs: KICKOFF_AT_MS,
       finalWhistleMs: 0,
       target: null,
-      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: "200" },
+      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: "45" },
     });
 
-    expect(amendment.events[0].minute).toBe(60);
+    expect(amendment.events[0].minute).toBe(45);
+  });
+
+  it("still places an addition with no minute in the middle of regulation", () => {
+    const amendment = buildAmendment({
+      submissionId: SUBMISSION,
+      periods: PERIODS,
+      kickoffAtMs: KICKOFF_AT_MS,
+      finalWhistleMs: 0,
+      target: null,
+      fact: { type: "GOAL_FOR", memberId: P.at, assistId: null, minute: null },
+    });
+
+    expect(amendment.events[0].minute).toBe(30);
   });
 
   it("does nothing when asked for nothing", () => {

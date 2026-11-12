@@ -7537,4 +7537,50 @@ Files: `lib/retro/start.ts` (new), `lib/retro/start.test.ts` (new), `lib/match/i
 `lib/retro/actions.ts` (one dispatch line and an appended `submitStart`), `lib/retro/queries.ts`,
 `app/(app)/match/[id]/saisie/_components/correct-start.tsx` (new),
 `app/(app)/match/[id]/saisie/_components/retro-corrections.tsx`, `docs/DECISIONS.md` (223),
+## 2026-11-12 — A correction after a whistle moves the whistle
+
+Decision **224**, built in a worktree in parallel with the starting-composition slice. The owner's
+match of 2026-11-10 was closed by tapping through game mode, whistles at 0′02″ and 30′02″, and typing it
+up as corrections showed two faces of one defect: `amendStamp` **clamped** a minute after the final
+whistle to it without a word, and « Ajouter un changement » **refused** one outright, red above 30.
+
+The rule is the owner's — « to the normal end, or later »: the period's actual kick-off plus
+`periodMinutes`, the action's clock, or a stranded action of that period, whichever is latest. A later
+period's kick-off and events shift by the same amount, which keeps their television labels; the final
+whistle follows the last period. `lib/retro/frame.ts` is pure and does the arithmetic; the server
+appends `VOID` + copies in the action's own batch.
+
+**Two traps found by testing rather than by reading.** A new `PERIOD_END` at 30′00″ replays *after* an
+old kick-off at 30′00″ — same clock, lower `seq` — and the reducer reads `kickoff-while-in-play`; so a
+kick-off on the new whistle's clock is re-appended even when nothing shifts. And a first-half action
+stranded past the second-half kick-off was neither counted nor protected from the shift; the stranded
+set is no longer bounded by the next kick-off and the shift skips that period's own actions.
+
+**Three tests that pinned the clamp were rewritten**, not deleted: they asserted exactly the behaviour
+the owner asked to remove. Two new ones in `change.test.ts` pin a change at 50′ after a 30′02″ whistle
+and « 30+2 » filed in the first half.
+
+Walked on a throwaway local database (`football_review_b`, never `football_prod`) seeded with a match
+whistled at 0′02″ / 30′02″, at 390 px in light and dark:
+
+```
+goal at 6′        Fin de période 00:02 annulé → Fin de période 30’ 30:00, kick-off re-appended
+change at 50′     « La fin de la 2e période sera déplacée à 60’. » — not red, Suivant enabled
+                  → Changement 50’ 50:00 · Fin de période 60’ 60:00 · Coup de sifflet final 60:00
+goal at 30+2      But 30’+2 32:00 · Fin de période 30’+2 · Coup d’envoi 30’ 32:00
+                  · Changement still 50’ (now 52:00) · Coup de sifflet final still 60’ (now 62:00)
+minutes           starters 62′, the goalkeeper off at the change 52′ — re-frozen
+```
+
+**Seen and not fixed, because it is the reducer's and outside this slice:** a struck-through moved line
+is labelled against the period's new kick-off, so the annulled change reads « 48’ » next to its copy at
+« 50’ ». On the roadmap.
+
+Gates: typecheck clean, eslint clean on the changed files, `npm test` **1697 passed** (1687 → +10),
+`npm run test:e2e` **11 passed** — run on a private port (`E2E_PORT=3217`) so it could not reuse another
+worktree's dev server.
+
+Files: `lib/retro/frame.ts` (new), `lib/retro/frame.test.ts` (new), `lib/retro/amend.ts`,
+`lib/retro/amend.test.ts`, `lib/retro/change.test.ts`, `lib/retro/actions.ts`,
+`app/(app)/match/[id]/saisie/_components/add-change.tsx`, `docs/DECISIONS.md` (224),
 `docs/ROADMAP.md`, `docs/SESSIONS.md`.
