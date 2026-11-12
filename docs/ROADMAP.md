@@ -2737,3 +2737,16 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       at 390 px in both themes; a player gets a 404 on the correction screen. Not looked at: the
       shared TERRAIN sheet says « Le terrain est identique à ce qu'il y a en jeu » before any move,
       which reads oddly after the match — the sheet's own copy, left alone
+- [x] **A correction after a whistle moves the whistle** — 2026-11-12. Decision **224**. On the
+      owner's match whistled at 0′02″ and 30′02″, an action typed after 30′02″ was silently clamped to
+      it and « Ajouter un changement » was red above 30. Now the whistle moves to the period's normal
+      end, or to the action if later, and a later period's kick-off and events shift with it so their
+      labels stay put. `VOID` + copy, one idempotent batch, pure arithmetic in `lib/retro/frame.ts`.
+      Walked in a browser at 390 px: goal at 6′ → first half ends at 30′; change at 50′ → final whistle
+      at 60′; goal at 30+2 → first half at 30’+2 and the second half shifted two minutes, every label
+      unchanged, starters credited 62′
+- [ ] **A struck-through moved line reads a minute it never had.** After a frame move the annulled
+      original is labelled against the period's *new* kick-off, so a change entered at 50′ shows
+      « Changement annulé 48’ » beside its copy at 50′. The reducer labels voided lines with the current
+      frame; it would need the frame as it stood before the move. Cosmetic, but it is a screen saying
+      something untrue

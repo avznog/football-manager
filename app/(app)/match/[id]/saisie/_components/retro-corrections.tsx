@@ -80,8 +80,8 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
   const nameOf = (memberId: string) =>
     view.players.find((player) => player.memberId === memberId)?.displayName ?? "Joueur retiré";
 
-  // Only « Ajouter un changement » still needs it, for the last minute a change can be made at: the
-  // correction sheet's own minute field stopped being a number with decision 215.
+  // Passed to « Ajouter un changement », which no longer uses it: decision 224 lifted the ceiling a
+  // change used to be held under, since a late change now moves the whistle instead.
   const regulation = regulationMinutes({
     periodsCount: view.match.periodsCount,
     periodMinutes: view.match.periodMinutes,

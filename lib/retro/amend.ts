@@ -18,7 +18,9 @@
  *   `event-after-final-whistle` and which would make the goal arrive after everybody had left the
  *   pitch — so nobody would be credited with the clean minutes they actually played;
  * - the minute is part of what the coach is correcting only when he says so. If he changes it, the
- *   new minute is used and clamped to the final whistle; if he does not, the goal stays at 27′.
+ *   new minute is used **as typed**; if he does not, the goal stays at 27′. A typed minute after a
+ *   whistle is no longer clamped to it — that stored a goal typed at 50′ at 30′ without a word — and
+ *   moves the whistle instead (decision 224, `lib/retro/frame.ts`).
  *
  * The `VOID` itself carries the same stamp as its target, so the two lines sit next to each other in
  * the timeline instead of the annulment appearing at the end of the match.
@@ -142,8 +144,8 @@ export type AmendChange = {
 /**
  * The one `LINEUP_APPLIED` « Ajouter un changement » appends.
  *
- * Stamped at the minute the coach named, clamped to the final whistle like every other correction —
- * and on the minute exactly, so it replays after the facts at that minute and before anything later
+ * Stamped at the minute the coach named, as typed — a change after a whistle moves the whistle
+ * (decision 224, `lib/retro/frame.ts`) rather than being refused or clamped — and on the minute exactly, so it replays after the facts at that minute and before anything later
  * (decision 147). `lineupId: null`: it is nobody's planned composition. The slots go in store order
  * as the screen sent them; `retroEventId` keys it on the submission, so a double tap is one change.
  */
@@ -157,19 +159,20 @@ export function buildChangeAmendment(input: {
   periodStarts?: ReadonlyMap<number, number> | null;
 }): Amendment {
   const periods = periodsConfig(input.periods);
-  const ceilingMs = input.finalWhistleMs > 0 ? input.finalWhistleMs : regulationMs(periods);
   const placed = clockMsForMinuteField(input.change.minute, periods, input.periodStarts);
   // `null` is a minute the field's shape allowed and this match has no place for — « 25+2 » of a 2×30.
   // The action checks for it before calling and says so; falling back to 0 here would silently put a
   // change at the kick-off, which is the worst of the available wrong answers.
   if (!placed) throw new Error(`Minute hors du match : ${input.change.minute}`);
-  const clockMs = Math.max(0, Math.min(placed.clockMs, ceilingMs));
+  // No ceiling (decision 224): a change after the whistle moves the whistle. The period is the
+  // parse's, not `periodOfClockMs` of the clock — « 30+2 » is the first half even at 32′.
+  const clockMs = Math.max(0, placed.clockMs);
   return {
     events: [
       {
         clientEventId: retroEventId(input.submissionId, 0),
         type: "LINEUP_APPLIED",
-        period: periodOfClockMs(clockMs, periods),
+        period: placed.period,
         minute: clockMsToMinute(clockMs),
         clockMs,
         occurredAt: new Date(input.kickoffAtMs + clockMs),
@@ -264,13 +267,8 @@ function amendStamp(
      * inside the first half's nominal span, and recomputing there would file it in the wrong half.
      */
     const stamped = clockMsForMinuteField(minute, periods, periodStarts);
-    if (stamped) {
-      const clockMs = Math.min(stamped.clockMs, ceilingMs);
-      return {
-        clockMs,
-        period: clockMs === stamped.clockMs ? stamped.period : periodOfClockMs(clockMs, periods),
-      };
-    }
+    // As typed, never clamped to the final whistle (decision 224): the frame follows the action.
+    if (stamped) return { clockMs: Math.max(0, stamped.clockMs), period: stamped.period };
     // Unplaceable: fall through to the target's own stamp, so a correction that only meant to change
     // the scorer is not moved to the kick-off by a minute the action should already have refused.
   }

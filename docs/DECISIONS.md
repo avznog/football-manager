@@ -9153,3 +9153,64 @@ The UI is game mode's own TERRAIN sheet, opened on the starting seven from a « 
 « Composition de départ » line of the correction screen — no new pitch. `isAmendableEntry` is left
 alone: the start is still not amendable through the fact/void path, it has its own door. The planned
 composition (`lineups`) is not touched: it is the record of what was intended.
+## 224 — A correction after a whistle moves the whistle, instead of being clamped or refused
+
+**2026-11-12.** The owner closed the match of 2026-11-10 by tapping through game mode in eight
+seconds, so its first half's `PERIOD_END` sits at 0′02″ and its final whistle at 30′02″. He then typed
+the match up as corrections and hit both halves of one defect:
+
+- **an action after the final whistle was silently clamped to it.** `amendStamp` did
+  `Math.min(typed, finalWhistleMs)`, so a goal typed at 50′ would have been stored at 30′ with nothing
+  said. That one he could not see, which made it the worse of the two;
+- **« Ajouter un changement » refused every minute after the final whistle**, so its field went red
+  above 30 — « Le match était déjà terminé à cette minute ».
+
+The minute he typed was true and the whistle was wrong, so neither answer was right. **An action or a
+change that lands after its period's whistle now moves the whistle**, in the same amendment.
+
+**Where the whistle goes — the owner's choice, « to the normal end, or later ».** The latest of: the
+period's **normal end**, which is its *actual* kick-off plus `periodMinutes` (not the match's nominal
+end — a second half that kicked off at 32′ has had its thirty minutes at 62′, decision 214); the
+action's own clock; and any action of the same period already stranded after the whistle, so that a
+second correction does not leave the first outside the football it describes. His two examples are
+the tests: a whistle at 0′02″ and a goal at 6′ end the first half at 30′00″; a whistle at 30′00″ and a
+goal at 30+2 end it at 32′00″.
+
+**What moves with it.** The events stamped *on* the old whistle after it — a half-time composition —
+move to the new one, so they still happen at half-time. If the new whistle reaches the next period's
+kick-off, **that kick-off and everything after it shift by the same amount**; because a television
+label is counted from the period's actual kick-off, shifting the kick-off and its events together
+leaves every label unchanged. Checked in a browser on the 30+2 example: the second-half change that
+read 50′ still reads 50′, now at 52′00″ of football, and the final whistle still reads 60′, at 62′00″.
+In the last period the `FINAL_WHISTLE` moves with the `PERIOD_END`.
+
+**Append-only, and why one kick-off is re-appended without moving.** Nothing is updated (invariant 1):
+every move is a `VOID` of the old event and a copy at the new clock with the same type, period and
+payload, appended in the original order. The reducer replays by clock and then `seq`, so a new
+`PERIOD_END` at 30′00″ would otherwise replay *after* the old kick-off that shares its clock and read
+as `kickoff-while-in-play`. So a kick-off exactly at the new whistle is re-appended even with a shift
+of zero — which is what the 0′02″ → 30′00″ case needs.
+
+**Where it lives.** `lib/retro/frame.ts`, pure: `frameMoveFor` computes the moves from the log and the
+action's stamp, and `withFrameMove` appends them to an amendment on the same submission id, so the
+whole batch is one idempotent submission (invariant 6). `lib/retro/actions.ts` runs it for both a
+corrected/added action and an added change, then through the existing `amendMatchEvents`, which
+re-freezes `match_player_stats`. The coach still cannot annul a whistle himself: `isAmendableEntry`
+refuses it from the screen and from a crafted POST alike, and the frame moves only as a consequence
+computed on the server.
+
+Two things the move made necessary elsewhere:
+
+- **The realism check maps copies back to their originals.** A moved event is a new row, so an
+  anomaly the log already had on the original would otherwise count as new and refuse a correction
+  that did not cause it.
+- **« Ajouter un changement » reads the pitch off the moved log**, on the screen and on the server.
+  After a 30+2 move the second half's events have shifted, and the old log would answer « who was on
+  at 32′ » for a moment that no longer exists. The minute step also **says the move before anything is
+  posted** — « La fin de la 2e période sera déplacée à 60’. »
+
+**What it does not do.** A whistle moves only when an action lands after it. The owner's real match
+still has its first half ending at 0′02″ until a first-half action is added or corrected; its earlier
+corrections at 6′–29′ do not move it on their own. And a correction typed with an absurd minute — a
+three-digit typo — extends the match to it, as typed: there is no upper bound, because the owner's rule
+has none and any number chosen here would be one he did not choose.

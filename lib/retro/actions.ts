@@ -27,12 +27,19 @@ import { amendMatchEvents } from "@/lib/match/append";
 import { finalizeMatchById } from "@/lib/match/finalize";
 import { actualPeriodStarts, clockMsForMinuteField, periodsConfig } from "@/lib/match/clock";
 import { getLiveMatch } from "@/lib/match/live";
-import { type LiveMatch, type PendingEvent, minuteLabelFr, reduceLive } from "@/lib/match/presenter";
+import {
+  type LiveMatch,
+  type PendingEvent,
+  mergeEvents,
+  minuteLabelFr,
+  reduceLive,
+} from "@/lib/match/presenter";
 import type { MatchState } from "@/lib/match/reducer";
 import type { Actor } from "@/lib/auth/can";
 
 import { type Amendment, buildAmendment, buildChangeAmendment, isAmendableEntry } from "./amend";
 import { changeCandidateIds, changeProblemFr, changeSeed, stateAtClock } from "./change";
+import { MAX_AMENDMENT_EVENTS, withFrameMove } from "./frame";
 import { introducedAnomalies, realismRefusalFr } from "./realism";
 import {
   amendStartSchema,
@@ -364,10 +371,19 @@ export async function submitAmendment(_prev: FormState, formData: FormData): Pro
 
   if (amendment.events.length === 0) return { error: "Il n’y a rien à corriger." };
 
-  const refusal = realismOf(live, state, amendment);
+  // An action after its period's whistle moves the whistle, in this same batch (decision 224).
+  const framed = withFrameMove(amendment, {
+    submissionId,
+    events: live.events,
+    periods: periodsConfig(live.match),
+    excludeIds: target ? new Set([target.eventId]) : undefined,
+  });
+  if (framed.events.length > MAX_AMENDMENT_EVENTS) return { error: FRAME_TOO_LONG_FR };
+
+  const refusal = realismOf(live, state, framed, framed.copies);
   if (refusal) return { error: refusal };
 
-  const result = await amendMatchEvents(actor, { matchId, events: amendment.events });
+  const result = await amendMatchEvents(actor, { matchId, events: framed.events });
   if (!result.ok) return { error: result.body.error };
 
   redirect(`/match/${matchId}/saisie?corrige=1`);
@@ -380,11 +396,27 @@ export async function submitAmendment(_prev: FormState, formData: FormData): Pro
  * to store a timeline with a warning on it. New anomalies are those not already in the log, compared
  * by `(code, eventId)`: a second goal by somebody off the pitch is new even if the log had one.
  */
-function realismOf(live: LiveMatch, state: MatchState, amendment: Amendment): string | null {
+function realismOf(
+  live: LiveMatch,
+  state: MatchState,
+  amendment: Amendment,
+  copies: ReadonlyMap<string, string> = new Map(),
+): string | null {
   const preview = reduceLive(live, amendment.events.map(toPending), null);
-  const introduced = introducedAnomalies(state.anomalies, preview.anomalies);
+  // A moved event is a new row (decision 224), so an anomaly the log already had on the original
+  // would otherwise read as new and refuse a correction that did not cause it.
+  const asOriginal = preview.anomalies.map((anomaly) =>
+    anomaly.eventId && copies.has(anomaly.eventId)
+      ? { ...anomaly, eventId: copies.get(anomaly.eventId)! }
+      : anomaly,
+  );
+  const introduced = introducedAnomalies(state.anomalies, asOriginal);
   return realismRefusalFr(introduced, preview, nameIn(live));
 }
+
+/** Only reachable with a match of a few hundred events, which seven-a-side does not produce. */
+const FRAME_TOO_LONG_FR =
+  "Cette correction déplacerait trop d’actions d’un coup : corrige le match en plusieurs fois.";
 
 function toPending(event: Amendment["events"][number]): PendingEvent {
   return {
@@ -468,11 +500,23 @@ async function submitChange(actor: Actor, formData: FormData): Promise<FormState
     periodStarts: actualPeriodStarts(state.playIntervals),
   });
   const stamped = amendment.events[0];
-  if (finalWhistleMs > 0 && stamped.clockMs >= finalWhistleMs) {
-    return { error: "Le match était déjà terminé à cette minute : un changement se fait avant." };
-  }
+  /*
+   * No « le match était déjà terminé » any more (decision 224): a change after a whistle moves the
+   * whistle, in this same batch, like an action does. The pitch « at that minute » is then read from
+   * the log **with the frame already moved**, because after an added-time move the second half's
+   * events have shifted and the old log would answer for a moment that no longer exists.
+   */
+  const framed = withFrameMove(amendment, {
+    submissionId,
+    events: live.events,
+    periods: periodsConfig(live.match),
+  });
+  if (framed.events.length > MAX_AMENDMENT_EVENTS) return { error: FRAME_TOO_LONG_FR };
+  const moved = framed.events.slice(amendment.events.length);
+  const liveMoved: LiveMatch =
+    moved.length === 0 ? live : { ...live, events: mergeEvents(live.events, moved.map(toPending)) };
 
-  const atClock = stateAtClock(live, stamped.clockMs);
+  const atClock = stateAtClock(liveMoved, stamped.clockMs);
   const problem = changeProblemFr(
     { outIds, inIds, slots },
     {
@@ -492,10 +536,10 @@ async function submitChange(actor: Actor, formData: FormData): Promise<FormState
     if (same) return { error: "Personne n’entre, personne ne sort et personne ne change de poste." };
   }
 
-  const refusal = realismOf(live, state, amendment);
+  const refusal = realismOf(live, state, framed, framed.copies);
   if (refusal) return { error: refusal };
 
-  const result = await amendMatchEvents(actor, { matchId, events: amendment.events });
+  const result = await amendMatchEvents(actor, { matchId, events: framed.events });
   if (!result.ok) return { error: result.body.error };
 
   redirect(`/match/${matchId}/saisie?corrige=1`);

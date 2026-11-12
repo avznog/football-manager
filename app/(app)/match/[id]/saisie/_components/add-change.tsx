@@ -23,12 +23,12 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import {
   availableOptions,
+  mergeEvents,
   onPitchOptions,
   playerIndex,
   reduceLive,
 } from "@/lib/match/presenter";
 import {
-  MS_PER_MINUTE,
   actualPeriodStarts,
   clockMsForMinuteField,
   formatMinuteLabelFr,
@@ -38,6 +38,7 @@ import { changeArrangement, terrainPayload, type SlotAssignment } from "@/lib/ma
 
 import { MinuteField } from "./minute-field";
 import { changeCandidateIds, stateAtClock } from "@/lib/retro/change";
+import { frameMoveFor } from "@/lib/retro/frame";
 import type { RetroView } from "@/lib/retro/queries";
 
 /**
@@ -53,22 +54,48 @@ type Step =
   | ({ step: "in"; outIds: string[]; inIds: string[] } & Placed)
   | ({ step: "terrain"; outIds: string[]; inIds: string[]; initial: SlotAssignment[] } & Placed);
 
-/** The last minute a change can be stamped at: strictly before the final whistle. */
-export function lastChangeMinute(finalWhistleMs: number, regulation: number): number {
-  if (finalWhistleMs <= 0) return regulation;
-  return Math.max(0, Math.floor((finalWhistleMs - 1) / MS_PER_MINUTE));
+/** « 1re période », « 2e période » — said in the whistle-move sentence. */
+const periodNameFr = (period: number) => (period === 1 ? "1re période" : `${period}e période`);
+
+/**
+ * `live`, with the frame moves a change at `placed` would append already in it (decision 224), so the
+ * pitch « at that minute » is read off the log as it will be. Pending ids are local to this screen.
+ */
+function withMovedFrame(
+  live: RetroView["live"],
+  periods: ReturnType<typeof periodsConfig>,
+  placed: { clockMs: number; period: number },
+): RetroView["live"] {
+  const move = frameMoveFor({ events: live.events, periods, placed });
+  if (move.drafts.length === 0) return live;
+  return {
+    ...live,
+    events: mergeEvents(
+      live.events,
+      move.drafts.map((draft, index) => ({
+        clientEventId: `frame-preview-${index}`,
+        type: draft.type,
+        period: draft.period,
+        minute: draft.minute,
+        clockMs: draft.clockMs,
+        occurredAt: draft.occurredAt.toISOString(),
+        payload: draft.payload,
+        voidsEventId: draft.voidsEventId,
+      })),
+    ),
+  };
 }
 
 export function AddChange({
   teamId,
   view,
-  regulation,
   open,
   onClose,
   action,
 }: {
   teamId: string;
   view: RetroView;
+  /** The match's regulation minutes. Still passed; unused since decision 224 lifted the ceiling. */
   regulation: number;
   open: boolean;
   onClose: () => void;
@@ -78,7 +105,6 @@ export function AddChange({
   const [minuteText, setMinuteText] = useState("");
 
   const live = view.live;
-  const maxMinute = lastChangeMinute(view.finalWhistleMs, regulation);
   const players = useMemo(() => playerIndex(live.players), [live.players]);
   const wholeMatch = useMemo(() => reduceLive(live, [], null), [live]);
   // Where each period really kicked off, so `30+2` lands on the clock it means and the stamp reads
@@ -90,9 +116,23 @@ export function AddChange({
   );
 
   const placedClockMs = flow.step === "minute" ? null : flow.clockMs;
+  const placedPeriod = flow.step === "minute" ? null : flow.period;
+  /*
+   * The log as it will be once the change is in (decision 224): a change after a whistle moves that
+   * whistle, and after an added-time move the next period's events shift. The lists below have to
+   * show the pitch of *that* log — the server reads the same one (`withFrameMove`) — or a change in
+   * the first half's added time would offer the second half's players.
+   */
+  const liveMoved = useMemo(
+    () =>
+      placedClockMs === null || placedPeriod === null
+        ? live
+        : withMovedFrame(live, periods, { clockMs: placedClockMs, period: placedPeriod }),
+    [live, periods, placedClockMs, placedPeriod],
+  );
   const atClock = useMemo(
-    () => (placedClockMs === null ? null : stateAtClock(live, placedClockMs)),
-    [live, placedClockMs],
+    () => (placedClockMs === null ? null : stateAtClock(liveMoved, placedClockMs)),
+    [liveMoved, placedClockMs],
   );
 
   const base = useMemo<SlotAssignment[]>(
@@ -145,8 +185,9 @@ export function AddChange({
 
   /*
    * `30+2` as well as `20` (decision 215), resolved to the real clock here so the lists below show the
-   * pitch as it actually was. A change must land strictly before the final whistle, which is a
-   * question about the clock and not about the minute: after an overrun first half the two differ.
+   * pitch as it actually was. **No ceiling any more** (decision 224): a minute after a whistle is a
+   * true minute and moves the whistle, so every minute the match has a place for is accepted, and the
+   * sheet says what the move will be before anything is posted.
    */
   const placed = useMemo(
     () =>
@@ -155,8 +196,19 @@ export function AddChange({
         : clockMsForMinuteField(minuteText, periods, periodStarts),
     [minuteText, periods, periodStarts],
   );
-  const ceilingMs = view.finalWhistleMs > 0 ? view.finalWhistleMs - 1 : regulation * MS_PER_MINUTE;
-  const minuteOk = placed !== null && placed.clockMs >= 0 && placed.clockMs <= ceilingMs;
+  const minuteOk = placed !== null && placed.clockMs >= 0;
+  const whistleMove = useMemo(() => {
+    if (!placed) return null;
+    const move = frameMoveFor({ events: live.events, periods, placed });
+    if (!move.extended) return null;
+    const label = formatMinuteLabelFr(
+      move.extended.toMs,
+      move.extended.period,
+      periods,
+      periodStarts.get(move.extended.period),
+    );
+    return `La fin de la ${periodNameFr(move.extended.period)} sera déplacée à ${label}.`;
+  }, [placed, live.events, periods, periodStarts]);
 
   function submit(assignments: SlotAssignment[]) {
     if (flow.step !== "terrain") return;
@@ -186,7 +238,7 @@ export function AddChange({
         open
         onClose={close}
         title="Ajouter un changement"
-        description={`À quelle minute ? Entre 0 et ${maxMinute}, ou la deuxième case pour le temps additionnel : les listes suivantes montrent le terrain à cette minute-là.`}
+        description="À quelle minute ? La deuxième case sert au temps additionnel. Les listes suivantes montrent le terrain à cette minute-là."
         footer={
           <Button
             fullWidth
@@ -217,6 +269,13 @@ export function AddChange({
           periods={periods}
           invalid={minuteText !== "" && !minuteOk}
         />
+        {/* Said before anything is posted (decision 224): a change after the whistle moves it, and
+            the coach should read where to before he confirms rather than discover it in the déroulé. */}
+        {whistleMove ? (
+          <p role="status" className="mt-3 text-sm text-ink-muted">
+            {whistleMove}
+          </p>
+        ) : null}
       </Sheet>
     );
   }
