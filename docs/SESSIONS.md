@@ -7497,3 +7497,12 @@ the script; on `v1.3.1` it warns and the pull still runs. No version bump — th
 
 Files: `scripts/push-ratings-to-old-app.mts` (new), `.github/workflows/old-app.yml`,
 `docs/DECISIONS.md` (222), `docs/ROADMAP.md`, `docs/SESSIONS.md`, `docs/COST.md`.
+
+### The ratings sync no longer stops at one bad match
+
+Decision **225**. The pull now skips a match that has a note the app would refuse, instead of aborting
+the whole run, and says so with a `::warning::`. The 2026-11-10 match (no minutes for anyone, its
+whistles at 0:02 and 30:02) is skipped and the rest syncs. Dry runs against production for 2026-11-03,
+the match the owner meant: **pull 0 to write (all 101 old-app notes already here), push 20 to copy**,
+and **Pierre rated 10 players in both apps, 8 differently** — both kept where they are, as decision 222
+says. Files: `scripts/import-ratings-from-old-app.mts`, `docs/DECISIONS.md` (225), `docs/SESSIONS.md`.
