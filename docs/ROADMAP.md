@@ -2750,3 +2750,22 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       « Changement annulé 48’ » beside its copy at 50′. The reducer labels voided lines with the current
       frame; it would need the frame as it stood before the move. Cosmetic, but it is a screen saying
       something untrue
+- [x] **Bring somebody onto a finished match from outside the sheet, or take somebody off it** —
+      2026-11-12. Decision **226**. « Ajouter un changement » and the start correction offer the team's
+      players the sheet does not name, and its supporters, under « Pas sur la feuille de match », and
+      say before « Valider » what the sheet becomes (« Rémi sera ajouté à la feuille de match comme
+      remplaçant. »). « Sur la feuille de match » on the correction screen has « Retirer du match » per
+      person: who played in his place (or « Personne, on a joué à 6 »), a confirmation of exactly what
+      changes, then every pitch snapshot he was in is replaced. His notes are kept and stop counting
+      while he is off the match — one shared rule, `lib/rating/eligibility.ts`, read by the match's
+      results and by the season stats — and come back if he is added again. The ratings sync skips such
+      a note individually and never copies a hidden one
+- [ ] **The red « X est hors feuille » warning on the pitch sheet doubles decision 226's sentence.**
+      `terrainFlagFr` is game mode's warning and the pitch sheet is shared, so after a match an
+      off-sheet player is drawn as unavailable *and* announced as being added. Both are true; one
+      should go in the post-match context
+- [ ] **« Qui a joué à sa place ? » offers men who were on the pitch the whole time**, who are then
+      refused at the confirmation. Filtering them out would need the spells of every candidate against
+      the removed player's — cheap, not done
+- [ ] **An annulled starting composition reads « Changement » in the déroulé**, struck through, because
+      a voided `LINEUP_APPLIED` is never the start (decisions 223, 226). Cosmetic

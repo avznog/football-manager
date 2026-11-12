@@ -128,6 +128,12 @@ export type LivePlayer = {
   /** From `match_squad`; null when the match sheet says nothing about them. */
   squadRole: SquadRole | null;
   isPlayer: boolean;
+  /**
+   * He has left the team since. Only a man on this match's sheet is in `LiveMatch.players` at all once
+   * he has left (`getDepartedSheetMembers`), so this is set on those rows and absent elsewhere. It
+   * stops him being brought onto the match from outside the sheet after the fact (decision 226).
+   */
+  hasLeft?: boolean;
 };
 
 export type LiveMatch = {

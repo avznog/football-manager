@@ -66,6 +66,13 @@ export type TerrainSheetProps = {
   onConfirm: (assignments: SlotAssignment[]) => void;
   /** Hands the arrangement to the list composer, for a coach who cannot drag reliably. */
   onUseList?: (assignments: SlotAssignment[]) => void;
+  /**
+   * Candidates who are **not on the match sheet** (decision 226): drawn on the bench under their own
+   * heading rather than among the others, so bringing one on is visibly adding him to the match.
+   */
+  offSheet?: { heading: string; memberIds: readonly string[] };
+  /** Sentences said above « Valider » for the arrangement as it stands — « Rémi sera ajouté… ». */
+  noticesFor?: (assignments: readonly SlotAssignment[]) => string[];
 };
 
 /* -------------------------------------------------------------------------- */
@@ -109,6 +116,8 @@ export function TerrainSheet({
   leftPitchMemberIds,
   onConfirm,
   onUseList,
+  offSheet,
+  noticesFor,
 }: TerrainSheetProps) {
   const [arranged, setArranged] = useState<SlotAssignment[]>(() => [...initialAssignments]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -138,10 +147,18 @@ export function TerrainSheet({
     [arranged, slots, players, base, formationId, selected],
   );
 
-  const bench = useMemo(
+  const fullBench = useMemo(
     () => terrainBench(arranged, { candidates, base }),
     [arranged, candidates, base],
   );
+  // The bench split in two when some candidates are not on the sheet (decision 226). Somebody coming
+  // off stays in the first group whatever he is: he was on the pitch, so he is on the match.
+  const offSheetIds = useMemo(() => new Set(offSheet?.memberIds ?? []), [offSheet]);
+  const bench = fullBench.filter((entry) => entry.comingOff || !offSheetIds.has(entry.memberId));
+  const offSheetBench = fullBench.filter(
+    (entry) => !entry.comingOff && offSheetIds.has(entry.memberId),
+  );
+  const notices = noticesFor ? noticesFor(arranged) : [];
 
   const review = useMemo(
     () => terrainReview(base, arranged, { slots, players, leftPitchMemberIds }),
@@ -245,6 +262,42 @@ export function TerrainSheet({
 
   const dragged = drag?.moved && drag.point ? players.get(drag.subject.memberId) : undefined;
 
+  /** One disc on the bench — the same button in both groups, so both are dragged and tapped alike. */
+  const benchItem = (entry: (typeof fullBench)[number]) => {
+    const isSelected = selected === entry.memberId;
+    const flag = terrainFlagFr(entry.memberId, players);
+    return (
+      <li key={entry.memberId}>
+        <button
+          type="button"
+          aria-pressed={isSelected}
+          aria-label={benchButtonLabelFr(entry.name, entry.comingOff, flag)}
+          className={cn(
+            "flex min-h-11 min-w-11 touch-none flex-col items-center gap-1 rounded-xl border p-1.5",
+            isSelected ? "border-accent bg-accent/10" : "border-transparent bg-surface-2",
+            entry.comingOff ? "border-warning/60 bg-warning/10" : null,
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+          )}
+          onPointerDown={(event) =>
+            gesture.begin(event, { memberId: entry.memberId, fromSlotId: null })
+          }
+          {...gesture.handlers}
+          onKeyDown={(event) => onPlayerKeyDown(event, entry.memberId)}
+        >
+          <PlayerDisc
+            name={entry.name}
+            jerseyNumber={entry.jerseyNumber}
+            primaryColor={kit.primaryColor}
+            secondaryColor={kit.secondaryColor}
+            variant={flag ? "unavailable" : isSelected ? "selected" : "normal"}
+            statusLabel={entry.comingOff ? "sort" : (flag ?? undefined)}
+            size="md"
+          />
+        </button>
+      </li>
+    );
+  };
+
   /* --- render -------------------------------------------------------------- */
 
   return (
@@ -263,6 +316,17 @@ export function TerrainSheet({
               {review.problems.map((problem) => (
                 <li key={problem.code} className="text-sm font-semibold text-danger">
                   {problem.message}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {/* What the sheet will become, said before « Valider » rather than discovered afterwards. */}
+          {notices.length > 0 ? (
+            <ul className="space-y-1">
+              {notices.map((notice) => (
+                <li key={notice} className="text-sm font-semibold text-ink">
+                  {notice}
                 </li>
               ))}
             </ul>
@@ -373,44 +437,19 @@ export function TerrainSheet({
           ) : (
             // Wraps rather than scrolls sideways: a player hidden off the edge of a 320 px screen is
             // a player the coach forgets.
-            <ul className="flex flex-wrap gap-2">
-              {bench.map((entry) => {
-                const isSelected = selected === entry.memberId;
-                const flag = terrainFlagFr(entry.memberId, players);
-                return (
-                  <li key={entry.memberId}>
-                    <button
-                      type="button"
-                      aria-pressed={isSelected}
-                      aria-label={benchButtonLabelFr(entry.name, entry.comingOff, flag)}
-                      className={cn(
-                        "flex min-h-11 min-w-11 touch-none flex-col items-center gap-1 rounded-xl border p-1.5",
-                        isSelected ? "border-accent bg-accent/10" : "border-transparent bg-surface-2",
-                        entry.comingOff ? "border-warning/60 bg-warning/10" : null,
-                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                      )}
-                      onPointerDown={(event) =>
-                        gesture.begin(event, { memberId: entry.memberId, fromSlotId: null })
-                      }
-                      {...gesture.handlers}
-                      onKeyDown={(event) => onPlayerKeyDown(event, entry.memberId)}
-                    >
-                      <PlayerDisc
-                        name={entry.name}
-                        jerseyNumber={entry.jerseyNumber}
-                        primaryColor={kit.primaryColor}
-                        secondaryColor={kit.secondaryColor}
-                        variant={flag ? "unavailable" : isSelected ? "selected" : "normal"}
-                        statusLabel={entry.comingOff ? "sort" : (flag ?? undefined)}
-                        size="md"
-                      />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <ul className="flex flex-wrap gap-2">{bench.map(benchItem)}</ul>
           )}
         </section>
+
+        {/* --- not on the sheet (decision 226) --- */}
+        {offSheet && offSheetBench.length > 0 ? (
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
+              {offSheet.heading}
+            </h3>
+            <ul className="flex flex-wrap gap-2">{offSheetBench.map(benchItem)}</ul>
+          </section>
+        ) : null}
 
         {/* --- what one confirmation will do --- */}
         <section className="space-y-2 rounded-xl border border-border/60 bg-surface-2 p-3">

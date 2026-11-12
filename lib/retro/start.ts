@@ -68,6 +68,8 @@ export type StartCandidate = {
   displayName: string;
   isPlayer: boolean;
   squadRole: "starter" | "substitute" | "supporter" | null;
+  /** Left the team since; see `LivePlayer.hasLeft` (decision 226). */
+  hasLeft?: boolean;
 };
 
 /** `slotId:memberId`, sorted — the shape both sides compare and the submission id is seeded from. */
@@ -107,10 +109,22 @@ export function startProblemFr(input: {
     if (!candidate.isPlayer) {
       return `${candidate.displayName} ne joue pas : il peut être supporter, pas sur le terrain.`;
     }
-    // A supporter is on the sheet to rate, by the coach's own choice (decision 211). Turning him into
-    // a starter here would quietly undo that choice; it is undone where it was made.
-    if (candidate.squadRole === "supporter") {
-      return `${candidate.displayName} est supporter de ce match : retire-le des supporters avant de le faire démarrer.`;
+    /*
+     * A supporter used to be refused here (« retire-le des supporters avant… »). Decision 226 turns
+     * that into a promotion said out loud: the screen offers him under « Pas sur la feuille de match »
+     * and its confirm step says « Léo C passe de supporter à titulaire. », so the role is not undone
+     * quietly — which was the whole reason for the refusal — and the coach no longer has to make a
+     * round trip through the supporters card to fix one line of a sheet.
+     *
+     * Somebody who has **left the team** is still refused, unless the sheet already had him playing:
+     * he can be moved within a match he was part of, never added to one after he left.
+     */
+    if (
+      candidate.hasLeft &&
+      candidate.squadRole !== "starter" &&
+      candidate.squadRole !== "substitute"
+    ) {
+      return `${candidate.displayName} a quitté l’équipe : il ne peut plus être ajouté à ce match.`;
     }
   }
 
@@ -163,8 +177,12 @@ export function buildStartAmendment(input: {
  *
  * Only for a match **with** a sheet. A match with none has no rows to correct, and writing some here
  * would switch every screen that reads « no sheet » as « anybody may be offered » over to the sheet's
- * narrower rules (`changeCandidateIds`) on the strength of seven rows nobody chose. Supporters are
- * never touched: they cannot be in a start (`startProblemFr`), so they cannot leave one either.
+ * narrower rules (`changeCandidateIds`) on the strength of seven rows nobody chose.
+ *
+ * Whoever now starts becomes `starter` **whatever he was** — a substitute, nobody (Rémi, forgotten
+ * when the sheet was made), or a supporter promoted (decision 226). The screen has said so before the
+ * coach confirmed (`sheetAdditionFr`). A supporter who does not start keeps his role: a start he was
+ * never in is not one he can leave.
  */
 export function squadAfterStart(input: {
   hasSquadSheet: boolean;

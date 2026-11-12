@@ -284,5 +284,6 @@ function toDepartedLivePlayer(
     isInjured: false,
     squadRole: squadRoles.get(member.teamMemberId) ?? null,
     isPlayer: member.isPlayer,
+    hasLeft: true,
   };
 }

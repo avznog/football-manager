@@ -301,10 +301,34 @@ describe("startProblemFr", () => {
     expect(ask(startWith(P.dc2, P.staff))).toBe("Coach ne joue pas : il peut être supporter, pas sur le terrain.");
   });
 
-  it("refuses a supporter, whom the coach named so he could rate (decision 211)", () => {
-    expect(ask(startWith(P.dc2, P.fan))).toBe(
-      "Léo est supporter de ce match : retire-le des supporters avant de le faire démarrer.",
+  /*
+   * Decision 226 turned this refusal into a promotion said out loud: the screen offers him under
+   * « Pas sur la feuille de match » and says « Léo passe de supporter à titulaire. » before Valider.
+   */
+  it("accepts a supporter now, whose promotion the screen announces (decision 226)", () => {
+    expect(ask(startWith(P.dc2, P.fan))).toBeNull();
+  });
+
+  it("refuses somebody who has left the team, unless the sheet already had him playing", () => {
+    const left = candidates.map((candidate) =>
+      candidate.memberId === P.fan
+        ? { ...candidate, hasLeft: true }
+        : candidate.memberId === P.sub
+          ? { ...candidate, hasLeft: true }
+          : candidate,
     );
+    const askWith = (proposed: { slotId: string; memberId: string }[]) =>
+      startProblemFr({
+        current,
+        proposed,
+        knownSlotIds: new Set(SLOTS.map((s) => s.id)),
+        candidates: left,
+      });
+    expect(askWith(startWith(P.dc2, P.fan))).toBe(
+      "Léo a quitté l’équipe : il ne peut plus être ajouté à ce match.",
+    );
+    // A substitute of this very match who has left since may still be moved within it.
+    expect(askWith(startWith(P.dc2, P.sub))).toBeNull();
   });
 
   it("refuses a man twice, an unknown slot, an unknown player, and an empty pitch", () => {

@@ -42,6 +42,7 @@ import {
 import type { RetroTimelineLine, RetroView } from "@/lib/retro/queries";
 
 import { AddChange } from "./add-change";
+import { RemoveFromMatch } from "./remove-from-match";
 
 export type RetroCorrectionsProps = {
   teamId: string;
@@ -71,8 +72,8 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
    * at the bottom of the page with its sentence at the top is a refusal the coach never reads: the
    * sheets close on submit and leave him looking at the card he started from.
    */
-  const [lastFrom, setLastFrom] = useState<"line" | "change">("line");
-  const dispatch = (from: "line" | "change") => (payload: FormData) => {
+  const [lastFrom, setLastFrom] = useState<"line" | "change" | "sheet">("line");
+  const dispatch = (from: "line" | "change" | "sheet") => (payload: FormData) => {
     setLastFrom(from);
     action(payload);
   };
@@ -187,6 +188,16 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
           </Button>
         </div>
       </Card>
+
+      {/* Decision 226: taking off the match somebody who was never there. After the cards that add,
+          because removing is the rarer act and the destructive one. */}
+      <RemoveFromMatch
+        teamId={teamId}
+        view={view}
+        pending={pending}
+        error={state?.error && lastFrom === "sheet" ? state.error : null}
+        action={dispatch("sheet")}
+      />
 
       <Card title="Ajouter une action oubliée" as="h2">
         <div className="space-y-3">

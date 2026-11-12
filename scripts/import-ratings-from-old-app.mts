@@ -291,6 +291,8 @@ const problems: string[] = [];
 /** Matches left out because at least one of their notes is one the app would refuse. */
 const skippedMatches: string[] = [];
 let alreadyThere = 0;
+/** Notes whose rater or rated is not on that match here (decision 226): skipped one by one. */
+let offTheMatch = 0;
 /** Per match and rater: how many players he rated in both apps, and on how many the notes differ. */
 const doubleVotes = new Map<string, { name: string; pairs: number; differing: number }>();
 
@@ -340,11 +342,18 @@ for (const plan of plans) {
     if (Math.round(score * 10) !== score * 10) {
       problems.push(`${plan.day} : une note de ${row.rater} a plus d'une décimale`);
     }
-    if (!withMinutes.has(rated)) {
-      problems.push(`${plan.day} : ${row.rated} est noté sans avoir joué (décision 137)`);
-    }
-    if (!eligible.has(rater)) {
-      problems.push(`${plan.day} : ${row.rater} note sans être sur la feuille (décision 159)`);
+    /*
+     * A note whose rater or rated is **not on this match here** is skipped on its own and counted,
+     * not a reason to skip the whole match (decision 226). Since a coach can remove somebody from a
+     * finished match, « nobody on the sheet named Lucien » is an ordinary state rather than a
+     * corruption: the old app still has his notes, this app keeps them hidden while he is off it, and
+     * they would only be written here to be filtered out of every screen anyway. The other refusals —
+     * a self-rating, a score out of range — are still the old app writing something malformed, and
+     * still skip the match.
+     */
+    if (!withMinutes.has(rated) || !eligible.has(rater)) {
+      offTheMatch += 1;
+      continue;
     }
 
     // The same old-app note, offered again: a re-run, and nothing to say about it.
@@ -410,6 +419,12 @@ console.log(
   `\nnotes      ${toInsert.length} à écrire, ${alreadyThere} déjà en base · ` +
     `aucune suppression, aucune mise à jour`,
 );
+if (offTheMatch > 0) {
+  console.log(
+    `notes      ${offTheMatch} note(s) ignorée(s) : la personne n’est plus sur ce match ` +
+      `(décision 226). Elles restent dans l’ancienne application.`,
+  );
+}
 if (doubleVotes.size > 0) {
   // Counts and names only, never a score (see above).
   const differing = [...doubleVotes.values()].reduce((n, t) => n + t.differing, 0);
