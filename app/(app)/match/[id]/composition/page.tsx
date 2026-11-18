@@ -126,9 +126,11 @@ export default async function CompositionsPage({
 
       {/* Two plans a row from `lg:` (decision 227, slice C), in the `wide` page. A plain `space-y-4`
           block at phone width, which lays the cards out exactly as the page's own `space-y-4` did;
-          rendered only when there is a plan, because an empty block would still take that margin. */}
+          rendered only when there is a plan, because an empty block would still take that margin.
+          Three a row from 85rem (decision 230), where the 88rem page holds three ~370 px cards: two
+          a row there left each card-sized pitch floating in a 570 px card. */}
       {lineups.length > 0 ? (
-      <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
+      <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 min-[85rem]:grid-cols-3">
       {lineups.map((row) => {
         const plan = toPlannedLineup(row);
         const previous = planInForceBefore(plans, plan.fromMinute, plan.id);

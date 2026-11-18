@@ -70,10 +70,12 @@ export default async function SaisiePage({ params, searchParams }: PageProps<"/m
   const played = view.match.status === "finished" || kickoff.getTime() <= now.getTime();
   const corrected = query.corrige === "1";
 
-  // `wide` only where the corrections render (decision 227): they are two columns from `lg:`, and a
-  // `read` page would leave the déroulé a 340 px column. The first-time entry form keeps `read`.
+  // `wide` where the corrections or the entry form render (decisions 227, 230): both are two columns
+  // from `lg:`. The empty states stay `read`, one short card in the middle of the page.
+  const twoColumns =
+    played && (view.hasLog || (view.slots.length > 0 && view.players.length > 0));
   return (
-    <PageContainer width={played && view.hasLog ? "wide" : "read"} className="space-y-4">
+    <PageContainer width={twoColumns ? "wide" : "read"} className="space-y-4">
       <header className="space-y-1">
         <Link
           href={`/match/${view.match.id}`}

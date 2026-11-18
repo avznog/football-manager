@@ -7817,3 +7817,22 @@ Files: `app/(app)/calendrier/page.tsx`, `app/(app)/calendrier/_components/next-e
 `app/(app)/stats/page.tsx`, `app/(app)/stats/equipe-type/page.tsx`,
 `app/(app)/stats/equipe-type/_components/seven-pitch.tsx`,
 `app/(app)/stats/equipe-type/_components/context-field.tsx`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+## 2026-11-18 — Desktop redo of the match pages (decision 230)
+
+The owner rejected the first desktop pass: every page was still one column. This one lays the match
+pages out in columns from `lg:` with no change at phone width.
+
+Heights at 1440 × 900, coach, before → after: upcoming match 1 809 → 1 127 (« Ouvrir le mode match »
+at y≈474), live 1 115 → 903, played 5 141 → 3 004, entered afterwards 4 781 → 3 087, unrecorded 1 746 →
+1 418, compositions 1 311 → 1 253, saisie (first entry) 1 449 → 979, saisie (correction) 1 298 → 1 278,
+notation form 1 368 → 923. Player: played 2 939 → 2 121, entered afterwards 3 376 → 2 262.
+
+Checked: 390 px captures on a throwaway database, baseline run twice (identical), after the change
+44/44 identical. typecheck, eslint on the changed files, 1 736 unit tests and 11 e2e passed.
+
+Files: `app/globals.css`, `app/(app)/match/[id]/page.tsx`,
+`app/(app)/match/[id]/composition/_components/composition-card.tsx`,
+`app/(app)/match/[id]/composition/page.tsx`, `app/(app)/match/[id]/_components/compositions-strip.tsx`,
+`app/(app)/match/[id]/saisie/page.tsx`, `app/(app)/match/[id]/saisie/_components/retro-form.tsx`,
+`app/(app)/match/[id]/notation/page.tsx`, `app/(app)/match/[id]/notation/_components/rating-sheet.tsx`,
+`docs/DECISIONS.md` (230), `docs/ROADMAP.md`, `docs/SESSIONS.md`.

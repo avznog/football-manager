@@ -101,9 +101,15 @@ export function RatingSheet({ teamId, matchId, targets }: RatingSheetProps) {
 
       {/* `divide-y` rather than a `Card` each: twelve cards is twelve borders and a screen the reader
           has to scroll through twice. One list, one rule between rows. */}
-      <ul className="divide-y divide-border/60">
+      {/* From `lg:` (decision 230) the rows become a grid of tiles, two then three a row, so twelve
+          players fit one screen instead of a 720 px list three screens long. The rule between rows
+          becomes each tile's own border, since a `divide-y` in a grid draws lines across columns. */}
+      <ul className="divide-y divide-border/60 lg:grid lg:grid-cols-2 lg:gap-3 lg:divide-y-0 min-[85rem]:grid-cols-3">
         {targets.map((target) => (
-          <li key={target.membershipId} className="py-3 first:pt-0">
+          <li
+            key={target.membershipId}
+            className="py-3 first:pt-0 lg:rounded-xl lg:border lg:border-border/60 lg:p-3 lg:first:pt-3"
+          >
             <RatingRow
               target={target}
               score={scoreOf(target.membershipId)}
@@ -116,10 +122,16 @@ export function RatingSheet({ teamId, matchId, targets }: RatingSheetProps) {
       </ul>
 
       <div className="space-y-2">
-        <Button type="submit" fullWidth pending={pending} disabled={open.length === 0}>
+        <Button
+          type="submit"
+          fullWidth
+          pending={pending}
+          disabled={open.length === 0}
+          className="lg:w-auto lg:min-w-60"
+        >
           Envoyer mes notes
         </Button>
-        <p className="text-center text-xs text-ink-subtle">{RATING_IS_FINAL_FR}</p>
+        <p className="text-center text-xs text-ink-subtle lg:text-left">{RATING_IS_FINAL_FR}</p>
       </div>
     </form>
   );

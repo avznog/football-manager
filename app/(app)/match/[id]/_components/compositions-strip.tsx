@@ -56,10 +56,13 @@ export function CompositionsStrip({ compositions, kit }: CompositionsStripProps)
       }
       as="h2"
       flush
+      /* A query container (decision 230): the strip's column count follows the width it is given —
+         the full page, or the left column of the finished recap — not the viewport's. */
+      className="lg:@container"
     >
       <ul
         aria-label="Les compositions du match, de la première à la dernière"
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:overflow-x-visible"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 lg:grid lg:grid-cols-1 lg:gap-4 lg:overflow-x-visible lg:@xl:grid-cols-2 lg:@3xl:grid-cols-3 lg:@5xl:grid-cols-4"
       >
         {compositions.map((composition, index) => (
           <li key={composition.eventId} className="w-68 shrink-0 snap-start space-y-2 lg:w-auto">
@@ -82,6 +85,9 @@ export function CompositionsStrip({ compositions, kit }: CompositionsStripProps)
               slots={composition.slots}
               kit={kit}
               size="sm"
+              /* `thumb` (decision 230): on the 88rem page a strip column can reach 500 px, and an
+                 uncapped pitch would follow it to 730 px tall — the size the owner complained of. */
+              fit="thumb"
               pitchLabel={`Composition à la ${composition.minuteLabel}`}
             />
 
