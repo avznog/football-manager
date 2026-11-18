@@ -32,6 +32,13 @@ export type CompositionsStripProps = {
  * **Nothing is on hover** (decision 072): the position code is on the disc, the name under it, the
  * minute above and who was off the pitch below. Server Component, no JavaScript — the scroll and the
  * snapping are the browser's.
+ *
+ * ## On a desktop it is a grid (decision 227, slice C)
+ *
+ * A sideways strip is a thumb's gesture; a mouse wheel cannot scroll it without Shift. From `lg:` the
+ * blocks wrap two to a row, the spacer that exists only for the snapping goes, and so does « Fais
+ * défiler sur le côté », which would be an instruction for something the screen no longer does. Every
+ * one of those is an `lg:` class, so the phone strip is untouched.
  */
 export function CompositionsStrip({ compositions, kit }: CompositionsStripProps) {
   // A match with no applied composition has no blocks: the recap simply has no such card. Every
@@ -41,16 +48,21 @@ export function CompositionsStrip({ compositions, kit }: CompositionsStripProps)
   return (
     <Card
       title="Les compositions"
-      description="Chaque changement du match, dans l’ordre. Fais défiler sur le côté."
+      description={
+        <>
+          Chaque changement du match, dans l’ordre.
+          <span className="lg:hidden"> Fais défiler sur le côté.</span>
+        </>
+      }
       as="h2"
       flush
     >
       <ul
         aria-label="Les compositions du match, de la première à la dernière"
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:overflow-x-visible"
       >
         {compositions.map((composition, index) => (
-          <li key={composition.eventId} className="w-68 shrink-0 snap-start space-y-2">
+          <li key={composition.eventId} className="w-68 shrink-0 snap-start space-y-2 lg:w-auto">
             <div className="flex items-baseline justify-between gap-2">
               <p className="min-w-0 truncate">
                 <span className="text-lg font-bold text-ink">{composition.minuteLabel}</span>{" "}
@@ -83,7 +95,7 @@ export function CompositionsStrip({ compositions, kit }: CompositionsStripProps)
         {/* The last block cannot start at the left edge without something after it to scroll into,
             so it ends up half a pane in with its predecessor's « 11 / 12 » beside its own. This is
             that something: 80 px of nothing, so every block in the strip snaps to the same place. */}
-        <li aria-hidden className="w-20 shrink-0" />
+        <li aria-hidden className="w-20 shrink-0 lg:hidden" />
       </ul>
     </Card>
   );

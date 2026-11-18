@@ -602,8 +602,19 @@ export function CompositionEditor(props: CompositionEditorProps) {
   const draggedMember =
     drag?.subject.kind === "player" && drag.moved ? byId.get(drag.subject.id) : undefined;
 
+  /*
+   * Desktop (decision 227, slice C): two columns from `lg:`, the pitch sticky on the left and
+   * everything that acts on it on the right — minute, then the dock, then the deduced changes and the
+   * squad list. Decision 105: on a laptop the dock used to sit ~1 900 px down, below PlanChanges and
+   * the whole SquadList, so the bench a player is dragged from and the turf he is dropped on were never
+   * on screen together. Placement only (`lg:col-*`, `lg:order-*`); the JSX order — the phone's order
+   * — is untouched, and below `lg:` none of these classes applies.
+   */
   return (
-    <form action={action} className="space-y-4">
+    <form
+      action={action}
+      className="space-y-4 lg:grid lg:grid-cols-[26rem_minmax(0,1fr)] lg:items-start lg:gap-x-6 lg:gap-y-4 lg:space-y-0"
+    >
       <input type="hidden" name="teamId" value={props.teamId} />
       <input type="hidden" name="matchId" value={props.matchId} />
       {props.lineupId ? <input type="hidden" name="lineupId" value={props.lineupId} /> : null}
@@ -629,7 +640,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
           ce qui change » is advice about a state that has passed, and « Changements déduits » below
           says what he has done instead. */}
       {!dirty && (props.prefillNoticeFr ?? []).length > 0 ? (
-        <div className="space-y-1 rounded-2xl bg-surface-2 p-3">
+        <div className="space-y-1 rounded-2xl bg-surface-2 p-3 lg:order-1 lg:col-start-2">
           {(props.prefillNoticeFr ?? []).map((line) => (
             <p key={line} className="text-sm text-ink-muted">
               {line}
@@ -643,7 +654,10 @@ export function CompositionEditor(props: CompositionEditorProps) {
           the starting composition either: its minute is 0 by definition, and the page's own title
           already says « Composition de départ ». */}
       {props.selectsSquad ? null : (
-      <Card title={planTitleFr({ fromMinute: titleMinute, isInitial: titleMinute === 0 })}>
+      <Card
+        title={planTitleFr({ fromMinute: titleMinute, isInitial: titleMinute === 0 })}
+        className="lg:order-2 lg:col-start-2"
+      >
         {/* Half the card's width, as it was beside the old formation select: a minute needs no more,
             and a 326 px number field reads as a text box. */}
         <div className="grid grid-cols-2 gap-3">
@@ -692,7 +706,13 @@ export function CompositionEditor(props: CompositionEditorProps) {
       )}
 
       {/* --- the pitch --- */}
-      <Card title="Terrain">
+      {/* `lg:row-span-6` covers every row the right column can fill (notice, minute, dock, changes,
+          list), so the pitch never pushes them down; `lg:sticky` keeps it in view while the squad
+          list scrolls past it. */}
+      <Card
+        title="Terrain"
+        className="lg:sticky lg:top-20 lg:col-start-1 lg:row-span-6 lg:row-start-1"
+      >
         <div className="space-y-2">
           {/* The wrapper has the pitch's exact box (`Pitch` is `w-full` with a fixed aspect ratio),
               which is what `fromClientPoint` needs to convert a finger into a point — so the cap
@@ -780,6 +800,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
 
       {/* --- the changes this composition implies --- */}
       <PlanChanges
+        className="lg:order-4 lg:col-start-2"
         changes={changes}
         previousTitleFr={previous ? planTitleFr(previous) : null}
         warningsFr={warnings.map((issue) => issue.messageFr)}
@@ -788,6 +809,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
       {/* --- who else is selected: the starting composition only (decision 165) --- */}
       {props.selectsSquad ? (
         <SquadList
+          className="lg:order-5 lg:col-start-2"
           members={members}
           onPitch={new Set(assignments.map((assignment) => assignment.memberId))}
           marks={marks}
@@ -801,7 +823,14 @@ export function CompositionEditor(props: CompositionEditorProps) {
       ) : null}
 
       {/* --- the dock: the bench and the confirm button, both always on screen --- */}
-      <div ref={dockRef} className={cn(DOCK_CLASS, benchDropHint !== null && DOCK_TARGET_CLASS)}>
+      <div
+        ref={dockRef}
+        className={cn(
+          DOCK_CLASS,
+          "lg:order-3 lg:col-start-2",
+          benchDropHint !== null && DOCK_TARGET_CLASS,
+        )}
+      >
         {/* The dock carries the players and the buttons, and nothing else. The two status lines that
             used to sit here — the bench count with the tap instruction, and the save state — were
             permanent text above a strip of discs on the one screen with no vertical room to spare,
@@ -853,7 +882,7 @@ export function CompositionEditor(props: CompositionEditorProps) {
           <ul
             aria-label="Banc : appuie sur un joueur puis sur un poste, ou fais-le glisser sur le terrain."
             aria-describedby={benchHintId}
-            className="flex snap-x gap-2 overflow-x-auto overscroll-x-contain pb-1"
+            className="flex snap-x gap-2 overflow-x-auto overscroll-x-contain pb-1 lg:flex-wrap lg:overflow-x-visible"
           >
             {firstGroup.map((member) => (
               <BenchDisc
@@ -1012,6 +1041,8 @@ type SquadListProps = {
   locked: ReadonlySet<string>;
   disabled: boolean;
   onChange: (memberId: string, mark: BenchMark) => void;
+  /** Desktop placement only (`lg:`); nothing at phone width. */
+  className?: string;
 };
 
 /**
@@ -1025,12 +1056,21 @@ type SquadListProps = {
  * Native radios, named `role:<membershipId>`, so the list submits with the composition and works
  * without JavaScript; `readBenchMarks` is their only reader.
  */
-function SquadList({ members, onPitch, marks, locked, disabled, onChange }: SquadListProps) {
+function SquadList({
+  members,
+  onPitch,
+  marks,
+  locked,
+  disabled,
+  onChange,
+  className,
+}: SquadListProps) {
   return (
     <Card
       title="Remplaçants et supporters"
       description="Les joueurs sur le terrain sont titulaires. Les autres : remplaçant, supporter, ou non sélectionné (—)."
       flush
+      className={className}
     >
       <ul className="divide-y divide-border/60">
         {members.map((member) => {

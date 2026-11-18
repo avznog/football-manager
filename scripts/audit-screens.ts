@@ -43,8 +43,21 @@ const PASSWORD = process.env.AUDIT_PASSWORD ?? "motdepasse";
 const BASE = process.env.AUDIT_BASE_URL ?? "http://localhost:3000";
 const SHOTS = "audit";
 
-/** iPhone-ish, and the width `CLAUDE.md` asks every screen to be looked at. */
-const VIEWPORT = { width: 390, height: 844 };
+/**
+ * The widths every screen is walked at.
+ *
+ * 390 × 844 is iPhone-ish, and the width `CLAUDE.md` asks every screen to be looked at. 1280 × 800 is
+ * a laptop, added with the desktop work (decision 227): nobody had designed the app above `md:` until
+ * then, and the defects found there — a pitch 1 053 px tall on an 800 px screen, game mode's ACTION
+ * below the fold, the composition editor's « Enregistrer » 1 900 px down — were all visible in one
+ * screenshot and caught by no test. Its captures carry a `-1280` suffix; the 390 px ones keep their
+ * names, so a diff against an older run still lines up.
+ */
+const VIEWPORTS = [
+  { width: 390, height: 844, suffix: "" },
+  { width: 1280, height: 800, suffix: "-1280" },
+] as const;
+type Viewport = (typeof VIEWPORTS)[number];
 
 /**
  * Strings that mean a framework has answered instead of the app. Each one was, or would be, a screen
@@ -235,6 +248,7 @@ async function login(page: Page, username: string): Promise<void> {
 /* -------------------------------------------------------------------------- */
 
 async function walk(
+  viewport: Viewport,
   theme: "light" | "dark",
   who: { label: string; username: string; isCoach: boolean },
   targets: readonly Target[],
@@ -252,7 +266,7 @@ async function walk(
   // French phone writes `jj/mm/aaaa`, so that one difference is the harness, not the app.
   const browser = await chromium.launch({ args: ["--lang=fr-FR"] });
   const context = await browser.newContext({
-    viewport: VIEWPORT,
+    viewport: { width: viewport.width, height: viewport.height },
     colorScheme: theme,
     locale: "fr-FR",
     timezoneId: "Europe/Paris",
@@ -261,7 +275,7 @@ async function walk(
 
   let current = "connexion";
   const noted = (problem: string) =>
-    findings.push({ theme, who: who.label, target: current, problem });
+    findings.push({ theme, who: who.label, target: `${current}${viewport.suffix}`, problem });
   const onConsole = (message: ConsoleMessage) => {
     if (message.type() !== "error") return;
     const text = message.text();
@@ -278,7 +292,7 @@ async function walk(
     await page.goto(`${BASE}${target.path}`);
     await page.waitForLoadState("networkidle");
 
-    const seen = await measure(page, VIEWPORT.width);
+    const seen = await measure(page, viewport.width);
     const refused = seen.heading === "Page introuvable";
     const mayNotSee = target.audience === "coach" && !who.isCoach;
 
@@ -297,11 +311,11 @@ async function walk(
     }
 
     await page.screenshot({
-      path: `${SHOTS}/${theme}-${who.label}-${target.name}.png`,
+      path: `${SHOTS}/${theme}-${who.label}-${target.name}${viewport.suffix}.png`,
       fullPage: true,
     });
     process.stdout.write(
-      `  ${theme.padEnd(5)} ${who.label.padEnd(6)} ${target.name.padEnd(22)} ` +
+      `  ${String(viewport.width).padEnd(4)} ${theme.padEnd(5)} ${who.label.padEnd(6)} ${target.name.padEnd(22)} ` +
         `${refused ? "404" : "   "} ${JSON.stringify(seen.heading)}\n`,
     );
   }
@@ -315,22 +329,26 @@ async function main(): Promise<void> {
   const findings: Finding[] = [];
 
   console.log(
-    `Audit de ${targets.length} écrans à ${VIEWPORT.width} px, clair et sombre, ` +
-      `en tant que ${coach} (coach) et ${player} (joueur).\n`,
+    `Audit de ${targets.length} écrans à ${VIEWPORTS.map((v) => `${v.width} px`).join(" et ")}, ` +
+      `clair et sombre, en tant que ${coach} (coach) et ${player} (joueur).\n`,
   );
 
-  for (const theme of ["light", "dark"] as const) {
-    for (const who of [
-      { label: "coach", username: coach, isCoach: true },
-      { label: "joueur", username: player, isCoach: false },
-    ]) {
-      await walk(theme, who, targets, findings);
+  for (const viewport of VIEWPORTS) {
+    for (const theme of ["light", "dark"] as const) {
+      for (const who of [
+        { label: "coach", username: coach, isCoach: true },
+        { label: "joueur", username: player, isCoach: false },
+      ]) {
+        await walk(viewport, theme, who, targets, findings);
+      }
     }
   }
 
   await sql.end();
 
-  console.log(`\n${targets.length * 4} écrans visités. Captures dans ./${SHOTS}/.`);
+  console.log(
+    `\n${targets.length * 4 * VIEWPORTS.length} écrans visités. Captures dans ./${SHOTS}/.`,
+  );
   if (findings.length === 0) {
     console.log(
       "Aucun défaut mécanique.\n" +

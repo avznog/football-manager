@@ -55,7 +55,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { Card, EmptyState } from "@/components/ui";
+import { Card, EmptyState, PageContainer } from "@/components/ui";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { formatDate, formatTime } from "@/lib/calendar/time";
 import { competitionLabelOf, statsFilterOptions } from "@/lib/competition/options";
@@ -171,8 +171,9 @@ export default async function EquipeTypePage({
     </>
   );
 
+  // `wide` (decision 227): from `lg:` the pitch and its list sit side by side (`SevenPitch`).
   return (
-    <div className="space-y-6">
+    <PageContainer width="wide" className="space-y-6">
       <header>
         <div>
           {/* `min-h-11` and `inline-flex`, the same back link as every other `/match/[id]`-style
@@ -205,7 +206,7 @@ export default async function EquipeTypePage({
         filterLabel={filterLabel}
         scopeLabel={scopeLabel}
       />
-    </div>
+    </PageContainer>
   );
 }
 

@@ -2790,6 +2790,12 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       `md:` where the sidebar shows it; `md:max-w-prose` on card descriptions and page intros; every
       page title `md:text-2xl`; `Sheet` takes `size="md" | "lg"` instead of a width in `className`; the
       stats filter strip follows the `md:px-6` gutter
-- [ ] **Desktop, slice C** (plan of 2026-11-18): two-column `lg:` layouts (composition editor —
-      decision 105's dock is 1 900 px down —, correction screen, match page, stats with `wide`,
-      compositions strip). Same rule: `md:`/`lg:` only, 390 px diffed to zero
+- [x] **Desktop, slice C: two-column layouts** — 2026-11-18. Decision **229**. From `lg:`: the
+      composition editor puts the pitch sticky on the left and the minute, the bench (wrapping, not a
+      sideways strip) and « Enregistrer » on the right — decision 105's dock was 1 900 px down; the
+      correction screen keeps the déroulé left and the three acting cards in a sticky, scrollable right
+      column; the finished match page splits into scoreboard, notes duty, the read-only cards, and
+      « Corriger » / game mode / delete sticky on the right; stats, équipe type and compositions adopt
+      `wide`, two boards or plans a row; the compositions strip wraps two to a row. **No card moved in
+      the phone order** — only consecutive runs are wrapped, and an empty run renders nothing.
+      `scripts/audit-screens.ts` walks 1280 × 800 too

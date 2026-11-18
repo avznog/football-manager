@@ -267,9 +267,14 @@ export function SevenPitch({
 
   const openSlot = slots.find((slot) => slot.slotId === openSlotId) ?? null;
 
+  /*
+   * Desktop (decision 227, slice C): from `lg:` the pitch and the list of the seven sit side by side —
+   * the list says in words what the discs say on the turf, and reading one against the other is the
+   * point of having both. Placement only; at phone width the section is the column it always was.
+   */
   return (
-    <section className="space-y-3">
-      <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+    <section className="space-y-3 lg:grid lg:grid-flow-dense lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] lg:items-start lg:gap-x-6 lg:gap-y-3 lg:space-y-0">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 lg:col-span-2">
         <h2 className="text-lg font-bold tracking-tight text-ink">
           {sevenHeadingFr(seven, touched)}
         </h2>
@@ -287,7 +292,7 @@ export function SevenPitch({
 
       {/* The optimum's own figure, kept on screen the moment the heading stops claiming to be it. */}
       {touched ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2 lg:col-span-2">
           <p className="text-xs text-ink-muted tabular-nums">
             {aggregation !== null
               ? optimumComparisonFr(seven, formatSevenFigure("ratings", optimumAggregate))
@@ -299,7 +304,7 @@ export function SevenPitch({
         </div>
       ) : null}
 
-      <div ref={pitchRef}>
+      <div ref={pitchRef} className="lg:col-start-1">
         <PitchLayout
           slots={pitchSlots}
           kit={kit}
@@ -364,11 +369,14 @@ export function SevenPitch({
       </div>
 
       {/* The tap is announced, and to everybody: a swap moves two discs at once. */}
-      <p aria-live="polite" className="min-h-4 text-xs text-ink-muted">
+      <p aria-live="polite" className="min-h-4 text-xs text-ink-muted lg:col-start-1">
         {announcement}
       </p>
 
+      {/* `lg:col-start-2` plus the section's `lg:grid-flow-dense`: the list goes back up beside the
+          pitch rather than after the announcement line under it. */}
       <SlotList
+        className="lg:col-start-2"
         slots={slots}
         assignment={assignment}
         candidateById={candidateById}
@@ -519,15 +527,23 @@ function SlotList({
   candidateById,
   cellFor,
   whyByCandidateId,
+  className,
 }: {
   slots: readonly SevenSlotView[];
   assignment: Readonly<Record<string, string | null>>;
   candidateById: Map<string, SevenCandidateView>;
   cellFor: (slotId: string, candidateId: string) => SevenCell | null;
   whyByCandidateId?: Readonly<Record<string, string>>;
+  /** Desktop placement only (`lg:`); nothing at phone width. */
+  className?: string;
 }) {
   return (
-    <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-surface">
+    <ul
+      className={cn(
+        "divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-surface",
+        className,
+      )}
+    >
       {slots.map((slot) => {
         const chosenId = assignment[slot.slotId] ?? null;
         const chosen = chosenId ? candidateById.get(chosenId) : undefined;

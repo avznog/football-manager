@@ -7726,3 +7726,41 @@ Files: `components/nav/nav-items.tsx`, `components/nav/sidebar-nav.tsx`, `compon
 `components/action-sheet/terrain-sheet.tsx`, `app/(app)/match/[id]/_components/match-links.tsx` (new),
 `app/(app)/match/[id]/page.tsx`, `app/(app)/stats/_components/filters.tsx`, the title and intro lines of
 eleven page files, `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+### Desktop, slice C: two columns from `lg:`
+
+Decision **229**, slice C of the plan of 2026-11-18. Every new class is `lg:`; the phone DOM order is
+untouched, so it stays the keyboard and screen-reader order, and a card is placed with
+`lg:col-start-*` / `lg:row-start-*` / `lg:order-*` rather than moved in the JSX. Wrappers only group a
+consecutive run, carry the parent's own `space-y-*`, and are not rendered when the run is empty (an
+empty block still takes the parent's margin).
+
+- **Composition editor**: the pitch is sticky on the left; the minute, the bench (wrapping discs, no
+  sideways scroll), the errors, « Enregistrer », then the plan's changes and the squad on the right.
+  At 1280×800 the save button is at y≈573, where it was about 1 900 px down the page. Its page is `wide`.
+- **Finished match**: scoreboard, ratings panel, déroulé and compositions on the left; the notes run and
+  then a sticky « Corriger le match » · game mode · delete column on the right. The ratings panel went
+  left so « Corriger » could rise: its heading is at y≈711 at 1280×800 and the button just below the
+  fold (visible at 1440×900) — the scoreboard's height is the limit. `wide` only when in columns.
+- **Correction screen**: déroulé left, the three action cards right in a sticky column capped at the
+  viewport and scrollable; `wide` only once there is something to correct.
+- **Compositions strip** is two a row from `lg:` instead of a sideways scroll, and stops saying so.
+  The compositions page is `wide` with its lineups two a row.
+- **Stats** is `wide` with each section's boards two a row; « Impact par poste » and « Notes » stay
+  one column. **Équipe type** is `wide`, pitch left and list right (`lg:grid-flow-dense`, because the
+  `aria-live` line between them would otherwise take the right column).
+- **`scripts/audit-screens.ts`** also captures at 1280×800 (`-1280` suffix).
+
+Checked: 390 px captures on a throwaway database, baseline run twice; after the change 56/58 identical,
+the two differences being the known tie-order swap on the coach's played match (judged by crop). The
+équipe type's `SlotList` placement was fixed after that diff and adds `lg:` classes only. Looked at in
+both themes and both roles at 1280 and 1440. typecheck, eslint, 1 736 unit tests and 11 e2e passed.
+
+Files: `components/composition/composition-editor.tsx`,
+`app/(app)/match/[id]/composition/_components/editor-screen.tsx`,
+`app/(app)/match/[id]/composition/page.tsx`, `app/(app)/match/[id]/page.tsx`,
+`app/(app)/match/[id]/_components/compositions-strip.tsx`,
+`app/(app)/match/[id]/saisie/page.tsx`, `app/(app)/match/[id]/saisie/_components/retro-corrections.tsx`,
+`app/(app)/stats/page.tsx`, `app/(app)/stats/equipe-type/page.tsx`,
+`app/(app)/stats/equipe-type/_components/seven-pitch.tsx`, `scripts/audit-screens.ts`,
+`docs/DECISIONS.md` (229), `docs/ROADMAP.md`, `docs/SESSIONS.md`.

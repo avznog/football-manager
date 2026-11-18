@@ -43,6 +43,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PageContainer } from "@/components/ui/page-container";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import {
@@ -246,9 +247,87 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
       </Card>
     );
 
+  /*
+   * Desktop (decision 227, slice C), a finished match only: two columns from `lg:`. The phone order is
+   * never changed — it interleaves left and right cards — so the page is cut into the four runs that
+   * are already consecutive in it: the scoreboard (left), the notes duty (right), everything read from
+   * the ratings to the compositions (left), and « Corriger », game mode and delete (right, sticky).
+   * Each run is a `space-y-6` block, which at phone width lays its cards out exactly as the page's own
+   * `space-y-6` did; and a run with nothing in it renders no block at all, because an empty one would
+   * still take the parent's 24 px margin.
+   */
+  const columns = finished && recap !== null;
+  const hasNotesRun = columns && (ratingDuty != null || results?.readable === true);
+  const tail = (
+    <>
+      {/* 8. « Saisie rétroactive » (`docs/PLAN.md`, screen 8). A match played without the phone is
+             typed up here and becomes an ordinary event log; a match that already has one is
+             corrected action by action. */}
+      {mayAmend && finished ? (
+        <Card title={recorded ? "Corriger le match" : "Saisir le match"} as="h2">
+          <div className="space-y-3">
+            <p className="text-sm text-ink-muted">
+              {recorded
+                ? "Un but attribué au mauvais joueur, une action oubliée : la correction s’ajoute au déroulé, elle ne le réécrit pas."
+                : "Ce match a été joué sans le téléphone. Renseigne qui a joué et les buts : le score, les minutes et les clean sheets se déduisent."}
+            </p>
+            <ButtonLink
+              href={`/match/${match.id}/saisie`}
+              variant={recorded ? "secondary" : "primary"}
+              fullWidth
+            >
+              {recorded ? "Corriger une action" : "Saisir le match"}
+            </ButtonLink>
+            {/* The undo for « Marquer comme terminé », and the reason that button needs no dialog.
+                Only while the log is empty: once there is a déroulé, going back to `scheduled` would
+                mean voiding events to stay coherent, which is a different feature (decision 121). */}
+            {!logged ? (
+              <form action={reopenMatch}>
+                <input type="hidden" name="teamId" value={team.id} />
+                <input type="hidden" name="matchId" value={match.id} />
+                <Button type="submit" variant="ghost" fullWidth>
+                  Terminé par erreur ? Rouvrir le match
+                </Button>
+              </form>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
+      {/* 9. A finished match keeps game mode here: the déroulé is consultation now. */}
+      {finished ? gameModeCard : null}
+
+      {/* 10. And the deletion last, under everything it would destroy (decision 191). A link rather
+             than a button: what it opens is a confirmation that names the déroulé, the notes, the
+             sheet and the compositions, one tap from the act itself. */}
+      {mayDelete ? (
+        <Card title="Supprimer le match" as="h2">
+          <div className="space-y-3">
+            <p className="text-sm text-ink-muted">
+              Le match et tout ce qui y est rattaché disparaissent. L’écran suivant dit exactement
+              quoi.
+            </p>
+            <ButtonLink href={`/match/${match.id}/supprimer`} variant="secondary" fullWidth>
+              Supprimer ce match…
+            </ButtonLink>
+          </div>
+        </Card>
+      ) : null}
+    </>
+  );
+  const hasTail = (mayAmend && finished) || (finished && gameModeCard !== null) || mayDelete;
+
+  // `wide` only when the page is in two columns: at the `read` width the left one would be 344 px.
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
+    <PageContainer
+      width={columns ? "wide" : "read"}
+      className={
+        columns
+          ? "space-y-6 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6 lg:space-y-0"
+          : "space-y-6"
+      }
+    >
+      <header className="space-y-2 lg:col-span-2">
         <Link
           href="/calendrier"
           className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -337,7 +416,12 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
       {finished && recap !== null ? (
         <>
           {/* 1. The result. The one place the app celebrates. */}
-          <Scoreboard recap={recap} opponentName={match.opponentName} status={match.status} />
+          <div className="lg:col-start-1 lg:row-start-2">
+            <Scoreboard recap={recap} opponentName={match.opponentName} status={match.status} />
+          </div>
+
+          {hasNotesRun ? (
+          <div className="space-y-6 lg:col-start-2 lg:row-start-2">
 
           {/* 2. The notes — and first the duty, because a reader who still owes some is the reader
                  this screen was reached for. It promises nothing in return: « tu verras les notes de
@@ -390,7 +474,10 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
               published={results.published}
             />
           ) : null}
+          </div>
+          ) : null}
 
+          <div className="space-y-6 lg:col-start-1 lg:row-span-2 lg:row-start-3">
           {results ? (
             <RatingsPanel
               results={results}
@@ -434,62 +521,16 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
                  planned — including the plans the afternoon never used. Under the blocks, which are
                  what actually happened. */}
           {isCoach ? <CompositionCard team={team} match={match} /> : null}
+          </div>
         </>
       ) : null}
 
-      {/* 8. « Saisie rétroactive » (`docs/PLAN.md`, screen 8). A match played without the phone is
-             typed up here and becomes an ordinary event log; a match that already has one is
-             corrected action by action. */}
-      {mayAmend && finished ? (
-        <Card title={recorded ? "Corriger le match" : "Saisir le match"} as="h2">
-          <div className="space-y-3">
-            <p className="text-sm text-ink-muted">
-              {recorded
-                ? "Un but attribué au mauvais joueur, une action oubliée : la correction s’ajoute au déroulé, elle ne le réécrit pas."
-                : "Ce match a été joué sans le téléphone. Renseigne qui a joué et les buts : le score, les minutes et les clean sheets se déduisent."}
-            </p>
-            <ButtonLink
-              href={`/match/${match.id}/saisie`}
-              variant={recorded ? "secondary" : "primary"}
-              fullWidth
-            >
-              {recorded ? "Corriger une action" : "Saisir le match"}
-            </ButtonLink>
-            {/* The undo for « Marquer comme terminé », and the reason that button needs no dialog.
-                Only while the log is empty: once there is a déroulé, going back to `scheduled` would
-                mean voiding events to stay coherent, which is a different feature (decision 121). */}
-            {!logged ? (
-              <form action={reopenMatch}>
-                <input type="hidden" name="teamId" value={team.id} />
-                <input type="hidden" name="matchId" value={match.id} />
-                <Button type="submit" variant="ghost" fullWidth>
-                  Terminé par erreur ? Rouvrir le match
-                </Button>
-              </form>
-            ) : null}
-          </div>
-        </Card>
-      ) : null}
-
-      {/* 9. A finished match keeps game mode here: the déroulé is consultation now. */}
-      {finished ? gameModeCard : null}
-
-      {/* 10. And the deletion last, under everything it would destroy (decision 191). A link rather
-             than a button: what it opens is a confirmation that names the déroulé, the notes, the
-             sheet and the compositions, one tap from the act itself. */}
-      {mayDelete ? (
-        <Card title="Supprimer le match" as="h2">
-          <div className="space-y-3">
-            <p className="text-sm text-ink-muted">
-              Le match et tout ce qui y est rattaché disparaissent. L’écran suivant dit exactement
-              quoi.
-            </p>
-            <ButtonLink href={`/match/${match.id}/supprimer`} variant="secondary" fullWidth>
-              Supprimer ce match…
-            </ButtonLink>
-          </div>
-        </Card>
-      ) : null}
-    </div>
+      {/* The tail (8–10), in a sticky right column when the page is in two columns. */}
+      {columns && hasTail ? (
+        <div className="space-y-6 lg:sticky lg:top-20 lg:col-start-2 lg:row-start-3">{tail}</div>
+      ) : (
+        tail
+      )}
+    </PageContainer>
   );
 }

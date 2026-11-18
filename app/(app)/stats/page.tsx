@@ -17,6 +17,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageContainer } from "@/components/ui/page-container";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { competitionLabelOf, statsFilterOptions } from "@/lib/competition/options";
 import { getTeamCompetitions } from "@/lib/competition/queries";
@@ -84,8 +85,9 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
   const filterLabel = competitionLabelOf(competitions, query.competitionId);
   const scopeLabel = filterLabel?.toLocaleLowerCase("fr-FR") ?? "toutes compétitions";
 
+  // `wide` (decision 227): the sections below are two boards a row from `lg:`.
   return (
-    <div className="space-y-6">
+    <PageContainer width="wide" className="space-y-6">
       <header className="space-y-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Statistiques</h1>
@@ -110,7 +112,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
       ) : (
         <SeasonCards query={query} stats={stats} />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -304,11 +306,11 @@ function SeasonCards({
         />
       </Section>
 
-      <Section title="Impact par poste">
+      <Section title="Impact par poste" single>
         <ImpactByPosition impact={stats.impact} />
       </Section>
 
-      <Section title="Notes">
+      <Section title="Notes" single>
         <Leaderboard
           title="Meilleures notes"
           /* « à partir de 3 matchs notés », not « 3 notes » (decision 137). A season average is the
@@ -341,11 +343,30 @@ function SeasonCards({
   );
 }
 
-/** One of the page's sections: a heading and its cards. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * One of the page's sections: a heading and its cards.
+ *
+ * Two cards a row from `lg:` (decision 227, slice C), in the `wide` page: a board is a short ranked
+ * list, and stacked one under another at 1 000 px each was a long column of mostly empty width. The
+ * heading spans both. `single` keeps one full-width card for a section that has only one — a lone
+ * board in half the width reads as a missing neighbour.
+ */
+function Section({
+  title,
+  children,
+  single = false,
+}: {
+  title: string;
+  children: ReactNode;
+  single?: boolean;
+}) {
   return (
-    <section className="space-y-4">
-      <h2 className="text-base font-semibold text-ink">{title}</h2>
+    <section
+      className={
+        single ? "space-y-4" : "space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0"
+      }
+    >
+      <h2 className="text-base font-semibold text-ink lg:col-span-2">{title}</h2>
       {children}
     </section>
   );
