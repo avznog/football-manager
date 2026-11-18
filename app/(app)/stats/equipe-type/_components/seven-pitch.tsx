@@ -584,7 +584,9 @@ function SlotList({
                 </span>
               ) : null}
             </span>
-            <span className="max-w-28 shrink-0 text-right text-xs text-ink-muted">
+            {/* 7rem keeps the name readable at 390 px; on desktop the list has ~600 px and the 7rem
+                cap folded « 1 but de l’équipe toutes les 27′ » onto six lines (decision 230). */}
+            <span className="max-w-28 shrink-0 text-right text-xs text-ink-muted lg:max-w-60">
               {cell ? (
                 <>
                   <span className="block text-sm font-semibold text-ink tabular-nums">

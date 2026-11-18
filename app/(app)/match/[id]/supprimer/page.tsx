@@ -76,11 +76,13 @@ export default async function DeleteMatchPage({ params }: PageProps<"/match/[id]
           <form action={deleteMatch}>
             <input type="hidden" name="teamId" value={team.id} />
             <input type="hidden" name="matchId" value={match.id} />
-            <Button type="submit" variant="danger" fullWidth>
+            {/* Label-sized on desktop (decision 230): a full-width red bar across a desktop card
+                reads as a banner, not as one of two answers. The phone keeps its thumb targets. */}
+            <Button type="submit" variant="danger" fullWidth className="lg:w-auto">
               Supprimer définitivement
             </Button>
           </form>
-          <ButtonLink href={`/match/${match.id}`} variant="ghost" fullWidth>
+          <ButtonLink href={`/match/${match.id}`} variant="ghost" fullWidth className="lg:w-auto">
             Annuler
           </ButtonLink>
         </div>

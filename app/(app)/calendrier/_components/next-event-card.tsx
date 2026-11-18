@@ -11,6 +11,7 @@ import Link from "next/link";
 
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/components/ui/cn";
 import { capitalizeFirst, formatRelativeDays, formatWhen } from "@/lib/calendar/time";
 import type { CalendarEvent } from "@/lib/calendar/timeline";
 import { MatchStatusBadge, ScorePill, matchSubtitle, matchTitle } from "./event-parts";
@@ -18,9 +19,11 @@ import { MatchStatusBadge, ScorePill, matchSubtitle, matchTitle } from "./event-
 export type NextEventCardProps = {
   event: CalendarEvent;
   now: Date;
+  /** Desktop placement only (decision 230): where the calendar's grid puts the card. */
+  className?: string;
 };
 
-export function NextEventCard({ event, now }: NextEventCardProps) {
+export function NextEventCard({ event, now, className }: NextEventCardProps) {
   const startsAt = new Date(event.startsAt);
   const href = `/match/${event.id}`;
   const title = matchTitle(event);
@@ -28,7 +31,7 @@ export function NextEventCard({ event, now }: NextEventCardProps) {
   const live = event.status === "live";
 
   return (
-    <Card className={live ? "border-danger/50" : "border-accent/40"}>
+    <Card className={cn(live ? "border-danger/50" : "border-accent/40", className)}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <MatchStatusBadge status={event.status} />
@@ -54,7 +57,9 @@ export function NextEventCard({ event, now }: NextEventCardProps) {
 
         {event.score !== null ? <ScorePill match={event} /> : null}
 
-        <ButtonLink href={href} variant="secondary" fullWidth>
+        {/* The thumb's full-width target on a phone; on desktop the size of its label rather than a
+            bar across the card (decision 230). */}
+        <ButtonLink href={href} variant="secondary" fullWidth className="lg:w-auto">
           Voir le match
         </ButtonLink>
       </div>

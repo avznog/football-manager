@@ -2799,3 +2799,13 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       `wide`, two boards or plans a row; the compositions strip wraps two to a row. **No card moved in
       the phone order** — only consecutive runs are wrapped, and an empty run renders nothing.
       `scripts/audit-screens.ts` walks 1280 × 800 too
+- [x] **Desktop, second pass: the non-match pages in columns** — 2026-11-18. Decision **230**. The
+      owner found the first pass « still one column, as if it was a giant phone ». From `lg:`:
+      calendar is next match and « À venir » left, history in the wider right column; équipe is the
+      roster (two a row from `xl:`) beside the coach's invites · competitions · settings column, or the
+      player's encadrement; a player's page puts the pitch beside fiche and injuries, with the stats a
+      third column from `2xl:`; « Moi » is two columns, three from `xl:`; the match form lays its fields
+      in pairs; stats is two columns from `xl:`, with Défense and Gardiens side by side; équipe type
+      puts the controls beside the pitch from `2xl:`. Full-width buttons on those pages are label-sized
+      from `lg:`. A tall column spanning several rows goes into a trailing `1fr` row so it does not
+      stretch its neighbours' rows. 390 px is pixel-identical to before.

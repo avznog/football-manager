@@ -73,7 +73,8 @@ export function SevenContextField({
         )}
       </Field>
 
-      <Button type="submit" variant="secondary" fullWidth>
+      {/* Label-sized on desktop (decision 230): a 1 100 px bar under the notes reads as a divider. */}
+      <Button type="submit" variant="secondary" fullWidth className="lg:w-auto">
         {SEVEN_CONTEXT_SUBMIT_FR}
       </Button>
     </form>
