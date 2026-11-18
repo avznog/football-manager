@@ -14,6 +14,13 @@ export type FieldProps = {
   error?: string | string[] | null;
   className?: string;
   /**
+   * How wide the field may get on desktop (decision 227). Below `md:` every field is the full width
+   * of its column, as it always was. `short` (10rem) is for a number of a digit or two; `date`
+   * (16rem) fits a `datetime-local` with its picker. Unset, the field takes its column, which on a
+   * form page is the 32rem `PageContainer width="form"`.
+   */
+  size?: "short" | "date";
+  /**
    * Render the control. It receives the ids to wire up:
    * `<Input id={id} aria-describedby={describedBy} invalid={invalid} />`
    */
@@ -35,6 +42,7 @@ export function Field({
   hint,
   error,
   className,
+  size,
   children,
 }: FieldProps) {
   const invalid = Array.isArray(error) ? error.length > 0 : Boolean(error);
@@ -43,7 +51,14 @@ export function Field({
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div
+      className={cn(
+        "space-y-1.5",
+        size === "short" && "md:max-w-40",
+        size === "date" && "md:max-w-64",
+        className,
+      )}
+    >
       <Label htmlFor={htmlFor} optional={optional}>
         {label}
       </Label>

@@ -137,9 +137,14 @@ export function AppShell({ team, user, isCoach, children }: AppShellProps) {
             last card, named as air — it used to hide inside a 4.5rem that
             claimed to be the height of a 3.5rem bar. Same pixels as before,
             one fewer number that can be wrong. */}
+        {/* The width (decision 227): `max-w-read` is the 48rem this box has always had — the same
+            value `max-w-3xl` was — so every page keeps today's 720 px unless it declares otherwise.
+            A page that renders `PageContainer width="wide"` widens the box itself through the
+            `:has()`; a form page narrows its own content instead. Below `md:` the phone is narrower
+            than every one of these, so none of them binds. */}
         <main
           id="contenu"
-          className="mx-auto w-full max-w-3xl flex-1 px-4 py-4 pb-[calc(var(--tabbar-h)+1rem+env(safe-area-inset-bottom,0px))] md:px-6 md:py-6 md:pb-10"
+          className="mx-auto w-full max-w-read flex-1 px-4 py-4 pb-[calc(var(--tabbar-h)+1rem+env(safe-area-inset-bottom,0px))] md:px-6 md:py-6 md:pb-10 md:has-[[data-page-width=wide]]:max-w-wide"
         >
           {children}
         </main>

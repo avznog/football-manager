@@ -7674,3 +7674,25 @@ Files: `components/pitch/Pitch.tsx`, `components/pitch/PitchLayout.tsx`, `compon
 `app/(app)/match/[id]/composition/page.tsx`, `app/(app)/stats/equipe-type/_components/seven-pitch.tsx`,
 `app/(jeu)/layout.tsx`, `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `docs/DECISIONS.md`
 (227), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+### Desktop slice B — page widths and forms
+
+Decision **228**. Tokens `max-w-form` / `max-w-read` / `max-w-wide`, a `PageContainer`, and the shell's
+`<main>` widening itself through `:has()` when a page declares `wide` — so `read` (today's 720 px) stays
+the default and no page nobody wrapped can move. The new match, edit match and delete pages are 32rem
+forms; `Field size="short" | "date"`; their submits are label-sized on desktop; team settings capped to
+32rem in its card. `wide` is built but unused until slice C's grids.
+
+Proof: a production build on a throwaway database, captured twice and diffed. 390 px: **56/58
+identical** to slice A's captures; the two others are the played match, where two players tied at
+7,0 from identical notes swapped places — tie order follows per-seed ids, not CSS (worth a stable
+tie-break by name some day; out of this slice). Desktop 1280 × 800: only the three form pages, the
+team page and the played match changed. Measured: opponent 686 → 478 px, kick-off 686 → 256, the
+numbers 337 → 160. typecheck, eslint, `npm test` 1736, `npm run test:e2e` 11 passed.
+
+Files: `app/globals.css`, `components/ui/page-container.tsx` (new), `components/ui/field.tsx`,
+`components/ui/index.ts`, `components/nav/app-shell.tsx` (`<main>` only),
+`app/(app)/match/_components/match-form.tsx`, `app/(app)/equipe/team-settings.tsx`,
+`app/(app)/match/nouveau/page.tsx`, `app/(app)/match/[id]/modifier/page.tsx`,
+`app/(app)/match/[id]/supprimer/page.tsx`, `docs/DECISIONS.md` (228), `docs/ROADMAP.md`,
+`docs/SESSIONS.md`.

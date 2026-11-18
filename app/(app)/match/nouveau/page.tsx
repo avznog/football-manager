@@ -10,6 +10,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
+import { PageContainer } from "@/components/ui/page-container";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { getTeamCompetitions } from "@/lib/competition/queries";
@@ -26,7 +27,7 @@ export default async function NewMatchPage() {
   const competitions = competitionOptions(await getTeamCompetitions(team.id));
 
   return (
-    <div className="space-y-4">
+    <PageContainer width="form" className="space-y-4">
       <header className="space-y-1">
         <Link
           href="/calendrier"
@@ -53,6 +54,6 @@ export default async function NewMatchPage() {
           }}
         />
       </Card>
-    </div>
+    </PageContainer>
   );
 }

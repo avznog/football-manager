@@ -91,6 +91,7 @@ export function MatchForm({ teamId, matchId, defaults, competitions }: MatchForm
         label="Coup d’envoi"
         hint="Heure française."
         error={state?.fieldErrors?.kickoffAt}
+        size="date"
       >
         {({ id, describedBy, invalid }) => (
           <DateInput
@@ -175,8 +176,15 @@ export function MatchForm({ teamId, matchId, defaults, competitions }: MatchForm
           `aria-describedby`, which is why the hint is not simply rendered after the grid: whichever
           number you are editing, the consequence is read out with it. */}
       <div className="space-y-1.5">
-        <div className="grid grid-cols-2 gap-3">
-          <Field htmlFor="periodsCount" label="Périodes" error={state?.fieldErrors?.periodsCount}>
+        {/* Two 10rem columns on desktop (decision 227): a one- or two-digit number in half of a
+            32rem form was still a 250 px field. The phone keeps its two halves. */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(2,minmax(0,10rem))]">
+          <Field
+            htmlFor="periodsCount"
+            label="Périodes"
+            error={state?.fieldErrors?.periodsCount}
+            size="short"
+          >
             {({ id, describedBy, invalid }) => (
               <Input
                 id={id}
@@ -199,6 +207,7 @@ export function MatchForm({ teamId, matchId, defaults, competitions }: MatchForm
             htmlFor="periodMinutes"
             label="Minutes par période"
             error={state?.fieldErrors?.periodMinutes}
+            size="short"
           >
             {({ id, describedBy, invalid }) => (
               <Input
@@ -232,12 +241,15 @@ export function MatchForm({ teamId, matchId, defaults, competitions }: MatchForm
 
       {/* Nothing to file the match under, so there is nothing to submit: the sentence above says
           where to go, and a button that would only come back refused is worse than a disabled one. */}
+      {/* Full width on the phone, where it is the thumb's target; on desktop a button the size of
+          its label, under the fields it submits, rather than a 512 px bar (decision 227). */}
       <Button
         type="submit"
         fullWidth
         size="lg"
         pending={pending}
         disabled={competitions.length === 0}
+        className="md:w-auto md:min-w-40"
       >
         {editing ? "Enregistrer" : "Créer le match"}
       </Button>
