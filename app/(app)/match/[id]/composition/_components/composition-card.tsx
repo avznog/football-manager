@@ -34,7 +34,21 @@ import {
 import { getCompositionMembers, getMatchLineups, toPlannedLineup } from "@/lib/composition/queries";
 import type { MatchRow } from "@/lib/match/queries";
 
-export async function CompositionCard({ team, match }: { team: ActiveTeam; match: MatchRow }) {
+/**
+ * `split` (decision 230): from `lg:`, the pitch on the left and its title, the later plans and the
+ * link on the right, for a card that sits in a wide column. Stacked, a card-sized pitch left two-thirds
+ * of the card empty and pushed the plans a screen down. Phone rendering is the same either way: every
+ * class it adds is `lg:`-prefixed.
+ */
+export async function CompositionCard({
+  team,
+  match,
+  split = false,
+}: {
+  team: ActiveTeam;
+  match: MatchRow;
+  split?: boolean;
+}) {
   const [members, lineups] = await Promise.all([
     getCompositionMembers(team.id, match.id),
     getMatchLineups(match.id),
@@ -69,7 +83,13 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
         </Badge>
       }
     >
-      <div className="space-y-3">
+      <div
+        className={
+          split && first
+            ? "space-y-3 lg:grid lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:grid-rows-[auto_auto_1fr] lg:items-start lg:gap-x-6 lg:gap-y-3 lg:space-y-0"
+            : "space-y-3"
+        }
+      >
         {first ? (
           <>
             <LineupPitch
@@ -81,6 +101,7 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
               fit="card"
               planned={!first.isApplied}
               label={`${planTitleFr(first)}, ${first.formationLabel}`}
+              className={split ? "lg:col-start-1 lg:row-span-3 lg:row-start-1" : undefined}
             />
             <p className="text-sm text-ink-muted">
               {planTitleFr(first)} · {first.formationName}

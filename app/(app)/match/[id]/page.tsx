@@ -317,17 +317,40 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
   );
   const hasTail = (mayAmend && finished) || (finished && gameModeCard !== null) || mayDelete;
 
-  // `wide` only when the page is in two columns: at the `read` width the left one would be 344 px.
+  /*
+   * Before the final whistle (decision 230). The first desktop pass laid out only the finished match,
+   * and the owner's screenshot was a live one: a 720 px phone column, « Mode match » a full-width bar,
+   * the composition a screen further down. Now the coach gets the match on the left — title, score,
+   * game mode, the actions — and the composition on the right, so the page is one screen; a player,
+   * who has no composition card, gets the title beside game mode. The phone order is the page's own
+   * and is not touched: every placement is an `lg:` class on a child, or on a wrapper whose only
+   * phone class is the `space-y-6` the page already gives its children.
+   */
+  const coachBeforeEnd = !finished && isCoach;
+  const playerBeforeEnd = !finished && !isCoach;
+  const layoutClass = columns
+    ? "space-y-6 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6 lg:space-y-0"
+    : coachBeforeEnd
+      ? "space-y-6 lg:grid lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0"
+      : playerBeforeEnd
+        ? "space-y-6 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6 lg:space-y-0"
+        : "space-y-6";
+  const headerClass = columns
+    ? "space-y-2 lg:col-span-2"
+    : coachBeforeEnd || playerBeforeEnd
+      ? "space-y-2 lg:col-start-1 lg:row-start-1"
+      : "space-y-2";
+  /** Game mode's cell before the end: under the title for the coach, beside it for a player. */
+  const gameModeCellClass = coachBeforeEnd
+    ? "lg:col-start-1 lg:row-start-2"
+    : "lg:col-start-2 lg:row-start-1";
+  const hasActionsBeforeEnd = !finished && (mayFinish || hasTail);
+
+  // `wide` when the page is in columns: at the `read` width the left one would be 344 px. A player
+  // before the end has two short cards, which the `read` width holds side by side.
   return (
-    <PageContainer
-      width={columns ? "wide" : "read"}
-      className={
-        columns
-          ? "space-y-6 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6 lg:space-y-0"
-          : "space-y-6"
-      }
-    >
-      <header className="space-y-2 lg:col-span-2">
+    <PageContainer width={columns || coachBeforeEnd ? "wide" : "read"} className={layoutClass}>
+      <header className={headerClass}>
         <Link
           href="/calendrier"
           className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -395,18 +418,30 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
       {/* Before the final whistle: the order of the afternoon (174)       */}
       {/* ---------------------------------------------------------------- */}
 
-      {finished ? null : gameModeCard}
+      {finished ? null : <div className={gameModeCellClass}>{gameModeCard}</div>}
 
       {/* The match sheet and the compositions are the coach's job (`docs/PLAN.md`, screen 3): a
           player does not see them here. Before the match it is the second thing he wants; after it,
-          it is a record and waits until under the blocks. */}
-      {!finished && isCoach ? <CompositionCard team={team} match={match} /> : null}
+          it is a record and waits until under the blocks. On desktop it is the right-hand column,
+          beside everything else, its pitch and its plans side by side (decision 230). */}
+      {coachBeforeEnd ? (
+        <div className="lg:col-start-2 lg:row-span-3 lg:row-start-1">
+          <CompositionCard team={team} match={match} split />
+        </div>
+      ) : null}
 
       {/* Under the composition whether or not the kick-off has come round (decision 174, which moved
           it from the top of the page for a match already played): declaring a match over is the last
-          thing done with it, and it must not push game mode and the composition down the screen. */}
-      {mayFinish ? (
-        <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff={!played} />
+          thing done with it, and it must not push game mode and the composition down the screen.
+          Wrapped with the deletion that follows it, so both sit under game mode on desktop; the
+          wrapper's `space-y-6` is the page's own, so the phone spacing is unchanged. */}
+      {hasActionsBeforeEnd ? (
+        <div className="space-y-6 lg:col-start-1 lg:row-start-3">
+          {mayFinish ? (
+            <FinishMatchCard teamId={team.id} matchId={match.id} beforeKickoff={!played} />
+          ) : null}
+          {tail}
+        </div>
       ) : null}
 
       {/* ---------------------------------------------------------------- */}
@@ -477,7 +512,13 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
           </div>
           ) : null}
 
-          <div className="space-y-6 lg:col-start-1 lg:row-span-2 lg:row-start-3">
+          {/*
+            The long middle (decision 230): the notes, the supporters, the minutes and the déroulé in
+            two balanced newspaper columns from 85rem, where the left column holds two ~400 px ones.
+            CSS columns rather than a grid because they keep the DOM order — the phone's order — and
+            still balance the heights, where a grid would line its rows up and leave holes.
+          */}
+          <div className="space-y-6 lg:col-start-1 lg:row-start-3 min-[85rem]:columns-2 min-[85rem]:gap-6 min-[85rem]:*:break-inside-avoid">
           {results ? (
             <RatingsPanel
               results={results}
@@ -508,26 +549,47 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
 
           {/* 5. Le déroulé. */}
           <TimelineList entries={recap.timeline} />
+          </div>
+
+          {/* The compositions, under the middle. A separate wrapper only when there is something in
+              it — an empty one would still take the page's 24 px gap on a phone. On a desktop it is
+              `contents` (decision 230): the blocks go under the left column and the coach's card into
+              the right one, under the actions, instead of a second full-width pitch at the bottom. */}
+          {recap.compositions.length > 0 || isCoach ? (
+          <div className="space-y-6 lg:contents">
 
           {/* 6. Les compositions: the Déroulé above says what changed, and this says what the pitch
                  looked like after each change (decision 182). Both roles read it — there is no branch
-                 here, and that is deliberate: a composition is not privileged. */}
-          <CompositionsStrip
-            compositions={recap.compositions}
-            kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
-          />
+                 here, and that is deliberate: a composition is not privileged. Wrapped only when it
+                 draws something, for the same 24 px. */}
+          {recap.compositions.length > 0 ? (
+            <div className="lg:col-start-1 lg:row-start-4">
+              <CompositionsStrip
+                compositions={recap.compositions}
+                kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
+              />
+            </div>
+          ) : null}
 
           {/* 7. The coach's own composition card, which after the match is the record of what he
                  planned — including the plans the afternoon never used. Under the blocks, which are
                  what actually happened. */}
-          {isCoach ? <CompositionCard team={team} match={match} /> : null}
+          {isCoach ? (
+            <div className="lg:col-start-2 lg:row-start-4">
+              <CompositionCard team={team} match={match} />
+            </div>
+          ) : null}
           </div>
+          ) : null}
         </>
       ) : null}
 
-      {/* The tail (8–10), in a sticky right column when the page is in two columns. */}
-      {columns && hasTail ? (
-        <div className="space-y-6 lg:sticky lg:top-20 lg:col-start-2 lg:row-start-3">{tail}</div>
+      {/* The tail (8–10), in a sticky right column when the page is in two columns. Before the end
+          it is rendered above, with the finish card. */}
+      {!finished ? null : columns && hasTail ? (
+        <div className="space-y-6 lg:sticky lg:top-20 lg:col-start-2 lg:row-start-3">
+          {tail}
+        </div>
       ) : (
         tail
       )}

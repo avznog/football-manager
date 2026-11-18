@@ -41,10 +41,12 @@
      binds there. `read` is the box the app shell's <main> has always had — 48rem including its
      `md:px-6`, so 720 px of content — and stays the default. `wide` widens that same box for a page
      that asks for it (`PageContainer width="wide"`), `form` narrows the content of a form page.
-     `--container-*` is Tailwind's namespace, so these are `max-w-form`, `max-w-read`, `max-w-wide`. */
+     `--container-*` is Tailwind's namespace, so these are `max-w-form`, `max-w-read`, `max-w-wide`.
+     `wide` is 88rem since decision 230: at 72rem a 1 920 px screen still showed a centred column with
+     ~400 px of empty space either side, which is what the owner called « a giant phone ». */
   --container-form: 32rem;
   --container-read: 48rem;
-  --container-wide: 72rem;
+  --container-wide: 88rem;
 
   /* ---------------- LIGHT THEME ----------------
      Ratios below are against the surfaces they are allowed to sit on:

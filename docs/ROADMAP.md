@@ -2809,3 +2809,9 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       puts the controls beside the pitch from `2xl:`. Full-width buttons on those pages are label-sized
       from `lg:`. A tall column spanning several rows goes into a trailing `1fr` row so it does not
       stretch its neighbours' rows. 390 px is pixel-identical to before.
+- [x] **Desktop, the match pages laid out for real** — 2026-11-18. Decision **230**, after the owner
+      rejected slices A–D as « a giant phone ». `--container-wide` 88rem; the match page is in columns
+      in every state (composition card beside game mode before the match, a balanced two-column flow
+      and an actions column after it), the composition card has a `split` form, the strip is a query
+      container of `thumb` pitches, the saisie form and the notation tiles are two/three columns. Phone
+      captures identical (44/44).

@@ -33,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageContainer } from "@/components/ui/page-container";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { matchNameFr, pluralize } from "@/lib/calendar/labels";
@@ -107,9 +108,17 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
   // is every member's, and whether *this* member took part no longer bears on it.
   const mayRate = finished && can(actor, "rating:submit", { teamId: team.id });
   const whyAsked = whyAskedFr(played, sheetRole);
+  // The form is the one state with something to lay out: its rows are tiles from `lg:` and want the
+  // `wide` page (decision 230). Every other state is one short card and keeps `read`.
+  const formShown =
+    finished &&
+    eligible &&
+    targets.length > 0 &&
+    !(progress.complete && progress.requiredCount > 0) &&
+    mayRate;
 
   return (
-    <div className="space-y-6">
+    <PageContainer width={formShown ? "wide" : "read"} className="space-y-6">
       <header className="space-y-2">
         <Link
           href={`/match/${match.id}`}
@@ -202,7 +211,7 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
         />
       ) : (
         <>
-          <p className="text-sm text-ink-muted">
+          <p className="text-sm text-ink-muted md:max-w-prose">
             Une note de 0 à 10 par demi-points, pour chaque joueur qui était sur le terrain. L’équipe
             lira une moyenne par joueur, jamais ta note à toi — seul le coach voit les notes une par
             une.
@@ -210,14 +219,16 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
           {/* Why he is being asked although he did not play, when that is the case. Everybody notes
               now (decision 139), and a supporter who was told the opposite last week is owed the
               reason rather than left to guess that something broke. */}
-          {whyAsked ? <p className="text-sm text-ink-muted">{whyAsked}</p> : null}
+          {whyAsked ? <p className="text-sm text-ink-muted md:max-w-prose">{whyAsked}</p> : null}
           {/* Nothing closes the notation, so there is no deadline to state — what is stated instead is
               who decides, and, when the figures are already out, that his notes will still move one the
               squad has read (decision 079's rule applied to the absence of a limit). */}
-          <p className="text-sm font-medium text-ink">{ratingInvitationFr(meansVisible)}</p>
+          <p className="text-sm font-medium text-ink md:max-w-prose">
+            {ratingInvitationFr(meansVisible)}
+          </p>
           <RatingSheet teamId={team.id} matchId={match.id} targets={targets} />
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

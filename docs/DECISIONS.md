@@ -9422,3 +9422,45 @@ Where this departs from the plan:
 
 `scripts/audit-screens.ts` now walks 1280 × 800 as well as 390 × 844, with a `-1280` suffix on the
 desktop captures so a diff against an older 390 px run still lines up.
+
+## 230 — The match pages are laid out for a desktop, not widened: the first pass was rejected
+
+**2026-11-18.** Supersedes the part of decision **228** that kept `read` (48rem) as the desktop width
+of the match pages, and decision **229**'s « two a row » for the compositions strip. The rest of 228
+— the three tokens, `PageContainer`, a page that says nothing keeps `read` — stands.
+
+**Why.** The owner looked at slices A–D on a real screen and rejected them: « Honestly, it is
+cataclysmic. Every page is still in one column, as if it was a giant phone. » He was right on the
+measurements. At 1440 × 900 the upcoming match was 1 809 px tall with the composition card under game
+mode; the played match was 5 141 px; the notation form was a 720 px list three screens long with the
+right half of the window empty. Slices B and C had added widths and a few two-column runs, but every
+match page in a `read` box was still one column of phone cards, and the widest box was 72rem on a
+1 216 px main. Being correct at 390 px and being byte-identical there was never in question — the
+failure was that nothing was *assembled* for the width.
+
+**The rule now.** On the match pages, every state with more than one card is in columns from `lg:`,
+the primary view fits a 1440 × 900 screen as far as the content allows, and no pitch is larger than
+`card`. Still no card moves in the phone order and every addition is `md:`/`lg:`/`min-[…]:`: the
+390 px captures are identical before and after (44/44).
+
+- **`--container-wide` is 88rem** (was 72rem): at 1440 the main is the window less the sidebar.
+- **Match page, before the end.** Coach: `wide`, a `24rem | 1fr` grid — the header, game mode, then
+  Terminer / delete on the left, and the composition card on the right in its new **`split`** form
+  (pitch beside the plans, `CompositionCard split`). Player: `read` in `1fr | 22rem`, game mode beside
+  the header. The upcoming coach page went from 1 809 to 1 127 px and « Ouvrir le mode match » to y≈474.
+- **Match page, finished.** The run of read-only cards (notes, supporters, minutes, déroulé) is a
+  balanced two-column flow from 85rem (CSS columns, so the DOM order is the reading order); the
+  compositions strip goes under it in the left column and the coach's composition card into the right
+  one, under the actions (`lg:contents` on their shared wrapper). 5 141 → 3 004 px; it is still the
+  longest page because the coach's notes list one row per player, and that list is the content.
+- **Compositions strip** is a query container: one to four blocks a row by the width the card is given,
+  and each block's pitch is `thumb`. Two a row of a viewport breakpoint drew 730 px pitches on 88rem.
+- **Compositions page**: three plans a row from 85rem.
+- **Saisie, first entry**: score and composition on the left, actions, « Ce qui sera enregistré » and
+  the save button on the right; `wide` once there is something to fill. 1 449 → 979 px.
+- **Notation**: the rows are tiles, two then three a row, and « Envoyer mes notes » is label-sized from
+  `lg:`. Twelve players fit one screen: 1 368 → 923 px. Only the form state is `wide`.
+
+Checked on a throwaway database by capturing every page and state in both roles and themes at
+390 × 844, 1440 × 900 and 1920 × 1080, before and after; the 1440 × 900 viewport-only contact sheet is
+what the owner reviews.

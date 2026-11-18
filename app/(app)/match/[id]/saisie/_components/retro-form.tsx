@@ -260,20 +260,30 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
     setActions((rows) => rows.filter((row) => row.key !== key));
 
   return (
-    <form action={action} className="space-y-4">
+    /*
+     * Two columns from `lg:` (decision 230): who played on the left — the score and the starting seven
+     * — and what happened on the right — the actions, what will be recorded, and « Enregistrer ». The
+     * two wrappers hold consecutive runs of the form, so the phone order is the form's own, and their
+     * `space-y-4` is the form's, so the phone spacing is too.
+     */
+    <form
+      action={action}
+      className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 lg:gap-y-4 lg:space-y-0"
+    >
       <input type="hidden" name="teamId" value={teamId} />
       <input type="hidden" name="matchId" value={view.match.id} />
       <input type="hidden" name="lineupId" value={lineupId} />
 
-      {state?.error ? <FieldError className="px-1">{state.error}</FieldError> : null}
+      {state?.error ? <FieldError className="px-1 lg:col-span-2">{state.error}</FieldError> : null}
       {state?.fieldErrors
         ? Object.entries(state.fieldErrors).map(([key, messages]) => (
-            <FieldError key={key} className="px-1">
+            <FieldError key={key} className="px-1 lg:col-span-2">
               {messages}
             </FieldError>
           ))
         : null}
 
+      <div className="space-y-4 lg:col-start-1">
       {/* ---- The score, derived ------------------------------------------- */}
 
       {/*
@@ -345,7 +355,9 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
           })}
         </ul>
       </Card>
+      </div>
 
+      <div className="space-y-4 lg:col-start-2">
       {/* ---- Everything that happened, in one list ------------------------ */}
 
       {/*
@@ -578,6 +590,7 @@ export function RetroForm({ teamId, view }: RetroFormProps) {
         Le déroulé sera écrit comme si le match avait été suivi en direct : les statistiques, le
         résumé et les notes s’en servent tels quels.
       </p>
+      </div>
     </form>
   );
 }
