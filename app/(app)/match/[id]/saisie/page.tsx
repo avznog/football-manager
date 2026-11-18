@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageContainer } from "@/components/ui/page-container";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { capitalizeFirst, formatDay, formatTime } from "@/lib/calendar/time";
@@ -69,8 +70,10 @@ export default async function SaisiePage({ params, searchParams }: PageProps<"/m
   const played = view.match.status === "finished" || kickoff.getTime() <= now.getTime();
   const corrected = query.corrige === "1";
 
+  // `wide` only where the corrections render (decision 227): they are two columns from `lg:`, and a
+  // `read` page would leave the déroulé a 340 px column. The first-time entry form keeps `read`.
   return (
-    <div className="space-y-4">
+    <PageContainer width={played && view.hasLog ? "wide" : "read"} className="space-y-4">
       <header className="space-y-1">
         <Link
           href={`/match/${view.match.id}`}
@@ -152,6 +155,6 @@ export default async function SaisiePage({ params, searchParams }: PageProps<"/m
           <RetroForm teamId={team.id} view={view} />
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

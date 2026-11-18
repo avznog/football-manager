@@ -14,6 +14,7 @@ import Link from "next/link";
 import { CompositionEditor, type EditorMember } from "@/components/composition";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageContainer } from "@/components/ui/page-container";
 import type { ActiveTeam } from "@/lib/auth/dal";
 import { matchNameFr } from "@/lib/calendar/labels";
 import { capitalizeFirst } from "@/lib/calendar/time";
@@ -257,8 +258,10 @@ function Shell({
   match: MatchRow;
   children: ReactNode;
 }) {
+  // `wide` (decision 227): the editor is two columns from `lg:` — pitch and controls side by side —
+  // and the `read` width would leave the controls a 280 px column.
   return (
-    <div className="space-y-4">
+    <PageContainer width="wide" className="space-y-4">
       <header className="space-y-1">
         <Link
           href={backHref}
@@ -273,7 +276,7 @@ function Shell({
         </p>
       </header>
       {children}
-    </div>
+    </PageContainer>
   );
 }
 

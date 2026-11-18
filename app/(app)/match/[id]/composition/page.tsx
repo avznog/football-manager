@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageContainer } from "@/components/ui/page-container";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { matchNameFr } from "@/lib/calendar/labels";
@@ -84,8 +85,9 @@ export default async function CompositionsPage({
 
   const kit = { primaryColor: team.primaryColor, secondaryColor: team.secondaryColor };
 
+  // `wide` (decision 227): the plans are two a row from `lg:`.
   return (
-    <div className="space-y-4">
+    <PageContainer width="wide" className="space-y-4">
       <header className="space-y-1">
         <Link
           href={`/match/${match.id}`}
@@ -122,6 +124,11 @@ export default async function CompositionsPage({
         <p className="text-sm text-ink-muted">{screen.frozenNoticeFr}</p>
       ) : null}
 
+      {/* Two plans a row from `lg:` (decision 227, slice C), in the `wide` page. A plain `space-y-4`
+          block at phone width, which lays the cards out exactly as the page's own `space-y-4` did;
+          rendered only when there is a plan, because an empty block would still take that margin. */}
+      {lineups.length > 0 ? (
+      <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
       {lineups.map((row) => {
         const plan = toPlannedLineup(row);
         const previous = planInForceBefore(plans, plan.fromMinute, plan.id);
@@ -232,6 +239,8 @@ export default async function CompositionsPage({
           </Card>
         );
       })}
+      </div>
+      ) : null}
 
       {plans.length > 0 && screen.editable ? (
         <Card
@@ -243,6 +252,6 @@ export default async function CompositionsPage({
           </ButtonLink>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

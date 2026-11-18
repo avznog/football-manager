@@ -9382,3 +9382,43 @@ The raw `<input>`s in team settings, invites and `/moi` are untouched on purpose
 kick-off 686 → 256, periods and minutes 337 → 160. At 390 px, 56 of 58 captures are pixel-identical;
 the other two are the played match, where Léo and Thomas both average exactly 7,0 from the same four
 notes and swapped places between two seeds — their tie order follows ids that change with each seed.
+
+## 229 — Two columns from `lg:` without moving a card in the phone order
+
+**2026-11-18.** Slice C of the desktop plan (decision 227): the composition editor, the correction
+screen, the finished match page, stats, the équipe type and the compositions page get a two-column
+layout from `lg:`. The rule that shaped every one of them is that **the phone order is never changed**,
+because it is also the keyboard and screen-reader order; reordering the JSX and restoring the phone
+order with CSS `order` would have left a phone reader tabbing through the page in an order he cannot
+see.
+
+**How a page splits without moving anything.** Where the cards meant for the right column are already
+consecutive in the phone order, they are wrapped in one block: a `space-y-*` block identical to the
+parent's lays its children out exactly as the parent did, so the wrapper is invisible at 390 px. A run
+that can be empty renders no block at all, because an empty block still takes the parent's margin.
+Where a page interleaves left and right cards, it is cut into the runs that *are* consecutive and each
+run is placed with `lg:col-start-*`/`lg:row-start-*`; floats were tried on paper and rejected, because a
+float may not rise above anything earlier in the source, which would have put « Corriger le match »
+under the compositions.
+
+Where this departs from the plan:
+
+- **The finished match page is `wide`**, not `read`: at 48rem the left column would have been 344 px.
+  Only when it is in two columns — an upcoming match keeps `read`. Its runs: the scoreboard (left), the
+  notes duty and the man of the match (right), everything from the ratings panel to the compositions
+  (left), and « Corriger », game mode and delete (right, sticky). **The ratings panel is left, not
+  right**: for a coach it lists every note, and in the right column it pushed « Corriger le match » off
+  the screen — the action this layout exists to bring up.
+- **The correction screen's sticky column is the right one**, not the déroulé: a match's déroulé is
+  taller than a screen, and a sticky element taller than the viewport hides its own bottom. The right
+  column holds the three cards that act, capped to the viewport height and scrollable on its own,
+  because « Sur la feuille de match » lists every player. `wide` only when there are corrections to
+  show; the first-time entry form keeps `read`.
+- **The composition editor's page is `wide`** too, for the same reason as the match page.
+- **The compositions strip is two blocks a row, not three**: in the match page's left column three
+  would be about 200 px each, smaller than the 272 px a block is drawn at on a phone.
+- **Stats** puts two boards a row in every section but « Impact par poste » and « Notes », which have
+  one card each — a lone board in half the width reads as a missing neighbour.
+
+`scripts/audit-screens.ts` now walks 1280 × 800 as well as 390 × 844, with a `-1280` suffix on the
+desktop captures so a diff against an older 390 px run still lines up.

@@ -88,13 +88,20 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
     periodMinutes: view.match.periodMinutes,
   });
 
+  /*
+   * Desktop (decision 227, slice C): from `lg:` the déroulé is the left column and the three cards
+   * that add or remove something sit in a sticky right column, so the list a correction is reasoned
+   * from stays in view while the coach picks what to do. The three cards were already consecutive, so
+   * their wrapper is a plain `space-y-4` block: at phone width it lays them out exactly as the
+   * parent's `space-y-4` did.
+   */
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-x-6 lg:gap-y-4 lg:space-y-0">
       {state?.error && lastFrom === "line" ? (
-        <FieldError className="px-1">{state.error}</FieldError>
+        <FieldError className="px-1 lg:col-span-2">{state.error}</FieldError>
       ) : null}
 
-      <Card>
+      <Card className="lg:col-span-2">
         <p className="text-sm text-ink-muted">
           Une correction ne réécrit rien&nbsp;: l’action fautive est annulée et la bonne est ajoutée.
           Les deux restent dans le déroulé, et les statistiques de la saison sont recalculées
@@ -169,6 +176,10 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
         </ul>
       </Card>
 
+      {/* Capped to the viewport and scrollable on its own: « Sur la feuille de match » lists every
+          player, and a sticky column taller than the screen would hide its own bottom. */}
+      <div className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
+
       <Card title="Ajouter un changement" as="h2">
         <div className="space-y-3">
           <p className="text-sm text-ink-muted">
@@ -209,6 +220,7 @@ export function RetroCorrections({ teamId, view }: RetroCorrectionsProps) {
           </Button>
         </div>
       </Card>
+      </div>
 
       <AmendSheet
         teamId={teamId}
