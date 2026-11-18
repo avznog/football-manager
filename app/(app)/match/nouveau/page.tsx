@@ -35,7 +35,7 @@ export default async function NewMatchPage() {
         >
           ← Calendrier
         </Link>
-        <h1 className="text-xl font-bold tracking-tight text-ink">Nouveau match</h1>
+        <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Nouveau match</h1>
       </header>
 
       <Card>

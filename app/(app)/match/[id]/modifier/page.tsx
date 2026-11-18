@@ -48,7 +48,7 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
         >
           ← {match.opponentName}
         </Link>
-        <h1 className="text-xl font-bold tracking-tight text-ink">Modifier le match</h1>
+        <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Modifier le match</h1>
       </header>
 
       <Card>

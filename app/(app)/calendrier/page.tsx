@@ -35,7 +35,7 @@ export default async function CalendarPage() {
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight text-ink">Calendrier</h1>
+        <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Calendrier</h1>
         {team.isCoach ? (
           <ButtonLink href="/match/nouveau" size="sm">
             Nouveau match

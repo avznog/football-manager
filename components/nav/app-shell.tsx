@@ -92,8 +92,11 @@ export function AppShell({ team, user, isCoach, children }: AppShellProps) {
             {team.name}
           </p>
 
+          {/* `md:hidden` because the sidebar carries the same badge from `md:` (decision 227):
+              shown twice on one desktop screen it read as two different things. Phones never see
+              it either way — `hidden` below `sm:`. */}
           {isCoach ? (
-            <Badge variant="accent" className="hidden sm:inline-flex">
+            <Badge variant="accent" className="hidden sm:inline-flex md:hidden">
               Coach
             </Badge>
           ) : null}

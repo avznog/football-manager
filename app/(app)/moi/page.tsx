@@ -40,7 +40,7 @@ export default async function MePage() {
       <header className="flex items-center gap-3">
         <Avatar name={user.displayName} size="lg" />
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-bold tracking-tight text-ink">
+          <h1 className="truncate text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">
             {user.displayName}
           </h1>
           <p className="truncate text-sm text-ink-subtle">@{user.username}</p>

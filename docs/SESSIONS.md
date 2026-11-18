@@ -7696,3 +7696,33 @@ Files: `app/globals.css`, `components/ui/page-container.tsx` (new), `components/
 `app/(app)/match/nouveau/page.tsx`, `app/(app)/match/[id]/modifier/page.tsx`,
 `app/(app)/match/[id]/supprimer/page.tsx`, `docs/DECISIONS.md` (228), `docs/ROADMAP.md`,
 `docs/SESSIONS.md`.
+### Desktop, slice D: navigation and polish
+
+Decision **227**, slice D of the plan of 2026-11-18. Every change is `md:` or desktop-only, and the
+390 px captures were diffed against a baseline taken on the unchanged base (capture run twice, second
+run kept, because the first run changes the data — slice A's finding).
+
+- **The sidebar highlights Calendrier on `/match/*`.** A match is reached from the calendar and was
+  nobody's tab, so the sidebar lit nothing on the screens a coach uses most with a mouse.
+  `isSidebarActivePath` is the sidebar's own rule; the bottom tab bar keeps `isActivePath`.
+- **A row of the match's pages under its title**, `hidden md:block`: Match · Compositions ·
+  Corriger (« Saisir » when nothing was recorded) · Noter. It grants nothing: each link appears on the
+  flag the page already shows that card on — `match:manageLineups` (the compositions page's own guard),
+  `match:amend` on a finished match, `mayRate`. A player sees Match · Noter at most, and a row of one
+  link is not drawn. Placed between the title and the date on purpose: the header is `space-y-2`, which
+  puts a bottom margin on every child but the last, so a hidden row placed last would still have added
+  8 px under the date on a phone.
+- **The header « Coach » badge is `md:hidden`**: from `md:` the sidebar shows the same badge.
+- **`md:max-w-prose`** on `Card` descriptions and on the intro paragraph under each page title.
+- **Page titles `md:text-2xl md:leading-tight`** everywhere they were `text-xl`; the three already at
+  `text-2xl` were the target. Phones keep their sizes.
+- **`Sheet` takes `size="md" | "lg"`** (`md:max-w-lg` / `md:max-w-xl`) instead of a width in
+  `className`; the terrain sheet, the only override, is `size="lg"` at the same width as before.
+- **The stats filter strip** bleeds by `md:-mx-6 md:px-6`, the shell's desktop gutter, instead of
+  stopping 8 px short.
+
+Files: `components/nav/nav-items.tsx`, `components/nav/sidebar-nav.tsx`, `components/nav/app-shell.tsx`
+(the badge only), `components/ui/card.tsx`, `components/ui/sheet.tsx`,
+`components/action-sheet/terrain-sheet.tsx`, `app/(app)/match/[id]/_components/match-links.tsx` (new),
+`app/(app)/match/[id]/page.tsx`, `app/(app)/stats/_components/filters.tsx`, the title and intro lines of
+eleven page files, `docs/ROADMAP.md`, `docs/SESSIONS.md`.

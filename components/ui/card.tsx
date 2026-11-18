@@ -55,7 +55,9 @@ export function Card({
               </Heading>
             ) : null}
             {description ? (
-              <p className="mt-0.5 text-sm text-ink-muted">{description}</p>
+              // `md:max-w-prose` (decision 227): on a desktop card a sentence otherwise runs
+              // 100–120 characters to the line. A phone column never gets that wide.
+              <p className="mt-0.5 text-sm text-ink-muted md:max-w-prose">{description}</p>
             ) : null}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}

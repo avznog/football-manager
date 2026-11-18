@@ -2783,6 +2783,13 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       C's grids, since a one-column board list at 1104 px would be worse than today. **Mobile pixel-
       identical**: 56/58 screens at 390 px diffed to zero, and the two others differ only by two
       players tied at 7,0 swapping places — tie order follows ids that change with each seed, not CSS
-- [ ] **Desktop, slices C and D** (plan of 2026-11-18): two-column `lg:` layouts (composition editor —
+- [x] **Desktop, slice D: navigation and polish** — 2026-11-18. Decision **227**. The sidebar
+      highlights Calendrier on `/match/*` (the tab bar keeps its own rule); a `hidden md:block` row of
+      the match's pages under its title — Match · Compositions · Corriger/Saisir · Noter, each shown on
+      exactly the flag the page already shows that card on; the header « Coach » badge hidden from
+      `md:` where the sidebar shows it; `md:max-w-prose` on card descriptions and page intros; every
+      page title `md:text-2xl`; `Sheet` takes `size="md" | "lg"` instead of a width in `className`; the
+      stats filter strip follows the `md:px-6` gutter
+- [ ] **Desktop, slice C** (plan of 2026-11-18): two-column `lg:` layouts (composition editor —
       decision 105's dock is 1 900 px down —, correction screen, match page, stats with `wide`,
-      compositions strip); navigation and polish. Same rule: `md:`/`lg:` only, 390 px diffed to zero
+      compositions strip). Same rule: `md:`/`lg:` only, 390 px diffed to zero
