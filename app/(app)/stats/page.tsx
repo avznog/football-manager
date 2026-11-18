@@ -85,10 +85,14 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
   const filterLabel = competitionLabelOf(competitions, query.competitionId);
   const scopeLabel = filterLabel?.toLocaleLowerCase("fr-FR") ?? "toutes compétitions";
 
-  // `wide` (decision 227): the sections below are two boards a row from `lg:`.
+  // `wide` (decision 227): the sections below are two boards a row from `lg:`. From `xl:` the page is
+  // itself two columns (decision 230): the long sections span both, the short ones sit side by side.
   return (
-    <PageContainer width="wide" className="space-y-6">
-      <header className="space-y-3">
+    <PageContainer
+      width="wide"
+      className="space-y-6 xl:grid xl:grid-cols-2 xl:items-start xl:gap-6 xl:space-y-0"
+    >
+      <header className="space-y-3 xl:col-span-2">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Statistiques</h1>
           <p className="mt-0.5 text-sm text-ink-muted md:max-w-prose">
@@ -102,6 +106,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
       {/* Nothing at all: one honest empty state rather than eight cards full of dashes. */}
       {stats.isEmpty ? (
         <EmptyState
+          className="xl:col-span-2"
           title="Pas encore de statistiques"
           description={
             filterLabel === null
@@ -132,6 +137,7 @@ function SeasonCards({
     return (
       <>
         <EmptyState
+          className="xl:col-span-2"
           title="Aucun match terminé dans cette sélection"
           description={
             query.competitionId === null
@@ -140,7 +146,7 @@ function SeasonCards({
           }
         />
         {stats.liveMatches > 0 ? (
-          <p className="text-sm text-ink-muted">
+          <p className="text-sm text-ink-muted xl:col-span-2">
             {matchCount(stats.liveMatches)} en cours{" "}
             {stats.liveMatches > 1 ? "sont exclus" : "est exclu"} : ses minutes bougent encore.
           </p>
@@ -151,18 +157,22 @@ function SeasonCards({
 
   return (
     <>
-      <TeamSummary
-        team={stats.team}
-        matchesConsidered={stats.matchesConsidered}
-        liveMatches={stats.liveMatches}
-      />
+      {/* A wrapper for the `xl:` placement only: on the phone it is a block around one card, inside
+          the same `space-y-6`, so it renders as the bare card did. */}
+      <div className="xl:col-span-2">
+        <TeamSummary
+          team={stats.team}
+          matchesConsidered={stats.matchesConsidered}
+          liveMatches={stats.liveMatches}
+        />
+      </div>
 
       {/* The one place the season's figures turn into a claim about next Sunday. Kept as a link
           rather than a section of this page: it needs its own choice of seven in the URL, and four more chips here would bury the season under its own controls. The competition
           filter travels with it so the two screens agree on what they are talking about. */}
       <Link
         href={equipeTypeHref({ competitionId: query.competitionId, seven: DEFAULT_SEVEN })}
-        className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-surface px-4 py-3 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-surface px-4 py-3 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent xl:col-span-2"
       >
         <span className="min-w-0">
           <span className="block font-semibold text-ink">L’équipe type</span>
@@ -235,7 +245,7 @@ function SeasonCards({
         />
       </Section>
 
-      <Section title="Défense">
+      <Section title="Défense" half>
         <Leaderboard
           title="Buts encaissés sur le terrain"
           /* Fewest first since decision 195, and the heading says so: a list of totals that starts at
@@ -260,7 +270,7 @@ function SeasonCards({
         />
       </Section>
 
-      <Section title="Gardiens">
+      <Section title="Gardiens" half>
         <Leaderboard
           title="Buts encaissés au goal"
           description="Du total le plus faible au plus élevé : les buts pris pendant qu’il était dans les buts"
@@ -334,11 +344,13 @@ function SeasonCards({
         />
       </Section>
 
-      <PlayerList
-        players={sortPlayers(stats.players, query.sort)}
-        query={query}
-        pendingRatingMatches={stats.pendingRatingMatches}
-      />
+      <div className="xl:col-span-2">
+        <PlayerList
+          players={sortPlayers(stats.players, query.sort)}
+          query={query}
+          pendingRatingMatches={stats.pendingRatingMatches}
+        />
+      </div>
     </>
   );
 }
@@ -350,23 +362,39 @@ function SeasonCards({
  * list, and stacked one under another at 1 000 px each was a long column of mostly empty width. The
  * heading spans both. `single` keeps one full-width card for a section that has only one — a lone
  * board in half the width reads as a missing neighbour.
+ *
+ * From `xl:` the page itself is two columns (decision 230), and a section says how it sits in them:
+ * `full` spans both with **three** boards a row, `half` takes one column with its boards stacked —
+ * two boards side by side in half of a 1 200 px page were 270 px each, too narrow for « 1 but
+ * encaissé toutes les 39′ ». `single` takes one column too.
  */
 function Section({
   title,
   children,
   single = false,
+  half = false,
 }: {
   title: string;
   children: ReactNode;
   single?: boolean;
+  half?: boolean;
 }) {
+  const layout = single
+    ? "space-y-4"
+    : half
+      ? "space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 xl:grid-cols-1"
+      : "space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 xl:col-span-2 xl:grid-cols-3";
   return (
-    <section
-      className={
-        single ? "space-y-4" : "space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0"
-      }
-    >
-      <h2 className="text-base font-semibold text-ink lg:col-span-2">{title}</h2>
+    <section className={layout}>
+      <h2
+        className={
+          single ? "text-base font-semibold text-ink lg:col-span-2" : half
+            ? "text-base font-semibold text-ink lg:col-span-2 xl:col-span-1"
+            : "text-base font-semibold text-ink lg:col-span-2 xl:col-span-3"
+        }
+      >
+        {title}
+      </h2>
       {children}
     </section>
   );

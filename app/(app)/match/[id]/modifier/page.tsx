@@ -40,7 +40,8 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
   const competitions = competitionOptions(allCompetitions, match.competitionId);
 
   return (
-    <PageContainer width="form" className="space-y-4">
+    // Same width rule as « Nouveau match » (decision 230): two form columns from `lg:` need 56rem.
+    <PageContainer width="wide" className="space-y-4 md:mx-auto md:max-w-form lg:max-w-4xl">
       <header className="space-y-1">
         <Link
           href={`/match/${match.id}`}

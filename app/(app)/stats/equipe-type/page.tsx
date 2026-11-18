@@ -391,8 +391,16 @@ async function Seven({
     }),
   ].filter((note): note is string => note !== null);
 
+  /*
+   * Two wrappers from `2xl:` (decision 230): the answer on the left — whose seven it is, the pitch and
+   * its list, the model's summary — and the ways of asking again beside it, with the caveats under
+   * them, instead of a full-width form and a card of caveats a screen below the pitch. On the phone
+   * the wrappers are two `space-y-6` blocks inside this one, holding the same five things in the same
+   * order with the same 1.5rem between them, so it renders as the fragment did.
+   */
   return (
-    <>
+    <div className="space-y-6 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_24rem] 2xl:items-start 2xl:gap-6 2xl:space-y-0">
+      <div className="space-y-6">
       {/* Whose seven this is, immediately above it and never behind a hover (decision 072). The three
           model failures read as facts about the model with the algorithm's seven still on the pitch,
           and never as a status code: a rate limit is a busy minute and a hang says only that the
@@ -436,7 +444,9 @@ async function Seven({
           <p className="text-sm leading-relaxed text-ink">{answer.summary}</p>
         </Card>
       ) : null}
+      </div>
 
+      <div className="space-y-6 2xl:sticky 2xl:top-20">
       {/* The selects and the context field sit here, between the seven and the paragraphs about it: the
           reader meets the answer first, then the ways of asking a different question. Four chip rows
           above the pitch put about 216 px of controls before anything they control. */}
@@ -453,7 +463,8 @@ async function Seven({
           </p>
         ))}
       </Card>
-    </>
+      </div>
+    </div>
   );
 }
 

@@ -17,6 +17,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PageContainer } from "@/components/ui/page-container";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { formatDateFr, injuryStatus, parisDate } from "@/lib/player/injury";
@@ -67,9 +68,39 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
   // has such a member. What the removal actually takes away is now derived (decision NNN).
   const removal = removeMemberCardFr(profile.displayName, profile.isPlayer);
 
+  /*
+   * Desktop (decision 230), `lg:`/`2xl:` only. A player's page is three things a reader looks at
+   * together — where he plays (the pitch), who he is (fiche, injuries) and what he has done (stats) —
+   * so from `lg:` the pitch is a column of its own beside the fiche, and from `2xl:` the stats take a
+   * third column instead of sitting under everything. Not `xl:`: at 1440 px the content is ~1 100 px
+   * wide, and a third column folded the fiche's labels onto three lines. Rows are explicit so the
+   * phone order stands.
+   * A member of the encadrement has no pitch and no stats: his two cards simply sit side by side.
+   */
+  const layout = profile.isPlayer
+    ? {
+        page: "lg:grid-cols-[26rem_minmax(0,1fr)] 2xl:grid-cols-[26rem_minmax(0,1fr)_minmax(0,1fr)]",
+        positions: "lg:col-start-1 lg:row-span-4 lg:row-start-3",
+        fiche: "lg:col-start-2 lg:row-start-3",
+        injuries: "lg:col-start-2 lg:row-start-4",
+        stats: "lg:col-start-2 lg:row-start-5 2xl:col-start-3 2xl:row-span-3 2xl:row-start-3",
+        removal: "lg:col-start-2 lg:row-start-6 2xl:row-start-5",
+      }
+    : {
+        page: "lg:grid-cols-2",
+        positions: "",
+        fiche: "lg:col-start-1 lg:row-start-3",
+        injuries: "lg:col-start-2 lg:row-start-3",
+        stats: "",
+        removal: "lg:col-start-1 lg:row-start-4",
+      };
+
   return (
-    <div className="space-y-6">
-      <p className="text-sm">
+    <PageContainer
+      width="wide"
+      className={`space-y-6 lg:grid lg:items-start lg:gap-6 lg:space-y-0 ${layout.page}`}
+    >
+      <p className="text-sm lg:col-span-full">
         <Link
           href="/equipe"
           className="inline-flex min-h-11 items-center text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -78,7 +109,7 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
         </Link>
       </p>
 
-      <header className="flex items-center gap-4">
+      <header className="flex items-center gap-4 lg:col-span-full">
         <Avatar name={profile.displayName} size="lg" />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">
@@ -104,18 +135,21 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
       </header>
 
       {profile.isPlayer ? (
-        <PositionsEditor
-          // Remounted when the stored positions change, so a save (or somebody else's) resets the
-          // local selection instead of leaving a stale « non enregistré ».
-          key={positionsSignature(profile.positions)}
-          teamId={team.id}
-          memberId={profile.membershipId}
-          positions={profile.positions}
-          canEdit={canEditPositions}
-        />
+        // A wrapper carrying the desktop placement only; on the phone it is a block around one card.
+        <div className={layout.positions}>
+          <PositionsEditor
+            // Remounted when the stored positions change, so a save (or somebody else's) resets the
+            // local selection instead of leaving a stale « non enregistré ».
+            key={positionsSignature(profile.positions)}
+            teamId={team.id}
+            memberId={profile.membershipId}
+            positions={profile.positions}
+            canEdit={canEditPositions}
+          />
+        </div>
       ) : null}
 
-      <Card title="Fiche">
+      <Card title="Fiche" className={layout.fiche}>
         {/* The maillot, as two fields and two permissions: the coach hands out the number, which has
             to be unique in the squad, and the flocage belongs to the man whose back it is printed on
             (decision 104). Hence two forms rather than one — whoever may change only one of them
@@ -200,17 +234,19 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
       </Card>
 
       {profile.isPlayer ? (
-        <InjuriesCard
-          teamId={team.id}
-          memberId={profile.membershipId}
-          injuries={profile.injuries}
-          today={today}
-          canManage={canManageInjuries}
-          isSelf={isSelf}
-        />
+        <div className={layout.injuries}>
+          <InjuriesCard
+            teamId={team.id}
+            memberId={profile.membershipId}
+            injuries={profile.injuries}
+            today={today}
+            canManage={canManageInjuries}
+            isSelf={isSelf}
+          />
+        </div>
       ) : (
         /* Not « Fiche joueur »: the one sentence under that heading says this member is not one. */
-        <Card title={noPlayerSheetTitleFr()}>
+        <Card title={noPlayerSheetTitleFr()} className={layout.injuries}>
           <p className="text-sm text-ink-muted">
             Ce membre fait partie de l’encadrement&nbsp;: pas de postes ni de blessures à suivre.
           </p>
@@ -218,11 +254,13 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
       )}
 
       {profile.isPlayer ? (
-        <PlayerStatsCard teamId={team.id} memberId={profile.membershipId} isSelf={isSelf} />
+        <div className={layout.stats}>
+          <PlayerStatsCard teamId={team.id} memberId={profile.membershipId} isSelf={isSelf} />
+        </div>
       ) : null}
 
       {canRemove && !isSelf && !profile.isLastCoach ? (
-        <Card title={removal.titleFr} description={removal.descriptionFr}>
+        <Card title={removal.titleFr} description={removal.descriptionFr} className={layout.removal}>
           {/* A plain form: no confirmation dialog to get wrong, and it works without JavaScript.
               `removeMember` sets `left_at` and sends the coach back to the squad list — this page
               would be a 404 on the next render.
@@ -234,12 +272,18 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
           <form action={removeMember}>
             <input type="hidden" name="teamId" value={team.id} />
             <input type="hidden" name="memberId" value={profile.membershipId} />
-            <Button type="submit" variant="danger" fullWidth aria-label={removal.buttonFr}>
+            <Button
+              type="submit"
+              variant="danger"
+              fullWidth
+              aria-label={removal.buttonFr}
+              className="lg:w-auto"
+            >
               {removal.buttonFr}
             </Button>
           </form>
         </Card>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }

@@ -7764,3 +7764,56 @@ Files: `components/composition/composition-editor.tsx`,
 `app/(app)/stats/page.tsx`, `app/(app)/stats/equipe-type/page.tsx`,
 `app/(app)/stats/equipe-type/_components/seven-pitch.tsx`, `scripts/audit-screens.ts`,
 `docs/DECISIONS.md` (229), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-11-18 — Desktop second pass: the non-match pages (decision 230)
+
+The owner rejected the first desktop pass on his ~1 863 px screen: every page was still a single column.
+This session reworked the pages outside `/match/[id]/**`. A parallel session did game mode, the match
+pages and the `--container-wide` token (88rem). All layout is `lg:`/`xl:`/`2xl:` grid placement with
+explicit lines. JSX order is unchanged, and every wrapper `<div>` is one that renders the same on a phone.
+
+- **Calendrier** (`wide`): `2fr | 3fr`. The next match and « À venir » sit on the left. The history is
+  on the right because it is the longest list, and a narrow third column cut its opponent names.
+  « Voir le match » is label-sized.
+- **Équipe** (`wide`): the roster is on the left, two players a row from `xl:`. On the right is the
+  coach's management column (invites, competitions, settings), or for a player the encadrement and
+  the read-only note. The management column spans into a trailing `1fr` row
+  (`lg:grid-rows-[auto_auto_auto_1fr]`). Spanning only the two card rows stretched them and left a
+  screen of blank space between « Effectif » and « Encadrement ». The calendar uses the same trick.
+- **Joueur** (`wide`): the positions pitch is on the left; fiche, injuries, stats and removal are on
+  the right. The stats get a third column only from `2xl:`. At 1440 the content is ~1 100 px whatever
+  the token, and a third column folded the fiche's labels onto three lines.
+- **Moi** (`wide`): two columns, three from `xl:`.
+- **Match form** (`nouveau`, `modifier`): fields in pairs from `lg:` in a `max-w-4xl` page. The submit
+  button is label-sized. **Supprimer**: both buttons are label-sized from `lg:`.
+- **Stats**: two columns from `xl:`. Long sections span both with three boards a row; Défense and
+  Gardiens take one column each (`Section half`). **Équipe type**: controls and notes sit beside the
+  pitch from `2xl:`. The `SlotList` figure is wider from `lg:`, and « Redemander le sept » is
+  label-sized.
+
+At 1440×900, coach (page height → primary action y):
+- calendrier 1111 → 903 (fits);
+- équipe 2971 → 2123 (« Enregistrer » 2866 → 2018);
+- joueur 2468 → 1682 (first « Enregistrer » 1169 → 363);
+- match nouveau 975 → 903 (« Créer le match » 862 → 554);
+- modifier 1001 → 903 (888 → 580);
+- stats 5755 → 5221;
+- équipe type 1807 → 1622 (1501 → 1316);
+- moi and supprimer already fitted.
+
+For a player: équipe 1180 → 903, joueur 2137 → 1435.
+
+Checked: captures on a throwaway database, with the baseline run twice (90/90 identical). After the
+change, 390×844 is **30/30 pixel-identical**. Looked at 1440 and 1920 in both roles and both themes.
+typecheck, eslint on the changed files, 1 736 unit tests and 11 e2e passed.
+
+Not verified: the 88rem token is not in this branch, so 1920 was seen at 72rem. The `2xl:` three
+columns on a player's page are 1 104 px wide there, and cramped until the token lands.
+
+Files: `app/(app)/calendrier/page.tsx`, `app/(app)/calendrier/_components/next-event-card.tsx`,
+`app/(app)/equipe/page.tsx`, `app/(app)/joueur/[id]/page.tsx`, `app/(app)/moi/page.tsx`,
+`app/(app)/match/_components/match-form.tsx`, `app/(app)/match/nouveau/page.tsx`,
+`app/(app)/match/[id]/modifier/page.tsx`, `app/(app)/match/[id]/supprimer/page.tsx`,
+`app/(app)/stats/page.tsx`, `app/(app)/stats/equipe-type/page.tsx`,
+`app/(app)/stats/equipe-type/_components/seven-pitch.tsx`,
+`app/(app)/stats/equipe-type/_components/context-field.tsx`, `docs/ROADMAP.md`, `docs/SESSIONS.md`.

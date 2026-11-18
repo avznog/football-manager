@@ -66,7 +66,16 @@ export function MatchForm({ teamId, matchId, defaults, competitions }: MatchForm
   const lengthHintId = "match-length";
 
   return (
-    <form action={action} className="space-y-5">
+    /*
+     * Two columns from `lg:` (decision 230), in pairs that belong together — opponent and kick-off,
+     * venue side and competition, ground and length — so the form is three rows on a desktop instead
+     * of a 512 px strip of six. `lg:items-start`: each control sits right under a one-line label, so
+     * the pairs' inputs line up whatever hint one of them carries underneath.
+     */
+    <form
+      action={action}
+      className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 lg:gap-y-5 lg:space-y-0"
+    >
       <input type="hidden" name="teamId" value={teamId} />
       {editing ? <input type="hidden" name="matchId" value={matchId} /> : null}
 
@@ -234,7 +243,7 @@ export function MatchForm({ teamId, matchId, defaults, competitions }: MatchForm
       </div>
 
       {state?.error ? (
-        <p role="alert" className="text-sm font-medium text-danger">
+        <p role="alert" className="text-sm font-medium text-danger lg:col-span-2">
           {state.error}
         </p>
       ) : null}
@@ -249,7 +258,7 @@ export function MatchForm({ teamId, matchId, defaults, competitions }: MatchForm
         size="lg"
         pending={pending}
         disabled={competitions.length === 0}
-        className="md:w-auto md:min-w-40"
+        className="md:w-auto md:min-w-40 lg:col-span-2 lg:justify-self-start"
       >
         {editing ? "Enregistrer" : "Créer le match"}
       </Button>

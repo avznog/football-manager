@@ -3,6 +3,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PageContainer } from "@/components/ui/page-container";
 import { logout, switchTeam } from "@/lib/auth/actions";
 import { requireTeamContext, requireUser } from "@/lib/auth/dal";
 import { injuryStatus, injurySummaryFr, parisDate } from "@/lib/player/injury";
@@ -35,9 +36,17 @@ export default async function MePage() {
   const today = parisDate(new Date());
   const status = injuryStatus(profile?.injuries ?? [], today);
 
+  /*
+   * Desktop (decision 230): the page's three cards side by side instead of stacked — two columns from
+   * `lg:` (team and preferences on the left, the player card on the right), three from `xl:`. Grid
+   * lines are explicit so the phone's order and spacing are untouched.
+   */
   return (
-    <div className="space-y-6">
-      <header className="flex items-center gap-3">
+    <PageContainer
+      width="wide"
+      className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0 xl:grid-cols-3"
+    >
+      <header className="flex items-center gap-3 lg:col-span-2 xl:col-span-3">
         <Avatar name={user.displayName} size="lg" />
         <div className="min-w-0">
           <h1 className="truncate text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">
@@ -47,7 +56,7 @@ export default async function MePage() {
         </div>
       </header>
 
-      <Card title="Mon équipe">
+      <Card title="Mon équipe" className="lg:col-start-1 lg:row-start-2">
         <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink">
           {team.name}
           {/* Not a ternary on `role`: that badged the founder of a team « joueur » the moment
@@ -87,13 +96,17 @@ export default async function MePage() {
       <Card
         title="Préférences"
         description="Le thème suit ton téléphone par défaut."
+        className="lg:col-start-1 lg:row-start-3 xl:col-start-2 xl:row-start-2"
       >
         <ThemeToggle />
       </Card>
 
       {/* No preferred positions here any more (cahier des charges, decision 163): the coach sets them,
           and they live on the fiche, read-only for the player, behind « Ouvrir ma fiche ». */}
-      <Card title={myPlayerCardTitleFr(profile !== null)}>
+      <Card
+        title={myPlayerCardTitleFr(profile !== null)}
+        className="lg:col-start-2 lg:row-span-2 lg:row-start-2 xl:col-start-3 xl:row-span-1"
+      >
         {profile ? (
           <div className="space-y-4">
             <p className={status.injured ? "text-sm text-danger" : "text-sm text-ink-muted"}>
@@ -139,11 +152,11 @@ export default async function MePage() {
         )}
       </Card>
 
-      <form action={logout}>
+      <form action={logout} className="lg:col-start-1 lg:row-start-4 xl:row-start-3">
         <Button type="submit" variant="danger">
           Se déconnecter
         </Button>
       </form>
-    </div>
+    </PageContainer>
   );
 }

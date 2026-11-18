@@ -27,7 +27,9 @@ export default async function NewMatchPage() {
   const competitions = competitionOptions(await getTeamCompetitions(team.id));
 
   return (
-    <PageContainer width="form" className="space-y-4">
+    // `wide` so the shell lets the page past 48rem, then the form's own width: 32rem from `md:` as on
+    // every form page, and 56rem from `lg:`, where the form is two columns (decision 230).
+    <PageContainer width="wide" className="space-y-4 md:mx-auto md:max-w-form lg:max-w-4xl">
       <header className="space-y-1">
         <Link
           href="/calendrier"
