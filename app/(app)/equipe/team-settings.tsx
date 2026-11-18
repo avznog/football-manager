@@ -38,7 +38,9 @@ export function TeamSettings({
       title="Réglages de l’équipe"
       description="Le nom, le blason, et les couleurs du maillot — celles des joueurs sur le terrain."
     >
-      <form action={action} className="space-y-4">
+      {/* A form inside the 720 px « read » page: on desktop it keeps the 32rem of every form page
+          (decision 227) rather than stretching a team name across the card. The phone is unchanged. */}
+      <form action={action} className="space-y-4 md:max-w-form">
         <input type="hidden" name="teamId" value={teamId} />
 
         {state?.error ? (
@@ -123,7 +125,7 @@ function ColorField({
 function SaveButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending} fullWidth>
+    <Button type="submit" disabled={pending} fullWidth className="md:w-auto md:min-w-40">
       {pending ? "Enregistrement…" : "Enregistrer"}
     </Button>
   );

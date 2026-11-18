@@ -36,6 +36,16 @@
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
 
+  /* ---------------- PAGE WIDTHS (decision 227) ----------------
+     Desktop only: below `md:` every page is the full width of the phone, so none of these ever
+     binds there. `read` is the box the app shell's <main> has always had — 48rem including its
+     `md:px-6`, so 720 px of content — and stays the default. `wide` widens that same box for a page
+     that asks for it (`PageContainer width="wide"`), `form` narrows the content of a form page.
+     `--container-*` is Tailwind's namespace, so these are `max-w-form`, `max-w-read`, `max-w-wide`. */
+  --container-form: 32rem;
+  --container-read: 48rem;
+  --container-wide: 72rem;
+
   /* ---------------- LIGHT THEME ----------------
      Ratios below are against the surfaces they are allowed to sit on:
      canvas #F4F6F8 / surface #FFFFFF / surface-2 #E9ECF0

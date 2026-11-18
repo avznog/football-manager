@@ -2774,7 +2774,15 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       only) now gives 405 × 592 (équipe type, by window height), 384 × 562 (cards) at 1280 × 800. Game
       mode is capped to a phone-width column with its action bar kept sticky, so ACTION is on screen.
       **Mobile pixel-identical**: 58/58 screens at 390 px diffed to zero against the baseline
-- [ ] **Desktop, slices B–D** (plan of 2026-11-18): page-width system and forms; two-column `lg:`
-      layouts (composition editor — decision 105's dock is 1 900 px down —, correction screen, match
-      page, stats, compositions strip); navigation and polish. Same rule: `md:`/`lg:` only, 390 px
-      diffed to zero
+- [x] **Desktop, slice B: page widths and forms** — 2026-11-18. Decision **228**. Three tokens
+      (`max-w-form` 32rem, `max-w-read` 48rem, `max-w-wide` 72rem) and a `PageContainer` a page uses to
+      say how wide it is. The new match, edit match and delete pages are 512 px forms: at 1280 × 800 the
+      opponent field 686 → 478 px, the kick-off 686 → 256 px, the two numbers 337 → 160 px, the submit a
+      button the size of its label. The team settings form is capped the same way inside its card.
+      `wide` exists but **no page uses it yet**: stats, équipe type and compositions get it with slice
+      C's grids, since a one-column board list at 1104 px would be worse than today. **Mobile pixel-
+      identical**: 56/58 screens at 390 px diffed to zero, and the two others differ only by two
+      players tied at 7,0 swapping places — tie order follows ids that change with each seed, not CSS
+- [ ] **Desktop, slices C and D** (plan of 2026-11-18): two-column `lg:` layouts (composition editor —
+      decision 105's dock is 1 900 px down —, correction screen, match page, stats with `wide`,
+      compositions strip); navigation and polish. Same rule: `md:`/`lg:` only, 390 px diffed to zero

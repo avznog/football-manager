@@ -27,6 +27,7 @@ export {
   type SegmentTone,
   type SegmentedControlProps,
 } from "./segmented-control";
+export { PageContainer, type PageContainerProps, type PageWidth } from "./page-container";
 export { Select, type SelectProps } from "./select";
 export { Sheet, type SheetProps } from "./sheet";
 export { Slider, type SliderProps } from "./slider";

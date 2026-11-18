@@ -9339,3 +9339,46 @@ turning `md:static`: it used to sit below a 1053 px pitch, so ACTION was off-scr
 The rest of the plan — a page-width system for forms and pages, two-column `lg:` layouts for the
 composition editor, the correction screen, the match page and stats, and the navigation — follows in
 its own slices under this same convention.
+
+## 228 — Pages declare a width, `read` stays the default, and nothing widens before its grid exists
+
+**2026-11-18.** Slice B of the desktop plan (decision 227): a width system, and forms that stop
+stretching. It departs from the plan in four places, recorded here because each was a choice.
+
+**Three tokens and a container.** `--container-form` 32rem, `--container-read` 48rem,
+`--container-wide` 72rem in `app/globals.css`, so Tailwind gives `max-w-form` / `max-w-read` /
+`max-w-wide`. `PageContainer` (`components/ui/page-container.tsx`) renders a page's root element with a
+`width` of `form`, `read` or `wide`, and does nothing below `md:`.
+
+**1. `read` stays the default instead of every page being wrapped.** The plan lifted the shell's cap at
+`md:` (`md:max-w-none`) and had each page declare its width. That makes every page nobody wrapped
+stretch to the whole window the day it ships, and there are about twenty. Instead the shell's
+`<main>` keeps the box it always had — `max-w-read` is exactly `max-w-3xl`, 48rem, 720 px of content
+— and **widens itself** when a page asks: `md:has-[[data-page-width=wide]]:max-w-wide`. A page cannot
+widen its parent any other way. A `form` page narrows its own content (`md:mx-auto md:max-w-form`).
+So a page that says nothing does not move, and declaring `read` is documentation.
+
+**2. No page is `wide` yet.** The plan put stats, the équipe type and the compositions there. But
+widening a one-column list of boards to 1104 px makes it worse, not better: a label at one edge and a
+figure at the other. They get `wide` in slice C, together with the `lg:` grids that use the room.
+
+**3. `Field` has two desktop sizes, not one.** `size="short"` (`md:max-w-40`, 10rem) for a number of
+a digit or two; `size="date"` (`md:max-w-64`, 16rem) because a `datetime-local` with its picker does
+not fit 10rem.
+
+**4. No `md:grid-cols-2` pairing in the match form.** Its neighbouring fields carry hints of different
+heights (« Heure française. », the venue's sentence that follows the side picked), so side by side
+their inputs would not line up — and inside a 32rem form one column reads better than two cramped
+ones. The periods pair stays, at two 10rem columns. The team settings form already sets its two
+colours side by side; it is capped to 32rem inside its card instead.
+
+The submits of those forms are `md:w-auto md:min-w-40`: full width on the phone, where they are the
+thumb's target; the size of their label on desktop, under the fields they submit.
+
+The raw `<input>`s in team settings, invites and `/moi` are untouched on purpose: moving them onto
+`Input` would change their height on the phone.
+
+**Measured** at 1280 × 800 on the new and edit match pages: content 720 → 512 px, opponent 686 → 478,
+kick-off 686 → 256, periods and minutes 337 → 160. At 390 px, 56 of 58 captures are pixel-identical;
+the other two are the played match, where Léo and Thomas both average exactly 7,0 from the same four
+notes and swapped places between two seeds — their tie order follows ids that change with each seed.

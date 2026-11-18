@@ -26,6 +26,7 @@ import Link from "next/link";
 
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PageContainer } from "@/components/ui/page-container";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { matchDeletionWarningFr } from "@/lib/calendar/deletion";
@@ -47,7 +48,7 @@ export default async function DeleteMatchPage({ params }: PageProps<"/match/[id]
   const kickoff = new Date(match.kickoffAt);
 
   return (
-    <div className="space-y-4">
+    <PageContainer width="form" className="space-y-4">
       <header className="space-y-1">
         <Link
           href={`/match/${match.id}`}
@@ -84,6 +85,6 @@ export default async function DeleteMatchPage({ params }: PageProps<"/match/[id]
           </ButtonLink>
         </div>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

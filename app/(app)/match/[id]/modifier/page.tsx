@@ -15,6 +15,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
+import { PageContainer } from "@/components/ui/page-container";
 import { can } from "@/lib/auth/can";
 import { requireTeamContext } from "@/lib/auth/dal";
 import { toLocalInput } from "@/lib/calendar/time";
@@ -39,7 +40,7 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
   const competitions = competitionOptions(allCompetitions, match.competitionId);
 
   return (
-    <div className="space-y-4">
+    <PageContainer width="form" className="space-y-4">
       <header className="space-y-1">
         <Link
           href={`/match/${match.id}`}
@@ -66,6 +67,6 @@ export default async function EditMatchPage({ params }: PageProps<"/match/[id]/m
           }}
         />
       </Card>
-    </div>
+    </PageContainer>
   );
 }
