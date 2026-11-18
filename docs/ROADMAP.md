@@ -2769,3 +2769,12 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       the removed player's — cheap, not done
 - [ ] **An annulled starting composition reads « Changement » in the déroulé**, struck through, because
       a voided `LINEUP_APPLIED` is never the start (decisions 223, 226). Cosmetic
+- [x] **Desktop, slice A: the pitch has three sizes** — 2026-11-18. Decision **227**. The same pitch was
+      398 px tall on one screen and 1053 px on another; a `fit` prop (`hero` / `card` / `thumb`, `md:`
+      only) now gives 405 × 592 (équipe type, by window height), 384 × 562 (cards) at 1280 × 800. Game
+      mode is capped to a phone-width column with its action bar kept sticky, so ACTION is on screen.
+      **Mobile pixel-identical**: 58/58 screens at 390 px diffed to zero against the baseline
+- [ ] **Desktop, slices B–D** (plan of 2026-11-18): page-width system and forms; two-column `lg:`
+      layouts (composition editor — decision 105's dock is 1 900 px down —, correction screen, match
+      page, stats, compositions strip); navigation and polish. Same rule: `md:`/`lg:` only, 390 px
+      diffed to zero

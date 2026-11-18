@@ -1279,7 +1279,10 @@ function ActionBar({
     // half competed with `safe-pb`'s `padding-bottom`, and `.safe-pb` is emitted after `.py-2`,
     // so the 8 px was dropped on every device whose bottom inset is 0. See the utility's own
     // comment in `globals.css`.
-    <div className="safe-pb-2 sticky bottom-0 z-30 -mx-3 mt-3 border-t border-border/60 bg-canvas/95 px-3 pt-2 backdrop-blur md:static md:mx-0 md:rounded-2xl md:border md:px-4 md:py-3">
+    //
+    // Sticky on a desktop too (decision 227). It used to turn `md:static` there, and since the
+    // pitch above it is drawn to a fixed ratio, ACTION ended up below a 1053 px pitch, off-screen.
+    <div className="safe-pb-2 sticky bottom-0 z-30 -mx-3 mt-3 border-t border-border/60 bg-canvas/95 px-3 pt-2 backdrop-blur md:bottom-3 md:mx-0 md:rounded-2xl md:border md:px-4 md:py-3">
       <div
         className={
           onPause ? "grid grid-cols-[2fr_1fr_1fr] gap-2" : "grid grid-cols-[2fr_1fr] gap-2"

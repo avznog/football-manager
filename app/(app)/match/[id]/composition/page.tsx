@@ -169,6 +169,7 @@ export default async function CompositionsPage({
                 members={members}
                 kit={kit}
                 size="md"
+                fit="card"
                 planned={!plan.isApplied}
                 label={`${planTitleFr(plan)}, ${plan.formationLabel}`}
               />

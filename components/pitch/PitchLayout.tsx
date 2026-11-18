@@ -10,7 +10,7 @@
 
 import type { ReactNode } from "react";
 
-import { Pitch, PitchPoint } from "./Pitch";
+import { Pitch, PitchPoint, type PitchFit } from "./Pitch";
 import { PlayerDisc, type PlayerDiscVariant } from "./PlayerDisc";
 import { SlotTarget, type SlotTargetState } from "./SlotTarget";
 import { DEFAULT_DISC_SIZE, type DiscSize } from "./sizes";
@@ -54,6 +54,8 @@ export type PitchLayoutProps = {
   kit: KitColors;
   size?: DiscSize;
   className?: string;
+  /** Desktop size class of the pitch (decision 227); see `PitchFit`. */
+  fit?: PitchFit;
   /** French accessible name for the pitch graphic. Omit to leave it decorative. */
   pitchLabel?: string;
   /** Number of mowing bands, forwarded to `Pitch`. */
@@ -78,13 +80,14 @@ export function PitchLayout({
   kit,
   size = DEFAULT_DISC_SIZE,
   className,
+  fit,
   pitchLabel,
   stripes,
   overlay,
   renderItem,
 }: PitchLayoutProps) {
   return (
-    <Pitch className={className} label={pitchLabel} stripes={stripes}>
+    <Pitch className={className} fit={fit} label={pitchLabel} stripes={stripes}>
       {slots.map((slot) => {
         const colors = slot.player?.kit ?? kit;
         const content = slot.player ? (

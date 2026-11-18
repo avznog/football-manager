@@ -9300,3 +9300,42 @@ count here, through the same shared rule, so a removal is not undone over there.
 Walked on an isolated database: a published match's coach view went from 34 notes to 22 when the player
 was removed (his 4 received and 8 given), the rows stayed, and it went back to 34 when he was put back
 through the start correction.
+
+## 227 — The desktop layout is `md:`/`lg:` additions only, and the pitch has three sizes
+
+**2026-11-18.** The owner: « the desktop UI is not really great — the fields are taking half a screen
+sometimes, and a screen and a half another time ». He confirmed the « fields » are **the football
+pitches**. Nobody had designed the app above 768 px; it was the 390 px column, capped at 720 px beside
+the sidebar, and every component sized itself on its own.
+
+**The convention, for this and every later desktop change:** desktop is **added**, never edited in.
+Only breakpoint-prefixed classes (`md:`, `lg:`) change, so a phone renders identically — and that is
+**proved, not asserted**: every screen is captured at 390 px before and after, in both themes and both
+roles, and the images must diff to **zero pixels**. The capture is deterministic (fixed client clock,
+reduced motion, animations and caret off, fonts awaited): two runs on unchanged code diffed to zero
+over 174 images before anything was changed, which is what makes the zero mean something.
+
+One trap found doing that, worth knowing for any future screen capture: **opening game mode as the
+coach before the kick-off applies the starting composition** (invariant 3), so the first capture run
+mutates the database and the match page loses « Terminer le match » for every later run. The baseline
+is therefore the second run, once that one-off write has happened.
+
+**The pitch has three sizes on a desktop**, through a `fit` prop on `Pitch` (forwarded by
+`PitchLayout` and `LineupPitch`), each `md:` only:
+
+- `hero` — the one pitch a screen is about (the équipe type): as large as the window allows **by
+  height**, `md:max-w-[min(100%,calc((100dvh-13rem)*0.684))]`, 0.684 being the drawing's width/height.
+  Measured: 405 × 592 at 1280 × 800, 473 × 692 at 1440 × 900 — was 720 × 1053 at both.
+- `card` — a pitch inside a card (positions on the player page, the match page's composition, the
+  compositions page): `md:max-w-sm`, 384 × 562 — was 686 × 1004.
+- `thumb` — `md:max-w-xs`, for the small ones; not applied yet, the sheets and the strip already have
+  their own width and are the next slices' business.
+
+**Game mode stays a phone screen** — the owner uses it at the pitch, on a phone, only. On a desktop it
+is capped to a phone-width column (`md:max-w-md`), and its action bar **stays sticky** instead of
+turning `md:static`: it used to sit below a 1053 px pitch, so ACTION was off-screen on a laptop
+(measured at y = 1348 on an 800 px window; now 719). No new layout for it.
+
+The rest of the plan — a page-width system for forms and pages, two-column `lg:` layouts for the
+composition editor, the correction screen, the match page and stats, and the navigation — follows in
+its own slices under this same convention.

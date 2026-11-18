@@ -25,8 +25,11 @@ export default async function GameLayout({ children }: { children: React.ReactNo
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">
       {/* `px-3`, not the shell's `px-4`: eight more pixels of pitch width is eleven more of height,
-          because the pitch is drawn to a fixed aspect ratio. */}
-      <main id="contenu" className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-3 md:px-6">
+          because the pitch is drawn to a fixed aspect ratio.
+          `md:max-w-md`: game mode is a phone screen, used at the pitch (decision 227). On a desktop
+          it is kept to a phone-width column rather than stretched to 720 px, which drew a pitch
+          1053 px tall. */}
+      <main id="contenu" className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-3 md:max-w-md md:px-6">
         {children}
       </main>
     </div>
