@@ -29,8 +29,8 @@ export default async function TeamPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight text-ink">{team.name}</h1>
-        <p className="text-sm text-ink-muted">
+        <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">{team.name}</h1>
+        <p className="text-sm text-ink-muted md:max-w-prose">
           {players.length} joueur{players.length > 1 ? "s" : ""}
         </p>
       </header>

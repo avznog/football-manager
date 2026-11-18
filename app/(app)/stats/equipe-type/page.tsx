@@ -184,14 +184,14 @@ export default async function EquipeTypePage({
           >
             ← Statistiques
           </Link>
-          <h1 className="text-xl font-bold tracking-tight text-ink">L’équipe type</h1>
-          <p className="mt-0.5 text-sm text-ink-muted">
+          <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">L’équipe type</h1>
+          <p className="mt-0.5 text-sm text-ink-muted md:max-w-prose">
             {SEVEN_OPTION_FR[query.seven]} · saison en cours, {scopeLabel} ·{" "}
             {matchCount(stats.matchesConsidered)} terminé
             {stats.matchesConsidered > 1 ? "s" : ""}
           </p>
           {/* The seven's rule, before its names: what the claim is a claim about. */}
-          <p className="mt-2 text-sm text-ink">{SEVEN_RULE_FR[query.seven]}</p>
+          <p className="mt-2 text-sm text-ink md:max-w-prose">{SEVEN_RULE_FR[query.seven]}</p>
         </div>
       </header>
 

@@ -266,8 +266,8 @@ function Shell({
         >
           ← Compositions
         </Link>
-        <h1 className="text-xl font-bold tracking-tight text-ink">{title}</h1>
-        <p className="text-sm text-ink-muted">
+        <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">{title}</h1>
+        <p className="text-sm text-ink-muted md:max-w-prose">
           {capitalizeFirst(matchNameFr(match.opponentName, match.isHome))} · {match.periodsCount}×
           {match.periodMinutes} minutes
         </p>

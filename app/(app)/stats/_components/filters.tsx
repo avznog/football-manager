@@ -93,7 +93,12 @@ export function CompetitionFilter({
   if (competitions.length < 2) return null;
 
   return (
-    <nav aria-label="Filtrer par compétition" className="-mx-4 overflow-x-auto px-4 pb-1">
+    // `-mx-4 px-4` bleeds the strip to the edge of the phone's `px-4` gutter; from `md:` the shell's
+    // gutter is `px-6`, so the bleed follows it or the strip stops 8 px short (decision 227).
+    <nav
+      aria-label="Filtrer par compétition"
+      className="-mx-4 overflow-x-auto px-4 pb-1 md:-mx-6 md:px-6"
+    >
       <div className="flex w-max gap-2">
         <Chip
           href={statsHref({ ...query, competitionId: null })}

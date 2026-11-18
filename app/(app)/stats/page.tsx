@@ -88,8 +88,8 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
     <div className="space-y-6">
       <header className="space-y-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-ink">Statistiques</h1>
-          <p className="mt-0.5 text-sm text-ink-muted">
+          <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Statistiques</h1>
+          <p className="mt-0.5 text-sm text-ink-muted md:max-w-prose">
             Saison en cours, {scopeLabel} · {matchCount(stats.matchesConsidered)} terminé
             {stats.matchesConsidered > 1 ? "s" : ""}
           </p>

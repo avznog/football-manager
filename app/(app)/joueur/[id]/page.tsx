@@ -81,7 +81,7 @@ export default async function PlayerPage({ params }: PageProps<"/joueur/[id]">) 
       <header className="flex items-center gap-4">
         <Avatar name={profile.displayName} size="lg" />
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-bold tracking-tight text-ink">
+          <h1 className="truncate text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">
             {profile.jerseyNumber !== null ? (
               <span className="mr-2 font-mono text-lg text-ink-subtle tabular-nums">
                 {profile.jerseyNumber}

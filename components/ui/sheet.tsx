@@ -18,6 +18,12 @@ export type SheetProps = {
   footer?: ReactNode;
   /** Set false for a step the user must answer (no Escape, no scrim click). */
   dismissible?: boolean;
+  /**
+   * The dialog's width from `md:` up — `md` is `max-w-lg`, `lg` is `max-w-xl` for a sheet that holds
+   * a pitch (decision 227). A named size rather than a width in `className`, so the app has two sheet
+   * widths and not one per caller. Phones are unaffected: below `md:` a sheet is always full-width.
+   */
+  size?: "md" | "lg";
   className?: string;
 };
 
@@ -38,6 +44,7 @@ export function Sheet({
   children,
   footer,
   dismissible = true,
+  size = "md",
   className,
 }: SheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -100,7 +107,8 @@ export function Sheet({
         className={cn(
           "flex max-h-[88dvh] w-full flex-col overflow-hidden bg-surface text-ink",
           "rounded-t-2xl border-t border-border/60",
-          "md:max-h-[85dvh] md:max-w-lg md:rounded-2xl md:border",
+          "md:max-h-[85dvh] md:rounded-2xl md:border",
+          size === "lg" ? "md:max-w-xl" : "md:max-w-lg",
           className,
         )}
       >

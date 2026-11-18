@@ -68,3 +68,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
 export function isActivePath(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
+
+/**
+ * The desktop sidebar's own rule: the tab rule, plus **a match belongs to the calendar**.
+ *
+ * `/match/*` is reached from the calendar and is nobody's tab, so the sidebar highlighted nothing on
+ * the screens a coach spends most time on with a mouse (decision 227). The bottom tab bar keeps
+ * `isActivePath` as it is: phones are out of scope for the desktop work.
+ */
+export function isSidebarActivePath(pathname: string, href: string): boolean {
+  if (href === "/calendrier" && (pathname === "/match" || pathname.startsWith("/match/"))) {
+    return true;
+  }
+  return isActivePath(pathname, href);
+}

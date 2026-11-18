@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/components/ui/cn";
 
-import { NAV_ITEMS, isActivePath } from "./nav-items";
+import { NAV_ITEMS, isSidebarActivePath } from "./nav-items";
 
 /** Vertical navigation used inside the desktop sidebar. */
 export function SidebarNav() {
@@ -15,7 +15,7 @@ export function SidebarNav() {
     <nav aria-label="Navigation principale" className="px-2">
       <ul className="space-y-1">
         {NAV_ITEMS.map((item) => {
-          const active = isActivePath(pathname, item.href);
+          const active = isSidebarActivePath(pathname, item.href);
           return (
             <li key={item.href}>
               <Link

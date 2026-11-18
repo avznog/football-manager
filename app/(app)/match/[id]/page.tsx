@@ -67,6 +67,7 @@ import {
 import { CompositionsStrip } from "./_components/compositions-strip";
 import { FinishMatchCard } from "./_components/finish-match-card";
 import { ManOfTheMatchCard } from "./_components/man-of-the-match";
+import { MatchLinks } from "./_components/match-links";
 import { MinutesTable } from "./_components/minutes-table";
 import { RatingsPanel } from "./_components/ratings-panel";
 import { Scoreboard } from "./_components/scoreboard";
@@ -272,7 +273,20 @@ export default async function MatchPage({ params }: PageProps<"/match/[id]">) {
           {match.opponentName}
         </h1>
 
-        <p className="text-sm text-ink-muted">
+        {/* Desktop only (decision 227). Each flag is the one this page already shows the matching
+            card on — composition card, « Corriger le match », the notes duty — so the row offers
+            nothing the page does not. Between the title and the date on purpose: `space-y-2` puts a
+            bottom margin on every child but the last, so a hidden row placed last would still add
+            8 px under the date on a phone. Here the date line always follows it. */}
+        <MatchLinks
+          matchId={match.id}
+          mayCompose={can(actor, "match:manageLineups", { teamId: team.id })}
+          mayAmend={mayAmend && finished}
+          recorded={recorded}
+          mayRate={mayRate}
+        />
+
+        <p className="text-sm text-ink-muted md:max-w-prose">
           {capitalizeFirst(formatDay(kickoff))} à {formatTime(kickoff)}
           {match.venue ? ` · ${match.venue}` : ""}
           {` · ${periodsLabel(match.periodsCount, match.periodMinutes)}`}

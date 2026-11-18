@@ -93,8 +93,8 @@ export default async function CompositionsPage({
         >
           ← {match.opponentName}
         </Link>
-        <h1 className="text-xl font-bold tracking-tight text-ink">Compositions</h1>
-        <p className="text-sm text-ink-muted">
+        <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Compositions</h1>
+        <p className="text-sm text-ink-muted md:max-w-prose">
           {/* Which match these compositions are for, said in the header rather than only in the back
               link: a coach places seven players for a fixture whose side he is entitled to see without
               going back a screen. */}

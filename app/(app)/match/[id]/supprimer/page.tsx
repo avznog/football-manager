@@ -56,10 +56,10 @@ export default async function DeleteMatchPage({ params }: PageProps<"/match/[id]
         >
           ← {match.opponentName}
         </Link>
-        <h1 className="text-xl font-bold tracking-tight text-ink">Supprimer le match</h1>
+        <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Supprimer le match</h1>
         {/* Which match, spelled out: the heading above says « le match » and a coach who has walked
             here from the calendar deserves to see the one he is about to lose named. */}
-        <p className="text-sm text-ink-muted">
+        <p className="text-sm text-ink-muted md:max-w-prose">
           {capitalizeFirst(matchNameFr(match.opponentName, match.isHome))} ·{" "}
           {formatDay(kickoff)} à {formatTime(kickoff)}
         </p>

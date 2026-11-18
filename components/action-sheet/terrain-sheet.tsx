@@ -308,7 +308,7 @@ export function TerrainSheet({
       description={`${stampLabel} · un seul enregistrement pour tous les changements`}
       // Decision 032: a flow with something to lose is not dismissed by a scrim tap or an Escape.
       dismissible={false}
-      className="md:max-w-xl"
+      size="lg"
       footer={
         <div className="space-y-2">
           {review.problems.length > 0 ? (

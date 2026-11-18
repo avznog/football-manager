@@ -128,7 +128,7 @@ export default async function NotationPage({ params }: PageProps<"/match/[id]/no
         <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink">
           Noter mes coéquipiers
         </h1>
-        <p className="text-sm text-ink-muted">
+        <p className="text-sm text-ink-muted md:max-w-prose">
           {capitalizeFirst(formatDay(kickoff))} à {formatTime(kickoff)} ·{" "}
           {matchNameFr(match.opponentName, match.isHome)}
         </p>
