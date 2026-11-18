@@ -303,6 +303,7 @@ export function SevenPitch({
         <PitchLayout
           slots={pitchSlots}
           kit={kit}
+          fit="hero"
           pitchLabel={`${sevenHeadingFr(seven, touched)} sur la pelouse`}
           renderItem={(slot, content) => {
             const chosenId = assignment[slot.id] ?? null;

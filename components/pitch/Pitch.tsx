@@ -97,9 +97,34 @@ export function PitchPoint({ x, y, children, className, style }: PitchPointProps
 /* Pitch                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * How big the pitch may get **on a desktop** (decision 227). The pitch is drawn to a fixed portrait
+ * ratio, so its width decides its height: left to `w-full` in a 720 px column it was 1053 px tall,
+ * a screen and a half, while the strip of compositions drew the same pitch at 398 px. Each value
+ * only adds `md:` classes, so a phone renders exactly as before.
+ *
+ * - `hero` — the one pitch the screen is about (the équipe type): as large as the window allows
+ *   *by height*, so it is never taller than the viewport minus the header and page title above it.
+ * - `card` — a pitch inside a card (positions, compositions): capped at 24rem, 384 × 562.
+ * - `thumb` — a small pitch among others (sheets, strips): capped at 20rem.
+ *
+ * Omitted, nothing is added: the caller sizes it, as before.
+ */
+export type PitchFit = "hero" | "card" | "thumb";
+
+const FIT_CLASSES: Readonly<Record<PitchFit, string>> = {
+  // 0.684 is the drawing's width/height (1080/1580); 13rem is the sticky header and the page's own
+  // heading above the pitch, so width × (1/0.684) never exceeds what is left of the window.
+  hero: "md:mx-auto md:max-w-[min(100%,calc((100dvh-13rem)*0.684))]",
+  card: "md:mx-auto md:max-w-sm",
+  thumb: "md:mx-auto md:max-w-xs",
+};
+
 export type PitchProps = {
   /** Markers to draw on the turf, positioned with `PitchPoint`. */
   children?: ReactNode;
+  /** Desktop size class; see `PitchFit`. No effect below `md`. */
+  fit?: PitchFit;
   /** Applied to the outer box. The aspect ratio is fixed, so only set width/margins here. */
   className?: string;
   /**
@@ -115,13 +140,14 @@ export type PitchProps = {
   label?: string;
 };
 
-export function Pitch({ children, className, stripes = 10, label }: PitchProps) {
+export function Pitch({ children, className, stripes = 10, label, fit }: PitchProps) {
   const bandHeight = VIEW_HEIGHT / stripes;
 
   return (
     <div
       className={cn(
         "relative w-full overflow-hidden rounded-2xl border border-border bg-turf select-none",
+        fit ? FIT_CLASSES[fit] : undefined,
         className,
       )}
       style={{ aspectRatio: `${VIEW_WIDTH} / ${VIEW_HEIGHT}` }}

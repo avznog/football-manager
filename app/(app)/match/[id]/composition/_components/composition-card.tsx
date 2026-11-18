@@ -78,6 +78,7 @@ export async function CompositionCard({ team, match }: { team: ActiveTeam; match
               members={members}
               kit={{ primaryColor: team.primaryColor, secondaryColor: team.secondaryColor }}
               size="md"
+              fit="card"
               planned={!first.isApplied}
               label={`${planTitleFr(first)}, ${first.formationLabel}`}
             />

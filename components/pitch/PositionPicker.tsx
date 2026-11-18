@@ -112,7 +112,7 @@ export function PositionPicker({
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <div role="group" aria-label="Postes du joueur sur le terrain">
-        <Pitch label="Terrain de football à 7, vu depuis nos buts">
+        <Pitch fit="card" label="Terrain de football à 7, vu depuis nos buts">
           {TARGETS.map((target) => {
             const preference = value[target.code];
             const state = stateOf(preference);

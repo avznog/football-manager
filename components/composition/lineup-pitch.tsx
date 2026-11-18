@@ -11,7 +11,7 @@
  */
 
 import { PitchLayout, type KitColors, type PitchSlot } from "@/components/pitch";
-import type { DiscSize } from "@/components/pitch";
+import type { DiscSize, PitchFit } from "@/components/pitch";
 import type { SquadRole } from "@/db/schema";
 import type { SlotAssignment } from "@/lib/match/lineup";
 
@@ -30,6 +30,8 @@ export type LineupPitchProps = {
   members: readonly LineupPitchMember[];
   kit: KitColors;
   size?: DiscSize;
+  /** Desktop size class of the pitch (decision 227). */
+  fit?: PitchFit;
   /** False once game mode has confirmed the composition — it is then a fact, not a plan. */
   planned?: boolean;
   /** French accessible name, e.g. « Composition de départ, 1-2-3-1 ». */
@@ -43,6 +45,7 @@ export function LineupPitch({
   members,
   kit,
   size = "md",
+  fit,
   planned = true,
   label,
   className,
@@ -81,6 +84,7 @@ export function LineupPitch({
       slots={pitchSlots}
       kit={kit}
       size={size}
+      fit={fit}
       pitchLabel={label}
       className={className}
     />

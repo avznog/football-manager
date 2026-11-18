@@ -7638,3 +7638,39 @@ Files: `lib/retro/sheet.ts` (new), `lib/retro/remove.ts` (new), `lib/rating/elig
 `app/(app)/match/[id]/saisie/_components/retro-corrections.tsx`,
 `scripts/import-ratings-from-old-app.mts`, `scripts/push-ratings-to-old-app.mts`,
 `docs/DECISIONS.md` (226), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+## 2026-11-18 — Desktop, step 0 and slice A: a baseline, and the pitch's three sizes
+
+Decision **227**. The owner said the desktop UI was poor — « the fields are taking half a screen
+sometimes, and a screen and a half another time » — and confirmed the fields are the pitches. Two
+read-only audits (UI, UX) produced the plan; this session ran its step 0 and slice A.
+
+**Step 0, the baseline.** A capture script outside the repository (`~/.cache/desktop-ui/capture.mts`,
+with `diff.mts`, both reusable by the next slices) walks the screens of `scripts/audit-screens.ts` plus
+the équipe type, as coach and as player, light and dark, at 390 × 844, 1280 × 800 and 1440 × 900,
+against a production build on a throwaway database. It is deterministic — fixed client clock, reduced
+motion, animations and caret off — and that was **proved before it was relied on**: two runs on
+unchanged code diffed to zero over 174 images. The first attempt did not: opening game mode as the
+coach before kick-off applies the starting composition (invariant 3), so the first run changed the
+database under the second. The baseline is the second run.
+
+Measured at 1280 × 800, confirming the audit: pitches 720 × 1053 (équipe type, game mode), 686 × 1004
+(player positions, match-page composition, compositions page), 384 × 562 (editor), 272 × 398 (strip);
+game mode's ACTION at y = 1348. The dev site's public pages (connexion, rejoindre) are fine at desktop
+widths: a 384 px column, 334 px fields.
+
+**Slice A.** A `fit` prop on `Pitch` — `hero`, `card`, `thumb`, `md:` classes only — forwarded by
+`PitchLayout` and `LineupPitch`; the équipe type is `hero`, the three in-card pitches `card`. Game mode's
+layout gets `md:max-w-md` and its action bar loses `md:static`. After: 405 × 592 and 384 × 562 at
+1280 × 800, 473 × 692 at 1440 × 900, ACTION at 719. **390 px: 58/58 images identical to the baseline.**
+Looked at in both themes and roles.
+
+Gates: typecheck clean, eslint clean on the changed files, `npm test` **1736 passed**, `npm run
+test:e2e` **11 passed** (own port and database).
+
+Files: `components/pitch/Pitch.tsx`, `components/pitch/PitchLayout.tsx`, `components/pitch/index.ts`,
+`components/pitch/PositionPicker.tsx`, `components/composition/lineup-pitch.tsx`,
+`app/(app)/match/[id]/composition/_components/composition-card.tsx`,
+`app/(app)/match/[id]/composition/page.tsx`, `app/(app)/stats/equipe-type/_components/seven-pitch.tsx`,
+`app/(jeu)/layout.tsx`, `app/(jeu)/match/[id]/jeu/_components/game-mode.tsx`, `docs/DECISIONS.md`
+(227), `docs/ROADMAP.md`, `docs/SESSIONS.md`.

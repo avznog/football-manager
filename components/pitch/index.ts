@@ -6,7 +6,7 @@
  * `SlotTarget` and `PitchLayout` from here freely — none of them ships any JavaScript.
  */
 
-export { Pitch, PitchPoint, type PitchProps, type PitchPointProps } from "./Pitch";
+export { Pitch, PitchPoint, type PitchFit, type PitchProps, type PitchPointProps } from "./Pitch";
 export { PlayerDisc, type PlayerDiscProps, type PlayerDiscVariant } from "./PlayerDisc";
 export { SlotTarget, type SlotTargetProps, type SlotTargetState } from "./SlotTarget";
 export {
