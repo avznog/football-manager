@@ -88,21 +88,38 @@ export default async function CompositionsPage({
   // `wide` (decision 227): the plans are two a row from `lg:`.
   return (
     <PageContainer width="wide" className="space-y-4">
-      <header className="space-y-1">
-        <Link
-          href={`/match/${match.id}`}
-          className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          ← {match.opponentName}
-        </Link>
-        <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Compositions</h1>
-        <p className="text-sm text-ink-muted md:max-w-prose">
-          {/* Which match these compositions are for, said in the header rather than only in the back
-              link: a coach places seven players for a fixture whose side he is entitled to see without
-              going back a screen. */}
-          {capitalizeFirst(matchNameFr(match.opponentName, match.isHome))} · {squadSummaryFr(counts)}
-        </p>
-      </header>
+      {/*
+        On desktop « Planifier un changement » sits beside the title rather than after every plan
+        (decision 232): with two or three pitches a row, the bottom of the page is a scroll away, and
+        it is the next thing a coach does after saving a composition. The wrapper is a plain block at
+        phone width -- the first child of the page's space-y-4, as the header was -- and the desktop
+        copy is hidden there, so the phone keeps the card at the bottom, unchanged.
+      */}
+      <div className="lg:flex lg:items-end lg:justify-between lg:gap-6">
+        <header className="space-y-1">
+          <Link
+            href={`/match/${match.id}`}
+            className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            ← {match.opponentName}
+          </Link>
+          <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl md:leading-tight">Compositions</h1>
+          <p className="text-sm text-ink-muted md:max-w-prose">
+            {/* Which match these compositions are for, said in the header rather than only in the back
+                link: a coach places seven players for a fixture whose side he is entitled to see without
+                going back a screen. */}
+            {capitalizeFirst(matchNameFr(match.opponentName, match.isHome))} · {squadSummaryFr(counts)}
+          </p>
+        </header>
+        {plans.length > 0 && screen.editable ? (
+          <div className="hidden lg:flex lg:shrink-0 lg:items-center lg:gap-3">
+            <p className="max-w-xs text-right text-sm text-ink-muted">{newPlanPrompt.title}</p>
+            <ButtonLink href={`/match/${match.id}/composition/nouvelle?minute=${nextMinute}`}>
+              Nouvelle composition
+            </ButtonLink>
+          </div>
+        ) : null}
+      </div>
 
       {plans.length === 0 ? (
         <Card title="Aucune composition">
@@ -248,6 +265,7 @@ export default async function CompositionsPage({
         <Card
           title={newPlanPrompt.title}
           description={newPlanPrompt.description}
+          className="lg:hidden"
         >
           <ButtonLink href={`/match/${match.id}/composition/nouvelle?minute=${nextMinute}`}>
             Nouvelle composition
