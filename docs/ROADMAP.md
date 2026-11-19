@@ -2815,3 +2815,9 @@ transcription) and `backlogs/matches-1-3-blocks.json` (the same blocks, machine-
       and an actions column after it), the composition card has a `split` form, the strip is a query
       container of `thumb` pitches, the saisie form and the notation tiles are two/three columns. Phone
       captures identical (44/44).
+- [x] **Dates and times typed in French, 24-hour, on every device** — 2026-11-19. Decision **231**,
+      superseding 133. The native pickers rendered in the browser's locale (`mm/dd/yyyy, --:-- AM` on
+      an English browser); they are now `[JJ] / [MM] / [AAAA]  [HH] h [MM]` boxes with the digit
+      keypad, auto-advance, Backspace back, paste of a whole date, and French messages for an
+      impossible date or one outside its bounds. Same posted value, so no action or schema changed;
+      without JavaScript the native field takes over through a `<noscript>`

@@ -7847,3 +7847,27 @@ running on the capture port served the second build's files underneath its first
 first comparison was between two different pages — stop servers by PID and check the port is free
 before trusting a capture. Files: `app/(app)/match/[id]/composition/page.tsx`, `docs/DECISIONS.md`
 (232), `docs/SESSIONS.md`.
+## 2026-11-19 — French 24-hour date fields
+
+Decision **231** (supersedes 133). `components/ui/date-input.tsx` is now a row of numeric boxes —
+`[22] / [11] / [2026]  [10] h [30]` — with the native picker's exact API and the same posted value
+through a hidden input, so `match-form.tsx`, `injury-declare-form.tsx` and `injuries-card.tsx` did not
+change. Pure helpers in `lib/calendar/date-parts.ts` with 16 tests. No-JS: a `<noscript>` native input
+under the same name, the hidden input named only once hydrated. `Field size="date"` 16rem → 24rem.
+The e2e specs fill the boxes through `fillDate` in `e2e/helpers/app.ts`.
+
+Checked in a browser on a throwaway database, with an **en-US** browser locale (the case that showed
+`mm/dd/yyyy`): new match, edit match and the player's injury form at 390 and 1440 px, light and dark;
+the edit form prefills `22 11 2026 10 30` and posts `2026-11-22T10:30`; 31/02 shows « Cette date
+n’existe pas. » and posts empty; « 4 » in the day box becomes « 04 » and moves to « Mois »; a paste of
+`22/11/2026 10:30` fills every box; Backspace in an empty « Minutes » goes to « Heure »; an injury
+return before its start says « Au plus tôt le 01/11/2026. »; with JavaScript off the native field shows
+and the boxes do not. Not looked at: the « Guéri le » form (the demo player had no injury), which is the
+same component with `min`/`max`.
+
+Gates: typecheck clean, eslint clean on changed files, `npm test` **1752** (+16), `npm run test:e2e`
+**11 passed** on port 3911.
+
+Files: `components/ui/date-input.tsx`, `components/ui/field.tsx`, `lib/calendar/date-parts.ts` (new),
+`lib/calendar/date-parts.test.ts` (new), `e2e/helpers/app.ts`, `e2e/happy-path.spec.ts`,
+`e2e/offline.spec.ts`, `docs/DECISIONS.md` (231), `docs/ROADMAP.md`, `docs/SESSIONS.md`.

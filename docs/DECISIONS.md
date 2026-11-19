@@ -9465,6 +9465,49 @@ Checked on a throwaway database by capturing every page and state in both roles 
 390 × 844, 1440 × 900 and 1920 × 1080, before and after; the 1440 × 900 viewport-only contact sheet is
 what the owner reviews.
 
+## 231 — Dates and times are typed into French 24-hour boxes, not the browser's picker
+
+**2026-11-19, superseding 133.** The owner: « il faut aussi que les dates soient au format français, et
+sur 24h ». Every date the app *writes* was already `22/11/2026` and every clock 24-hour (decision 109);
+what was not were the **fields**. `<input type="date">` and `type="datetime-local"` render in the
+browser's locale, so on an English phone or laptop the kick-off read `mm/dd/yyyy, --:-- AM`. Decision
+133 kept the native control and echoed its value in French underneath; asked where to replace it, the
+owner chose **everywhere, phone included**.
+
+`DateInput` is now a row of boxes — `[22] / [11] / [2026]  [10] h [30]`, placeholders `JJ MM AAAA HH
+MM` — each `inputMode="numeric"`, so a phone opens its digit keypad. Focus moves on when a box is full,
+and earlier when its first digit already decides it (« 4 » in the day box can only be « 04 »);
+Backspace in an empty box goes back; pasting `22/11/2026 10:30` (or the ISO a native field copied)
+fills them all. The `Field` label names the group (`role="group"`, labelled by the label, which now
+carries an id), and each box its part: « Jour », « Mois », « Année », « Heure », « Minutes ».
+
+**Nothing a caller or a server reads changed.** The public API is the native input's — `type`, `name`,
+`value`/`defaultValue`/`onChange`, `required`, `min`, `max`, the `Field` wiring — and the form posts the
+identical `YYYY-MM-DD` / `YYYY-MM-DDTHH:mm` through one hidden input under `name`, so no Server Action
+or schema moved. The one controlled caller, the injury start whose value is the return date's `min`,
+still gets an event with `target.value`.
+
+**An impossible value posts empty.** 31/02, 25 h, or a date outside `min`/`max` is said in French under
+the boxes (« Cette date n’existe pas. », « Au plus tôt le 01/11/2026. ») and set as the first box's
+validity message, so the browser refuses to submit it; if it got through anyway, the empty value makes
+the server's own « required » message fire. A nearby real date saved silently would be worse. Nothing is
+said while the boxes are still being filled.
+
+**Without JavaScript the boxes step aside**, and this is the choice worth recording. A `<noscript>` holds
+the old native input under the same `name` plus a style that hides the boxes, and the hidden input only
+takes its `name` once hydrated, so with scripting off exactly one field posts — the browser's own
+picker, which is exactly the pre-231 behaviour and still correct. The alternative, naming each box and
+assembling the value on the server, would have touched every action and schema that reads a date for
+the sake of a path almost nobody takes. Checked: with JavaScript disabled the native field is visible,
+the boxes are not, and one field named `kickoffAt` is on the page.
+
+The parsing is pure and tested in `lib/calendar/date-parts.ts`: split, assemble, leap years, bounds,
+paste, and the first-digit padding. The end-to-end suite fills the boxes through one helper,
+`fillDate`, exactly as a coach types, so it keeps testing the real UI.
+
+`Field size="date"` widened from 16rem to 24rem on desktop: the boxes with the time need it.
+`formatInputValueFr` in `lib/calendar/time.ts` no longer has a caller; it is left, tested, for the next
+place that wants to print a posted value.
 ## 232 — On desktop, « Planifier un changement » sits beside the compositions' title
 
 **2026-11-19.** The owner: after saving a composition, « the "planifier un changement" banner appears
