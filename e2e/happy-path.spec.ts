@@ -69,7 +69,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { playerOf, provisionFixture } from "./fixtures/provision";
 import type { Fixture, FixturePlayer, FixturePlayerKey } from "./fixtures/types";
-import { MS_PER_MINUTE, discName, login, logout, parisDate, pitch, segment } from "./helpers/app";
+import { MS_PER_MINUTE, discName, fillDate, login, logout, parisDate, pitch, segment } from "./helpers/app";
 
 const OPPONENT = "US Vallonnée";
 
@@ -198,7 +198,7 @@ test("le parcours complet : match, composition, mode match, notation, résumé",
     // A bare Paris wall clock, which is how the app reads a `datetime-local` (decision 013).
     // Tomorrow rather than today: a match still to come whatever hour the suite is run at, so no
     // screen ever has to decide whether the kick-off is behind us.
-    await page.getByLabel("Coup d’envoi").fill(`${parisDate(tomorrow())}T15:00`);
+    await fillDate(page, "Coup d’envoi", `${parisDate(tomorrow())}T15:00`);
     await page.getByRole("button", { name: "Créer le match" }).click();
 
     await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
@@ -1114,7 +1114,7 @@ test("le banc est une cible : un joueur glissé dessus quitte le terrain", async
 
   await page.getByRole("link", { name: "Nouveau match" }).first().click();
   await page.getByLabel("Adversaire").fill(OPPONENT);
-  await page.getByLabel("Coup d’envoi").fill(`${parisDate(tomorrow())}T15:00`);
+  await fillDate(page, "Coup d’envoi", `${parisDate(tomorrow())}T15:00`);
   await page.getByRole("button", { name: "Créer le match" }).click();
   await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
 
@@ -1171,7 +1171,7 @@ test("un changement en groupe : qui sort, qui entre, puis le terrain", async ({ 
   await login(page, fixture.coach.username, fixture.password);
   await page.getByRole("link", { name: "Nouveau match" }).first().click();
   await page.getByLabel("Adversaire").fill(OPPONENT);
-  await page.getByLabel("Coup d’envoi").fill(`${parisDate(tomorrow())}T15:00`);
+  await fillDate(page, "Coup d’envoi", `${parisDate(tomorrow())}T15:00`);
   await page.getByRole("button", { name: "Créer le match" }).click();
   await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
 
@@ -1301,7 +1301,7 @@ test("une compo prévue appliquée en avance : enregistrée à la minute du tap,
   await login(page, fixture.coach.username, fixture.password);
   await page.getByRole("link", { name: "Nouveau match" }).first().click();
   await page.getByLabel("Adversaire").fill(OPPONENT);
-  await page.getByLabel("Coup d’envoi").fill(`${parisDate(tomorrow())}T15:00`);
+  await fillDate(page, "Coup d’envoi", `${parisDate(tomorrow())}T15:00`);
   await page.getByRole("button", { name: "Créer le match" }).click();
   await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
 
@@ -1384,7 +1384,7 @@ test("un match joué sans le téléphone : terminer, saisir, rouvrir", async ({ 
   await page.getByRole("link", { name: "Nouveau match" }).first().click();
   await page.getByLabel("Adversaire").fill(OPPONENT);
   // Three weeks ago: the owner's own case, a match already played that nobody recorded.
-  await page.getByLabel("Coup d’envoi").fill(`${parisDate(threeWeeksAgo())}T15:00`);
+  await fillDate(page, "Coup d’envoi", `${parisDate(threeWeeksAgo())}T15:00`);
   await page.getByRole("button", { name: "Créer le match" }).click();
   await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
   const matchUrl = new URL(page.url()).pathname;
@@ -1494,7 +1494,7 @@ test("un changement ajouté après le match : refusé s’il est impossible, sin
 
   await page.getByRole("link", { name: "Nouveau match" }).first().click();
   await page.getByLabel("Adversaire").fill(OPPONENT);
-  await page.getByLabel("Coup d’envoi").fill(`${parisDate(threeWeeksAgo())}T15:00`);
+  await fillDate(page, "Coup d’envoi", `${parisDate(threeWeeksAgo())}T15:00`);
   await page.getByRole("button", { name: "Créer le match" }).click();
   await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
   const matchUrl = new URL(page.url()).pathname;
@@ -1612,7 +1612,7 @@ test("supprimer un match : la confirmation compte ce qui part, et un joueur ne p
 
   await page.getByRole("link", { name: "Nouveau match" }).first().click();
   await page.getByLabel("Adversaire").fill(OPPONENT);
-  await page.getByLabel("Coup d’envoi").fill(`${parisDate(threeWeeksAgo())}T15:00`);
+  await fillDate(page, "Coup d’envoi", `${parisDate(threeWeeksAgo())}T15:00`);
   await page.getByRole("button", { name: "Créer le match" }).click();
   await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
   const matchUrl = new URL(page.url()).pathname;

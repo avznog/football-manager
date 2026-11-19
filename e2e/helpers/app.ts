@@ -116,3 +116,23 @@ export function parisDateTime(date: Date): string {
   // fr-FR gives `19:12`, which is what the field wants after the `T`.
   return `${parisDate(date)}T${time}`;
 }
+
+/**
+ * Types an ISO value — `2026-11-22` or `2026-11-22T15:00` — into a `DateInput`'s French boxes, found
+ * by its field label (decision 231). The native pickers took `.fill(iso)`; the boxes are a group of
+ * « Jour », « Mois », « Année », « Heure », « Minutes », so this goes through them one by one exactly
+ * as a coach types, auto-advance included, and the suite keeps testing the real UI.
+ */
+export async function fillDate(scope: Page | Locator, label: string, iso: string): Promise<void> {
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/.exec(iso);
+  if (!match) throw new Error(`fillDate: « ${iso} » is not YYYY-MM-DD[THH:mm]`);
+  const [, year, month, day, hour, minute] = match;
+  const group = scope.getByRole("group", { name: label, exact: true });
+  await group.getByRole("textbox", { name: "Jour", exact: true }).fill(day);
+  await group.getByRole("textbox", { name: "Mois", exact: true }).fill(month);
+  await group.getByRole("textbox", { name: "Année", exact: true }).fill(year);
+  if (hour !== undefined && minute !== undefined) {
+    await group.getByRole("textbox", { name: "Heure", exact: true }).fill(hour);
+    await group.getByRole("textbox", { name: "Minutes", exact: true }).fill(minute);
+  }
+}

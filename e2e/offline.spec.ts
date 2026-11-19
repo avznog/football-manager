@@ -52,7 +52,7 @@
 import { expect, test } from "@playwright/test";
 
 import { provisionFixture } from "./fixtures/provision";
-import { MS_PER_MINUTE, login, parisDate } from "./helpers/app";
+import { MS_PER_MINUTE, fillDate, login, parisDate } from "./helpers/app";
 
 const OPPONENT = "AS Sans Réseau";
 
@@ -80,7 +80,7 @@ test("le hors-ligne : les actions tapées sans réseau arrivent une fois chacune
 
     await page.getByRole("link", { name: "Nouveau match" }).first().click();
     await page.getByLabel("Adversaire").fill(OPPONENT);
-    await page.getByLabel("Coup d’envoi").fill(`${parisDate(new Date(t0))}T15:00`);
+    await fillDate(page, "Coup d’envoi", `${parisDate(new Date(t0))}T15:00`);
     await page.getByRole("button", { name: "Créer le match" }).click();
     await expect(page.getByRole("heading", { level: 1, name: OPPONENT })).toBeVisible();
 
