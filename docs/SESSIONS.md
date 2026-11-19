@@ -7836,3 +7836,14 @@ Files: `app/globals.css`, `app/(app)/match/[id]/page.tsx`,
 `app/(app)/match/[id]/saisie/page.tsx`, `app/(app)/match/[id]/saisie/_components/retro-form.tsx`,
 `app/(app)/match/[id]/notation/page.tsx`, `app/(app)/match/[id]/notation/_components/rating-sheet.tsx`,
 `docs/DECISIONS.md` (230), `docs/ROADMAP.md`, `docs/SESSIONS.md`.
+
+### « Planifier un changement » beside the title on desktop
+
+Decision **232**. The compositions page rendered the prompt after every plan, past the fold once the
+plans sit two or three a row; from `lg:` it now sits beside the page title (y 1148 → 157 at
+1440×900). Phone unchanged, proved by building `main` and the fix the same way and diffing the 390 px
+page in both themes. One trap on the way, recorded because it cost a wrong first result: a server left
+running on the capture port served the second build's files underneath its first process, so the
+first comparison was between two different pages — stop servers by PID and check the port is free
+before trusting a capture. Files: `app/(app)/match/[id]/composition/page.tsx`, `docs/DECISIONS.md`
+(232), `docs/SESSIONS.md`.

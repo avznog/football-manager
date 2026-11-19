@@ -9464,3 +9464,17 @@ the primary view fits a 1440 × 900 screen as far as the content allows, and no 
 Checked on a throwaway database by capturing every page and state in both roles and themes at
 390 × 844, 1440 × 900 and 1920 × 1080, before and after; the 1440 × 900 viewport-only contact sheet is
 what the owner reviews.
+
+## 232 — On desktop, « Planifier un changement » sits beside the compositions' title
+
+**2026-11-19.** The owner: after saving a composition, « the "planifier un changement" banner appears
+on the bottom, where as it should appear on the right, or somewhere else, there should not be the need
+to scroll there ». The card is rendered after every plan, and since decision 230 lays the plans out
+two or three a row with card-sized pitches, the bottom of the page is a scroll away — y 1148 at
+1440×900, past the fold — while planning the next change is exactly what a coach does after saving.
+
+From `lg:` a compact copy (the prompt's title and the « Nouvelle composition » button) sits on the
+right of the page header, at y 157; the bottom card is `lg:hidden`. Below `lg:` nothing changes: the
+header and the desktop copy share a wrapper that is a plain block at phone width, the desktop copy is
+`hidden` there, and the card stays at the bottom. Checked by building `main` and the fix the same way
+and diffing the 390 px page: identical in both themes.
